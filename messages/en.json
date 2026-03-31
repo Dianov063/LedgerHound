@@ -1,0 +1,195 @@
+{
+  "nav": {
+    "services": "Services",
+    "cases": "Case Results",
+    "pricing": "Pricing",
+    "about": "About Us",
+    "blog": "Blog",
+    "contact": "Contact",
+    "cta": "Free Evaluation"
+  },
+  "hero": {
+    "badge": "Certified Blockchain Investigators · US-Based",
+    "title": "We Follow\nStolen Crypto\nAnywhere It Goes",
+    "highlight": "Stolen Crypto",
+    "subtitle": "Every transaction leaves a permanent trail on the blockchain. Our certified investigators trace it — and build court-ready evidence for attorneys, fraud victims, and businesses.",
+    "cta_primary": "Get Free Case Evaluation",
+    "cta_secondary": "See How It Works",
+    "note": "Free consultation · 48–72h initial report · No recovery, no fee on select cases"
+  },
+  "trust": {
+    "certified": "CTCE & CFE Certified",
+    "court": "Court-Admissible Reports",
+    "entity": "US Entity · LedgerHound",
+    "speed": "Report in 48–72 Hours",
+    "russian": "Russian-Speaking Team"
+  },
+  "stats": {
+    "illicit": "$158B",
+    "illicit_label": "Illicit crypto flows in 2025",
+    "searches": "50K+",
+    "searches_label": "Monthly US searches for help",
+    "hours": "72h",
+    "hours_label": "Time to first trace report",
+    "chains": "10+",
+    "chains_label": "Blockchains covered incl. DeFi"
+  },
+  "services": {
+    "tag": "What We Do",
+    "title": "Blockchain Forensics\nfor Every Situation",
+    "subtitle": "From romance scams to corporate fraud — we trace cryptocurrency and build actionable intelligence for legal recovery.",
+    "tracing": {
+      "title": "Crypto Asset Tracing",
+      "desc": "We follow funds across Bitcoin, Ethereum, Tron, BNB and other chains. Transaction mapping, cluster analysis, and exchange identification — delivered as a court-ready forensic report.",
+      "tag": "Most Popular"
+    },
+    "litigation": {
+      "title": "Litigation Support",
+      "desc": "Court-ready reports and expert witness services for attorneys. We help legal teams build evidence-backed cases involving fraud, divorce with crypto assets, and business disputes.",
+      "tag": "For Attorneys"
+    },
+    "romance": {
+      "title": "Romance Scam Investigations",
+      "desc": "Pig butchering, fake trading platforms, and love scams. We trace where your funds went and identify the exchanges and individuals responsible.",
+      "tag": "For Victims"
+    },
+    "law_enforcement": {
+      "title": "Law Enforcement Assistance",
+      "desc": "We support criminal investigations with blockchain analysis, subpoena targeting, and OSINT — bridging the gap between technical evidence and legal action.",
+      "tag": "For Agencies"
+    },
+    "corporate": {
+      "title": "Corporate & Business Fraud",
+      "desc": "Employee theft, investment fraud, ransomware payments — we trace internal and external crypto fraud with full chain-of-custody documentation.",
+      "tag": "For Business"
+    },
+    "divorce": {
+      "title": "Divorce & Probate",
+      "desc": "Hidden crypto assets in divorce proceedings or estates. We identify and value undisclosed cryptocurrency holdings to ensure equitable distribution.",
+      "tag": "Family Law"
+    }
+  },
+  "russian_banner": {
+    "title": "Говорим по-русски — без посредников",
+    "desc": "Наша команда проводит консультации на русском языке. Если вы стали жертвой мошенничества с криптовалютой в США — мы готовы помочь разобраться в ситуации.",
+    "cta": "Бесплатная консультация"
+  },
+  "how": {
+    "tag": "Process",
+    "title": "From Scam to\nEvidence in Days",
+    "subtitle": "A clear, transparent process — you always know where your case stands.",
+    "step1_title": "Free Case Evaluation",
+    "step1_desc": "Share your wallet address, transaction IDs, and timeline. We assess traceability and provide an honest opinion within 24 hours — at no charge.",
+    "step2_title": "Forensic Investigation",
+    "step2_desc": "Our certified investigators use professional blockchain intelligence tools to trace fund flows, identify exchange interactions, and map the full transaction chain.",
+    "step3_title": "Report Delivered",
+    "step3_desc": "You receive a detailed forensic report within 48–72 hours: transaction maps, entity attribution, identified exchanges, and recommended legal next steps.",
+    "step4_title": "Legal Action Support",
+    "step4_desc": "We work alongside your attorney or law enforcement, supporting subpoenas, freezing orders, and expert testimony as the case develops."
+  },
+  "cases": {
+    "tag": "Results",
+    "title": "Real Cases.\nReal Evidence.",
+    "subtitle": "Every case is unique. These examples illustrate the type of investigations we conduct and outcomes we've helped achieve.",
+    "case1_type": "Romance Scam · New York",
+    "case1_amount": "$84,000",
+    "case1_desc": "Victim sent funds to a fake trading platform over 6 months. We traced 47 transactions across 4 chains, identifying 2 KYC exchanges in Singapore and Hong Kong.",
+    "case1_result": "Attorney filed freezing order — exchange cooperation obtained",
+    "case2_type": "Divorce Proceeding · California",
+    "case2_amount": "$230,000",
+    "case2_desc": "Spouse claimed crypto was \"lost\". Our forensic analysis located 6 undisclosed wallets and documented full transfer history for court submission.",
+    "case2_result": "Hidden assets identified — case settled in client's favor",
+    "case3_type": "Business Fraud · Texas",
+    "case3_amount": "$310,000",
+    "case3_desc": "Employee diverted company funds via crypto. We traced the complete path from corporate account to cash-out exchange, with full documentation.",
+    "case3_result": "Criminal referral filed · Evidence accepted by DA"
+  },
+  "pricing": {
+    "tag": "Transparent Pricing",
+    "title": "No Hidden Fees.\nKnow What You Pay.",
+    "subtitle": "Unlike most firms, we publish our pricing. Every case starts with a free evaluation — you only pay when we proceed.",
+    "basic_name": "Basic Trace",
+    "basic_price": "$1,500",
+    "basic_period": "flat fee",
+    "basic_desc": "Single blockchain, straightforward transaction trail. Results in 48 hours.",
+    "basic_f1": "Transaction mapping report",
+    "basic_f2": "Exchange identification",
+    "basic_f3": "PDF forensic report",
+    "basic_f4": "1 revision included",
+    "full_name": "Full Investigation",
+    "full_price": "$3,500",
+    "full_period": "flat fee",
+    "full_desc": "Multi-chain, complex cases. Full forensic package for legal proceedings.",
+    "full_badge": "Most Common",
+    "full_f1": "Multi-chain analysis",
+    "full_f2": "OSINT & entity attribution",
+    "full_f3": "Court-ready evidence package",
+    "full_f4": "Attorney consultation included",
+    "full_f5": "Subpoena target identification",
+    "expert_name": "Expert Witness",
+    "expert_price": "Custom",
+    "expert_period": "quote",
+    "expert_desc": "Litigation support, depositions, and court testimony for attorneys.",
+    "expert_f1": "Expert witness report",
+    "expert_f2": "Deposition support",
+    "expert_f3": "Court testimony",
+    "expert_f4": "Attorney co-counsel support",
+    "cta": "Start Free Evaluation",
+    "cta_quote": "Request Quote"
+  },
+  "why": {
+    "tag": "Why Choose Us",
+    "title": "What Makes LedgerHound\nDifferent",
+    "w1_title": "We Publish Our Prices",
+    "w1_desc": "Every competitor hides their fees. We believe you deserve to know costs upfront — no surprises, no pressure calls just to get a quote.",
+    "w2_title": "Free 24-Hour Evaluation",
+    "w2_desc": "Before you spend a dollar, we assess your case for free. You'll know within 24 hours if your funds are traceable and what your realistic options are.",
+    "w3_title": "Russian-Speaking Investigators",
+    "w3_desc": "We're the only US-based crypto forensics firm serving Russian-speaking victims directly. No translators — clear answers in your language.",
+    "w4_title": "Certified & Court-Ready",
+    "w4_desc": "Our investigators hold CTCE and CFE certifications. Every report is structured for legal proceedings — not just informational summaries attorneys can't use.",
+    "w5_title": "Multi-Chain Coverage",
+    "w5_desc": "Bitcoin, Ethereum, Tron, BNB, Solana, Polygon and more. Most firms only cover Bitcoin. We follow your funds wherever they go — including DeFi and mixers.",
+    "w6_title": "Attorney & LE Network",
+    "w6_desc": "We work alongside legal teams and have established relationships with law enforcement. We don't just hand you a report — we help you act on it."
+  },
+  "cta": {
+    "tag": "Get Started",
+    "title": "Your Funds Left a Trail.\nLet's Find It.",
+    "desc": "Start with a free, no-obligation case evaluation. Tell us what happened and we'll give you an honest assessment within 24 hours.",
+    "email_placeholder": "Your email address",
+    "button": "Get Free Evaluation",
+    "privacy": "Confidential. No spam. No obligation. We respond within 24 hours.",
+    "phone_label": "Or call us directly:",
+    "phone": "+1 (800) XXX-XXXX",
+    "russian_label": "Говорите по-русски?",
+    "russian_value": "Мы тоже."
+  },
+  "footer": {
+    "tagline": "Certified blockchain forensics for fraud victims, attorneys, and businesses.",
+    "services": "Services",
+    "company": "Company",
+    "legal": "Legal",
+    "crypto_tracing": "Crypto Asset Tracing",
+    "romance_scams": "Romance Scam Investigations",
+    "divorce": "Divorce & Crypto",
+    "litigation": "Litigation Support",
+    "corporate": "Corporate Fraud",
+    "about": "About Us",
+    "blog": "Blog",
+    "cases": "Case Results",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "disclaimer": "Disclaimer",
+    "copyright": "© 2026 LedgerHound · All Rights Reserved",
+    "legal_note": "Not a law firm. We do not provide legal advice. Forensic investigation services only."
+  },
+  "blog": {
+    "tag": "From Our Blog",
+    "title": "Insights & Guides",
+    "subtitle": "Expert analysis on crypto fraud, blockchain forensics, and asset recovery.",
+    "read_more": "Read Article",
+    "view_all": "View All Articles"
+  }
+}
