@@ -64,7 +64,7 @@ export default function FreeEvaluationPage() {
               <div className="mt-6 flex items-center gap-3 text-sm text-slate-500">
                 <Phone size={14} className="text-brand-500" />
                 <span>Prefer to call?</span>
-                <a href="tel:+18001234567" className="text-brand-600 font-semibold hover:underline">+1 (800) XXX-XXXX</a>
+                <a href="tel:+18335591334" className="text-brand-600 font-semibold hover:underline">+1 (833) 559-1334</a>
                 <span className="text-slate-300">·</span>
                 <span className="text-brand-600 font-semibold">Говорим по-русски</span>
               </div>

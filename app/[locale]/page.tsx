@@ -497,7 +497,7 @@ export default function HomePage() {
 
           <div className="flex items-center justify-center gap-4 flex-wrap text-sm">
             <span className="text-brand-200">{t('cta.phone_label')}</span>
-            <a href="tel:+18001234567" className="text-white font-bold hover:underline">{t('cta.phone')}</a>
+            <a href="tel:+18335591334" className="text-white font-bold hover:underline">{t('cta.phone')}</a>
             <span className="text-brand-300 hidden sm:block">·</span>
             <span className="text-brand-200">{t('cta.russian_label')}</span>
             <span className="text-white font-bold">{t('cta.russian_value')}</span>

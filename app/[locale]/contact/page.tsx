@@ -35,7 +35,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 text-sm mb-0.5">Email</p>
-                    <a href="mailto:contact@ledgerhound.com" className="text-brand-600 hover:underline text-sm">contact@ledgerhound.com</a>
+                    <a href="mailto:contact@ledgerhound.vip" className="text-brand-600 hover:underline text-sm">contact@ledgerhound.vip</a>
                     <p className="text-xs text-slate-400 mt-0.5">We respond within 24 hours</p>
                   </div>
                 </div>
@@ -46,7 +46,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 text-sm mb-0.5">Phone</p>
-                    <a href="tel:+18001234567" className="text-brand-600 hover:underline text-sm">+1 (800) XXX-XXXX</a>
+                    <a href="tel:+18335591334" className="text-brand-600 hover:underline text-sm">+1 (833) 559-1334</a>
                     <p className="text-xs text-slate-400 mt-0.5">Mon–Fri, 9am–6pm EST · Говорим по-русски</p>
                   </div>
                 </div>

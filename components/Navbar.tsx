@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
 import { Menu, X, Globe, ChevronDown } from 'lucide-react';
 import { locales } from '@/i18n';
 
@@ -33,13 +33,8 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
-  const getLocalePath = (newLocale: string) => {
-    const segments = pathname.split('/').filter(Boolean);
-    const isLocaleSegment = locales.includes(segments[0] as any);
-    const pathWithoutLocale = isLocaleSegment ? segments.slice(1) : segments;
-    return newLocale === 'en'
-      ? `/${pathWithoutLocale.join('/')}`
-      : `/${newLocale}${pathWithoutLocale.length ? '/' + pathWithoutLocale.join('/') : ''}`;
+  const switchLocale = (newLocale: string) => {
+    router.replace(pathname, { locale: newLocale });
   };
 
   const navLinks = [
@@ -96,7 +91,7 @@ export default function Navbar() {
                     <button
                       key={l}
                       onClick={() => {
-                        router.push(getLocalePath(l));
+                        switchLocale(l);
                         setLangOpen(false);
                       }}
                       className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-left ${
@@ -150,7 +145,7 @@ export default function Navbar() {
                   <button
                     key={l}
                     onClick={() => {
-                      router.push(getLocalePath(l));
+                      switchLocale(l);
                       setMobileOpen(false);
                     }}
                     className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${

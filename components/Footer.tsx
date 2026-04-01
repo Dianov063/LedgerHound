@@ -44,11 +44,11 @@ export default function Footer() {
             </Link>
             <p className="text-sm leading-relaxed mb-5">{t('tagline')}</p>
             <div className="flex flex-col gap-2 text-sm">
-              <a href="mailto:contact@ledgerhound.com" className="flex items-center gap-2 hover:text-white transition-colors">
-                <Mail size={14} /> contact@ledgerhound.com
+              <a href="mailto:contact@ledgerhound.vip" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Mail size={14} /> contact@ledgerhound.vip
               </a>
-              <a href="tel:+18001234567" className="flex items-center gap-2 hover:text-white transition-colors">
-                <Phone size={14} /> +1 (800) XXX-XXXX
+              <a href="tel:+18335591334" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Phone size={14} /> +1 (833) 559-1334
               </a>
             </div>
           </div>
