@@ -1,12 +1,43 @@
+'use client';
+
+import { useState, FormEvent } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { CheckCircle2, Shield, Clock, Lock, Phone } from 'lucide-react';
+import { CheckCircle2, Shield, Clock, Lock, Phone, AlertCircle, Loader2 } from 'lucide-react';
+
+const FORMSPREE_ID = process.env.NEXT_PUBLIC_FORMSPREE_EVALUATION_ID || '';
 
 export default function FreeEvaluationPage() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus('loading');
+
+    const form = e.currentTarget;
+    const data = new FormData(form);
+
+    try {
+      const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+        method: 'POST',
+        body: data,
+        headers: { Accept: 'application/json' },
+      });
+
+      if (res.ok) {
+        setStatus('success');
+        form.reset();
+      } else {
+        setStatus('error');
+      }
+    } catch {
+      setStatus('error');
+    }
+  }
 
   const whatHappens = [
     { step: '1', title: 'Submit Your Information', desc: 'Fill out the form with your wallet address, transaction details, and a brief description of what happened.' },
@@ -75,102 +106,129 @@ export default function FreeEvaluationPage() {
               <h2 className="font-display font-bold text-2xl text-slate-900 mb-1">Submit Your Case</h2>
               <p className="text-sm text-slate-500 mb-6">Fields marked with * are required</p>
 
-              <form className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">First Name *</label>
-                    <input type="text" required className="input" placeholder="John" />
+              {status === 'success' ? (
+                <div className="text-center py-12">
+                  <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
+                  <h3 className="font-display font-bold text-xl text-slate-900 mb-2">Case Submitted!</h3>
+                  <p className="text-slate-600 text-sm mb-2">A certified investigator will review your case and contact you within 24 hours.</p>
+                  <p className="text-slate-400 text-xs mb-6">Check your email (including spam folder) for our response.</p>
+                  <button onClick={() => setStatus('idle')} className="text-brand-600 text-sm font-semibold hover:underline">
+                    Submit another case
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <input type="hidden" name="_subject" value="New Free Evaluation Request — LedgerHound" />
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">First Name *</label>
+                      <input type="text" name="firstName" required className="input" placeholder="John" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Name *</label>
+                      <input type="text" name="lastName" required className="input" placeholder="Smith" />
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Name *</label>
-                    <input type="text" required className="input" placeholder="Smith" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address *</label>
+                    <input type="email" name="email" required className="input" placeholder="john@example.com" />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address *</label>
-                  <input type="email" required className="input" placeholder="john@example.com" />
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone (optional)</label>
+                    <input type="tel" name="phone" className="input" placeholder="+1 (555) 000-0000" />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone (optional)</label>
-                  <input type="tel" className="input" placeholder="+1 (555) 000-0000" />
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Approximate Amount Lost *</label>
+                    <select name="amountLost" required className="input bg-white">
+                      <option value="">Select range...</option>
+                      <option>Under $10,000</option>
+                      <option>$10,000 – $50,000</option>
+                      <option>$50,000 – $100,000</option>
+                      <option>$100,000 – $500,000</option>
+                      <option>Over $500,000</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Approximate Amount Lost *</label>
-                  <select className="input bg-white">
-                    <option value="">Select range...</option>
-                    <option>Under $10,000</option>
-                    <option>$10,000 – $50,000</option>
-                    <option>$50,000 – $100,000</option>
-                    <option>$100,000 – $500,000</option>
-                    <option>Over $500,000</option>
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Type of Incident *</label>
+                    <select name="incidentType" required className="input bg-white">
+                      <option value="">Select type...</option>
+                      <option>Romance / Pig Butchering Scam</option>
+                      <option>Fake Trading Platform</option>
+                      <option>Hacked Wallet / Exchange</option>
+                      <option>Investment Fraud</option>
+                      <option>Divorce — Hidden Crypto</option>
+                      <option>Business / Employee Theft</option>
+                      <option>Ransomware Payment</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Type of Incident *</label>
-                  <select className="input bg-white">
-                    <option value="">Select type...</option>
-                    <option>Romance / Pig Butchering Scam</option>
-                    <option>Fake Trading Platform</option>
-                    <option>Hacked Wallet / Exchange</option>
-                    <option>Investment Fraud</option>
-                    <option>Divorce — Hidden Crypto</option>
-                    <option>Business / Employee Theft</option>
-                    <option>Ransomware Payment</option>
-                    <option>Other</option>
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Wallet Address or Transaction Hash</label>
+                    <input type="text" name="walletAddress" className="input font-mono text-sm" placeholder="bc1q... or 0x..." />
+                    <p className="text-xs text-slate-400 mt-1">If you don't have this, describe what you do have in the box below.</p>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Wallet Address or Transaction Hash</label>
-                  <input type="text" className="input font-mono text-sm" placeholder="bc1q... or 0x..." />
-                  <p className="text-xs text-slate-400 mt-1">If you don't have this, describe what you do have in the box below.</p>
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Describe What Happened *</label>
+                    <textarea
+                      required
+                      rows={5}
+                      name="description"
+                      className="input resize-none"
+                      placeholder="Tell us what happened: how you met the scammer, what platform was involved, how money was sent, and any other details you have..."
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Describe What Happened *</label>
-                  <textarea
-                    required
-                    rows={5}
-                    className="input resize-none"
-                    placeholder="Tell us what happened: how you met the scammer, what platform was involved, how money was sent, and any other details you have..."
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Language</label>
+                    <select name="language" className="input bg-white">
+                      <option>English</option>
+                      <option>Русский (Russian)</option>
+                      <option>Español (Spanish)</option>
+                      <option>中文 (Chinese)</option>
+                      <option>Français (French)</option>
+                      <option>العربية (Arabic)</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Language</label>
-                  <select className="input bg-white">
-                    <option>English</option>
-                    <option>Русский (Russian)</option>
-                    <option>Español (Spanish)</option>
-                    <option>中文 (Chinese)</option>
-                    <option>Français (French)</option>
-                    <option>العربية (Arabic)</option>
-                  </select>
-                </div>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" id="consent" name="consent" required className="mt-1 accent-brand-600" />
+                    <label htmlFor="consent" className="text-xs text-slate-500 leading-relaxed">
+                      I understand that this is a forensic investigation service, not a law firm, and that LedgerHound does not provide legal advice. I consent to being contacted about my case.
+                    </label>
+                  </div>
 
-                <div className="flex items-start gap-3">
-                  <input type="checkbox" id="consent" required className="mt-1 accent-brand-600" />
-                  <label htmlFor="consent" className="text-xs text-slate-500 leading-relaxed">
-                    I understand that this is a forensic investigation service, not a law firm, and that LedgerHound does not provide legal advice. I consent to being contacted about my case.
-                  </label>
-                </div>
+                  {status === 'error' && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg p-3">
+                      <AlertCircle size={16} />
+                      <span>Something went wrong. Please try again or email us at contact@ledgerhound.vip</span>
+                    </div>
+                  )}
 
-                <button
-                  type="submit"
-                  className="btn-primary w-full justify-center text-base py-3.5"
-                >
-                  Submit Free Evaluation Request
-                </button>
+                  <button
+                    type="submit"
+                    disabled={status === 'loading'}
+                    className="btn-primary w-full justify-center text-base py-3.5 disabled:opacity-60"
+                  >
+                    {status === 'loading' ? (
+                      <><Loader2 size={16} className="animate-spin" /> Submitting...</>
+                    ) : (
+                      'Submit Free Evaluation Request'
+                    )}
+                  </button>
 
-                <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1.5">
-                  <Lock size={11} />
-                  Your information is confidential and encrypted. We respond within 24 hours.
-                </p>
-              </form>
+                  <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1.5">
+                    <Lock size={11} />
+                    Your information is confidential and encrypted. We respond within 24 hours.
+                  </p>
+                </form>
+              )}
             </div>
           </div>
         </div>
