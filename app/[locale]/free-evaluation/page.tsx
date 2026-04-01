@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CheckCircle2, Shield, Clock, Lock, Phone, AlertCircle, Loader2 } from 'lucide-react';
 
-const FORMSPREE_ID = 'mreolrgb';
+const WEB3FORMS_KEY = '823f6807-8207-4f91-8d04-113c27f0b7e0';
 
 export default function FreeEvaluationPage() {
   const locale = useLocale();
@@ -20,12 +20,12 @@ export default function FreeEvaluationPage() {
 
     const form = e.currentTarget;
     const data = new FormData(form);
+    data.append('access_key', WEB3FORMS_KEY);
 
     try {
-      const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+      const res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         body: data,
-        headers: { Accept: 'application/json' },
       });
 
       if (res.ok) {
