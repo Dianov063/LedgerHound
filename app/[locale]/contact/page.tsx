@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Mail, Phone, Clock, Shield, MessageSquare, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
-const FORMSPREE_ID = process.env.NEXT_PUBLIC_FORMSPREE_CONTACT_ID || '';
+const FORMSPREE_ID = 'mreolrgb';
 
 export default function ContactPage() {
   const locale = useLocale();
