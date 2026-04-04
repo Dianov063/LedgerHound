@@ -45,6 +45,7 @@ export default function Navbar() {
     { href: `${prefix}/about`, label: t('about') },
     { href: `${prefix}/blog`, label: t('blog') },
     { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: 'FREE' },
+    { href: `${prefix}/graph-tracer`, label: t('graph'), badge: 'NEW' },
   ];
 
   return (
