@@ -22,7 +22,7 @@ import {
 interface GraphNode {
   id: string;
   label: string;
-  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'intermediate' | 'unknown';
+  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'scam' | 'intermediate' | 'unknown';
   totalIn: number;
   totalOut: number;
   txCount: number;
@@ -50,7 +50,8 @@ const NODE_COLORS: Record<string, string> = {
   source: '#1a7de9',
   exchange: '#00c853',
   mixer: '#ff1744',
-  defi: '#f59e0b',
+  defi: '#7c3aed',
+  scam: '#ff6d00',
   intermediate: '#546e7a',
   unknown: '#546e7a',
 };
@@ -60,6 +61,7 @@ const NODE_SIZES: Record<string, number> = {
   exchange: 35,
   mixer: 35,
   defi: 32,
+  scam: 38,
   intermediate: 25,
   unknown: 25,
 };
@@ -69,6 +71,7 @@ const NODE_LABELS: Record<string, string> = {
   exchange: 'Known Exchange',
   mixer: 'Mixer / High Risk',
   defi: 'DeFi Protocol',
+  scam: 'Flagged / Scam',
   intermediate: 'Unknown Wallet',
   unknown: 'Unknown Wallet',
 };
@@ -77,7 +80,8 @@ const LEGEND_ITEMS = [
   { color: '#1a7de9', label: 'Your Address', emoji: '🔵' },
   { color: '#00c853', label: 'Known Exchange', emoji: '🟢' },
   { color: '#ff1744', label: 'Mixer / High Risk', emoji: '🔴' },
-  { color: '#f59e0b', label: 'DeFi Protocol', emoji: '🟡' },
+  { color: '#7c3aed', label: 'DeFi Protocol', emoji: '🟣' },
+  { color: '#ff6d00', label: 'Flagged / Scam', emoji: '🟠' },
   { color: '#546e7a', label: 'Unknown Wallet', emoji: '⚪' },
 ];
 
@@ -169,6 +173,7 @@ export default function GraphTracer() {
                 const t = ele.data('type');
                 if (t === 'source') return '#93c5fd';
                 if (t === 'mixer') return '#ff616f';
+                if (t === 'scam') return '#ffab40';
                 return 'rgba(255,255,255,0.15)';
               },
               'text-outline-width': 2.5,
