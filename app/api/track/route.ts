@@ -18,31 +18,41 @@ async function fetchTransfers(params: object) {
   return json.result?.transfers || [];
 }
 
+async function fetchForAddress(address: string) {
+  const baseParams = {
+    fromBlock: '0x0',
+    toBlock: 'latest',
+    category: ['external', 'internal', 'erc20', 'erc721', 'erc1155'],
+    withMetadata: true,
+    maxCount: '0x3e8',
+  };
+
+  const [incoming, outgoing] = await Promise.all([
+    fetchTransfers({ ...baseParams, toAddress: address }),
+    fetchTransfers({ ...baseParams, fromAddress: address }),
+  ]);
+
+  const inTagged = incoming.map((tx: any) => ({ ...tx, direction: 'IN', trackedAddress: address }));
+  const outTagged = outgoing.map((tx: any) => ({ ...tx, direction: 'OUT', trackedAddress: address }));
+
+  return [...inTagged, ...outTagged];
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { address } = await req.json();
+    const { addresses } = await req.json();
 
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      return NextResponse.json({ error: 'Invalid Ethereum address' }, { status: 400 });
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+      return NextResponse.json({ error: 'Provide at least one address' }, { status: 400 });
     }
 
-    const baseParams = {
-      fromBlock: '0x0',
-      toBlock: 'latest',
-      category: ['external', 'internal', 'erc20', 'erc721', 'erc1155'],
-      withMetadata: true,
-      maxCount: '0x3e8',
-    };
+    const invalid = addresses.find((a: string) => !/^0x[a-fA-F0-9]{40}$/.test(a));
+    if (invalid) {
+      return NextResponse.json({ error: `Invalid address: ${invalid}` }, { status: 400 });
+    }
 
-    const [incoming, outgoing] = await Promise.all([
-      fetchTransfers({ ...baseParams, toAddress: address }),
-      fetchTransfers({ ...baseParams, fromAddress: address }),
-    ]);
-
-    const inTagged = incoming.map((tx: any) => ({ ...tx, direction: 'IN' }));
-    const outTagged = outgoing.map((tx: any) => ({ ...tx, direction: 'OUT' }));
-
-    const all = [...inTagged, ...outTagged].sort((a, b) => {
+    const results = await Promise.all(addresses.map(fetchForAddress));
+    const all = results.flat().sort((a, b) => {
       const da = a.metadata?.blockTimestamp ? new Date(a.metadata.blockTimestamp).getTime() : 0;
       const db = b.metadata?.blockTimestamp ? new Date(b.metadata.blockTimestamp).getTime() : 0;
       return db - da;
