@@ -24,12 +24,6 @@ const pages = [
 const blogPosts = [
   '/blog/how-to-trace-stolen-bitcoin',
   '/blog/pig-butchering-scam-recovery',
-  '/blog/crypto-divorce-hidden-assets',
-  '/blog/blockchain-evidence-court',
-  '/blog/how-crypto-scammers-launder-money',
-  '/blog/fake-crypto-trading-platforms-2026',
-  '/blog/crypto-ransomware-payment-tracing',
-  '/blog/subpoena-crypto-exchange',
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -55,13 +49,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  // Published blog posts — all locales with hreflang
-  const publishedPosts = [
-    '/blog/how-to-trace-stolen-bitcoin',
-    '/blog/pig-butchering-scam-recovery',
-  ];
-
-  for (const post of publishedPosts) {
+  for (const post of blogPosts) {
     for (const locale of locales) {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
@@ -79,17 +67,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       });
     }
-  }
-
-  // Placeholder blog posts (English only for now)
-  const placeholderPosts = blogPosts.filter((p) => !publishedPosts.includes(p));
-  for (const post of placeholderPosts) {
-    urls.push({
-      url: `${baseUrl}${post}`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    });
   }
 
   return urls;
