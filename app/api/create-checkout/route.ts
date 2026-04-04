@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    console.log('[checkout] Stripe key starts with:', process.env.STRIPE_SECRET_KEY?.slice(0, 12));
+
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -56,6 +58,9 @@ export async function POST(req: NextRequest) {
       success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.nextUrl.origin}/report`,
     });
+
+    console.log('[checkout] Session created:', session.id);
+    console.log('[checkout] Session URL:', session.url?.slice(0, 60));
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
