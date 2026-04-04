@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 import {
   Search, Scale, Heart, Shield, Building2, Users,
   ArrowRight, CheckCircle2, ChevronRight, Star,
-  Clock, FileText, Phone, Lock
+  Clock, FileText, Phone, Lock, BarChart3, Download,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -423,6 +423,45 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── WALLET TRACKER ─── */}
+      <section className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <p className="section-tag">{t('tracker_section.tag')}</p>
+            <h2 className="section-title text-3xl lg:text-4xl mb-4">
+              {t('tracker_section.title')}
+            </h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">{t('tracker_section.subtitle')}</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 mb-10 max-w-4xl mx-auto">
+            {[
+              { icon: Search, key: 'feature1' },
+              { icon: BarChart3, key: 'feature2' },
+              { icon: Download, key: 'feature3' },
+            ].map(({ icon: Icon, key }) => (
+              <div key={key} className="card text-center p-6">
+                <div className="w-12 h-12 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center mx-auto mb-4">
+                  <Icon size={22} className="text-brand-600" />
+                </div>
+                <h3 className="font-display font-bold text-slate-900 mb-2">{t(`tracker_section.${key}_title`)}</h3>
+                <p className="text-sm text-slate-500">{t(`tracker_section.${key}_desc`)}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center">
+            <Link
+              href={`${base}/wallet-tracker`}
+              className="btn-primary text-base px-8 py-3.5"
+            >
+              {t('tracker_section.cta')} <ArrowRight size={16} />
+            </Link>
+            <p className="text-xs text-slate-400 mt-4">{t('tracker_section.note')}</p>
           </div>
         </div>
       </section>

@@ -17,6 +17,7 @@ const pages = [
   { path: '/blog', priority: 0.8, changeFreq: 'daily' },
   { path: '/contact', priority: 0.7, changeFreq: 'monthly' },
   { path: '/free-evaluation', priority: 1.0, changeFreq: 'weekly' },
+  { path: '/wallet-tracker', priority: 0.9, changeFreq: 'weekly' },
 ];
 
 const blogPosts = [

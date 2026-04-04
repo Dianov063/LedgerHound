@@ -37,12 +37,14 @@ export default function Navbar() {
     router.replace(pathname, { locale: newLocale });
   };
 
+  const prefix = locale === 'en' ? '' : `/${locale}`;
   const navLinks = [
-    { href: `/${locale === 'en' ? '' : locale + '/'}services`.replace(/\/$/, ''), label: t('services') },
-    { href: `/${locale === 'en' ? '' : locale + '/'}cases`.replace(/\/$/, ''), label: t('cases') },
-    { href: `/${locale === 'en' ? '' : locale + '/'}pricing`.replace(/\/$/, ''), label: t('pricing') },
-    { href: `/${locale === 'en' ? '' : locale + '/'}about`.replace(/\/$/, ''), label: t('about') },
-    { href: `/${locale === 'en' ? '' : locale + '/'}blog`.replace(/\/$/, ''), label: t('blog') },
+    { href: `${prefix}/services`, label: t('services') },
+    { href: `${prefix}/cases`, label: t('cases') },
+    { href: `${prefix}/pricing`, label: t('pricing') },
+    { href: `${prefix}/about`, label: t('about') },
+    { href: `${prefix}/blog`, label: t('blog') },
+    { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: 'FREE' },
   ];
 
   return (
@@ -65,9 +67,14 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
+                className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors flex items-center gap-1.5"
               >
                 {link.label}
+                {link.badge && (
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             ))}
           </div>

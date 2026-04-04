@@ -13,6 +13,7 @@ export default function Footer() {
     { href: `${base}/services/divorce-crypto`, label: t('divorce') },
     { href: `${base}/services/litigation`, label: t('litigation') },
     { href: `${base}/services/corporate-fraud`, label: t('corporate') },
+    { href: `${base}/wallet-tracker`, label: t('wallet_tracker') },
   ];
 
   const company = [

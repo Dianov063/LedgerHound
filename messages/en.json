@@ -6,6 +6,7 @@
     "about": "About Us",
     "blog": "Blog",
     "contact": "Contact",
+    "tracker": "Wallet Tracker",
     "cta": "Free Evaluation"
   },
   "hero": {
@@ -175,6 +176,7 @@
     "divorce": "Divorce & Crypto",
     "litigation": "Litigation Support",
     "corporate": "Corporate Fraud",
+    "wallet_tracker": "Free Wallet Tracker",
     "about": "About Us",
     "blog": "Blog",
     "cases": "Case Results",
@@ -184,6 +186,19 @@
     "disclaimer": "Disclaimer",
     "copyright": "© 2026 LedgerHound · All Rights Reserved",
     "legal_note": "Not a law firm. We do not provide legal advice. Forensic investigation services only."
+  },
+  "tracker_section": {
+    "tag": "Free Tool",
+    "title": "Free Ethereum Wallet Tracker",
+    "subtitle": "Enter any wallet address and instantly see the complete transaction history — incoming, outgoing, tokens, and NFTs. Used by fraud victims, attorneys, and investigators.",
+    "feature1_title": "Complete Transaction History",
+    "feature1_desc": "Every transfer, token, and NFT movement",
+    "feature2_title": "Instant Analytics",
+    "feature2_desc": "Total received, sent, and transaction count",
+    "feature3_title": "Export to CSV",
+    "feature3_desc": "Download full report for legal proceedings",
+    "cta": "Try Free Wallet Tracker",
+    "note": "No registration required · No limits · Powered by blockchain intelligence"
   },
   "blog": {
     "tag": "From Our Blog",
