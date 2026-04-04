@@ -46,7 +46,8 @@ export default function Footer() {
                 Ledger<span className="text-brand-400">Hound</span>
               </span>
             </Link>
-            <p className="text-sm leading-relaxed mb-5">{t('tagline')}</p>
+            <p className="text-sm leading-relaxed mb-2">{t('tagline')}</p>
+            <p className="text-xs text-slate-500 mb-5">Operating under USPROJECT LLC · EIN 83-3989558 · New York, USA</p>
             <div className="flex flex-col gap-2 text-sm">
               <a href="mailto:contact@ledgerhound.vip" className="flex items-center gap-2 hover:text-white transition-colors">
                 <Mail size={14} /> contact@ledgerhound.vip
@@ -105,9 +106,14 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <p className="text-xs">{t('copyright')}</p>
-          <p className="text-xs text-slate-600 max-w-sm">{t('legal_note')}</p>
+        <div className="border-t border-slate-800 pt-8 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-xs">&copy; 2026 LedgerHound &middot; USPROJECT LLC &middot; All Rights Reserved</p>
+            <p className="text-xs text-slate-500">ledgerhound.vip</p>
+          </div>
+          <p className="text-xs text-slate-600 max-w-2xl">
+            Not a law firm. We do not provide legal advice. Forensic investigation services only. LedgerHound is a brand of USPROJECT LLC.
+          </p>
         </div>
       </div>
     </footer>

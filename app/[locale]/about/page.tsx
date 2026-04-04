@@ -130,13 +130,49 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Entity */}
-      <section className="py-12 bg-slate-50 border-y border-slate-100">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <p className="section-tag">Legal Entity</p>
-          <h2 className="section-title text-2xl mb-3">LedgerHound</h2>
-          <p className="text-slate-600 text-sm leading-relaxed mb-4">LedgerHound is a US-based blockchain forensics firm. All forensic investigations are conducted by certified professionals operating under applicable US law and professional standards.</p>
-          <p className="text-xs text-slate-400">Not a law firm. We do not provide legal advice. Forensic investigation services only.</p>
+      {/* Legal Entity */}
+      <section className="py-16 bg-slate-50 border-y border-slate-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <p className="section-tag">Legal Entity</p>
+            <h2 className="section-title text-3xl">Corporate Information</h2>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
+            <div className="grid sm:grid-cols-2 gap-4 mb-6">
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Company</p>
+                <p className="font-display font-bold text-slate-900">USPROJECT LLC</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">EIN</p>
+                <p className="font-display font-bold text-slate-900">83-3989558</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">State of Formation</p>
+                <p className="font-display font-bold text-slate-900">New York, USA</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">DOS ID</p>
+                <p className="font-display font-bold text-slate-900">5514622</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Website</p>
+                <p className="font-display font-bold text-brand-600">ledgerhound.vip</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Contact</p>
+                <p className="font-display font-bold text-slate-900">contact@ledgerhound.vip</p>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                LedgerHound is a registered brand operating under USPROJECT LLC, a New York limited liability company. All forensic investigations are conducted by certified professionals operating under applicable US law and professional standards.
+              </p>
+              <p className="text-xs text-slate-400 mt-3">
+                Not a law firm. We do not provide legal advice. Forensic investigation services only.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
