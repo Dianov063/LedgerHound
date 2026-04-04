@@ -16,12 +16,13 @@ const blogPosts = [
   },
   {
     slug: 'pig-butchering-scam-recovery',
-    category: 'Case Study',
-    title: 'Pig Butchering Scams: Can Victims Recover Their Funds?',
-    excerpt: 'Pig butchering (shā zhū pán) scams cost victims billions annually. We break down how these schemes work, what forensic investigation can achieve, and real case outcomes.',
-    date: 'March 8, 2026',
-    readTime: '6 min read',
+    category: 'Guide',
+    title: 'Pig Butchering Scams in 2026: What They Are, How They Work, and What To Do',
+    excerpt: 'The most financially devastating form of crypto fraud. $9.3 billion in reported losses in 2024 alone. Learn the full playbook, warning signs, and what to do if you\'re a victim.',
+    date: 'March 15, 2026',
+    readTime: '9 min read',
     featured: true,
+    published: true,
   },
   {
     slug: 'crypto-divorce-hidden-assets',
