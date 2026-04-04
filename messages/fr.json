@@ -22,6 +22,24 @@
   "cta": { "tag": "Commencer", "title": "Vos Fonds ont Laissé une Trace.\nTrouvons-la.", "desc": "Commencez par une évaluation gratuite et sans obligation. Dites-nous ce qui s'est passé et nous vous donnerons une évaluation honnête en 24 heures.", "email_placeholder": "Votre adresse email", "button": "Obtenir une Évaluation Gratuite", "privacy": "Confidentiel. Sans spam. Sans obligation. Nous répondons en 24 heures.", "phone_label": "Ou appelez-nous directement:", "phone": "+1 (833) 559-1334", "russian_label": "Vous parlez russe?", "russian_value": "Nous aussi." },
   "footer": { "tagline": "Forensique blockchain certifiée pour victimes de fraude, avocats et entreprises.", "services": "Services", "company": "Entreprise", "legal": "Mentions Légales", "crypto_tracing": "Traçage d'Actifs Crypto", "romance_scams": "Arnaques Romantiques", "divorce": "Divorce et Crypto", "litigation": "Soutien aux Litiges", "corporate": "Fraude d'Entreprise", "wallet_tracker": "Suivi Gratuit de Portefeuille", "graph_tracer": "Graphe de Transactions", "about": "À propos", "blog": "Blog", "cases": "Cas", "contact": "Contact", "privacy": "Politique de Confidentialité", "terms": "Conditions de Service", "disclaimer": "Avis de non-responsabilité", "copyright": "© 2026 LedgerHound · Tous droits réservés", "legal_note": "Pas un cabinet d'avocats. Nous ne fournissons pas de conseils juridiques. Services d'enquête forensique uniquement." },
   "tracker_section": { "tag": "Outil Gratuit", "title": "Suivi Gratuit de Portefeuille Ethereum", "subtitle": "Entrez n'importe quelle adresse de portefeuille et voyez instantanément l'historique complet des transactions — entrantes, sortantes, tokens et NFTs. Utilisé par les victimes de fraude, avocats et enquêteurs.", "feature1_title": "Historique Complet des Transactions", "feature1_desc": "Chaque transfert, token et mouvement NFT", "feature2_title": "Analyses Instantanées", "feature2_desc": "Total reçu, envoyé et nombre de transactions", "feature3_title": "Export CSV", "feature3_desc": "Téléchargez le rapport complet pour les procédures judiciaires", "cta": "Essayer le Suivi Gratuit", "note": "Sans inscription · Sans limites · Propulsé par l'intelligence blockchain" },
+  "graph_page": {
+    "badge": "Outil Gratuit d'Intelligence Blockchain",
+    "title": "Graphe de Flux de",
+    "title_highlight": "Transactions",
+    "subtitle": "Entrez n'importe quelle adresse Ethereum pour visualiser le flux complet des fonds. Notre outil identifie les exchanges, mixeurs et protocoles DeFi — cartographiant les transactions multi-sauts en temps réel. Utilisé par les enquêteurs, avocats et forces de l'ordre.",
+    "cta_title": "Besoin d'une enquête forensique professionnelle?",
+    "cta_desc": "Nos enquêteurs certifiés créent des rapports pour tribunal avec attribution complète d'entités et documentation de chaîne de custody. Évaluation gratuite — sans obligation.",
+    "cta_btn": "Obtenir une Évaluation Gratuite"
+  },
+  "tracker_page": {
+    "badge": "Outil Gratuit de Forensique Blockchain",
+    "title": "Suivi Gratuit de Portefeuille",
+    "title_highlight": "Ethereum",
+    "subtitle": "Entrez n'importe quelle adresse de portefeuille Ethereum pour voir son historique complet sur la chaîne. Notre outil montre toutes les transactions entrantes et sortantes, les transferts de tokens ERC-20, les mouvements NFT et le volume total. Utilisé par les victimes de fraude, avocats et enquêteurs.",
+    "cta_title": "Besoin d'aide pour tracer ces fonds professionnellement?",
+    "cta_desc": "Nos enquêteurs certifiés créent des rapports pour tribunal avec documentation complète de chaîne de custody. Évaluation gratuite — sans obligation.",
+    "cta_btn": "Obtenir une Évaluation Gratuite"
+  },
   "graph": {
     "placeholder": "Entrez une adresse Ethereum (0x...)",
     "depth": "Profondeur",

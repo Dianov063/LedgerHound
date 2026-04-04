@@ -22,6 +22,24 @@
   "cta": { "tag": "开始", "title": "您的资金留下了痕迹。\n让我们找到它。", "desc": "从免费、无义务的案例评估开始。告诉我们发生了什么，我们将在24小时内给出诚实的评估。", "email_placeholder": "您的电子邮件地址", "button": "获取免费评估", "privacy": "保密。无垃圾邮件。无义务。我们在24小时内回复。", "phone_label": "或直接致电我们：", "phone": "+1 (833) 559-1334", "russian_label": "说俄语吗？", "russian_value": "我们也说。" },
   "footer": { "tagline": "为欺诈受害者、律师和企业提供认证区块链取证。", "services": "服务", "company": "公司", "legal": "法律", "crypto_tracing": "加密资产追踪", "romance_scams": "浪漫骗局调查", "divorce": "离婚与加密", "litigation": "诉讼支持", "corporate": "企业欺诈", "wallet_tracker": "免费钱包追踪器", "graph_tracer": "交易图谱", "about": "关于我们", "blog": "博客", "cases": "案例", "contact": "联系", "privacy": "隐私政策", "terms": "服务条款", "disclaimer": "免责声明", "copyright": "© 2026 LedgerHound · 版权所有", "legal_note": "非律师事务所。我们不提供法律建议。仅提供法证调查服务。" },
   "tracker_section": { "tag": "免费工具", "title": "免费以太坊钱包追踪器", "subtitle": "输入任何钱包地址，即时查看完整交易历史——入账、出账、代币和NFT。被欺诈受害者、律师和调查人员使用。", "feature1_title": "完整交易历史", "feature1_desc": "每笔转账、代币和NFT变动", "feature2_title": "即时分析", "feature2_desc": "总接收、发送和交易计数", "feature3_title": "导出CSV", "feature3_desc": "下载完整报告用于法律程序", "cta": "试用免费钱包追踪器", "note": "无需注册 · 无限制 · 区块链智能驱动" },
+  "graph_page": {
+    "badge": "免费区块链情报工具",
+    "title": "交易流向",
+    "title_highlight": "图谱",
+    "subtitle": "输入任何以太坊地址，可视化完整资金流向。我们的图谱追踪器识别交易所、混币器和DeFi协议——实时映射多跳交易。被欺诈调查员、律师和执法机构使用。",
+    "cta_title": "需要专业的法证调查？",
+    "cta_desc": "我们的认证调查员编制法庭报告，包含完整的实体归属和监管链文档。免费案例评估——无义务。",
+    "cta_btn": "获取免费评估"
+  },
+  "tracker_page": {
+    "badge": "免费区块链取证工具",
+    "title": "免费以太坊钱包",
+    "title_highlight": "追踪器",
+    "subtitle": "输入任何以太坊钱包地址，查看完整的链上历史记录。我们的区块链取证工具显示所有入账和出账交易、ERC-20代币转账、NFT变动和总交易量。被欺诈受害者、律师和调查人员使用。",
+    "cta_title": "需要专业追踪这些资金？",
+    "cta_desc": "我们的认证调查员编制法庭报告，包含完整的监管链文档。免费案例评估——无义务。",
+    "cta_btn": "获取免费评估"
+  },
   "graph": {
     "placeholder": "输入以太坊地址 (0x...)",
     "depth": "深度",

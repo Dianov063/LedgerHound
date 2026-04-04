@@ -178,6 +178,24 @@
     "cta": "Probar Rastreador Gratuito",
     "note": "Sin registro · Sin límites · Impulsado por inteligencia blockchain"
   },
+  "graph_page": {
+    "badge": "Herramienta Gratuita de Inteligencia Blockchain",
+    "title": "Grafo de Flujo de",
+    "title_highlight": "Transacciones",
+    "subtitle": "Ingrese cualquier dirección Ethereum para visualizar el flujo completo de fondos. Nuestro rastreador identifica exchanges, mixers y protocolos DeFi — mapeando transacciones multi-salto en tiempo real. Usado por investigadores de fraude, abogados y fuerzas del orden.",
+    "cta_title": "¿Necesita una investigación forense profesional?",
+    "cta_desc": "Nuestros investigadores certificados crean informes para tribunal con atribución completa de entidades y documentación de cadena de custodia. Evaluación gratuita — sin obligación.",
+    "cta_btn": "Obtener Evaluación Gratuita"
+  },
+  "tracker_page": {
+    "badge": "Herramienta Gratuita de Forensia Blockchain",
+    "title": "Rastreador Gratuito de Billeteras",
+    "title_highlight": "Ethereum",
+    "subtitle": "Ingrese cualquier dirección de billetera Ethereum para ver su historial completo en la cadena. Nuestra herramienta muestra todas las transacciones entrantes y salientes, transferencias de tokens ERC-20, movimientos de NFT y volumen total. Usado por víctimas de fraude, abogados e investigadores.",
+    "cta_title": "¿Necesita ayuda rastreando estos fondos profesionalmente?",
+    "cta_desc": "Nuestros investigadores certificados crean informes para tribunal con documentación completa de cadena de custodia. Evaluación gratuita — sin obligación.",
+    "cta_btn": "Obtener Evaluación Gratuita"
+  },
   "graph": {
     "placeholder": "Ingrese dirección Ethereum (0x...)",
     "depth": "Profundidad",

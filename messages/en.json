@@ -202,6 +202,24 @@
     "cta": "Try Free Wallet Tracker",
     "note": "No registration required · No limits · Powered by blockchain intelligence"
   },
+  "graph_page": {
+    "badge": "Free Blockchain Intelligence Tool",
+    "title": "Transaction Flow",
+    "title_highlight": "Graph",
+    "subtitle": "Enter any Ethereum address to visualize the complete flow of funds. Our graph tracer identifies exchanges, mixers, and DeFi protocols — mapping multi-hop transactions in real time. Used by fraud investigators, attorneys, and law enforcement.",
+    "cta_title": "Need a professional forensic investigation?",
+    "cta_desc": "Our certified investigators build court-ready reports with full entity attribution and chain-of-custody documentation. Free case evaluation — no obligation.",
+    "cta_btn": "Get Free Case Evaluation"
+  },
+  "tracker_page": {
+    "badge": "Free Blockchain Forensics Tool",
+    "title": "Free Ethereum Wallet",
+    "title_highlight": "Tracker",
+    "subtitle": "Enter any Ethereum wallet address below to view its complete on-chain history. Our blockchain forensics tool shows all incoming and outgoing transactions, ERC-20 token transfers, NFT movements, and total volume. Used by fraud investigators, attorneys, and crypto fraud victims to trace stolen funds.",
+    "cta_title": "Need help tracing these funds professionally?",
+    "cta_desc": "Our certified investigators build court-ready reports with full chain-of-custody documentation. Free case evaluation — no obligation.",
+    "cta_btn": "Get Free Case Evaluation"
+  },
   "graph": {
     "placeholder": "Enter Ethereum address (0x...)",
     "depth": "Depth",
