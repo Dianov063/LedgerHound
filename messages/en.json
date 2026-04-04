@@ -9,6 +9,7 @@
     "tracker": "Wallet Tracker",
     "graph": "Graph Tracer",
     "calculator": "Recovery Calculator",
+    "report": "Wallet Report",
     "cta": "Free Evaluation"
   },
   "hero": {
@@ -189,7 +190,8 @@
     "disclaimer": "Disclaimer",
     "copyright": "© 2026 LedgerHound · All Rights Reserved",
     "legal_note": "Not a law firm. We do not provide legal advice. Forensic investigation services only.",
-    "recovery_calculator": "Recovery Calculator"
+    "recovery_calculator": "Recovery Calculator",
+    "wallet_report": "Wallet Report"
   },
   "tracker_section": {
     "tag": "Free Tool",
@@ -333,5 +335,49 @@
     "cta_page_title": "Not Sure Where to Start?",
     "cta_page_desc": "Get a free, confidential case evaluation from our blockchain forensics team. We'll review your situation and give you an honest assessment of your recovery options.",
     "cta_page_btn": "Get Free Evaluation"
+  },
+  "report": {
+    "badge": "Instant Delivery",
+    "title": "Forensic Wallet",
+    "title_highlight": "Report — $49",
+    "subtitle": "Get an automated blockchain forensic report for any Ethereum wallet. Risk scoring, transaction analysis, entity identification, and legal recommendations — delivered to your email in minutes.",
+    "wallet_label": "Ethereum Wallet Address",
+    "wallet_placeholder": "0x...",
+    "email_label": "Your Email Address",
+    "email_placeholder": "you@example.com",
+    "buy_btn": "Get Instant Report — $49",
+    "secure_note": "Secure payment via Stripe. Report delivered to your email.",
+    "whats_included": "What's Included",
+    "include_1": "Risk Score (0–100) with threat assessment",
+    "include_2": "Complete transaction history analysis",
+    "include_3": "Known entity identification (exchanges, mixers, DeFi)",
+    "include_4": "Top counterparty address mapping",
+    "include_5": "Wallet activity timeline and volume analytics",
+    "include_6": "Mixer and privacy tool detection",
+    "include_7": "Legal recommendations and subpoena targets",
+    "include_8": "Court-ready PDF format with case ID",
+    "sample_title": "Professional-Grade Analysis",
+    "sample_desc": "Each report includes 7 pages of detailed forensic analysis, generated using the same blockchain intelligence tools used by professional investigators. Suitable for attorney review, insurance claims, and law enforcement referrals.",
+    "faq_title": "Frequently Asked Questions",
+    "faq_1_q": "How fast will I receive my report?",
+    "faq_1_a": "Reports are generated automatically and delivered to your email within 2–5 minutes after payment.",
+    "faq_2_q": "Is this a certified forensic investigation?",
+    "faq_2_a": "This is an automated preliminary analysis. For certified, court-ready forensic investigations with expert testimony, contact us for a full engagement.",
+    "faq_3_q": "Which blockchains are supported?",
+    "faq_3_a": "Currently Ethereum and ERC-20 tokens. Bitcoin and other chain support coming soon.",
+    "faq_4_q": "Can I use this report in court?",
+    "faq_4_a": "This report provides factual blockchain data suitable for preliminary review. For court submissions, we recommend our certified forensic investigation service.",
+    "success_title": "Your Report Is Being Generated!",
+    "success_subtitle": "Check your email in 2–3 minutes. The report will be delivered as a PDF attachment.",
+    "success_email": "Report will be sent to:",
+    "success_meanwhile": "While You Wait",
+    "success_try_tools": "Try Our Free Tools",
+    "success_try_tools_desc": "Explore wallet transactions and fund flows with our free blockchain tools.",
+    "success_need_more": "Need a Full Investigation?",
+    "success_need_more_desc": "Our certified forensic team can provide court-ready reports with expert testimony.",
+    "success_cta": "Get Free Evaluation",
+    "cta_title": "Need a Certified Investigation?",
+    "cta_desc": "Automated reports are a great starting point. For complex cases requiring court testimony, certified methodology, and attorney support — our forensic team is ready.",
+    "cta_btn": "Contact Our Team"
   }
 }

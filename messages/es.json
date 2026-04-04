@@ -9,6 +9,7 @@
     "tracker": "Rastreador de Billeteras",
     "graph": "Grafo de Transacciones",
     "calculator": "Calculadora de Recuperación",
+    "report": "Informe de Billetera",
     "cta": "Evaluación Gratuita"
   },
   "hero": {
@@ -165,7 +166,8 @@
     "disclaimer": "Aviso Legal",
     "copyright": "© 2026 LedgerHound · Todos los derechos reservados",
     "legal_note": "No es un bufete de abogados. No brindamos asesoramiento legal. Solo servicios de investigación forense.",
-    "recovery_calculator": "Calculadora de Recuperación"
+    "recovery_calculator": "Calculadora de Recuperación",
+    "wallet_report": "Informe de Billetera"
   },
   "tracker_section": {
     "tag": "Herramienta Gratuita",
@@ -309,5 +311,49 @@
     "cta_page_title": "¿No sabe por dónde empezar?",
     "cta_page_desc": "Obtenga una evaluación de caso gratuita y confidencial de nuestro equipo de forensia blockchain. Revisaremos su situación y le daremos una evaluación honesta de sus opciones de recuperación.",
     "cta_page_btn": "Obtener Evaluación Gratuita"
+  },
+  "report": {
+    "badge": "Entrega Inmediata",
+    "title": "Informe Forense",
+    "title_highlight": "de Billetera — $49",
+    "subtitle": "Obtenga un informe forense automatizado de blockchain para cualquier billetera Ethereum. Puntuación de riesgo, análisis de transacciones, identificación de entidades y recomendaciones legales — entregado a su correo electrónico en minutos.",
+    "wallet_label": "Dirección de Billetera Ethereum",
+    "wallet_placeholder": "0x...",
+    "email_label": "Su Dirección de Correo Electrónico",
+    "email_placeholder": "you@example.com",
+    "buy_btn": "Obtener Informe Instantáneo — $49",
+    "secure_note": "Pago seguro a través de Stripe. Informe entregado a su correo electrónico.",
+    "whats_included": "Qué Incluye",
+    "include_1": "Puntuación de riesgo (0–100) con evaluación de amenazas",
+    "include_2": "Análisis completo del historial de transacciones",
+    "include_3": "Identificación de entidades conocidas (exchanges, mixers, DeFi)",
+    "include_4": "Mapeo de principales direcciones de contraparte",
+    "include_5": "Cronología de actividad de la billetera y análisis de volumen",
+    "include_6": "Detección de mixers y herramientas de privacidad",
+    "include_7": "Recomendaciones legales y objetivos para citaciones",
+    "include_8": "Formato PDF listo para tribunal con ID de caso",
+    "sample_title": "Análisis de Nivel Profesional",
+    "sample_desc": "Cada informe incluye 7 páginas de análisis forense detallado, generado utilizando las mismas herramientas de inteligencia blockchain que usan los investigadores profesionales. Apto para revisión de abogados, reclamaciones de seguros y derivaciones a las fuerzas del orden.",
+    "faq_title": "Preguntas Frecuentes",
+    "faq_1_q": "¿Qué tan rápido recibiré mi informe?",
+    "faq_1_a": "Los informes se generan automáticamente y se entregan a su correo electrónico en 2–5 minutos después del pago.",
+    "faq_2_q": "¿Es esto una investigación forense certificada?",
+    "faq_2_a": "Este es un análisis preliminar automatizado. Para investigaciones forenses certificadas y listas para tribunal con testimonio experto, contáctenos para un servicio completo.",
+    "faq_3_q": "¿Qué blockchains son compatibles?",
+    "faq_3_a": "Actualmente Ethereum y tokens ERC-20. Soporte para Bitcoin y otras cadenas próximamente.",
+    "faq_4_q": "¿Puedo usar este informe en un tribunal?",
+    "faq_4_a": "Este informe proporciona datos factuales de blockchain adecuados para revisión preliminar. Para presentaciones ante el tribunal, recomendamos nuestro servicio de investigación forense certificada.",
+    "success_title": "¡Su Informe Se Está Generando!",
+    "success_subtitle": "Revise su correo electrónico en 2–3 minutos. El informe se entregará como archivo PDF adjunto.",
+    "success_email": "El informe se enviará a:",
+    "success_meanwhile": "Mientras Espera",
+    "success_try_tools": "Pruebe Nuestras Herramientas Gratuitas",
+    "success_try_tools_desc": "Explore transacciones de billeteras y flujos de fondos con nuestras herramientas blockchain gratuitas.",
+    "success_need_more": "¿Necesita una Investigación Completa?",
+    "success_need_more_desc": "Nuestro equipo forense certificado puede proporcionar informes listos para tribunal con testimonio experto.",
+    "success_cta": "Obtener Evaluación Gratuita",
+    "cta_title": "¿Necesita una Investigación Certificada?",
+    "cta_desc": "Los informes automatizados son un excelente punto de partida. Para casos complejos que requieren testimonio judicial, metodología certificada y apoyo de abogados — nuestro equipo forense está listo.",
+    "cta_btn": "Contactar a Nuestro Equipo"
   }
 }
