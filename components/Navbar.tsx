@@ -46,6 +46,7 @@ export default function Navbar() {
     { href: `${prefix}/blog`, label: t('blog') },
     { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: 'FREE' },
     { href: `${prefix}/graph-tracer`, label: t('graph'), badge: 'NEW' },
+    { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: 'NEW' },
   ];
 
   return (

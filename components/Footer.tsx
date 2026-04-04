@@ -15,6 +15,7 @@ export default function Footer() {
     { href: `${base}/services/corporate-fraud`, label: t('corporate') },
     { href: `${base}/wallet-tracker`, label: t('wallet_tracker') },
     { href: `${base}/graph-tracer`, label: t('graph_tracer') },
+    { href: `${base}/recovery-calculator`, label: t('recovery_calculator') },
   ];
 
   const company = [
