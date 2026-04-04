@@ -47,35 +47,59 @@ interface GraphData {
 }
 
 const NODE_COLORS: Record<string, string> = {
-  source: '#6366f1',
-  exchange: '#22c55e',
-  mixer: '#ef4444',
+  source: '#1a7de9',
+  exchange: '#00c853',
+  mixer: '#ff1744',
   defi: '#f59e0b',
-  intermediate: '#64748b',
-  unknown: '#94a3b8',
+  intermediate: '#546e7a',
+  unknown: '#546e7a',
+};
+
+const NODE_SIZES: Record<string, number> = {
+  source: 45,
+  exchange: 35,
+  mixer: 35,
+  defi: 32,
+  intermediate: 25,
+  unknown: 25,
 };
 
 const NODE_LABELS: Record<string, string> = {
-  source: 'Source',
-  exchange: 'Exchange',
-  mixer: 'Mixer',
-  defi: 'DeFi',
-  intermediate: 'Intermediate',
-  unknown: 'Unknown',
+  source: 'Your Address',
+  exchange: 'Known Exchange',
+  mixer: 'Mixer / High Risk',
+  defi: 'DeFi Protocol',
+  intermediate: 'Unknown Wallet',
+  unknown: 'Unknown Wallet',
 };
+
+const LEGEND_ITEMS = [
+  { color: '#1a7de9', label: 'Your Address', emoji: '🔵' },
+  { color: '#00c853', label: 'Known Exchange', emoji: '🟢' },
+  { color: '#ff1744', label: 'Mixer / High Risk', emoji: '🔴' },
+  { color: '#f59e0b', label: 'DeFi Protocol', emoji: '🟡' },
+  { color: '#546e7a', label: 'Unknown Wallet', emoji: '⚪' },
+];
+
+const LOADING_STEPS = [
+  'Step 1/3: Fetching transactions...',
+  'Step 2/3: Building graph...',
+  'Step 3/3: Identifying entities...',
+];
 
 export default function GraphTracer() {
   const t = useTranslations('graph');
   const [address, setAddress] = useState('');
   const [depth, setDepth] = useState(2);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState('');
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState('');
   const [data, setData] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [layout, setLayout] = useState<'breadthfirst' | 'cose'>('breadthfirst');
   const cyRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sourceAddressRef = useRef<string>('');
 
   const initCytoscape = useCallback(
     async (graphData: GraphData) => {
@@ -87,6 +111,7 @@ export default function GraphTracer() {
         cyRef.current.destroy();
       }
 
+      const sourceAddr = sourceAddressRef.current;
       const elements: any[] = [];
 
       for (const node of graphData.nodes) {
@@ -105,6 +130,8 @@ export default function GraphTracer() {
 
       for (let i = 0; i < graphData.edges.length; i++) {
         const edge = graphData.edges[i];
+        const isOutgoing = edge.source === sourceAddr;
+        const isIncoming = edge.target === sourceAddr;
         elements.push({
           group: 'edges',
           data: {
@@ -116,6 +143,7 @@ export default function GraphTracer() {
             hash: edge.hash,
             timestamp: edge.timestamp,
             label: `${edge.value?.toFixed(4) || '0'} ${edge.token}`,
+            edgeType: isOutgoing ? 'outgoing' : isIncoming ? 'incoming' : 'neutral',
           },
         });
       }
@@ -130,42 +158,57 @@ export default function GraphTracer() {
               label: 'data(label)',
               'text-valign': 'bottom',
               'text-halign': 'center',
-              'font-size': '10px',
+              'font-size': '12px',
               color: '#e2e8f0',
-              'text-margin-y': 8,
-              'background-color': (ele: any) => NODE_COLORS[ele.data('type')] || '#94a3b8',
-              width: (ele: any) => Math.max(25, Math.min(60, 25 + ele.data('txCount') * 3)),
-              height: (ele: any) => Math.max(25, Math.min(60, 25 + ele.data('txCount') * 3)),
-              'border-width': (ele: any) => (ele.data('type') === 'source' ? 3 : 1),
-              'border-color': (ele: any) =>
-                ele.data('type') === 'source' ? '#a5b4fc' : 'rgba(255,255,255,0.1)',
-              'text-outline-width': 2,
+              'text-margin-y': 10,
+              'background-color': (ele: any) => NODE_COLORS[ele.data('type')] || '#546e7a',
+              width: (ele: any) => NODE_SIZES[ele.data('type')] || 25,
+              height: (ele: any) => NODE_SIZES[ele.data('type')] || 25,
+              'border-width': (ele: any) => (ele.data('type') === 'source' ? 4 : 2),
+              'border-color': (ele: any) => {
+                const t = ele.data('type');
+                if (t === 'source') return '#93c5fd';
+                if (t === 'mixer') return '#ff616f';
+                return 'rgba(255,255,255,0.15)';
+              },
+              'text-outline-width': 2.5,
               'text-outline-color': '#0f172a',
               'text-wrap': 'ellipsis',
-              'text-max-width': '80px',
+              'text-max-width': '100px',
             } as any,
           },
           {
             selector: 'edge',
             style: {
-              width: (ele: any) => Math.max(1, Math.min(5, ele.data('value') * 0.5)),
-              'line-color': '#475569',
-              'target-arrow-color': '#475569',
+              width: (ele: any) => Math.max(2, Math.min(6, 2 + (ele.data('value') || 0) * 0.3)),
+              'line-color': (ele: any) => {
+                const et = ele.data('edgeType');
+                if (et === 'outgoing') return '#ef4444';
+                if (et === 'incoming') return '#22c55e';
+                return '#475569';
+              },
+              'target-arrow-color': (ele: any) => {
+                const et = ele.data('edgeType');
+                if (et === 'outgoing') return '#ef4444';
+                if (et === 'incoming') return '#22c55e';
+                return '#475569';
+              },
               'target-arrow-shape': 'triangle',
+              'arrow-scale': 1.3,
               'curve-style': 'bezier',
-              opacity: 0.6,
+              opacity: 0.7,
               label: 'data(label)',
-              'font-size': '8px',
+              'font-size': '10px',
               color: '#94a3b8',
               'text-rotation': 'autorotate',
-              'text-outline-width': 1.5,
+              'text-outline-width': 2,
               'text-outline-color': '#0f172a',
             } as any,
           },
           {
             selector: 'node:selected',
             style: {
-              'border-width': 3,
+              'border-width': 4,
               'border-color': '#6366f1',
               'overlay-color': '#6366f1',
               'overlay-opacity': 0.15,
@@ -174,7 +217,7 @@ export default function GraphTracer() {
           {
             selector: 'node.highlighted',
             style: {
-              'border-width': 3,
+              'border-width': 4,
               'border-color': '#f59e0b',
             },
           },
@@ -184,28 +227,36 @@ export default function GraphTracer() {
               'line-color': '#f59e0b',
               'target-arrow-color': '#f59e0b',
               opacity: 1,
-              width: 3,
+              width: 4,
             },
           },
         ] as any,
         layout: {
           name: layout === 'breadthfirst' ? 'breadthfirst' : 'cose',
           directed: true,
-          padding: 40,
-          spacingFactor: 1.5,
+          padding: 80,
+          spacingFactor: 1.8,
           animate: true,
           animationDuration: 500,
-          ...(layout === 'cose'
+          ...(layout === 'breadthfirst'
             ? {
-                nodeRepulsion: () => 8000,
-                idealEdgeLength: () => 100,
-                gravity: 0.5,
+                roots: `#${sourceAddr}`,
               }
-            : {}),
+            : {
+                nodeRepulsion: () => 10000,
+                idealEdgeLength: () => 120,
+                gravity: 0.4,
+                padding: 80,
+              }),
         } as any,
-        minZoom: 0.2,
+        minZoom: 0.15,
         maxZoom: 3,
         wheelSensitivity: 0.3,
+      });
+
+      // Fit after layout finishes
+      cy.on('layoutstop', () => {
+        cy.fit(undefined, 60);
       });
 
       cy.on('tap', 'node', (evt: any) => {
@@ -248,7 +299,12 @@ export default function GraphTracer() {
     setError('');
     setData(null);
     setSelectedNode(null);
-    setProgress(t('progress_hop', { current: 1, total: depth }));
+    sourceAddressRef.current = address.toLowerCase();
+
+    // Animate loading steps
+    setLoadingStep(0);
+    const stepTimer1 = setTimeout(() => setLoadingStep(1), 2000);
+    const stepTimer2 = setTimeout(() => setLoadingStep(2), 5000);
 
     try {
       const res = await fetch('/api/trace-graph', {
@@ -260,18 +316,22 @@ export default function GraphTracer() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Trace failed');
 
+      setLoadingStep(2);
+      await new Promise((r) => setTimeout(r, 500));
       setData(json);
-      setProgress('');
     } catch (err: any) {
       setError(err.message || t('error_failed'));
     } finally {
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
       setLoading(false);
+      setLoadingStep(0);
     }
   };
 
   const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.3);
   const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() / 1.3);
-  const handleFit = () => cyRef.current?.fit(undefined, 40);
+  const handleFit = () => cyRef.current?.fit(undefined, 60);
 
   const handleExportPNG = () => {
     if (!cyRef.current) return;
@@ -349,15 +409,6 @@ export default function GraphTracer() {
               {error}
             </div>
           )}
-
-          {loading && progress && (
-            <div className="mt-4 flex items-center gap-3">
-              <div className="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
-                <div className="bg-indigo-500 h-full rounded-full animate-pulse" style={{ width: '60%' }} />
-              </div>
-              <span className="text-slate-400 text-xs whitespace-nowrap">{progress}</span>
-            </div>
-          )}
         </div>
 
         {/* Graph Area */}
@@ -365,9 +416,9 @@ export default function GraphTracer() {
           <div
             ref={containerRef}
             className={`bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all ${
-              data ? 'h-[600px]' : 'h-[400px]'
+              data ? 'h-[650px]' : 'h-[400px]'
             }`}
-            style={{ minHeight: data ? 600 : 400 }}
+            style={{ minHeight: data ? 650 : 400 }}
           >
             {!data && !loading && (
               <div className="flex items-center justify-center h-full">
@@ -379,10 +430,26 @@ export default function GraphTracer() {
             )}
             {loading && !data && (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Loader2 size={40} className="mx-auto text-indigo-500 mb-4 animate-spin" />
-                  <p className="text-slate-400 text-sm">{t('loading')}</p>
-                  <p className="text-slate-600 text-xs mt-1">{progress}</p>
+                <div className="text-center max-w-xs">
+                  <Loader2 size={40} className="mx-auto text-indigo-500 mb-6 animate-spin" />
+                  <div className="space-y-3">
+                    {LOADING_STEPS.map((step, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold transition-all duration-300 ${
+                          i < loadingStep ? 'bg-emerald-500 text-white' :
+                          i === loadingStep ? 'bg-indigo-500 text-white animate-pulse' :
+                          'bg-slate-800 text-slate-600'
+                        }`}>
+                          {i < loadingStep ? '✓' : i + 1}
+                        </div>
+                        <span className={`text-sm transition-colors duration-300 ${
+                          i <= loadingStep ? 'text-slate-300' : 'text-slate-600'
+                        }`}>
+                          {step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -391,55 +458,65 @@ export default function GraphTracer() {
           {/* Controls overlay */}
           {data && (
             <>
-              {/* Zoom controls - top right */}
-              <div className="absolute top-4 right-4 flex flex-col gap-1.5">
-                <button
-                  onClick={handleZoomIn}
-                  className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
-                  title="Zoom in"
-                >
-                  <ZoomIn size={16} />
-                </button>
-                <button
-                  onClick={handleZoomOut}
-                  className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
-                  title="Zoom out"
-                >
-                  <ZoomOut size={16} />
-                </button>
-                <button
-                  onClick={handleFit}
-                  className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
-                  title="Fit to view"
-                >
-                  <Maximize2 size={16} />
-                </button>
+              {/* Legend - top left */}
+              <div className="absolute top-4 left-4 bg-slate-800/95 border border-slate-700 rounded-xl px-4 py-3 space-y-1.5">
+                {LEGEND_ITEMS.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2">
+                    <span className="text-sm">{item.emoji}</span>
+                    <span className="text-xs text-slate-300">{item.label}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Layout toggle - top left */}
-              <div className="absolute top-4 left-4 flex gap-1.5">
-                <button
-                  onClick={() => setLayout('breadthfirst')}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
-                    layout === 'breadthfirst'
-                      ? 'bg-indigo-600 border-indigo-500 text-white'
-                      : 'bg-slate-800/90 border-slate-700 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <GitBranch size={12} />
-                  {t('layout_tree')}
-                </button>
-                <button
-                  onClick={() => setLayout('cose')}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
-                    layout === 'cose'
-                      ? 'bg-indigo-600 border-indigo-500 text-white'
-                      : 'bg-slate-800/90 border-slate-700 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <LayoutGrid size={12} />
-                  {t('layout_force')}
-                </button>
+              {/* Layout toggle + zoom - top right */}
+              <div className="absolute top-4 right-4 flex items-start gap-2">
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setLayout('breadthfirst')}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
+                      layout === 'breadthfirst'
+                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        : 'bg-slate-800/90 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <GitBranch size={12} />
+                    {t('layout_tree')}
+                  </button>
+                  <button
+                    onClick={() => setLayout('cose')}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
+                      layout === 'cose'
+                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        : 'bg-slate-800/90 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid size={12} />
+                    {t('layout_force')}
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={handleZoomIn}
+                    className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
+                    title="Zoom in"
+                  >
+                    <ZoomIn size={16} />
+                  </button>
+                  <button
+                    onClick={handleZoomOut}
+                    className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
+                    title="Zoom out"
+                  >
+                    <ZoomOut size={16} />
+                  </button>
+                  <button
+                    onClick={handleFit}
+                    className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-white p-2 rounded-lg transition-colors"
+                    title="Fit to view"
+                  >
+                    <Maximize2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Stats bar - bottom */}
@@ -486,19 +563,6 @@ export default function GraphTracer() {
           )}
         </div>
 
-        {/* Legend */}
-        {data && (
-          <div className="mt-4 flex flex-wrap items-center gap-4 bg-slate-900 border border-slate-800 rounded-xl px-5 py-3">
-            <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">{t('legend')}:</span>
-            {Object.entries(NODE_COLORS).map(([type, color]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <Circle size={10} fill={color} color={color} />
-                <span className="text-slate-400 text-xs capitalize">{NODE_LABELS[type]}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Side Panel */}
         {selectedNode && (
           <div className="fixed top-0 right-0 h-full w-96 max-w-full bg-slate-900 border-l border-slate-800 shadow-2xl z-50 overflow-y-auto">
@@ -530,8 +594,8 @@ export default function GraphTracer() {
               {/* Address */}
               <div className="mb-6">
                 <p className="text-slate-500 text-xs mb-1">{t('address')}</p>
-                <p className="text-white font-mono text-sm break-all">{selectedNode.label}</p>
-                <p className="text-slate-600 font-mono text-xs mt-1 break-all">{selectedNode.id}</p>
+                <p className="text-white font-semibold text-sm mb-1">{selectedNode.label}</p>
+                <p className="text-slate-600 font-mono text-xs break-all">{selectedNode.id}</p>
               </div>
 
               {/* Stats grid */}
