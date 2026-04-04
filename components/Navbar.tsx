@@ -73,7 +73,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
+                className="px-3 py-1.5 text-base font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
               >
                 {link.label}
               </Link>
@@ -132,16 +132,16 @@ export default function Navbar() {
         </div>
 
         {/* Bottom row: tools */}
-        <div className="hidden md:flex items-center justify-center gap-1 border-t border-slate-100 py-1.5">
+        <div className="hidden md:flex items-center justify-center gap-2 border-t border-slate-100 py-2">
           {toolLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href || '/'}
-              className="px-3 py-1 text-xs font-semibold text-slate-500 hover:text-brand-600 rounded-md hover:bg-brand-50 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-sm font-semibold text-slate-500 hover:text-brand-600 rounded-md hover:bg-brand-50 transition-colors flex items-center gap-1.5"
             >
               {link.label}
               {link.badge && (
-                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
                   {link.badge}
                 </span>
               )}
