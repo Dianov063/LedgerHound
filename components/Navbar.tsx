@@ -44,6 +44,8 @@ export default function Navbar() {
     { href: `${prefix}/pricing`, label: t('pricing') },
     { href: `${prefix}/about`, label: t('about') },
     { href: `${prefix}/blog`, label: t('blog') },
+  ];
+  const toolLinks = [
     { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: 'FREE' },
     { href: `${prefix}/graph-tracer`, label: t('graph'), badge: 'NEW' },
     { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: 'NEW' },
@@ -52,7 +54,8 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        {/* Top row: logo + pages + CTA */}
+        <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href={locale === 'en' ? '/' : `/${locale}`} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
@@ -63,20 +66,15 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Nav */}
+          {/* Desktop Nav - pages */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
               >
                 {link.label}
-                {link.badge && (
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
-                    {link.badge}
-                  </span>
-                )}
               </Link>
             ))}
           </div>
@@ -87,7 +85,7 @@ export default function Navbar() {
             <div className="relative">
               <button
                 onClick={() => setLangOpen(!langOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:text-brand-600 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-brand-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <Globe size={14} />
                 <span>{localeFlags[locale]} {localeNames[locale]}</span>
@@ -131,6 +129,24 @@ export default function Navbar() {
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
+
+        {/* Bottom row: tools */}
+        <div className="hidden md:flex items-center justify-center gap-1 border-t border-slate-100 py-1.5">
+          {toolLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href || '/'}
+              className="px-3 py-1 text-xs font-semibold text-slate-500 hover:text-brand-600 rounded-md hover:bg-brand-50 transition-colors flex items-center gap-1.5"
+            >
+              {link.label}
+              {link.badge && (
+                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
+                  {link.badge}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -147,6 +163,24 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="px-3 py-1 text-xs text-slate-400 font-medium uppercase tracking-wider">Tools</p>
+              {toolLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href || '/'}
+                  className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-brand-600 rounded-lg hover:bg-brand-50"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {link.label}
+                  {link.badge && (
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
+                      {link.badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
             <div className="pt-3 border-t border-slate-100">
               <p className="px-3 py-1 text-xs text-slate-400 font-medium uppercase tracking-wider">Language</p>
               <div className="grid grid-cols-2 gap-1 mt-1">
