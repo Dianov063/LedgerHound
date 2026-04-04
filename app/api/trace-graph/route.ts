@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     const MAX_NODES = 50;
 
     const getNodeType = (addr: string): GraphNode['type'] => {
-      const entity = KNOWN_ENTITIES[addr];
+      const entity = KNOWN_ENTITIES[addr.toLowerCase()];
       if (entity) return entity.type;
       return 'unknown';
     };
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
       if (currentDepth < maxDepth) {
         const nextAddresses = outgoing
           .map((tx: any) => tx.to?.toLowerCase())
-          .filter((a: string) => a && !visited.has(a) && !KNOWN_ENTITIES[a])
+          .filter((a: string) => a && !visited.has(a) && !KNOWN_ENTITIES[a.toLowerCase()])
           .slice(0, 5); // limit branches
 
         for (const next of nextAddresses) {

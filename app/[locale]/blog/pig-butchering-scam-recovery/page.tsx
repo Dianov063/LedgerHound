@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Shield,
 } from 'lucide-react';
+import { blogUI, type BlogLocale } from '@/lib/blog-translations';
 
 const tocItems = [
   { id: 'what-is', label: 'What Is a Pig Butchering Scam?' },
@@ -60,8 +61,9 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function PigButcheringArticle() {
-  const locale = useLocale();
+  const locale = useLocale() as BlogLocale;
   const base = locale === 'en' ? '' : `/${locale}`;
+  const ui = blogUI[locale] || blogUI.en;
   const [copied, setCopied] = useState(false);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -90,9 +92,9 @@ export default function PigButcheringArticle() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-8">
-            <Link href={base || '/'} className="hover:text-brand-600 transition-colors">Home</Link>
+            <Link href={base || '/'} className="hover:text-brand-600 transition-colors">{ui.home}</Link>
             <ChevronRight size={12} />
-            <Link href={`${base}/blog`} className="hover:text-brand-600 transition-colors">Blog</Link>
+            <Link href={`${base}/blog`} className="hover:text-brand-600 transition-colors">{ui.blog}</Link>
             <ChevronRight size={12} />
             <span className="text-slate-600">Pig Butchering Scams</span>
           </nav>
@@ -102,7 +104,7 @@ export default function PigButcheringArticle() {
               Guide
             </span>
             <span className="text-xs text-slate-400 flex items-center gap-1">
-              <Clock size={11} /> 9 min read
+              <Clock size={11} /> 9 {ui.minRead}
             </span>
           </div>
 
@@ -112,7 +114,7 @@ export default function PigButcheringArticle() {
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
             <span className="flex items-center gap-1.5">
-              <User size={14} /> LedgerHound Investigations Team
+              <User size={14} /> {ui.author}
             </span>
             <span className="flex items-center gap-1.5">
               <Calendar size={14} /> March 15, 2026
@@ -121,7 +123,7 @@ export default function PigButcheringArticle() {
 
           {/* Share buttons */}
           <div className="flex items-center gap-2 mt-6">
-            <span className="text-xs text-slate-400 mr-1">Share:</span>
+            <span className="text-xs text-slate-400 mr-1">{ui.shareArticle}</span>
             <button onClick={shareTwitter} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-600 bg-slate-100 hover:bg-brand-50 px-3 py-1.5 rounded-full transition-colors">
               𝕏 Twitter
             </button>
@@ -129,7 +131,7 @@ export default function PigButcheringArticle() {
               in LinkedIn
             </button>
             <button onClick={copyLink} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-600 bg-slate-100 hover:bg-brand-50 px-3 py-1.5 rounded-full transition-colors">
-              {copied ? <><Check size={12} className="text-emerald-500" /> Copied!</> : <><Link2 size={12} /> Copy Link</>}
+              {copied ? <><Check size={12} className="text-emerald-500" /> {ui.copied}</> : <><Link2 size={12} /> {ui.copyLink}</>}
             </button>
           </div>
         </div>
@@ -141,7 +143,7 @@ export default function PigButcheringArticle() {
           {/* Sticky TOC - desktop */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Table of Contents</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{ui.tableOfContents}</p>
               <nav className="space-y-1">
                 {tocItems.map((item) => (
                   <a
@@ -155,13 +157,13 @@ export default function PigButcheringArticle() {
               </nav>
 
               <div className="mt-8 p-4 bg-brand-50 border border-brand-100 rounded-xl">
-                <p className="text-xs font-bold text-brand-700 mb-2">Need Help?</p>
-                <p className="text-xs text-brand-600 mb-3">Free case evaluation within 24 hours. No obligation.</p>
+                <p className="text-xs font-bold text-brand-700 mb-2">{ui.needHelp}</p>
+                <p className="text-xs text-brand-600 mb-3">{ui.needHelpDesc}</p>
                 <Link
                   href={`${base}/free-evaluation`}
                   className="flex items-center justify-center gap-1.5 bg-brand-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors w-full"
                 >
-                  Get Free Evaluation <ArrowRight size={12} />
+                  {ui.getFreeEvaluation} <ArrowRight size={12} />
                 </Link>
               </div>
             </div>
@@ -406,13 +408,13 @@ export default function PigButcheringArticle() {
 
               {/* Mid-article CTA */}
               <div className="not-prose my-12 bg-gradient-to-r from-brand-600 to-brand-700 rounded-2xl p-8 text-center">
-                <h3 className="font-display font-bold text-xl text-white mb-2">Think you may be a victim?</h3>
-                <p className="text-brand-100 text-sm mb-5">Get a free, confidential case evaluation within 24 hours. No obligation, no upfront cost.</p>
+                <h3 className="font-display font-bold text-xl text-white mb-2">{ui.midCtaTitle}</h3>
+                <p className="text-brand-100 text-sm mb-5">{ui.midCtaDesc}</p>
                 <Link
                   href={`${base}/free-evaluation`}
                   className="inline-flex items-center gap-2 bg-white text-brand-700 font-bold px-6 py-3 rounded-lg hover:bg-brand-50 transition-colors text-sm"
                 >
-                  Get Free Case Evaluation <ArrowRight size={14} />
+                  {ui.midCtaBtn} <ArrowRight size={14} />
                 </Link>
               </div>
 
@@ -486,15 +488,15 @@ export default function PigButcheringArticle() {
             {/* Bottom CTA */}
             <div className="mt-12 bg-gradient-to-r from-brand-600 to-brand-700 rounded-2xl p-8 text-center">
               <Shield className="mx-auto text-brand-200 mb-3" size={32} />
-              <h3 className="font-display font-bold text-2xl text-white mb-2">Your Funds Left a Trail. Let's Find It.</h3>
-              <p className="text-brand-100 text-sm mb-5 max-w-lg mx-auto">No obligation. No upfront cost. Just an honest assessment of what we can find and what it will take.</p>
+              <h3 className="font-display font-bold text-2xl text-white mb-2">{ui.ctaTitle}</h3>
+              <p className="text-brand-100 text-sm mb-5 max-w-lg mx-auto">{ui.ctaDesc}</p>
               <Link
                 href={`${base}/free-evaluation`}
                 className="inline-flex items-center gap-2 bg-white text-brand-700 font-bold px-7 py-3.5 rounded-lg hover:bg-brand-50 transition-colors"
               >
-                Get Free Case Evaluation <ArrowRight size={16} />
+                {ui.ctaBtn} <ArrowRight size={16} />
               </Link>
-              <p className="text-brand-200 text-xs mt-4">+1 (833) 559-1334 · Говорите по-русски? Мы тоже.</p>
+              <p className="text-brand-200 text-xs mt-4">{ui.phone} · {ui.speakRussian}</p>
             </div>
 
             {/* Sources */}
@@ -509,7 +511,7 @@ export default function PigButcheringArticle() {
 
             {/* Share again */}
             <div className="mt-8 pt-6 border-t border-slate-200 flex items-center gap-3">
-              <span className="text-sm text-slate-500">Share this article:</span>
+              <span className="text-sm text-slate-500">{ui.shareArticle}</span>
               <button onClick={shareTwitter} className="text-xs text-slate-500 hover:text-brand-600 bg-slate-100 hover:bg-brand-50 px-3 py-1.5 rounded-full transition-colors">
                 𝕏 Twitter
               </button>
@@ -517,7 +519,7 @@ export default function PigButcheringArticle() {
                 in LinkedIn
               </button>
               <button onClick={copyLink} className="text-xs text-slate-500 hover:text-brand-600 bg-slate-100 hover:bg-brand-50 px-3 py-1.5 rounded-full transition-colors">
-                {copied ? <><Check size={12} className="text-emerald-500" /> Copied!</> : <><Link2 size={12} /> Copy Link</>}
+                {copied ? <><Check size={12} className="text-emerald-500" /> {ui.copied}</> : <><Link2 size={12} /> {ui.copyLink}</>}
               </button>
             </div>
           </article>
@@ -527,7 +529,7 @@ export default function PigButcheringArticle() {
       {/* Related Articles */}
       <section className="py-16 bg-slate-50 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-display font-bold text-2xl text-slate-900 mb-8">Related Articles</h2>
+          <h2 className="font-display font-bold text-2xl text-slate-900 mb-8">{ui.relatedArticles}</h2>
           <div className="grid md:grid-cols-3 gap-5">
             {relatedPosts.map((post) => (
               <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-brand-200 transition-colors group">

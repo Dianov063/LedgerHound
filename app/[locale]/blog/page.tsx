@@ -8,11 +8,12 @@ const blogPosts = [
   {
     slug: 'how-to-trace-stolen-bitcoin',
     category: 'Guide',
-    title: 'How to Trace Stolen Bitcoin: A Step-by-Step Overview',
-    excerpt: 'Every Bitcoin transaction leaves a permanent record on the blockchain. Learn how certified investigators use this data to follow stolen funds and build court-ready evidence.',
-    date: 'March 15, 2026',
-    readTime: '8 min read',
+    title: 'How to Trace Stolen Bitcoin and Cryptocurrency: A Step-by-Step Guide',
+    excerpt: 'Despite the common perception that crypto is untraceable, the opposite is true. Learn exactly how investigators trace stolen funds step by step — from transaction mapping to exchange subpoenas.',
+    date: 'March 28, 2026',
+    readTime: '10 min read',
     featured: true,
+    published: true,
   },
   {
     slug: 'pig-butchering-scam-recovery',

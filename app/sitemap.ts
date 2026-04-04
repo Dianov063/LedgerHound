@@ -55,8 +55,35 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  // Blog posts (English only for now)
-  for (const post of blogPosts) {
+  // Published blog posts — all locales with hreflang
+  const publishedPosts = [
+    '/blog/how-to-trace-stolen-bitcoin',
+    '/blog/pig-butchering-scam-recovery',
+  ];
+
+  for (const post of publishedPosts) {
+    for (const locale of locales) {
+      const localePath = locale === 'en' ? '' : `/${locale}`;
+      urls.push({
+        url: `${baseUrl}${localePath}${post}`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly',
+        priority: 0.8,
+        alternates: {
+          languages: Object.fromEntries(
+            locales.map((l) => [
+              l,
+              `${baseUrl}${l === 'en' ? '' : `/${l}`}${post}`,
+            ])
+          ),
+        },
+      });
+    }
+  }
+
+  // Placeholder blog posts (English only for now)
+  const placeholderPosts = blogPosts.filter((p) => !publishedPosts.includes(p));
+  for (const post of placeholderPosts) {
     urls.push({
       url: `${baseUrl}${post}`,
       lastModified: new Date(),
