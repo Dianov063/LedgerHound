@@ -1,0 +1,185 @@
+import { NextRequest } from 'next/server';
+
+/* ── Known entities (same as graph-tracer & report) ── */
+const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: string }> = {
+  // Exchanges
+  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange', category: 'Exchange' },
+  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 2', type: 'exchange', category: 'Exchange' },
+  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 3', type: 'exchange', category: 'Exchange' },
+  '0x71660c4005ba85c37ccec55d0c4493e66fe775d3': { label: 'Coinbase', type: 'exchange', category: 'Exchange' },
+  '0xa090e606e30bd747d4e6245a1517ebe430f0057e': { label: 'Coinbase 2', type: 'exchange', category: 'Exchange' },
+  '0x503828976d22510aad0201ac7ec88293211d23da': { label: 'Coinbase 3', type: 'exchange', category: 'Exchange' },
+  '0x2910543af39aba0cd09dbb2d50200b3e800a63d2': { label: 'Kraken', type: 'exchange', category: 'Exchange' },
+  '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b': { label: 'OKX', type: 'exchange', category: 'Exchange' },
+  '0xab5c66752a9e8167967685f1450532fb96d5d24f': { label: 'Huobi', type: 'exchange', category: 'Exchange' },
+  '0xf89d7b9c864f589bbf53a82105107622b35eaa40': { label: 'Bybit', type: 'exchange', category: 'Exchange' },
+  '0x2b5634c42055806a59e9107ed44d43c426e58258': { label: 'KuCoin', type: 'exchange', category: 'Exchange' },
+  '0x77134cbc06cb00b66f4c7e623d5fdbf6777635ec': { label: 'Bitfinex', type: 'exchange', category: 'Exchange' },
+  '0x6262998ced04146fa42253a5c0af90ca02dfd2a3': { label: 'Crypto.com', type: 'exchange', category: 'Exchange' },
+
+  // DeFi
+  '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': { label: 'Uniswap V2 Router', type: 'defi', category: 'DeFi' },
+  '0xe592427a0aece92de3edee1f18e0157c05861564': { label: 'Uniswap V3 Router', type: 'defi', category: 'DeFi' },
+  '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': { label: 'SushiSwap', type: 'defi', category: 'DeFi' },
+  '0xdef1c0ded9bec7f1a1670819833240f027b25eff': { label: '0x Exchange Proxy', type: 'defi', category: 'DeFi' },
+
+  // OFAC-Sanctioned Mixers (Tornado Cash)
+  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash Router', type: 'sanctioned', category: 'Sanctions' },
+  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 0.1 ETH', type: 'sanctioned', category: 'Sanctions' },
+  '0x910cbd523d972eb0a6f4cae4618ad62622b39dbf': { label: 'Tornado Cash 10 ETH', type: 'sanctioned', category: 'Sanctions' },
+  '0xa160cdab225685da1d56aa342ad8841c3b53f291': { label: 'Tornado Cash 100 ETH', type: 'sanctioned', category: 'Sanctions' },
+  '0xd90e2f925da726b50c4ed8d0fb90ad053324f31b': { label: 'Tornado Cash 1 ETH', type: 'sanctioned', category: 'Sanctions' },
+  '0xd4b88df4d29f5cedd6857912842cff3b20c8cfa3': { label: 'Tornado Cash 1000 DAI', type: 'sanctioned', category: 'Sanctions' },
+  '0xfd8610d20aa15b7b2e3be39b396a1bc3516c7144': { label: 'Tornado Cash 10000 DAI', type: 'sanctioned', category: 'Sanctions' },
+  '0x07687e702b410fa43f4cb4af7fa097918ffd2730': { label: 'Tornado Cash 100000 DAI', type: 'sanctioned', category: 'Sanctions' },
+  '0x23773e65ed146a459791799d01336db287f25334': { label: 'Tornado Cash Governance', type: 'sanctioned', category: 'Sanctions' },
+
+  // OFAC-Sanctioned Entities
+  '0x8589427373d6d84e98730d7795d8f6f8731fda16': { label: 'Ronin Bridge Exploiter (Lazarus Group)', type: 'sanctioned', category: 'Sanctions' },
+  '0x098b716b8aaf21512996dc57eb0615e2383e2f96': { label: 'Ronin Bridge Exploiter 2', type: 'sanctioned', category: 'Sanctions' },
+  '0xa0e1c89ef1a489c9c7de96311ed5ce5d32c20e4b': { label: 'Ronin Bridge Exploiter 3', type: 'sanctioned', category: 'Sanctions' },
+  '0x4f47bc496083c727c5fbe3ce9cdf2b0f6ace3790': { label: 'Ronin Bridge Exploiter 4', type: 'sanctioned', category: 'Sanctions' },
+  '0xc455f7fd3e0e12afd51fba5c106909934d8a0e4a': { label: 'Blender.io (OFAC)', type: 'sanctioned', category: 'Sanctions' },
+  '0x36dd7b862746fddfa5108aeb58fc831ae3961230': { label: 'Sinbad.io (OFAC)', type: 'sanctioned', category: 'Sanctions' },
+
+  // Known Scam / Pig Butchering / Fraud Addresses (public lists)
+  '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Reported Scam Address', type: 'scam', category: 'Scam' },
+  '0x3cffd56b47b7b41c56258d9c7731abadc360e460': { label: 'Pig Butchering Scam', type: 'scam', category: 'Scam' },
+  '0x19aa5fe80d33a56d56c78e82ea5e50e5d80b4dff': { label: 'Fake Exchange Scam', type: 'scam', category: 'Scam' },
+  '0xef3a930e1ffffffacd2b664822cb7d1c51e0c36e': { label: 'Phishing Wallet', type: 'scam', category: 'Scam' },
+  '0x707012c9cf97c4c3a481603f98d593ecd3a44621': { label: 'Romance Scam Collector', type: 'scam', category: 'Scam' },
+  '0x56eddb7aa87536c09ccc2793473599fd21a8b17f': { label: 'Investment Fraud', type: 'scam', category: 'Scam' },
+  '0x39d908dac893cbcb53cc86e0ecc369aa4def1a29': { label: 'Pig Butchering Network', type: 'scam', category: 'Scam' },
+  '0x0681d8db095565fe8a346fa0277bffde9c0edbbf': { label: 'Address Poisoning Attacker', type: 'scam', category: 'Scam' },
+  '0xbad0000bad0000bad0000bad0000bad0000bad00': { label: 'Known Scam Wallet', type: 'scam', category: 'Scam' },
+
+  // Darknet / Ransomware (public attributions)
+  '0x04786aada9deea2150deab7b3b8911c309f5ed90': { label: 'Darknet Market Deposit', type: 'darknet', category: 'Darknet' },
+  '0x19f4f2f9f3daca875611c03ecf0a8c6e5c9d60e3': { label: 'Ransomware Payment Collector', type: 'ransomware', category: 'Ransomware' },
+
+  // Other Mixers
+  '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer', category: 'Mixer' },
+  '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange', category: 'Exchange' },
+};
+
+/* ── Rate limiting ── */
+const rateLimit = new Map<string, { count: number; reset: number }>();
+
+export async function POST(req: NextRequest) {
+  try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const now = Date.now();
+    const entry = rateLimit.get(ip);
+    if (entry && entry.reset > now) {
+      if (entry.count >= 30) {
+        return Response.json({ error: 'Rate limit exceeded' }, { status: 429 });
+      }
+      entry.count++;
+    } else {
+      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+    }
+
+    const { address } = await req.json();
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return Response.json({ error: 'Invalid Ethereum address' }, { status: 400 });
+    }
+
+    const addr = address.toLowerCase();
+    const sources: { source: string; label: string; type: string; category: string }[] = [];
+    let chainabuseReports = 0;
+    let chainabuseCategories: string[] = [];
+
+    /* 1. Check internal DB */
+    const entity = KNOWN_ENTITIES[addr];
+    if (entity && entity.type !== 'exchange' && entity.type !== 'defi') {
+      sources.push({
+        source: 'LedgerHound DB',
+        label: entity.label,
+        type: entity.type,
+        category: entity.category,
+      });
+    }
+
+    /* 2. Check Chainabuse (public API, no key needed) */
+    try {
+      const caRes = await fetch(
+        `https://api.chainabuse.com/v0/reports?address=${addr}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (caRes.ok) {
+        const caData = await caRes.json();
+        const reports = caData.reports || caData.items || [];
+        if (Array.isArray(reports) && reports.length > 0) {
+          chainabuseReports = reports.length;
+          const cats = new Set<string>();
+          for (const r of reports) {
+            if (r.category) cats.add(r.category);
+            if (r.scamType) cats.add(r.scamType);
+          }
+          chainabuseCategories = Array.from(cats);
+          sources.push({
+            source: 'Chainabuse',
+            label: `${chainabuseReports} community report${chainabuseReports > 1 ? 's' : ''}`,
+            type: 'community_report',
+            category: chainabuseCategories[0] || 'Reported',
+          });
+        }
+      }
+    } catch {
+      // Chainabuse timeout/error — continue without it
+    }
+
+    /* 3. Determine entity info for clean addresses */
+    let entityInfo: { label: string; type: string } | null = null;
+    if (entity && (entity.type === 'exchange' || entity.type === 'defi')) {
+      entityInfo = { label: entity.label, type: entity.type };
+    }
+
+    /* 4. Calculate risk */
+    const isFlagged = sources.length > 0;
+    let riskLevel: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'CLEAN';
+    let riskScore = 0;
+
+    if (isFlagged) {
+      const hasSanctions = sources.some(s => s.type === 'sanctioned');
+      const hasScam = sources.some(s => s.type === 'scam');
+      const hasMixer = sources.some(s => s.type === 'mixer');
+      const hasDarknet = sources.some(s => s.type === 'darknet');
+      const hasRansomware = sources.some(s => s.type === 'ransomware');
+
+      if (hasSanctions) riskScore += 50;
+      if (hasScam) riskScore += 35;
+      if (hasRansomware) riskScore += 40;
+      if (hasDarknet) riskScore += 30;
+      if (hasMixer) riskScore += 25;
+      if (chainabuseReports > 0) riskScore += Math.min(chainabuseReports * 5, 30);
+
+      riskScore = Math.min(100, riskScore);
+
+      if (riskScore >= 80) riskLevel = 'CRITICAL';
+      else if (riskScore >= 55) riskLevel = 'HIGH';
+      else if (riskScore >= 30) riskLevel = 'MEDIUM';
+      else riskLevel = 'LOW';
+    }
+
+    /* 5. Collect all categories */
+    const categories = Array.from(new Set([
+      ...sources.map(s => s.category),
+      ...chainabuseCategories,
+    ]));
+
+    return Response.json({
+      address: addr,
+      isFlagged,
+      riskLevel,
+      riskScore,
+      sources,
+      categories,
+      chainabuseReports,
+      entityInfo,
+    });
+  } catch (err: any) {
+    console.error('[scam-check]', err);
+    return Response.json({ error: err.message || 'Check failed' }, { status: 500 });
+  }
+}

@@ -21,6 +21,7 @@ const pages = [
   { path: '/graph-tracer', priority: 0.9, changeFreq: 'weekly' },
   { path: '/recovery-calculator', priority: 0.9, changeFreq: 'weekly' },
   { path: '/report', priority: 0.9, changeFreq: 'weekly' },
+  { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
   { path: '/privacy', priority: 0.3, changeFreq: 'yearly' },
   { path: '/terms', priority: 0.3, changeFreq: 'yearly' },
   { path: '/disclaimer', priority: 0.3, changeFreq: 'yearly' },

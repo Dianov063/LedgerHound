@@ -10,7 +10,8 @@
     "graph": "Graph Tracer",
     "calculator": "Recovery Calculator",
     "report": "Wallet Report",
-    "cta": "Free Evaluation"
+    "cta": "Free Evaluation",
+    "scam_checker": "Scam Checker"
   },
   "hero": {
     "badge": "Certified Blockchain Investigators · US-Based",
@@ -191,7 +192,8 @@
     "copyright": "© 2026 LedgerHound · All Rights Reserved",
     "legal_note": "Not a law firm. We do not provide legal advice. Forensic investigation services only.",
     "recovery_calculator": "Recovery Calculator",
-    "wallet_report": "Wallet Report"
+    "wallet_report": "Wallet Report",
+    "scam_checker": "Scam Checker"
   },
   "tracker_section": {
     "tag": "Free Tool",
@@ -497,5 +499,52 @@
     "s8_email": "contact@ledgerhound.vip",
     "s8_phone": "+1 (833) 559-1334",
     "s8_address": "New York, USA"
+  },
+  "scam": {
+    "badge": "Free Security Tool",
+    "title": "Crypto Scam Address",
+    "title_highlight": "Checker",
+    "subtitle": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Powered by multiple databases including Chainabuse, OFAC SDN list, and LedgerHound intelligence.",
+    "placeholder": "Enter Ethereum address (0x...)",
+    "check_btn": "Check Address",
+    "checking": "Checking...",
+    "error_invalid": "Please enter a valid Ethereum address (0x...)",
+    "error_failed": "Check failed. Please try again.",
+    "recent": "Recent Searches",
+    "clear": "Clear",
+    "risk_clean": "CLEAN",
+    "risk_low": "LOW RISK",
+    "risk_medium": "MEDIUM RISK",
+    "risk_high": "HIGH RISK",
+    "risk_critical": "CRITICAL RISK",
+    "score": "Risk Score",
+    "flagged_title": "This address has been flagged",
+    "flagged_desc": "This wallet address appears in one or more scam, fraud, or sanctions databases. Exercise extreme caution.",
+    "clean_title": "No reports found for this address",
+    "clean_desc": "This address does not appear in any of our scam or sanctions databases. Note: this does not guarantee the address is safe — always exercise caution.",
+    "known_entity": "Known Entity Identified",
+    "entity_exchange": "Cryptocurrency Exchange",
+    "entity_defi": "DeFi Protocol",
+    "categories": "Flagged Categories",
+    "sources": "Report Sources",
+    "warning": "WARNING: Do not send funds to this address. If you have been scammed, preserve all evidence and file a report.",
+    "share": "Share Result",
+    "copied": "Link Copied!",
+    "cta_report": "Get Full Forensic Report — $49",
+    "report_address": "Report This Address",
+    "how_title": "How It Works",
+    "how_p1": "Our crypto scam checker cross-references wallet addresses against multiple intelligence databases in real time. We check the OFAC sanctions list (SDN), community reports from Chainabuse, and our proprietary LedgerHound database of known scam wallets, mixers, and darknet addresses.",
+    "how_p2": "Whether you want to check if a bitcoin address is a scam, verify if a crypto wallet is safe before sending funds, or look up a wallet address blacklist — our free tool gives you an instant risk assessment based on real data.",
+    "why_title": "Why Check Before You Send",
+    "why_i1": "Over $5.6 billion lost to crypto scams in 2023 according to FBI reports",
+    "why_i2": "Pig butchering scams use real-looking wallets that are actually fraud collectors",
+    "why_i3": "OFAC-sanctioned addresses can result in legal consequences if you transact with them",
+    "why_i4": "One quick check can save you from losing your entire investment",
+    "cta_title": "Need a Deeper Investigation?",
+    "cta_desc": "Our free scam checker provides instant results. For comprehensive forensic analysis with entity identification, transaction mapping, and court-ready documentation — get a professional report.",
+    "cta_report_btn": "Get Forensic Report — $49",
+    "cta_eval_btn": "Free Case Evaluation",
+    "seo_title": "Free Crypto Scam Address Checker | LedgerHound",
+    "seo_desc": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Free blockchain security tool powered by multiple databases."
   }
 }
