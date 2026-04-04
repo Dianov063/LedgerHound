@@ -6,6 +6,7 @@
     "about": "Nosotros",
     "blog": "Blog",
     "contact": "Contacto",
+    "tracker": "Rastreador de Billeteras",
     "cta": "Evaluación Gratuita"
   },
   "hero": {
@@ -151,6 +152,7 @@
     "divorce": "Divorcio y Cripto",
     "litigation": "Apoyo en Litigios",
     "corporate": "Fraude Corporativo",
+    "wallet_tracker": "Rastreador Gratuito de Billeteras",
     "about": "Nosotros",
     "blog": "Blog",
     "cases": "Casos",
@@ -160,6 +162,19 @@
     "disclaimer": "Aviso Legal",
     "copyright": "© 2026 LedgerHound · Todos los derechos reservados",
     "legal_note": "No es un bufete de abogados. No brindamos asesoramiento legal. Solo servicios de investigación forense."
+  },
+  "tracker_section": {
+    "tag": "Herramienta Gratuita",
+    "title": "Rastreador Gratuito de Billeteras Ethereum",
+    "subtitle": "Ingrese cualquier dirección de billetera y vea instantáneamente el historial completo de transacciones — entrantes, salientes, tokens y NFTs. Usado por víctimas de fraude, abogados e investigadores.",
+    "feature1_title": "Historial Completo de Transacciones",
+    "feature1_desc": "Cada transferencia, token y movimiento de NFT",
+    "feature2_title": "Análisis Instantáneo",
+    "feature2_desc": "Total recibido, enviado y recuento de transacciones",
+    "feature3_title": "Exportar a CSV",
+    "feature3_desc": "Descargue el informe completo para procedimientos legales",
+    "cta": "Probar Rastreador Gratuito",
+    "note": "Sin registro · Sin límites · Impulsado por inteligencia blockchain"
   },
   "blog": {
     "tag": "De Nuestro Blog",
