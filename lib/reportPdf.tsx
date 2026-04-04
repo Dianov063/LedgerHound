@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import type { ReportData } from './generateReport';
+import { fmtEth, type ReportData } from './generateReport';
 
 const blue = '#2563eb';
 const slate900 = '#0f172a';
@@ -125,15 +125,15 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
         <Text style={s.label}>TOTAL RECEIVED</Text>
-        <Text style={{ ...s.value, color: green }}>{data.totalReceived} ETH</Text>
+        <Text style={{ ...s.value, color: green }}>{fmtEth(data.totalReceived)} ETH</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
         <Text style={s.label}>TOTAL SENT</Text>
-        <Text style={{ ...s.value, color: red }}>{data.totalSent} ETH</Text>
+        <Text style={{ ...s.value, color: red }}>{fmtEth(data.totalSent)} ETH</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>NET BALANCE</Text>
-        <Text style={s.value}>{data.netBalance} ETH</Text>
+        <Text style={s.label}>NET FLOW</Text>
+        <Text style={s.value}>{fmtEth(data.netBalance)} ETH</Text>
       </View>
     </View>
 
@@ -165,7 +165,7 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
           <Text style={{ ...s.td, ...s.mono, width: '40%' }}>{shortAddr(cp.address)}</Text>
           <Text style={{ ...s.td, width: '20%' }}>{cp.label}</Text>
           <Text style={{ ...s.td, width: '20%' }}>{cp.count}</Text>
-          <Text style={{ ...s.td, width: '20%' }}>{cp.volume.toFixed(4)}</Text>
+          <Text style={{ ...s.td, width: '20%' }}>{fmtEth(cp.volume)}</Text>
         </View>
       ))}
     </View>
@@ -246,7 +246,7 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
           <Text style={{ ...s.td, width: '8%', color: tx.direction === 'IN' ? green : red, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{tx.direction}</Text>
           <Text style={{ ...s.td, ...s.mono, width: '28%', fontSize: 6 }}>{shortAddr(tx.from)}</Text>
           <Text style={{ ...s.td, ...s.mono, width: '28%', fontSize: 6 }}>{shortAddr(tx.to)}</Text>
-          <Text style={{ ...s.td, width: '12%', fontSize: 7 }}>{tx.value.toFixed(4)}</Text>
+          <Text style={{ ...s.td, width: '12%', fontSize: 7 }}>{fmtEth(tx.value)}</Text>
           <Text style={{ ...s.td, width: '10%', fontSize: 7 }}>{tx.token}</Text>
         </View>
       ))}

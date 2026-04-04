@@ -44,7 +44,28 @@ interface Transfer {
   value: number;
   asset: string;
   hash: string;
+  rawContract?: { value?: string; decimal?: string };
   metadata?: { blockTimestamp?: string };
+}
+
+/**
+ * Alchemy getAssetTransfers returns `value` in the token's native unit (ETH for
+ * external, token-decimals for ERC-20). However, some transfers return `value`
+ * as a raw big-integer (Wei-scale) when decimal info is missing. Any single-
+ * transfer value > 1e12 is clearly Wei (there are only ~120M ETH in existence).
+ */
+function safeValue(tx: Transfer): number {
+  const v = tx.value || 0;
+  if (v > 1e12) return v / 1e18;
+  return v;
+}
+
+/** Format ETH value: max 4 decimals, with thousands separators for large numbers */
+export function fmtEth(v: number): string {
+  if (Math.abs(v) >= 1000) {
+    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  }
+  return v.toFixed(4);
 }
 
 async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Promise<Transfer[]> {
@@ -143,16 +164,18 @@ export async function generateReport(walletAddress: string, email: string) {
   };
 
   for (const tx of incoming) {
-    totalReceived += tx.value || 0;
+    const val = safeValue(tx);
+    totalReceived += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.from) processCounterparty(tx.from, tx.value || 0);
+    if (tx.from) processCounterparty(tx.from, val);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
   for (const tx of outgoing) {
-    totalSent += tx.value || 0;
+    const val = safeValue(tx);
+    totalSent += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.to) processCounterparty(tx.to, tx.value || 0);
+    if (tx.to) processCounterparty(tx.to, val);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -202,7 +225,7 @@ export async function generateReport(walletAddress: string, email: string) {
     keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
   }
   if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
-  if (totalSent > 0) keyFindings.push(`Wallet sent ${totalSent.toFixed(4)} ETH across ${outgoing.length} outgoing transactions.`);
+  if (totalSent > 0) keyFindings.push(`Wallet sent ${fmtEth(totalSent)} ETH across ${outgoing.length} outgoing transactions.`);
   if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
 
   // Recommendations
@@ -222,7 +245,7 @@ export async function generateReport(walletAddress: string, email: string) {
       direction: 'IN' as const,
       from: tx.from || 'N/A',
       to: tx.to || address,
-      value: tx.value || 0,
+      value: safeValue(tx),
       token: tx.asset || 'ETH',
     })),
     ...outgoing.map((tx) => ({
@@ -230,7 +253,7 @@ export async function generateReport(walletAddress: string, email: string) {
       direction: 'OUT' as const,
       from: tx.from || address,
       to: tx.to || 'N/A',
-      value: tx.value || 0,
+      value: safeValue(tx),
       token: tx.asset || 'ETH',
     })),
   ]
