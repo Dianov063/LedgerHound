@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 
-type NetworkType = 'eth' | 'trx' | 'bnb' | 'polygon';
+type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+
+const VALID_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
 
 const ALCHEMY_ETH_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 const ALCHEMY_POLYGON_URL = 'https://polygon-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
@@ -94,20 +97,52 @@ const KNOWN_BSC_ENTITIES: Record<string, { label: string; type: string }> = {
   '0x55d398326f99059ff775485246999027b3197955': { label: 'USDT BSC Contract', type: 'defi' },
 };
 
+const KNOWN_BTC_ENTITIES: Record<string, { label: string; type: string }> = {
+  '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo': { label: 'Binance', type: 'exchange' },
+  '3FHNBLobJnbCPujupTVaaeeMLDPFJRCXsX': { label: 'Coinbase', type: 'exchange' },
+  '3AfP9N8mHkNQWx3FfKMJg9RFhJhRGJkFBv': { label: 'Kraken', type: 'exchange' },
+  'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97': { label: 'Binance Cold', type: 'exchange' },
+  '385cR5DM96n1HvBDMzLHPYcw89fZAXULJP': { label: 'Binance 2', type: 'exchange' },
+  '3Cbq7aT1tY8kMxWLbitaG7yT6bPbKChq64': { label: 'Bitfinex', type: 'exchange' },
+  '1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF': { label: 'Bitcoin Fog', type: 'mixer' },
+  '1FRmxkMPh5U7qHZKtYhYQfScDGBHbdBGpj': { label: 'Helix Mixer', type: 'mixer' },
+  '12tkqA9xSoowkzoERHMWNKsTey55YEBqkv': { label: 'WannaCry', type: 'scam' },
+};
+
+const KNOWN_SOL_ENTITIES: Record<string, { label: string; type: string }> = {
+  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM': { label: 'Binance', type: 'exchange' },
+  '5tzFkiKscXHK5ZXCGbClgAGNBRDSBHGBfmfgUpBhFDqJ': { label: 'Coinbase', type: 'exchange' },
+  'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': { label: 'Binance 2', type: 'exchange' },
+  '2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S': { label: 'Kraken', type: 'exchange' },
+  'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4': { label: 'Jupiter', type: 'defi' },
+  'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc': { label: 'Orca Whirlpool', type: 'defi' },
+};
+
 function getEntitiesForNetwork(network: NetworkType): Record<string, { label: string; type: string }> {
   switch (network) {
+    case 'btc':
+      return KNOWN_BTC_ENTITIES;
     case 'eth':
       return KNOWN_ENTITIES;
+    case 'sol':
+      return KNOWN_SOL_ENTITIES;
     case 'trx':
       return KNOWN_TRON_ENTITIES;
     case 'bnb':
       return KNOWN_BSC_ENTITIES;
-    case 'polygon':
-      return KNOWN_ENTITIES; // Reuse ETH entities for Polygon (many overlap)
+    default:
+      // All other EVM chains reuse ETH entities (many overlap)
+      return KNOWN_ENTITIES;
   }
 }
 
 function isValidAddress(network: NetworkType, addr: string): boolean {
+  if (network === 'btc') {
+    return /^(1|3)[a-zA-Z0-9]{24,33}$|^bc1[a-zA-Z0-9]{25,62}$/.test(addr);
+  }
+  if (network === 'sol') {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+  }
   if (network === 'trx') {
     return /^T[a-zA-Z0-9]{33}$/.test(addr);
   }
@@ -250,18 +285,211 @@ async function fetchBscGraphTransfers(address: string) {
   return getAlchemyTransfersForAddress(ALCHEMY_BNB_URL, address);
 }
 
+// ---- Bitcoin fetching via Blockstream ----
+
+async function fetchBtcGraphTransfers(address: string) {
+  const outgoing: any[] = [];
+  const incoming: any[] = [];
+
+  try {
+    const res = await fetch(`https://blockstream.info/api/address/${address}/txs`);
+    if (!res.ok) return { outgoing, incoming };
+    const txs: any[] = await res.json();
+
+    for (const tx of txs.slice(0, 40)) {
+      const hash = tx.txid || '';
+      const timestamp = tx.status?.block_time
+        ? new Date(tx.status.block_time * 1000).toISOString()
+        : '';
+
+      const inVin = tx.vin?.some((i: any) => i.prevout?.scriptpubkey_address === address);
+      const inVout = tx.vout?.some((o: any) => o.scriptpubkey_address === address);
+
+      if (inVin) {
+        // OUT: find primary recipient
+        let primaryTo = '';
+        let largest = 0;
+        for (const o of tx.vout || []) {
+          if (o.scriptpubkey_address !== address && (o.value || 0) > largest) {
+            largest = o.value || 0;
+            primaryTo = o.scriptpubkey_address || '';
+          }
+        }
+        const totalIn = (tx.vin || []).reduce((s: number, i: any) => i.prevout?.scriptpubkey_address === address ? s + (i.prevout.value || 0) : s, 0);
+        const change = (tx.vout || []).reduce((s: number, o: any) => o.scriptpubkey_address === address ? s + (o.value || 0) : s, 0);
+        const value = (totalIn - change) / 1e8;
+
+        if (primaryTo && value > 0) {
+          outgoing.push({ from: address, to: primaryTo, value, asset: 'BTC', hash, metadata: { blockTimestamp: timestamp } });
+        }
+      }
+
+      if (inVout && !inVin) {
+        // IN: find primary sender
+        let primaryFrom = '';
+        let largest = 0;
+        for (const i of tx.vin || []) {
+          if ((i.prevout?.value || 0) > largest) {
+            largest = i.prevout?.value || 0;
+            primaryFrom = i.prevout?.scriptpubkey_address || '';
+          }
+        }
+        const received = (tx.vout || []).reduce((s: number, o: any) => o.scriptpubkey_address === address ? s + (o.value || 0) : s, 0);
+        const value = received / 1e8;
+
+        if (primaryFrom && value > 0) {
+          incoming.push({ from: primaryFrom, to: address, value, asset: 'BTC', hash, metadata: { blockTimestamp: timestamp } });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[trace-graph] BTC fetch error:', err);
+  }
+
+  return { outgoing: outgoing.slice(0, 20), incoming: incoming.slice(0, 20) };
+}
+
+// ---- Solana fetching via Helius/public RPC ----
+
+async function fetchSolGraphTransfers(address: string) {
+  const outgoing: any[] = [];
+  const incoming: any[] = [];
+
+  const heliusKey = process.env.HELIUS_API_KEY || '';
+  const rpcUrl = heliusKey
+    ? `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`
+    : 'https://api.mainnet-beta.solana.com';
+
+  try {
+    // Get recent signatures
+    const sigRes = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignaturesForAddress', params: [address, { limit: 30 }] }),
+    });
+    const sigJson = await sigRes.json();
+    const sigs = sigJson.result || [];
+
+    for (const sig of sigs.slice(0, 20)) {
+      try {
+        const txRes = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }] }),
+        });
+        const txJson = await txRes.json();
+        const tx = txJson.result;
+        if (!tx || !tx.meta || tx.meta.err) continue;
+
+        const accountKeys: string[] = tx.transaction.message.accountKeys.map((k: any) => typeof k === 'string' ? k : k.pubkey);
+        const idx = accountKeys.indexOf(address);
+        if (idx === -1) continue;
+
+        const diff = tx.meta.postBalances[idx] - tx.meta.preBalances[idx];
+        if (diff === 0) continue;
+
+        const value = Math.abs(diff) / 1e9;
+        const feePayer = accountKeys[0];
+        const timestamp = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : '';
+
+        if (diff < 0) {
+          outgoing.push({ from: address, to: feePayer !== address ? feePayer : (accountKeys[1] || ''), value, asset: 'SOL', hash: sig.signature, metadata: { blockTimestamp: timestamp } });
+        } else {
+          incoming.push({ from: feePayer !== address ? feePayer : (accountKeys[1] || ''), to: address, value, asset: 'SOL', hash: sig.signature, metadata: { blockTimestamp: timestamp } });
+        }
+      } catch { /* skip individual tx errors */ }
+      // Small delay to avoid rate limits
+      await new Promise(r => setTimeout(r, 50));
+    }
+  } catch (err) {
+    console.error('[trace-graph] SOL fetch error:', err);
+  }
+
+  return { outgoing: outgoing.slice(0, 20), incoming: incoming.slice(0, 20) };
+}
+
+// ---- EVM chains via Etherscan V2 ----
+
+async function fetchEtherscanV2GraphTransfers(address: string, chainId: number) {
+  const apiKey = process.env.ETHERSCAN_API_KEY || '';
+  const addr = address.toLowerCase();
+  const outgoing: any[] = [];
+  const incoming: any[] = [];
+
+  try {
+    const base = `https://api.etherscan.io/v2/api?chainid=${chainId}&address=${addr}&sort=desc&apikey=${apiKey}`;
+    const [nativeRes, tokenRes] = await Promise.all([
+      fetch(`${base}&module=account&action=txlist`),
+      fetch(`${base}&module=account&action=tokentx`),
+    ]);
+    const nativeJson = await nativeRes.json();
+    const tokenJson = await tokenRes.json();
+
+    // Native txs
+    if (nativeJson.status === '1' && Array.isArray(nativeJson.result)) {
+      for (const tx of nativeJson.result.slice(0, 40)) {
+        if (tx.isError === '1') continue;
+        const from = (tx.from || '').toLowerCase();
+        const to = (tx.to || '').toLowerCase();
+        const value = parseFloat(tx.value || '0') / 1e18;
+        const hash = tx.hash || '';
+        const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
+        if (value === 0) continue;
+        const transfer = { from, to, value, asset: 'NATIVE', hash, metadata: { blockTimestamp: timestamp } };
+        if (from === addr) outgoing.push(transfer);
+        if (to === addr) incoming.push(transfer);
+      }
+    }
+
+    // Token txs
+    if (tokenJson.status === '1' && Array.isArray(tokenJson.result)) {
+      for (const tx of tokenJson.result.slice(0, 40)) {
+        const from = (tx.from || '').toLowerCase();
+        const to = (tx.to || '').toLowerCase();
+        const decimals = parseInt(tx.tokenDecimal || '18', 10);
+        const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
+        const symbol = tx.tokenSymbol || 'TOKEN';
+        const hash = tx.hash || '';
+        const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
+        const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
+        if (from === addr) outgoing.push(transfer);
+        if (to === addr) incoming.push(transfer);
+      }
+    }
+  } catch (err) {
+    console.error(`[trace-graph] Etherscan V2 (chain ${chainId}) error:`, err);
+  }
+
+  return { outgoing: outgoing.slice(0, 20), incoming: incoming.slice(0, 20) };
+}
+
+const CHAIN_IDS: Partial<Record<NetworkType, number>> = {
+  base: 8453, arb: 42161, op: 10, avax: 43114, ftm: 250,
+  linea: 59144, zksync: 324, scroll: 534352, mantle: 5000,
+};
+
 // ---- Unified transfer fetcher ----
 
 async function getTransfersForAddress(network: NetworkType, address: string) {
   switch (network) {
+    case 'btc':
+      return fetchBtcGraphTransfers(address);
     case 'eth':
       return getAlchemyTransfersForAddress(ALCHEMY_ETH_URL, address);
+    case 'sol':
+      return fetchSolGraphTransfers(address);
     case 'polygon':
       return getAlchemyTransfersForAddress(ALCHEMY_POLYGON_URL, address);
     case 'trx':
       return fetchTronGraphTransfers(address);
     case 'bnb':
       return fetchBscGraphTransfers(address);
+    default: {
+      // All other EVM chains via Etherscan V2
+      const chainId = CHAIN_IDS[network];
+      if (chainId) return fetchEtherscanV2GraphTransfers(address, chainId);
+      return { outgoing: [], incoming: [] };
+    }
   }
 }
 
@@ -291,11 +519,10 @@ export async function POST(req: NextRequest) {
   try {
     const { address, depth = 1, network = 'eth' } = await req.json();
 
-    const net = (['eth', 'trx', 'bnb', 'polygon'] as const).includes(network) ? network as NetworkType : 'eth';
+    const net: NetworkType = VALID_NETWORKS.includes(network) ? network as NetworkType : 'eth';
 
     if (!address || !isValidAddress(net, address)) {
-      const label = net === 'trx' ? 'TRON' : net === 'bnb' ? 'BSC' : net === 'polygon' ? 'Polygon' : 'Ethereum';
-      return NextResponse.json({ error: `Invalid ${label} address` }, { status: 400 });
+      return NextResponse.json({ error: `Invalid ${net.toUpperCase()} address` }, { status: 400 });
     }
 
     const entities = getEntitiesForNetwork(net);
@@ -305,8 +532,9 @@ export async function POST(req: NextRequest) {
     const visited = new Set<string>();
     const MAX_NODES = 50;
 
-    // TRON addresses are case-sensitive; EVM addresses are lowercased
-    const normalizeAddr = (addr: string) => (net === 'trx' ? addr : addr.toLowerCase());
+    // BTC, SOL, TRON addresses are case-sensitive; EVM addresses are lowercased
+    const caseSensitive = net === 'btc' || net === 'sol' || net === 'trx';
+    const normalizeAddr = (addr: string) => (caseSensitive ? addr : addr.toLowerCase());
 
     const getNodeType = (addr: string): GraphNode['type'] => {
       const key = net === 'trx' ? addr : addr.toLowerCase();
