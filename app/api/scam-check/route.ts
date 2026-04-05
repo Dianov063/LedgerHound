@@ -60,6 +60,36 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: st
   // Other Mixers
   '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer', category: 'Mixer' },
   '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange', category: 'Exchange' },
+
+  // ── TRON Addresses ──
+  // Exchanges
+  'TN5C4p6n8jBHEBEFVCEFkEzakAVAoHjE68': { label: 'Binance TRON', type: 'exchange', category: 'Exchange' },
+  'TFTWqeM8TErPWxitPUAH9rMuREjMCGEFSe': { label: 'Huobi TRON', type: 'exchange', category: 'Exchange' },
+  'TYASr5UV6HEcXatwdFQfmLVUqQQQMUxHLS': { label: 'OKX TRON', type: 'exchange', category: 'Exchange' },
+  'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange', category: 'Exchange' },
+  'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange', category: 'Exchange' },
+  'TCYSmggLNfJm8KXKDVL9HF93gHqJbGcTH3': { label: 'KuCoin TRON', type: 'exchange', category: 'Exchange' },
+  // TRON Scams
+  'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy': { label: 'Pig Butchering TRON 1', type: 'scam', category: 'Scam' },
+  'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG': { label: 'Pig Butchering TRON 2', type: 'scam', category: 'Scam' },
+  'THMciKzTHCw2YHaUka8Cq8MQGhBYDttx7c': { label: 'Pig Butchering TRON 3', type: 'scam', category: 'Scam' },
+  'TGzz8gjYiYRqpfmDwnLxfCAQasYZgqX9Bb': { label: 'Fake Exchange TRON', type: 'scam', category: 'Scam' },
+  'TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT': { label: 'USDT Scam Collector TRON', type: 'scam', category: 'Scam' },
+  'TVj7RNVHy6thbM7BWdSe9G6gXwKhjhdNZS': { label: 'Romance Scam TRON', type: 'scam', category: 'Scam' },
+  'TJNhWi2sWrZWoFqMpoRWPSFkBqaDDNNiEi': { label: 'Investment Fraud TRON', type: 'scam', category: 'Scam' },
+  'TLWBp82bGJuiFoFVS6RqQ7HM6Wf3cFNMXn': { label: 'Approval Scam TRON', type: 'scam', category: 'Scam' },
+
+  // ── BNB Chain (BSC) Addresses ──
+  // Exchanges
+  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance BSC', type: 'exchange', category: 'Exchange' },
+  // DeFi
+  '0x10ed43c718714eb63d5aa57b78b54704e256024e': { label: 'PancakeSwap V2 Router', type: 'defi', category: 'DeFi' },
+  '0x13f4ea83d0bd40e75c8222255bc855a974568dd4': { label: 'PancakeSwap V3 Router', type: 'defi', category: 'DeFi' },
+  '0x1111111254eeb25477b68fb85ed929f73a960582': { label: '1inch BSC', type: 'defi', category: 'DeFi' },
+  // BSC Scams
+  '0x7e1116d3109f17bc5ec04c0d241ae637489e4ac2': { label: 'BSC Rug Pull', type: 'scam', category: 'Scam' },
+  '0x9c2dc0c3cc2badde84b0025cf4df1c5af288d835': { label: 'BSC Honeypot Deployer', type: 'scam', category: 'Scam' },
+  '0x6e47dfa22fe4c0e5cf7a24490e8eaab407d7f1d0': { label: 'BSC Phishing', type: 'scam', category: 'Scam' },
 };
 
 /* ── Rate limiting ── */
@@ -80,17 +110,20 @@ export async function POST(req: NextRequest) {
     }
 
     const { address } = await req.json();
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      return Response.json({ error: 'Invalid Ethereum address' }, { status: 400 });
+    const isEth = /^0x[a-fA-F0-9]{40}$/.test(address);
+    const isTron = /^T[a-zA-Z0-9]{33}$/.test(address);
+    if (!address || (!isEth && !isTron)) {
+      return Response.json({ error: 'Invalid address. Supports Ethereum (0x...) and TRON (T...)' }, { status: 400 });
     }
 
-    const addr = address.toLowerCase();
+    // TRON addresses are case-sensitive, ETH are lowercased
+    const addr = isTron ? address : address.toLowerCase();
     const sources: { source: string; label: string; type: string; category: string }[] = [];
     let chainabuseReports = 0;
     let chainabuseCategories: string[] = [];
 
-    /* 1. Check internal DB */
-    const entity = KNOWN_ENTITIES[addr];
+    /* 1. Check internal DB (TRON is case-sensitive, ETH lowercased) */
+    const entity = KNOWN_ENTITIES[addr] || (isTron ? undefined : undefined);
     if (entity && entity.type !== 'exchange' && entity.type !== 'defi') {
       sources.push({
         source: 'LedgerHound DB',

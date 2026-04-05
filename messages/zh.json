@@ -354,5 +354,13 @@
     "cta_eval_btn": "免费案件评估",
     "seo_title": "免费加密货币诈骗地址检查器 | LedgerHound",
     "seo_desc": "检查加密货币钱包地址是否被举报为诈骗、欺诈或制裁。免费区块链安全工具。"
+  },
+  "networks": {
+    "eth": "Ethereum",
+    "trx": "TRON",
+    "bnb": "BNB Chain",
+    "polygon": "Polygon",
+    "select": "选择网络",
+    "auto_detected": "已自动检测网络"
   }
 }

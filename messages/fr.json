@@ -354,5 +354,13 @@
     "cta_eval_btn": "Evaluation Gratuite",
     "seo_title": "Verificateur Gratuit d'Arnaques Crypto | LedgerHound",
     "seo_desc": "Verifiez si une adresse de portefeuille crypto a ete signalee pour arnaque, fraude ou sanctions. Outil gratuit de securite blockchain."
+  },
+  "networks": {
+    "eth": "Ethereum",
+    "trx": "TRON",
+    "bnb": "BNB Chain",
+    "polygon": "Polygon",
+    "select": "Selectionner le Reseau",
+    "auto_detected": "Reseau detecte automatiquement"
   }
 }

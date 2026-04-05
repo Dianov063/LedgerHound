@@ -522,5 +522,13 @@
     "cta_eval_btn": "Evaluacion Gratuita",
     "seo_title": "Verificador Gratuito de Estafas Cripto | LedgerHound",
     "seo_desc": "Verifique si una direccion de billetera criptomoneda ha sido reportada por estafas, fraude o sanciones. Herramienta gratuita de seguridad blockchain."
+  },
+  "networks": {
+    "eth": "Ethereum",
+    "trx": "TRON",
+    "bnb": "BNB Chain",
+    "polygon": "Polygon",
+    "select": "Seleccionar Red",
+    "auto_detected": "Red detectada automaticamente"
   }
 }

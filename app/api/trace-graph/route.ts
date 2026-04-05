@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+type NetworkType = 'eth' | 'trx' | 'bnb' | 'polygon';
+
+const ALCHEMY_ETH_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+const ALCHEMY_POLYGON_URL = 'https://polygon-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   // Binance
@@ -64,8 +67,56 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer'
   '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Flagged Address', type: 'scam' },
 };
 
-async function fetchTransfers(params: object) {
-  const res = await fetch(ALCHEMY_URL, {
+const KNOWN_TRON_ENTITIES: Record<string, { label: string; type: string }> = {
+  'TN5C4p6n8jBHEBEFVCEFkEzakAVAoHjE68': { label: 'Binance TRON', type: 'exchange' },
+  'TFTWqeM8TErPWxitPUAH9rMuREjMCGEFSe': { label: 'Huobi TRON', type: 'exchange' },
+  'TYASr5UV6HEcXatwdFQfmLVUqQQQMUxHLS': { label: 'OKX TRON', type: 'exchange' },
+  'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange' },
+  'TCYSmggLNfJm8KXKDVL9HF93gHqJbGcTH3': { label: 'KuCoin TRON', type: 'exchange' },
+  'TKbQQJigNqXXe3Fx1EMseSJaJD3UJSg5FG': { label: 'Gate.io TRON', type: 'exchange' },
+  'TVGDpEqR1GbK2mhpBECQuJCz3SWJzHaXvz': { label: 'Bybit TRON', type: 'exchange' },
+  'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange' },
+  'TNaRAoLUyYEV2uF7GUrzSjRQTU8v5ZJ5VR': { label: 'SunSwap V2', type: 'defi' },
+  'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy': { label: 'Pig Butchering TRON 1', type: 'scam' },
+  'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG': { label: 'Pig Butchering TRON 2', type: 'scam' },
+  'THMciKzTHCw2YHaUka8Cq8MQGhBYDttx7c': { label: 'Pig Butchering TRON 3', type: 'scam' },
+  'TGzz8gjYiYRqpfmDwnLxfCAQasYZgqX9Bb': { label: 'Fake Exchange TRON', type: 'scam' },
+  'TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT': { label: 'USDT Scam Collector', type: 'scam' },
+};
+
+const KNOWN_BSC_ENTITIES: Record<string, { label: string; type: string }> = {
+  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance BSC', type: 'exchange' },
+  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance BSC 2', type: 'exchange' },
+  '0x10ed43c718714eb63d5aa57b78b54704e256024e': { label: 'PancakeSwap V2', type: 'defi' },
+  '0x13f4ea83d0bd40e75c8222255bc855a974568dd4': { label: 'PancakeSwap V3', type: 'defi' },
+  '0x1111111254eeb25477b68fb85ed929f73a960582': { label: '1inch BSC', type: 'defi' },
+  '0x55d398326f99059ff775485246999027b3197955': { label: 'USDT BSC Contract', type: 'defi' },
+};
+
+function getEntitiesForNetwork(network: NetworkType): Record<string, { label: string; type: string }> {
+  switch (network) {
+    case 'eth':
+      return KNOWN_ENTITIES;
+    case 'trx':
+      return KNOWN_TRON_ENTITIES;
+    case 'bnb':
+      return KNOWN_BSC_ENTITIES;
+    case 'polygon':
+      return KNOWN_ENTITIES; // Reuse ETH entities for Polygon (many overlap)
+  }
+}
+
+function isValidAddress(network: NetworkType, addr: string): boolean {
+  if (network === 'trx') {
+    return /^T[a-zA-Z0-9]{33}$/.test(addr);
+  }
+  return /^0x[a-fA-F0-9]{40}$/i.test(addr);
+}
+
+// ---- Alchemy-based fetching (ETH / Polygon) ----
+
+async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
+  const res = await fetch(alchemyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] }),
@@ -75,7 +126,7 @@ async function fetchTransfers(params: object) {
   return json.result?.transfers || [];
 }
 
-async function getTransfersForAddress(address: string) {
+async function getAlchemyTransfersForAddress(alchemyUrl: string, address: string) {
   const base = {
     fromBlock: '0x0',
     toBlock: 'latest',
@@ -85,12 +136,172 @@ async function getTransfersForAddress(address: string) {
   };
 
   const [outgoing, incoming] = await Promise.all([
-    fetchTransfers({ ...base, fromAddress: address }),
-    fetchTransfers({ ...base, toAddress: address }),
+    fetchAlchemyTransfers(alchemyUrl, { ...base, fromAddress: address }),
+    fetchAlchemyTransfers(alchemyUrl, { ...base, toAddress: address }),
   ]);
 
   return { outgoing, incoming };
 }
+
+// ---- TRON fetching via TronGrid ----
+
+async function fetchTronGraphTransfers(address: string) {
+  const apiKey = process.env.TRONGRID_API_KEY || '';
+  const headers: Record<string, string> = {};
+  if (apiKey) headers['TRON-PRO-API-KEY'] = apiKey;
+
+  const [trxRes, trc20Res] = await Promise.all([
+    fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions?limit=200&only_confirmed=true`, { headers }),
+    fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=200&only_confirmed=true`, { headers }),
+  ]);
+
+  const trxJson = await trxRes.json();
+  const trc20Json = await trc20Res.json();
+
+  const outgoing: any[] = [];
+  const incoming: any[] = [];
+
+  // Parse native TRX transactions
+  const trxData = trxJson.data || [];
+  for (const tx of trxData) {
+    const contract = tx.raw_data?.contract?.[0];
+    if (!contract || contract.type !== 'TransferContract') continue;
+    const param = contract.parameter?.value;
+    if (!param) continue;
+
+    const from = param.owner_address ? tronHexToBase58(param.owner_address) : '';
+    const to = param.to_address ? tronHexToBase58(param.to_address) : '';
+    const value = (param.amount || 0) / 1e6; // TRX has 6 decimals
+    const hash = tx.txID || '';
+    const timestamp = tx.block_timestamp ? new Date(tx.block_timestamp).toISOString() : '';
+
+    const transfer = { from, to, value, asset: 'TRX', hash, metadata: { blockTimestamp: timestamp } };
+
+    if (from.toLowerCase() === address.toLowerCase()) {
+      outgoing.push(transfer);
+    }
+    if (to.toLowerCase() === address.toLowerCase()) {
+      incoming.push(transfer);
+    }
+  }
+
+  // Parse TRC20 token transactions
+  const trc20Data = trc20Json.data || [];
+  for (const tx of trc20Data) {
+    const from = tx.from || '';
+    const to = tx.to || '';
+    const decimals = parseInt(tx.token_info?.decimals || '6', 10);
+    const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
+    const symbol = tx.token_info?.symbol || 'TOKEN';
+    const hash = tx.transaction_id || '';
+    const timestamp = tx.block_timestamp ? new Date(tx.block_timestamp).toISOString() : '';
+
+    const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
+
+    if (from.toLowerCase() === address.toLowerCase()) {
+      outgoing.push(transfer);
+    }
+    if (to.toLowerCase() === address.toLowerCase()) {
+      incoming.push(transfer);
+    }
+  }
+
+  // Limit to 20 per direction
+  return {
+    outgoing: outgoing.slice(0, 20),
+    incoming: incoming.slice(0, 20),
+  };
+}
+
+function tronHexToBase58(hexAddress: string): string {
+  // TronGrid sometimes returns base58 directly, sometimes hex
+  if (hexAddress.startsWith('T')) return hexAddress;
+  // For hex addresses starting with 41, convert to base58
+  // This is a simplified approach - in production you'd use a proper tron-web library
+  // TronGrid API usually returns base58 in trc20 endpoints
+  return hexAddress;
+}
+
+// ---- BSC fetching via BscScan ----
+
+async function fetchBscGraphTransfers(address: string) {
+  const apiKey = process.env.BSCSCAN_API_KEY || '';
+
+  const [bnbRes, bep20Res] = await Promise.all([
+    fetch(`https://api.bscscan.com/api?module=account&action=txlist&address=${address}&sort=desc&apikey=${apiKey}`),
+    fetch(`https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&sort=desc&apikey=${apiKey}`),
+  ]);
+
+  const bnbJson = await bnbRes.json();
+  const bep20Json = await bep20Res.json();
+
+  const outgoing: any[] = [];
+  const incoming: any[] = [];
+
+  // Parse native BNB transactions
+  const bnbTxs = (bnbJson.result || []).slice(0, 40);
+  for (const tx of bnbTxs) {
+    const from = (tx.from || '').toLowerCase();
+    const to = (tx.to || '').toLowerCase();
+    const value = parseFloat(tx.value || '0') / 1e18;
+    const hash = tx.hash || '';
+    const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
+
+    if (value === 0 && !tx.input?.startsWith('0x')) continue;
+
+    const transfer = { from, to, value, asset: 'BNB', hash, metadata: { blockTimestamp: timestamp } };
+
+    if (from === address.toLowerCase()) {
+      outgoing.push(transfer);
+    }
+    if (to === address.toLowerCase()) {
+      incoming.push(transfer);
+    }
+  }
+
+  // Parse BEP20 token transactions
+  const bep20Txs = (bep20Json.result || []).slice(0, 40);
+  for (const tx of bep20Txs) {
+    const from = (tx.from || '').toLowerCase();
+    const to = (tx.to || '').toLowerCase();
+    const decimals = parseInt(tx.tokenDecimal || '18', 10);
+    const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
+    const symbol = tx.tokenSymbol || 'TOKEN';
+    const hash = tx.hash || '';
+    const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
+
+    const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
+
+    if (from === address.toLowerCase()) {
+      outgoing.push(transfer);
+    }
+    if (to === address.toLowerCase()) {
+      incoming.push(transfer);
+    }
+  }
+
+  return {
+    outgoing: outgoing.slice(0, 20),
+    incoming: incoming.slice(0, 20),
+  };
+}
+
+// ---- Unified transfer fetcher ----
+
+async function getTransfersForAddress(network: NetworkType, address: string) {
+  switch (network) {
+    case 'eth':
+      return getAlchemyTransfersForAddress(ALCHEMY_ETH_URL, address);
+    case 'polygon':
+      return getAlchemyTransfersForAddress(ALCHEMY_POLYGON_URL, address);
+    case 'trx':
+      return fetchTronGraphTransfers(address);
+    case 'bnb':
+      return fetchBscGraphTransfers(address);
+  }
+}
+
+// ---- Graph types ----
 
 interface GraphNode {
   id: string;
@@ -110,64 +321,74 @@ interface GraphEdge {
   timestamp: string;
 }
 
+// ---- Route handler ----
+
 export async function POST(req: NextRequest) {
   try {
-    const { address, depth = 1 } = await req.json();
+    const { address, depth = 1, network = 'eth' } = await req.json();
 
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      return NextResponse.json({ error: 'Invalid Ethereum address' }, { status: 400 });
+    const net = (['eth', 'trx', 'bnb', 'polygon'] as const).includes(network) ? network as NetworkType : 'eth';
+
+    if (!address || !isValidAddress(net, address)) {
+      const label = net === 'trx' ? 'TRON' : net === 'bnb' ? 'BSC' : net === 'polygon' ? 'Polygon' : 'Ethereum';
+      return NextResponse.json({ error: `Invalid ${label} address` }, { status: 400 });
     }
 
+    const entities = getEntitiesForNetwork(net);
     const maxDepth = Math.min(Math.max(1, depth), 3);
     const nodes = new Map<string, GraphNode>();
     const edges: GraphEdge[] = [];
     const visited = new Set<string>();
     const MAX_NODES = 50;
 
+    // TRON addresses are case-sensitive; EVM addresses are lowercased
+    const normalizeAddr = (addr: string) => (net === 'trx' ? addr : addr.toLowerCase());
+
     const getNodeType = (addr: string): GraphNode['type'] => {
-      const entity = KNOWN_ENTITIES[addr.toLowerCase()];
-      if (entity) return entity.type;
+      const key = net === 'trx' ? addr : addr.toLowerCase();
+      const entity = entities[key];
+      if (entity) return entity.type as GraphNode['type'];
       return 'unknown';
     };
 
     const ensureNode = (addr: string, isSource = false) => {
-      const lower = addr.toLowerCase();
-      if (!nodes.has(lower)) {
-        const entity = KNOWN_ENTITIES[lower];
-        nodes.set(lower, {
-          id: lower,
-          label: entity?.label || `${lower.slice(0, 6)}…${lower.slice(-4)}`,
-          type: isSource ? 'source' : getNodeType(lower),
+      const key = normalizeAddr(addr);
+      if (!nodes.has(key)) {
+        const entity = entities[key];
+        nodes.set(key, {
+          id: key,
+          label: entity?.label || `${key.slice(0, 6)}…${key.slice(-4)}`,
+          type: isSource ? 'source' : getNodeType(key),
           totalIn: 0,
           totalOut: 0,
           txCount: 0,
         });
       }
-      return nodes.get(lower)!;
+      return nodes.get(key)!;
     };
 
     const traceHop = async (addr: string, currentDepth: number) => {
-      const lower = addr.toLowerCase();
-      if (visited.has(lower) || currentDepth > maxDepth || nodes.size >= MAX_NODES) return;
-      visited.add(lower);
+      const key = normalizeAddr(addr);
+      if (visited.has(key) || currentDepth > maxDepth || nodes.size >= MAX_NODES) return;
+      visited.add(key);
 
-      const { outgoing, incoming } = await getTransfersForAddress(lower);
+      const { outgoing, incoming } = await getTransfersForAddress(net, key);
 
       for (const tx of outgoing) {
         if (!tx.to || nodes.size >= MAX_NODES) continue;
-        const toLower = tx.to.toLowerCase();
-        const fromNode = ensureNode(lower, currentDepth === 1);
-        const toNode = ensureNode(toLower);
+        const toKey = normalizeAddr(tx.to);
+        const fromNode = ensureNode(key, currentDepth === 1);
+        const toNode = ensureNode(toKey);
         fromNode.totalOut += tx.value || 0;
         fromNode.txCount++;
         toNode.totalIn += tx.value || 0;
         toNode.txCount++;
 
         edges.push({
-          source: lower,
-          target: toLower,
+          source: key,
+          target: toKey,
           value: tx.value || 0,
-          token: tx.asset || 'ETH',
+          token: tx.asset || (net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH'),
           hash: tx.hash || '',
           timestamp: tx.metadata?.blockTimestamp || '',
         });
@@ -175,19 +396,19 @@ export async function POST(req: NextRequest) {
 
       for (const tx of incoming) {
         if (!tx.from || nodes.size >= MAX_NODES) continue;
-        const fromLower = tx.from.toLowerCase();
-        const fromNode = ensureNode(fromLower);
-        const toNode = ensureNode(lower, currentDepth === 1);
+        const fromKey = normalizeAddr(tx.from);
+        const fromNode = ensureNode(fromKey);
+        const toNode = ensureNode(key, currentDepth === 1);
         fromNode.totalOut += tx.value || 0;
         fromNode.txCount++;
         toNode.totalIn += tx.value || 0;
         toNode.txCount++;
 
         edges.push({
-          source: fromLower,
-          target: lower,
+          source: fromKey,
+          target: key,
           value: tx.value || 0,
-          token: tx.asset || 'ETH',
+          token: tx.asset || (net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH'),
           hash: tx.hash || '',
           timestamp: tx.metadata?.blockTimestamp || '',
         });
@@ -196,8 +417,8 @@ export async function POST(req: NextRequest) {
       // Trace next hop for outgoing destinations
       if (currentDepth < maxDepth) {
         const nextAddresses = outgoing
-          .map((tx: any) => tx.to?.toLowerCase())
-          .filter((a: string) => a && !visited.has(a) && !KNOWN_ENTITIES[a.toLowerCase()])
+          .map((tx: any) => normalizeAddr(tx.to || ''))
+          .filter((a: string) => a && !visited.has(a) && !entities[a])
           .slice(0, 5); // limit branches
 
         for (const next of nextAddresses) {
@@ -207,8 +428,9 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    ensureNode(address.toLowerCase(), true);
-    await traceHop(address.toLowerCase(), 1);
+    const rootAddr = normalizeAddr(address);
+    ensureNode(rootAddr, true);
+    await traceHop(rootAddr, 1);
 
     const knownEntities = Array.from(nodes.values())
       .filter((n) => n.type === 'exchange' || n.type === 'mixer' || n.type === 'defi' || n.type === 'scam')

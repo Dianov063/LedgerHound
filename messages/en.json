@@ -546,5 +546,13 @@
     "cta_eval_btn": "Free Case Evaluation",
     "seo_title": "Free Crypto Scam Address Checker | LedgerHound",
     "seo_desc": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Free blockchain security tool powered by multiple databases."
+  },
+  "networks": {
+    "eth": "Ethereum",
+    "trx": "TRON",
+    "bnb": "BNB Chain",
+    "polygon": "Polygon",
+    "select": "Select Network",
+    "auto_detected": "Network auto-detected"
   }
 }

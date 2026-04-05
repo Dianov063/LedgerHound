@@ -91,9 +91,61 @@ const LOADING_STEPS = [
   'Step 3/3: Identifying entities...',
 ];
 
+type NetworkType = 'eth' | 'trx' | 'bnb' | 'polygon';
+
+function getExplorerBaseUrl(network: NetworkType): string {
+  switch (network) {
+    case 'eth':
+      return 'https://etherscan.io';
+    case 'trx':
+      return 'https://tronscan.org/#';
+    case 'bnb':
+      return 'https://bscscan.com';
+    case 'polygon':
+      return 'https://polygonscan.com';
+  }
+}
+
+function getExplorerAddressUrl(network: NetworkType, addr: string): string {
+  const base = getExplorerBaseUrl(network);
+  return `${base}/address/${addr}`;
+}
+
+function getExplorerTxUrl(network: NetworkType, hash: string): string {
+  const base = getExplorerBaseUrl(network);
+  if (network === 'trx') return `${base}/transaction/${hash}`;
+  return `${base}/tx/${hash}`;
+}
+
+function getExplorerLabel(network: NetworkType): string {
+  switch (network) {
+    case 'eth':
+      return 'View on Etherscan';
+    case 'trx':
+      return 'View on TronScan';
+    case 'bnb':
+      return 'View on BscScan';
+    case 'polygon':
+      return 'View on PolygonScan';
+  }
+}
+
+function isValidAddress(network: NetworkType, addr: string): boolean {
+  if (network === 'trx') {
+    return /^T[a-zA-Z0-9]{33}$/.test(addr);
+  }
+  return /^0x[a-fA-F0-9]{40}$/i.test(addr);
+}
+
+function getPlaceholder(network: NetworkType): string {
+  if (network === 'trx') return 'Enter TRON address (T...)';
+  return 'Enter Ethereum address (0x...)';
+}
+
 export default function GraphTracer() {
   const t = useTranslations('graph');
   const [address, setAddress] = useState('');
+  const [network, setNetwork] = useState<NetworkType>('eth');
   const [depth, setDepth] = useState(2);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -104,6 +156,15 @@ export default function GraphTracer() {
   const cyRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceAddressRef = useRef<string>('');
+  const networkRef = useRef<NetworkType>('eth');
+
+  // Auto-detect TRON addresses
+  const handleAddressChange = (value: string) => {
+    setAddress(value);
+    if (value.startsWith('T') && value.length === 34) {
+      setNetwork('trx');
+    }
+  };
 
   const initCytoscape = useCallback(
     async (graphData: GraphData) => {
@@ -295,7 +356,7 @@ export default function GraphTracer() {
   }, [data, layout, initCytoscape]);
 
   const handleTrace = async () => {
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!address || !isValidAddress(network, address)) {
       setError(t('error_invalid'));
       return;
     }
@@ -304,7 +365,8 @@ export default function GraphTracer() {
     setError('');
     setData(null);
     setSelectedNode(null);
-    sourceAddressRef.current = address.toLowerCase();
+    sourceAddressRef.current = network === 'trx' ? address : address.toLowerCase();
+    networkRef.current = network;
 
     // Animate loading steps
     setLoadingStep(0);
@@ -315,7 +377,7 @@ export default function GraphTracer() {
       const res = await fetch('/api/trace-graph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, depth }),
+        body: JSON.stringify({ address, depth, network }),
       });
 
       const json = await res.json();
@@ -356,19 +418,38 @@ export default function GraphTracer() {
     link.click();
   };
 
+  const currentNetwork = networkRef.current;
+
   return (
     <div className="bg-slate-950 min-h-screen">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {/* Search Bar */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+          {/* Network selector tabs */}
+          <div className="flex items-center gap-1 mb-3">
+            {(['eth', 'trx', 'bnb', 'polygon'] as const).map((n) => (
+              <button
+                key={n}
+                onClick={() => setNetwork(n)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  network === n
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                {n === 'eth' ? 'ETH' : n === 'trx' ? 'TRON' : n === 'bnb' ? 'BNB' : 'POLYGON'}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
               <input
                 type="text"
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder={t('placeholder')}
+                onChange={(e) => handleAddressChange(e.target.value)}
+                placeholder={getPlaceholder(network)}
                 className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono"
                 onKeyDown={(e) => e.key === 'Enter' && handleTrace()}
               />
@@ -645,7 +726,7 @@ export default function GraphTracer() {
                             </span>
                             {edge.hash && (
                               <a
-                                href={`https://etherscan.io/tx/${edge.hash}`}
+                                href={getExplorerTxUrl(currentNetwork, edge.hash)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -663,13 +744,13 @@ export default function GraphTracer() {
               {/* Actions */}
               <div className="space-y-2">
                 <a
-                  href={`https://etherscan.io/address/${selectedNode.id}`}
+                  href={getExplorerAddressUrl(currentNetwork, selectedNode.id)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-3 rounded-xl transition-colors"
                 >
                   <ExternalLink size={14} />
-                  {t('view_etherscan')}
+                  {getExplorerLabel(currentNetwork)}
                 </a>
               </div>
             </div>

@@ -73,7 +73,7 @@ function ScamCheckerInner() {
   // Pre-fill from URL param
   useEffect(() => {
     const addr = searchParams.get('address');
-    if (addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) {
+    if (addr && /^(0x[a-fA-F0-9]{40}|T[a-zA-Z0-9]{33})$/.test(addr)) {
       setAddress(addr);
     }
   }, [searchParams]);
@@ -93,7 +93,7 @@ function ScamCheckerInner() {
 
   const checkAddress = useCallback(async (addr?: string) => {
     const target = addr || address;
-    if (!/^0x[a-fA-F0-9]{40}$/.test(target)) {
+    if (!/^(0x[a-fA-F0-9]{40}|T[a-zA-Z0-9]{33})$/.test(target)) {
       setError(t('error_invalid'));
       return;
     }

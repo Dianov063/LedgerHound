@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 
 /* ---------- types ---------- */
+type Network = 'eth' | 'trx' | 'bnb' | 'polygon';
+
 interface Transfer {
   hash: string;
   from: string;
@@ -25,7 +27,31 @@ interface Stats {
   total: number;
   totalEthIn: number;
   totalEthOut: number;
+  totalNativeIn?: number;
+  totalNativeOut?: number;
 }
+
+/* ---------- constants ---------- */
+const NATIVE_CURRENCY: Record<Network, string> = {
+  eth: 'ETH',
+  trx: 'TRX',
+  bnb: 'BNB',
+  polygon: 'MATIC',
+};
+
+const EXPLORER_TX_URL: Record<Network, (hash: string) => string> = {
+  eth: (hash) => `https://etherscan.io/tx/${hash}`,
+  trx: (hash) => `https://tronscan.org/#/transaction/${hash}`,
+  bnb: (hash) => `https://bscscan.com/tx/${hash}`,
+  polygon: (hash) => `https://polygonscan.com/tx/${hash}`,
+};
+
+const NETWORK_LABELS: Record<Network, string> = {
+  eth: 'ETH',
+  trx: 'TRON',
+  bnb: 'BNB',
+  polygon: 'POLYGON',
+};
 
 /* ---------- helpers ---------- */
 function shorten(addr: string) {
@@ -111,8 +137,10 @@ function exportCSV(transfers: Transfer[], multiAddress: boolean) {
 /* ========== PAGE ========== */
 export default function WalletTracker() {
   const [input, setInput] = useState('');
+  const [network, setNetwork] = useState<Network>('eth');
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [nativeCurrency, setNativeCurrency] = useState<string>('ETH');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
   const [trackedAddresses, setTrackedAddresses] = useState<string[]>([]);
@@ -124,6 +152,15 @@ export default function WalletTracker() {
   const [dateTo, setDateTo] = useState('');
 
   const multiAddress = trackedAddresses.length > 1;
+
+  // auto-detect network from address input
+  function handleInputChange(value: string) {
+    setInput(value);
+    const trimmed = value.trim();
+    if (trimmed.startsWith('T') && trimmed.length === 34) {
+      setNetwork('trx');
+    }
+  }
 
   // derived
   const uniqueTokens = useMemo(() => {
@@ -176,22 +213,36 @@ export default function WalletTracker() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const raw = input.trim();
-    const addresses = raw
-      .split(/[\s,]+/)
-      .map((a) => a.trim().toLowerCase())
-      .filter(Boolean);
+
+    // Split addresses: for TRX single address, for EVM comma-separated
+    const addresses = network === 'trx'
+      ? [raw].filter(Boolean)
+      : raw.split(/[\s,]+/).map((a) => a.trim().toLowerCase()).filter(Boolean);
 
     if (addresses.length === 0) {
       setStatus('error');
-      setError('Enter at least one Ethereum address.');
+      setError('Enter at least one wallet address.');
       return;
     }
 
-    const invalid = addresses.find((a) => !/^0x[a-fA-F0-9]{40}$/.test(a));
-    if (invalid) {
-      setStatus('error');
-      setError(`Invalid address: ${invalid}`);
-      return;
+    // Validate based on network
+    const evmPattern = /^0x[a-fA-F0-9]{40}$/;
+    const tronPattern = /^T[a-zA-Z0-9]{33}$/;
+
+    if (network === 'trx') {
+      const invalid = addresses.find((a) => !tronPattern.test(a));
+      if (invalid) {
+        setStatus('error');
+        setError(`Invalid TRON address: ${invalid}`);
+        return;
+      }
+    } else {
+      const invalid = addresses.find((a) => !evmPattern.test(a));
+      if (invalid) {
+        setStatus('error');
+        setError(`Invalid address: ${invalid}`);
+        return;
+      }
     }
 
     setStatus('loading');
@@ -208,7 +259,7 @@ export default function WalletTracker() {
       const res = await fetch('/api/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses }),
+        body: JSON.stringify({ addresses, network }),
       });
 
       const data = await res.json();
@@ -216,6 +267,7 @@ export default function WalletTracker() {
 
       setTransfers(data.transfers);
       setStats(data.stats);
+      setNativeCurrency(data.nativeCurrency || NATIVE_CURRENCY[network]);
       setStatus('done');
     } catch (err: any) {
       setStatus('error');
@@ -230,9 +282,34 @@ export default function WalletTracker() {
     setDateTo('');
   }
 
+  // Resolve native currency values with backward compat
+  const nativeIn = stats?.totalNativeIn ?? stats?.totalEthIn ?? 0;
+  const nativeOut = stats?.totalNativeOut ?? stats?.totalEthOut ?? 0;
+
+  const placeholder = network === 'trx'
+    ? 'TABC... (TRON address)'
+    : '0xABC..., 0xDEF... (comma-separated for multiple)';
+
   return (
     <div className="bg-slate-950 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Network Tabs */}
+        <div className="flex items-center gap-1 mb-4 max-w-3xl mx-auto">
+          {(['eth', 'trx', 'bnb', 'polygon'] as const).map((n) => (
+            <button
+              key={n}
+              onClick={() => setNetwork(n)}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                network === n
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {NETWORK_LABELS[n]}
+            </button>
+          ))}
+        </div>
 
         {/* Search */}
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto mb-10">
@@ -242,8 +319,8 @@ export default function WalletTracker() {
               <input
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="0xABC..., 0xDEF... (comma-separated for multiple)"
+                onChange={(e) => handleInputChange(e.target.value)}
+                placeholder={placeholder}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-sm font-mono text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
               />
             </div>
@@ -278,12 +355,12 @@ export default function WalletTracker() {
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
               <TrendingDown size={14} className="text-green-500 mx-auto mb-1.5" />
-              <p className="text-xl font-bold text-green-400">{stats.totalEthIn} ETH</p>
+              <p className="text-xl font-bold text-green-400">{nativeIn} {nativeCurrency}</p>
               <p className="text-[10px] text-slate-500 mt-1">Total Received</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
               <TrendingUp size={14} className="text-red-400 mx-auto mb-1.5" />
-              <p className="text-xl font-bold text-red-400">{stats.totalEthOut} ETH</p>
+              <p className="text-xl font-bold text-red-400">{nativeOut} {nativeCurrency}</p>
               <p className="text-[10px] text-slate-500 mt-1">Total Sent</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
@@ -447,7 +524,7 @@ export default function WalletTracker() {
                         </td>
                         <td className="px-5 py-3 font-mono text-xs whitespace-nowrap">
                           <a
-                            href={`https://etherscan.io/tx/${tx.hash}`}
+                            href={EXPLORER_TX_URL[network](tx.hash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-brand-500 hover:text-brand-400 inline-flex items-center gap-1"
