@@ -52,45 +52,63 @@ interface Transfer {
 }
 
 /**
- * Alchemy getAssetTransfers: `value` is normally in the token's native unit,
- * but can be null for ERC-20s when Alchemy can't resolve decimals.
- * Fallback: decode rawContract.value (hex Wei) with rawContract.decimal.
+ * Alchemy getAssetTransfers: `value` is ALREADY converted to the token's
+ * native unit (ETH for external, token-decimals for ERC-20).
+ *   value: 1.5  → means 1.5 ETH.  NO wei conversion needed.
  *
- * For ETH (external), values > 1e12 are clearly in Wei (only ~120M ETH exist).
+ * The only fallback: when `value` is null (Alchemy can't resolve ERC-20
+ * decimals), compute from rawContract.value (hex) / 10^rawContract.decimal.
  */
 function safeValue(tx: Transfer): number {
-  // Try the high-level value first
-  let v = tx.value ?? 0;
+  // Alchemy value is already human-readable — use directly
+  if (tx.value != null && tx.value !== 0) {
+    return tx.value;
+  }
 
-  // If value is 0/null but rawContract has data, compute from raw hex + decimals
-  if ((!v || v === 0) && tx.rawContract?.value) {
+  // Fallback for ERC-20s where Alchemy returned value: null
+  if (tx.rawContract?.value) {
     try {
-      const rawHex = tx.rawContract.value;
-      const rawBig = BigInt(rawHex);
+      const rawBig = BigInt(tx.rawContract.value);
       const rawDec = tx.rawContract.decimal || '';
-      const decimals = rawDec.startsWith('0x') ? parseInt(rawDec, 16) : (parseInt(rawDec, 10) || 18);
-      v = Number(rawBig) / Math.pow(10, decimals);
+      const decimals = rawDec.startsWith('0x')
+        ? parseInt(rawDec, 16)
+        : (parseInt(rawDec, 10) || 18);
+      return Number(rawBig) / Math.pow(10, decimals);
     } catch {
-      v = 0;
+      return 0;
     }
   }
 
-  // Sanity check: if value looks like Wei (way too large for ETH), convert
-  if (v > 1e12) return v / 1e18;
-  return v;
+  return 0;
 }
 
 /** Check if a token is likely spam/airdrop */
 function isSpamToken(tx: Transfer): boolean {
   const asset = (tx.asset || '').trim();
-  // No asset name
   if (!asset) return false;
+
+  const lower = asset.toLowerCase();
+
   // Known spam patterns: URLs, very long names, suspicious chars
   if (/[/:.<>]/.test(asset) || asset.length > 20) return true;
   if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
-  // Common airdrop spam token names
-  const spamNames = ['visit', 'claim', 'airdrop', 'reward', 'voucher', 'ticket', 'bonus', 'gift', 'free', 'disney', 'ukraine', 'windows'];
-  if (spamNames.some((s) => asset.toLowerCase().includes(s))) return true;
+
+  // Exact-match spam token names (case-insensitive)
+  const spamExact = new Set([
+    'visa', 'paypal', 'nba', 'nfl', 'metamask', 'opensea',
+    'pranksy', 'vitalik', 'bowl', 'lens', 'mooney', 'solid',
+    'wlunc', 'zepe', 'alpha', 'apecoin',
+  ]);
+  if (spamExact.has(lower)) return true;
+
+  // Substring-match spam keywords
+  const spamKeywords = [
+    'visit', 'claim', 'airdrop', 'reward', 'voucher', 'ticket',
+    'bonus', 'gift', 'free', 'disney', 'ukraine', 'windows',
+    'nft', 'coinbase', 'binance',
+  ];
+  if (spamKeywords.some((s) => lower.includes(s))) return true;
+
   return false;
 }
 
@@ -109,12 +127,16 @@ function filterSpam(transfers: Transfer[]): Transfer[] {
   });
 }
 
-/** Format ETH value: max 4 decimals, with thousands separators for large numbers */
+/** Format value with smart precision: >1000 → 2 dec, <1 → 6 dec, else 4 dec */
 export function fmtEth(v: number): string {
-  if (Math.abs(v) >= 1000) {
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  const abs = Math.abs(v);
+  if (abs >= 1000) {
+    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  return v.toFixed(4);
+  if (abs > 0 && abs < 1) {
+    return v.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+  }
+  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
 async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Promise<Transfer[]> {
@@ -295,8 +317,8 @@ export async function generateReport(
   recommendations.push('File FBI IC3 report at ic3.gov if not already done.');
   recommendations.push('For court-ready certified investigation with expert testimony, contact LedgerHound at contact@ledgerhound.vip.');
 
-  // Transaction list (top 50)
-  const allTxs = [
+  // Transaction list — deduplicated, max 3 per (token + counterparty)
+  const rawTxs = [
     ...incoming.map((tx) => ({
       date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
       direction: 'IN' as const,
@@ -313,9 +335,38 @@ export async function generateReport(
       value: safeValue(tx),
       token: tx.asset || 'ETH',
     })),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 50);
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  // Deduplicate: max 3 rows per (from + token) or (to + token)
+  const groupCounts = new Map<string, number>();
+  const allTxs: typeof rawTxs = [];
+  for (const tx of rawTxs) {
+    const counterparty = tx.direction === 'IN' ? tx.from : tx.to;
+    const key = `${counterparty}|${tx.token}`;
+    const count = groupCounts.get(key) || 0;
+    if (count < 3) {
+      allTxs.push(tx);
+      groupCounts.set(key, count + 1);
+    } else if (count === 3) {
+      // Count remaining for summary row
+      const remaining = rawTxs.filter((t) => {
+        const cp = t.direction === 'IN' ? t.from : t.to;
+        return `${cp}|${t.token}` === key;
+      }).length - 3;
+      if (remaining > 0) {
+        allTxs.push({
+          date: '',
+          direction: tx.direction,
+          from: tx.direction === 'IN' ? counterparty : address,
+          to: tx.direction === 'OUT' ? counterparty : address,
+          value: 0,
+          token: `+${remaining} more ${tx.token}`,
+        });
+      }
+      groupCounts.set(key, count + 1); // prevent duplicate summary rows
+    }
+    if (allTxs.length >= 50) break;
+  }
 
   const reportData: ReportData = {
     walletAddress: address,
