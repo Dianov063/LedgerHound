@@ -40,40 +40,77 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer'
   '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Flagged Address', type: 'scam' },
 };
 
+/* ── Known legitimate tokens (used to separate ETH stats from junk) ── */
+const KNOWN_TOKENS = new Set([
+  'ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC', 'BTC',
+  'MATIC', 'BNB', 'UNI', 'AAVE', 'LINK', 'CRV', 'MKR',
+  'LDO', 'RPL', 'COMP', 'SNX', 'BAL', 'SUSHI', 'YFI',
+  'GRT', 'ENS', 'DYDX', 'OP', 'ARB', 'PEPE', 'SHIB',
+  'APE', 'SAND', 'MANA', 'LRC', 'IMX', 'FXS', 'FRAX',
+  'LUSD', 'RAI', 'RETH', 'STETH', 'CBETH', '1INCH',
+  'TORN', 'OMG', 'SAI', 'REQ', 'MASK', 'DATA', 'LPT',
+]);
+
+const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 interface Transfer {
   from: string;
   to: string;
   value: number | null;
-  asset: string;
+  asset: string | null;
   hash: string;
   category?: string;
   rawContract?: { value?: string; decimal?: string; address?: string };
   metadata?: { blockTimestamp?: string };
 }
 
+/* ── Spam detection keywords ── */
+const SPAM_KEYWORDS = [
+  'visit', 'claim', 'airdrop', 'reward', 'voucher', 'ticket',
+  'bonus', 'gift', 'free', 'disney', 'ukraine', 'windows',
+  'google', 'youtube', 'tesla', 'tiktok', 'porn',
+  'mcdonalds', 'superbowl', 'superbo', 'netflix',
+  'amazon', 'apple', 'twitter', 'facebook', 'instagram',
+  'coinbase', 'binance', 'opensea', 'metamask',
+];
+
+const SPAM_EXACT = new Set([
+  'visa', 'paypal', 'nba', 'nfl', 'pranksy', 'vitalik',
+  'bowl', 'lens', 'mooney', 'solid', 'wlunc', 'vsolid',
+  'zepe', 'dhold', 'sablier', 'tls', 'shi', 'nike',
+  'endgame', 'vshiba', 'kimu', 'koti', 'milkers',
+  'flokisnacks', 'flokielon', 'flokifire', 'shibindia',
+  'voof', 'sher', 'vb', 'apecoin',
+]);
+
 /**
- * Alchemy getAssetTransfers: `value` is ALREADY converted to the token's
- * native unit (ETH for external, token-decimals for ERC-20).
- *   value: 1.5  → means 1.5 ETH.  NO wei conversion needed.
+ * Alchemy getAssetTransfers: `value` is already in human-readable units.
+ *   external → value = ETH amount (e.g. 1.5 means 1.5 ETH)
+ *   erc20    → value = token amount (already divided by decimals)
  *
- * The only fallback: when `value` is null (Alchemy can't resolve ERC-20
- * decimals), compute from rawContract.value (hex) / 10^rawContract.decimal.
+ * Fallback only when value is null: use rawContract.value (hex) ÷ 10^decimal.
+ * Sanity cap: any single transfer > 1e15 is garbage data → return 0.
  */
 function safeValue(tx: Transfer): number {
-  // Alchemy value is already human-readable — use directly
-  if (tx.value != null && tx.value !== 0) {
-    return tx.value;
+  // Alchemy pre-converted value — use directly
+  if (tx.value !== null && tx.value !== undefined) {
+    const v = Number(tx.value);
+    if (!isNaN(v) && v < 1e15) return v;
+    return 0; // impossibly large → garbage
   }
 
   // Fallback for ERC-20s where Alchemy returned value: null
-  if (tx.rawContract?.value) {
+  if (tx.rawContract?.value && tx.rawContract?.decimal) {
     try {
-      const rawBig = BigInt(tx.rawContract.value);
-      const rawDec = tx.rawContract.decimal || '';
+      const raw = BigInt(tx.rawContract.value);
+      const rawDec = tx.rawContract.decimal;
       const decimals = rawDec.startsWith('0x')
         ? parseInt(rawDec, 16)
         : (parseInt(rawDec, 10) || 18);
-      return Number(rawBig) / Math.pow(10, decimals);
+      // Reject obviously broken decimals (0 or 1 → produces huge numbers)
+      if (decimals < 2) return 0;
+      const converted = Number(raw) / Math.pow(10, decimals);
+      if (!isNaN(converted) && converted < 1e15) return converted;
     } catch {
       return 0;
     }
@@ -85,29 +122,28 @@ function safeValue(tx: Transfer): number {
 /** Check if a token is likely spam/airdrop */
 function isSpamToken(tx: Transfer): boolean {
   const asset = (tx.asset || '').trim();
-  if (!asset) return false;
+
+  // No asset name or control characters → spam
+  if (!asset || asset.charCodeAt(0) < 32) return true;
 
   const lower = asset.toLowerCase();
 
-  // Known spam patterns: URLs, very long names, suspicious chars
+  // URL patterns, very long names, suspicious chars
   if (/[/:.<>]/.test(asset) || asset.length > 20) return true;
   if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
 
-  // Exact-match spam token names (case-insensitive)
-  const spamExact = new Set([
-    'visa', 'paypal', 'nba', 'nfl', 'metamask', 'opensea',
-    'pranksy', 'vitalik', 'bowl', 'lens', 'mooney', 'solid',
-    'wlunc', 'zepe', 'alpha', 'apecoin',
-  ]);
-  if (spamExact.has(lower)) return true;
+  // Exact-match spam names
+  if (SPAM_EXACT.has(lower)) return true;
 
   // Substring-match spam keywords
-  const spamKeywords = [
-    'visit', 'claim', 'airdrop', 'reward', 'voucher', 'ticket',
-    'bonus', 'gift', 'free', 'disney', 'ukraine', 'windows',
-    'nft', 'coinbase', 'binance',
-  ];
-  if (spamKeywords.some((s) => lower.includes(s))) return true;
+  if (SPAM_KEYWORDS.some((s) => lower.includes(s))) return true;
+
+  // Minted from null address AND not a known legitimate token → spam airdrop
+  if (tx.from === NULL_ADDRESS && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+
+  // Absurdly large value (>10B) for unknown tokens → spam
+  const val = safeValue(tx);
+  if (val > 1e10 && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
 
   return false;
 }
@@ -117,10 +153,9 @@ function filterSpam(transfers: Transfer[]): Transfer[] {
   return transfers.filter((tx) => {
     // Always keep ETH/native transfers
     if (tx.category === 'external') return true;
-    if ((tx.asset || '').toUpperCase() === 'ETH') return true;
-    // Filter obvious spam
+    // Filter spam
     if (isSpamToken(tx)) return false;
-    // Filter dust: if value rounds to 0.0000, skip
+    // Filter dust: value rounds to ~0
     const val = safeValue(tx);
     if (val > 0 && val < 0.0001) return false;
     return true;
@@ -179,8 +214,11 @@ export interface ReportData {
   totalReceived: number;
   totalSent: number;
   netBalance: number;
+  ethReceived: number;
+  ethSent: number;
   transactionCount: number;
   uniqueTokens: string[];
+  spamFiltered: number;
   firstActivity: string;
   lastActivity: string;
   topCounterparties: { address: string; label: string; count: number; volume: number }[];
@@ -215,16 +253,23 @@ export async function generateReport(
   ]);
   const outgoing = filterSpam(rawOutgoing);
   const incoming = filterSpam(rawIncoming);
+  const spamFiltered = (rawIncoming.length - incoming.length) + (rawOutgoing.length - outgoing.length);
 
-  console.log(`[generateReport] Transfers: ${rawIncoming.length} in (${incoming.length} after spam filter), ${rawOutgoing.length} out (${outgoing.length} after spam filter)`);
+  console.log(`[generateReport] Transfers: ${rawIncoming.length} in → ${incoming.length} clean, ${rawOutgoing.length} out → ${outgoing.length} clean (${spamFiltered} spam filtered)`);
 
-  // Calculate stats
-  let totalReceived = 0;
-  let totalSent = 0;
+  // Calculate stats — ETH-only totals (different tokens can't be summed)
+  let ethReceived = 0;
+  let ethSent = 0;
   const tokenSet = new Set<string>();
   const counterpartyMap = new Map<string, { count: number; volume: number }>();
   const entityMap = new Map<string, { label: string; type: string; interactions: number }>();
   const timestamps: number[] = [];
+
+  /** Only count ETH/WETH toward totals — token values are different units */
+  const isEthLike = (tx: Transfer) =>
+    tx.category === 'external' ||
+    (tx.asset || '').toUpperCase() === 'ETH' ||
+    (tx.asset || '').toUpperCase() === 'WETH';
 
   const processCounterparty = (addr: string, value: number) => {
     const lower = addr.toLowerCase();
@@ -244,19 +289,21 @@ export async function generateReport(
 
   for (const tx of incoming) {
     const val = safeValue(tx);
-    totalReceived += val;
+    if (isEthLike(tx)) ethReceived += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.from) processCounterparty(tx.from, val);
+    if (tx.from) processCounterparty(tx.from, isEthLike(tx) ? val : 0);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
   for (const tx of outgoing) {
     const val = safeValue(tx);
-    totalSent += val;
+    if (isEthLike(tx)) ethSent += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.to) processCounterparty(tx.to, val);
+    if (tx.to) processCounterparty(tx.to, isEthLike(tx) ? val : 0);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
+
+  console.log(`[generateReport] ETH received: ${ethReceived.toFixed(4)}, sent: ${ethSent.toFixed(4)}, net: ${(ethReceived - ethSent).toFixed(4)}`);
 
   timestamps.sort((a, b) => a - b);
   const firstActivity = timestamps.length > 0 ? new Date(timestamps[0]).toISOString().split('T')[0] : 'N/A';
@@ -285,7 +332,7 @@ export async function generateReport(
 
   if (hasMixer) riskScore += 30;
   if (hasScam) riskScore += 25;
-  if (!hasExchange && totalSent > 10) riskScore += 10;
+  if (!hasExchange && ethSent > 10) riskScore += 10;
   if (hasExchange) riskScore -= 20;
   if (outgoing.length + incoming.length < 5) riskScore -= 15;
 
@@ -304,7 +351,8 @@ export async function generateReport(
     keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
   }
   if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
-  if (totalSent > 0) keyFindings.push(`Wallet sent ${fmtEth(totalSent)} ETH across ${outgoing.length} outgoing transactions.`);
+  if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ETH across ${outgoing.filter((t) => t.category === 'external').length} native ETH transactions.`);
+  if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
   if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
 
   // Recommendations
@@ -337,7 +385,7 @@ export async function generateReport(
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
-  // Deduplicate: max 3 rows per (from + token) or (to + token)
+  // Deduplicate: max 3 rows per (counterparty + token)
   const groupCounts = new Map<string, number>();
   const allTxs: typeof rawTxs = [];
   for (const tx of rawTxs) {
@@ -348,7 +396,6 @@ export async function generateReport(
       allTxs.push(tx);
       groupCounts.set(key, count + 1);
     } else if (count === 3) {
-      // Count remaining for summary row
       const remaining = rawTxs.filter((t) => {
         const cp = t.direction === 'IN' ? t.from : t.to;
         return `${cp}|${t.token}` === key;
@@ -363,20 +410,25 @@ export async function generateReport(
           token: `+${remaining} more ${tx.token}`,
         });
       }
-      groupCounts.set(key, count + 1); // prevent duplicate summary rows
+      groupCounts.set(key, count + 1);
     }
     if (allTxs.length >= 50) break;
   }
+
+  const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
   const reportData: ReportData = {
     walletAddress: address,
     caseId,
     date,
-    totalReceived: Math.round(totalReceived * 10000) / 10000,
-    totalSent: Math.round(totalSent * 10000) / 10000,
-    netBalance: Math.round((totalReceived - totalSent) * 10000) / 10000,
+    totalReceived: round4(ethReceived),
+    totalSent: round4(ethSent),
+    netBalance: round4(ethReceived - ethSent),
+    ethReceived: round4(ethReceived),
+    ethSent: round4(ethSent),
     transactionCount: outgoing.length + incoming.length,
     uniqueTokens: Array.from(tokenSet),
+    spamFiltered,
     firstActivity,
     lastActivity,
     topCounterparties,

@@ -135,24 +135,25 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
     <Header data={data} />
     <Text style={s.h2}>Wallet Analytics</Text>
 
+    {/* ETH-only stats — most relevant for forensic analysis */}
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>TOTAL RECEIVED</Text>
-        <Text style={{ ...s.value, color: green }}>{fmtEth(data.totalReceived)} ETH</Text>
+        <Text style={s.label}>ETH RECEIVED</Text>
+        <Text style={{ ...s.value, color: green }}>{fmtEth(data.ethReceived)} ETH</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>TOTAL SENT</Text>
-        <Text style={{ ...s.value, color: red }}>{fmtEth(data.totalSent)} ETH</Text>
+        <Text style={s.label}>ETH SENT</Text>
+        <Text style={{ ...s.value, color: red }}>{fmtEth(data.ethSent)} ETH</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>NET FLOW</Text>
-        <Text style={s.value}>{fmtEth(data.netBalance)} ETH</Text>
+        <Text style={s.label}>ETH NET FLOW</Text>
+        <Text style={s.value}>{fmtEth(data.ethReceived - data.ethSent)} ETH</Text>
       </View>
     </View>
 
     <View style={s.divider} />
 
-    <View style={{ ...s.row, marginBottom: 16 }}>
+    <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
         <Text style={s.label}>TRANSACTIONS</Text>
         <Text style={s.value}>{data.transactionCount.toLocaleString('en-US')}</Text>
@@ -166,6 +167,12 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
         <Text style={s.value}>{data.uniqueTokens.length}</Text>
       </View>
     </View>
+
+    {data.spamFiltered > 0 && (
+      <Text style={{ fontSize: 8, color: slate400, fontStyle: 'italic', marginBottom: 8 }}>
+        * Totals include ETH and major tokens only. {data.spamFiltered} spam/airdrop token transfers filtered out.
+      </Text>
+    )}
 
     <View style={s.sectionDivider} />
 
@@ -269,6 +276,12 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
         </View>
       ))}
     </View>
+
+    {data.spamFiltered > 0 && (
+      <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 6 }}>
+        Showing legitimate transfers only. {data.spamFiltered} spam/airdrop token transfers were filtered from this analysis.
+      </Text>
+    )}
 
     <Footer data={data} pageNum={5} />
   </Page>
