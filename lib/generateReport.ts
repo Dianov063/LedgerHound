@@ -45,8 +45,8 @@ const KNOWN_TOKENS = new Set([
   'ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC', 'BTC',
   'MATIC', 'BNB', 'UNI', 'AAVE', 'LINK', 'CRV', 'MKR',
   'LDO', 'RPL', 'COMP', 'SNX', 'BAL', 'SUSHI', 'YFI',
-  'GRT', 'ENS', 'DYDX', 'OP', 'ARB', 'PEPE', 'SHIB',
-  'APE', 'SAND', 'MANA', 'LRC', 'IMX', 'FXS', 'FRAX',
+  'GRT', 'ENS', 'DYDX', 'OP', 'ARB',
+  'SAND', 'MANA', 'LRC', 'IMX', 'FXS', 'FRAX',
   'LUSD', 'RAI', 'RETH', 'STETH', 'CBETH', '1INCH',
   'TORN', 'OMG', 'SAI', 'REQ', 'MASK', 'DATA', 'LPT',
 ]);
@@ -77,10 +77,18 @@ const SPAM_KEYWORDS = [
 const SPAM_EXACT = new Set([
   'visa', 'paypal', 'nba', 'nfl', 'pranksy', 'vitalik',
   'bowl', 'lens', 'mooney', 'solid', 'wlunc', 'vsolid',
-  'zepe', 'dhold', 'sablier', 'tls', 'shi', 'nike',
+  'zepe', 'dhold', 'sablier', 'tls', 'shi', 'nike', 'vish',
   'endgame', 'vshiba', 'kimu', 'koti', 'milkers',
   'flokisnacks', 'flokielon', 'flokifire', 'shibindia',
-  'voof', 'sher', 'vb', 'apecoin',
+  'voof', 'sher', 'vb', 'apecoin', 'plsx', 'belle', 'vya',
+  'year', 'sea', 'erc20', 'sz', 'upool', 'hex2t', 'disco',
+  'minigogeta', 'vvb', 'kick', 'aaa', 'beb', 'swd', 'nme',
+  'pyro', 'ethmny', 'fry', 'sushib', 'dtf', 'okswap',
+  'lr', 'swc', 'doe', 'party', 'unii', 'fire', 'rev',
+  'axn', 'aleph', 'ecrtt', 'uet', 'viu', 'fifamini',
+  'elec', 'sc', 'mdt', 'umi', 'shibtzu', 'gsgc', 'manu',
+  'gaia', 'hur', 'vbt', 'ape dao', 'da-fi', 'uni-v2',
+  'time', 'kncl',
 ]);
 
 /**
@@ -128,8 +136,9 @@ function isSpamToken(tx: Transfer): boolean {
 
   const lower = asset.toLowerCase();
 
-  // URL patterns, very long names, suspicious chars
-  if (/[/:.<>]/.test(asset) || asset.length > 20) return true;
+  // URL patterns, very long names, suspicious chars, @-handles, spaces in name
+  if (/[/:.<>@]/.test(asset) || asset.length > 15) return true;
+  if (/\s/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
   if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
 
   // Exact-match spam names
@@ -141,9 +150,10 @@ function isSpamToken(tx: Transfer): boolean {
   // Minted from null address AND not a known legitimate token → spam airdrop
   if (tx.from === NULL_ADDRESS && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
 
-  // Absurdly large value (>10B) for unknown tokens → spam
+  // Absurdly large value (>1M) for unknown tokens → spam airdrop
+  // Legitimate tokens rarely exceed 1M units in a single transfer unless it's SHIB/PEPE
   const val = safeValue(tx);
-  if (val > 1e10 && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+  if (val > 1e6 && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
 
   return false;
 }
@@ -365,52 +375,71 @@ export async function generateReport(
   recommendations.push('File FBI IC3 report at ic3.gov if not already done.');
   recommendations.push('For court-ready certified investigation with expert testimony, contact LedgerHound at contact@ledgerhound.vip.');
 
-  // Transaction list — deduplicated, max 3 per (token + counterparty)
-  const rawTxs = [
-    ...incoming.map((tx) => ({
-      date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
-      direction: 'IN' as const,
-      from: tx.from || 'N/A',
-      to: tx.to || address,
-      value: safeValue(tx),
-      token: tx.asset || 'ETH',
-    })),
-    ...outgoing.map((tx) => ({
-      date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
-      direction: 'OUT' as const,
-      from: tx.from || address,
-      to: tx.to || 'N/A',
-      value: safeValue(tx),
-      token: tx.asset || 'ETH',
-    })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  // Build transaction list: ETH first → major tokens → rest, dedup by token (max 3)
+  type TxRow = { date: string; direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string };
+  const MAJOR_TOKENS = new Set(['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC']);
 
-  // Deduplicate: max 3 rows per (counterparty + token)
-  const groupCounts = new Map<string, number>();
-  const allTxs: typeof rawTxs = [];
+  const toRow = (tx: Transfer, dir: 'IN' | 'OUT'): TxRow => ({
+    date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+    direction: dir,
+    from: dir === 'IN' ? (tx.from || 'N/A') : (tx.from || address),
+    to: dir === 'OUT' ? (tx.to || 'N/A') : (tx.to || address),
+    value: safeValue(tx),
+    token: tx.asset || 'ETH',
+  });
+
+  const rawTxs: TxRow[] = [
+    ...incoming.map((tx) => toRow(tx, 'IN')),
+    ...outgoing.map((tx) => toRow(tx, 'OUT')),
+  ];
+
+  // Sort priority: ETH first, then major tokens, then others — within each group by value desc
+  const sortKey = (tx: TxRow): number => {
+    const upper = tx.token.toUpperCase();
+    if (upper === 'ETH') return 0;
+    if (MAJOR_TOKENS.has(upper)) return 1;
+    return 2;
+  };
+  rawTxs.sort((a, b) => {
+    const pa = sortKey(a), pb = sortKey(b);
+    if (pa !== pb) return pa - pb;
+    return b.value - a.value; // higher value first within same priority
+  });
+
+  // Deduplicate by TOKEN (max 3 rows per token symbol, then summary)
+  const tokenCounts = new Map<string, { shown: number; total: number; totalValue: number }>();
+  // Pre-count totals per token
   for (const tx of rawTxs) {
-    const counterparty = tx.direction === 'IN' ? tx.from : tx.to;
-    const key = `${counterparty}|${tx.token}`;
-    const count = groupCounts.get(key) || 0;
-    if (count < 3) {
+    const key = tx.token.toUpperCase();
+    const existing = tokenCounts.get(key) || { shown: 0, total: 0, totalValue: 0 };
+    existing.total++;
+    existing.totalValue += tx.value;
+    tokenCounts.set(key, existing);
+  }
+
+  const allTxs: TxRow[] = [];
+  const tokenShown = new Map<string, number>();
+  for (const tx of rawTxs) {
+    const key = tx.token.toUpperCase();
+    const shown = tokenShown.get(key) || 0;
+    if (shown < 3) {
       allTxs.push(tx);
-      groupCounts.set(key, count + 1);
-    } else if (count === 3) {
-      const remaining = rawTxs.filter((t) => {
-        const cp = t.direction === 'IN' ? t.from : t.to;
-        return `${cp}|${t.token}` === key;
-      }).length - 3;
+      tokenShown.set(key, shown + 1);
+    } else if (shown === 3) {
+      // Add summary row
+      const stats = tokenCounts.get(key)!;
+      const remaining = stats.total - 3;
       if (remaining > 0) {
         allTxs.push({
           date: '',
           direction: tx.direction,
-          from: tx.direction === 'IN' ? counterparty : address,
-          to: tx.direction === 'OUT' ? counterparty : address,
-          value: 0,
+          from: '—',
+          to: '—',
+          value: stats.totalValue,
           token: `+${remaining} more ${tx.token}`,
         });
       }
-      groupCounts.set(key, count + 1);
+      tokenShown.set(key, shown + 1); // prevent duplicate summary
     }
     if (allTxs.length >= 50) break;
   }
