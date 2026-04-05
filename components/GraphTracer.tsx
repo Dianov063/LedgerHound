@@ -12,6 +12,7 @@ import {
   X,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   GitBranch,
   Circle,
   AlertTriangle,
@@ -91,18 +92,63 @@ const LOADING_STEPS = [
   'Step 3/3: Identifying entities...',
 ];
 
-type NetworkType = 'eth' | 'trx' | 'bnb' | 'polygon';
+type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+
+const PRIMARY_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
+const MORE_NETWORKS: NetworkType[] = ['avax', 'polygon', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+
+const NETWORK_DISPLAY_LABELS: Record<NetworkType, string> = {
+  btc: 'BTC',
+  eth: 'ETH',
+  sol: 'SOL',
+  trx: 'TRON',
+  bnb: 'BNB',
+  polygon: 'MATIC',
+  base: 'BASE',
+  arb: 'ARB',
+  op: 'OP',
+  avax: 'AVAX',
+  ftm: 'FTM',
+  linea: 'LINEA',
+  zksync: 'zkSYNC',
+  scroll: 'SCROLL',
+  mantle: 'MANTLE',
+};
+
+const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
 
 function getExplorerBaseUrl(network: NetworkType): string {
   switch (network) {
+    case 'btc':
+      return 'https://blockstream.info';
     case 'eth':
       return 'https://etherscan.io';
+    case 'sol':
+      return 'https://solscan.io';
     case 'trx':
       return 'https://tronscan.org/#';
     case 'bnb':
       return 'https://bscscan.com';
     case 'polygon':
       return 'https://polygonscan.com';
+    case 'base':
+      return 'https://basescan.org';
+    case 'arb':
+      return 'https://arbiscan.io';
+    case 'op':
+      return 'https://optimistic.etherscan.io';
+    case 'avax':
+      return 'https://snowtrace.io';
+    case 'ftm':
+      return 'https://ftmscan.com';
+    case 'linea':
+      return 'https://lineascan.build';
+    case 'zksync':
+      return 'https://era.zksync.network';
+    case 'scroll':
+      return 'https://scrollscan.com';
+    case 'mantle':
+      return 'https://mantlescan.xyz';
   }
 }
 
@@ -113,33 +159,93 @@ function getExplorerAddressUrl(network: NetworkType, addr: string): string {
 
 function getExplorerTxUrl(network: NetworkType, hash: string): string {
   const base = getExplorerBaseUrl(network);
+  if (network === 'btc') return `${base}/tx/${hash}`;
+  if (network === 'sol') return `${base}/tx/${hash}`;
   if (network === 'trx') return `${base}/transaction/${hash}`;
   return `${base}/tx/${hash}`;
 }
 
 function getExplorerLabel(network: NetworkType): string {
   switch (network) {
+    case 'btc':
+      return 'View on Blockstream';
     case 'eth':
       return 'View on Etherscan';
+    case 'sol':
+      return 'View on Solscan';
     case 'trx':
       return 'View on TronScan';
     case 'bnb':
       return 'View on BscScan';
     case 'polygon':
       return 'View on PolygonScan';
+    case 'base':
+      return 'View on BaseScan';
+    case 'arb':
+      return 'View on Arbiscan';
+    case 'op':
+      return 'View on Optimistic Etherscan';
+    case 'avax':
+      return 'View on Snowtrace';
+    case 'ftm':
+      return 'View on FTMScan';
+    case 'linea':
+      return 'View on LineaScan';
+    case 'zksync':
+      return 'View on zkSync Explorer';
+    case 'scroll':
+      return 'View on ScrollScan';
+    case 'mantle':
+      return 'View on MantleScan';
   }
 }
 
 function isValidAddress(network: NetworkType, addr: string): boolean {
+  if (network === 'btc') {
+    return /^(1|3)[a-zA-Z0-9]{24,33}$|^bc1[a-zA-Z0-9]{25,62}$/.test(addr);
+  }
+  if (network === 'sol') {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+  }
   if (network === 'trx') {
     return /^T[a-zA-Z0-9]{33}$/.test(addr);
   }
+  // All EVM networks
   return /^0x[a-fA-F0-9]{40}$/i.test(addr);
 }
 
 function getPlaceholder(network: NetworkType): string {
-  if (network === 'trx') return 'Enter TRON address (T...)';
-  return 'Enter Ethereum address (0x...)';
+  switch (network) {
+    case 'btc':
+      return 'Enter Bitcoin address (1..., 3..., bc1...)';
+    case 'sol':
+      return 'Enter Solana address';
+    case 'trx':
+      return 'Enter TRON address (T...)';
+    default:
+      return `Enter ${NETWORK_DISPLAY_LABELS[network]} address (0x...)`;
+  }
+}
+
+function detectNetworkFromAddress(value: string): NetworkType | null {
+  if (/^(1|3)[a-zA-Z0-9]{24,33}$/.test(value) || /^bc1[a-zA-Z0-9]{25,62}$/.test(value)) {
+    return 'btc';
+  }
+  if (/^T[a-zA-Z0-9]{33}$/.test(value)) {
+    return 'trx';
+  }
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) && !value.startsWith('0x')) {
+    // Could be Solana - only auto-detect if it doesn't look like BTC or TRON
+    if (!value.startsWith('T') && !value.startsWith('1') && !value.startsWith('3') && !value.startsWith('bc1')) {
+      return 'sol';
+    }
+  }
+  return null;
+}
+
+/** Returns true if the network should NOT have its address lowercased */
+function shouldPreserveCase(network: NetworkType): boolean {
+  return network === 'btc' || network === 'sol' || network === 'trx';
 }
 
 export default function GraphTracer() {
@@ -153,16 +259,30 @@ export default function GraphTracer() {
   const [data, setData] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [layout, setLayout] = useState<'breadthfirst' | 'cose'>('breadthfirst');
+  const [moreOpen, setMoreOpen] = useState(false);
   const cyRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceAddressRef = useRef<string>('');
   const networkRef = useRef<NetworkType>('eth');
+  const moreDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Auto-detect TRON addresses
+  // Close "More" dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreDropdownRef.current && !moreDropdownRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-detect network from address input
   const handleAddressChange = (value: string) => {
     setAddress(value);
-    if (value.startsWith('T') && value.length === 34) {
-      setNetwork('trx');
+    const detected = detectNetworkFromAddress(value);
+    if (detected) {
+      setNetwork(detected);
     }
   };
 
@@ -365,7 +485,7 @@ export default function GraphTracer() {
     setError('');
     setData(null);
     setSelectedNode(null);
-    sourceAddressRef.current = network === 'trx' ? address : address.toLowerCase();
+    sourceAddressRef.current = shouldPreserveCase(network) ? address : address.toLowerCase();
     networkRef.current = network;
 
     // Animate loading steps
@@ -426,20 +546,52 @@ export default function GraphTracer() {
         {/* Search Bar */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
           {/* Network selector tabs */}
-          <div className="flex items-center gap-1 mb-3">
-            {(['eth', 'trx', 'bnb', 'polygon'] as const).map((n) => (
+          <div className="flex items-center gap-1 mb-3 flex-wrap">
+            {PRIMARY_NETWORKS.map((n) => (
               <button
                 key={n}
-                onClick={() => setNetwork(n)}
+                onClick={() => { setNetwork(n); setMoreOpen(false); }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                   network === n
                     ? 'bg-brand-600 text-white'
                     : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
-                {n === 'eth' ? 'ETH' : n === 'trx' ? 'TRON' : n === 'bnb' ? 'BNB' : 'POLYGON'}
+                {NETWORK_DISPLAY_LABELS[n]}
               </button>
             ))}
+
+            {/* More dropdown */}
+            <div className="relative" ref={moreDropdownRef}>
+              <button
+                onClick={() => setMoreOpen(!moreOpen)}
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  MORE_NETWORKS.includes(network)
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                {MORE_NETWORKS.includes(network) ? NETWORK_DISPLAY_LABELS[network] : 'More'}
+                <ChevronDown size={12} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {moreOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[140px] py-1">
+                  {MORE_NETWORKS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => { setNetwork(n); setMoreOpen(false); }}
+                      className={`block w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${
+                        network === n
+                          ? 'bg-brand-600/20 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      {NETWORK_DISPLAY_LABELS[n]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-4">

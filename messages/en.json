@@ -36,8 +36,8 @@
     "searches_label": "Monthly US searches for help",
     "hours": "72h",
     "hours_label": "Time to first trace report",
-    "chains": "10+",
-    "chains_label": "Blockchains covered incl. DeFi"
+    "chains": "15+",
+    "chains_label": "Blockchains covered: BTC, ETH, SOL, TRX & more"
   },
   "services": {
     "tag": "What We Do",
@@ -210,18 +210,18 @@
   },
   "graph_page": {
     "badge": "Free Blockchain Intelligence Tool",
-    "title": "Transaction Flow",
+    "title": "Multi-Chain Transaction Flow",
     "title_highlight": "Graph",
-    "subtitle": "Enter any Ethereum address to visualize the complete flow of funds. Our graph tracer identifies exchanges, mixers, and DeFi protocols — mapping multi-hop transactions in real time. Used by fraud investigators, attorneys, and law enforcement.",
+    "subtitle": "Enter any cryptocurrency address to visualize the complete flow of funds across Bitcoin, Ethereum, Solana, TRON, BNB Chain, and more. Our graph tracer identifies exchanges, mixers, and DeFi protocols — mapping multi-hop transactions in real time. Used by fraud investigators, attorneys, and law enforcement.",
     "cta_title": "Need a professional forensic investigation?",
     "cta_desc": "Our certified investigators build court-ready reports with full entity attribution and chain-of-custody documentation. Free case evaluation — no obligation.",
     "cta_btn": "Get Free Case Evaluation"
   },
   "tracker_page": {
     "badge": "Free Blockchain Forensics Tool",
-    "title": "Free Ethereum Wallet",
+    "title": "Free Multi-Chain Wallet",
     "title_highlight": "Tracker",
-    "subtitle": "Enter any Ethereum wallet address below to view its complete on-chain history. Our blockchain forensics tool shows all incoming and outgoing transactions, ERC-20 token transfers, NFT movements, and total volume. Used by fraud investigators, attorneys, and crypto fraud victims to trace stolen funds.",
+    "subtitle": "Enter any cryptocurrency wallet address to view its complete on-chain transaction history. Our multi-chain blockchain forensics tool supports Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain (BEP20), Polygon (MATIC), Base, Arbitrum, Optimism, Avalanche, and Fantom. Used by fraud investigators, attorneys, and crypto fraud victims to trace stolen funds across all major blockchains.",
     "cta_title": "Need help tracing these funds professionally?",
     "cta_desc": "Our certified investigators build court-ready reports with full chain-of-custody documentation. Free case evaluation — no obligation.",
     "cta_btn": "Get Free Case Evaluation"
@@ -504,8 +504,8 @@
     "badge": "Free Security Tool",
     "title": "Crypto Scam Address",
     "title_highlight": "Checker",
-    "subtitle": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Powered by multiple databases including Chainabuse, OFAC SDN list, and LedgerHound intelligence.",
-    "placeholder": "Enter Ethereum address (0x...)",
+    "subtitle": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Supports Bitcoin, Ethereum, Solana, TRON, and all major blockchains. Powered by multiple databases including Chainabuse, OFAC SDN list, and LedgerHound intelligence.",
+    "placeholder": "Enter any wallet address (BTC, ETH, SOL, TRON...)",
     "check_btn": "Check Address",
     "checking": "Checking...",
     "error_invalid": "Please enter a valid Ethereum address (0x...)",
@@ -549,10 +549,22 @@
   },
   "networks": {
     "eth": "Ethereum",
+    "btc": "Bitcoin",
+    "sol": "Solana",
     "trx": "TRON",
     "bnb": "BNB Chain",
     "polygon": "Polygon",
+    "base": "Base",
+    "arb": "Arbitrum",
+    "op": "Optimism",
+    "avax": "Avalanche",
+    "ftm": "Fantom",
+    "linea": "Linea",
+    "zksync": "zkSync Era",
+    "scroll": "Scroll",
+    "mantle": "Mantle",
     "select": "Select Network",
-    "auto_detected": "Network auto-detected"
+    "auto_detected": "Network auto-detected",
+    "more": "More chains"
   }
 }

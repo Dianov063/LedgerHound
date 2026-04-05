@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useMemo, FormEvent } from 'react';
+import { useState, useMemo, useRef, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import {
   Search, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight,
   Copy, Check, ExternalLink, Activity, TrendingDown, TrendingUp, Hash,
-  Download, X, Calendar, Coins, BarChart3,
+  Download, X, Calendar, Coins, BarChart3, ChevronDown,
 } from 'lucide-react';
 
 /* ---------- types ---------- */
-type Network = 'eth' | 'trx' | 'bnb' | 'polygon';
+type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
 interface Transfer {
   hash: string;
@@ -33,25 +33,63 @@ interface Stats {
 
 /* ---------- constants ---------- */
 const NATIVE_CURRENCY: Record<Network, string> = {
+  btc: 'BTC',
   eth: 'ETH',
+  sol: 'SOL',
   trx: 'TRX',
   bnb: 'BNB',
   polygon: 'MATIC',
+  base: 'ETH',
+  arb: 'ETH',
+  op: 'ETH',
+  avax: 'AVAX',
+  ftm: 'FTM',
+  linea: 'ETH',
+  zksync: 'ETH',
+  scroll: 'ETH',
+  mantle: 'MNT',
 };
 
 const EXPLORER_TX_URL: Record<Network, (hash: string) => string> = {
+  btc: (hash) => `https://blockstream.info/tx/${hash}`,
   eth: (hash) => `https://etherscan.io/tx/${hash}`,
+  sol: (hash) => `https://solscan.io/tx/${hash}`,
   trx: (hash) => `https://tronscan.org/#/transaction/${hash}`,
   bnb: (hash) => `https://bscscan.com/tx/${hash}`,
   polygon: (hash) => `https://polygonscan.com/tx/${hash}`,
+  base: (hash) => `https://basescan.org/tx/${hash}`,
+  arb: (hash) => `https://arbiscan.io/tx/${hash}`,
+  op: (hash) => `https://optimistic.etherscan.io/tx/${hash}`,
+  avax: (hash) => `https://snowtrace.io/tx/${hash}`,
+  ftm: (hash) => `https://ftmscan.com/tx/${hash}`,
+  linea: (hash) => `https://lineascan.build/tx/${hash}`,
+  zksync: (hash) => `https://era.zksync.network/tx/${hash}`,
+  scroll: (hash) => `https://scrollscan.com/tx/${hash}`,
+  mantle: (hash) => `https://mantlescan.xyz/tx/${hash}`,
 };
 
 const NETWORK_LABELS: Record<Network, string> = {
+  btc: 'BTC',
   eth: 'ETH',
+  sol: 'SOL',
   trx: 'TRON',
   bnb: 'BNB',
-  polygon: 'POLYGON',
+  polygon: 'MATIC',
+  base: 'BASE',
+  arb: 'ARB',
+  op: 'OP',
+  avax: 'AVAX',
+  ftm: 'FTM',
+  linea: 'LINEA',
+  zksync: 'zkSYNC',
+  scroll: 'SCROLL',
+  mantle: 'MANTLE',
 };
+
+const PRIMARY_NETWORKS: Network[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
+const MORE_NETWORKS: Network[] = ['avax', 'polygon', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+
+const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
 
 /* ---------- helpers ---------- */
 function shorten(addr: string) {
@@ -74,6 +112,24 @@ function formatDateShort(ts?: string) {
 function toISODate(ts?: string) {
   if (!ts) return '';
   return new Date(ts).toISOString().split('T')[0];
+}
+
+function detectNetwork(addr: string): Network | null {
+  const trimmed = addr.trim();
+  if (/^(1|3)[a-zA-Z0-9]{24,33}$/.test(trimmed) || trimmed.startsWith('bc1')) return 'btc';
+  if (trimmed.startsWith('T') && trimmed.length === 34) return 'trx';
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed) && !trimmed.startsWith('0x') && !trimmed.startsWith('T')) return 'sol';
+  if (trimmed.startsWith('0x') && trimmed.length === 42) return 'eth';
+  return null;
+}
+
+function getPlaceholder(network: Network): string {
+  switch (network) {
+    case 'btc': return '1A1zP1... or bc1q... (Bitcoin address)';
+    case 'sol': return 'So11111... (Solana address)';
+    case 'trx': return 'TABC... (TRON address)';
+    default: return '0xABC..., 0xDEF... (comma-separated for multiple)';
+  }
 }
 
 /* ---------- CopyableAddress ---------- */
@@ -144,6 +200,19 @@ export default function WalletTracker() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
   const [trackedAddresses, setTrackedAddresses] = useState<string[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  // Close "More" dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // filters
   const [dirFilter, setDirFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
@@ -156,9 +225,9 @@ export default function WalletTracker() {
   // auto-detect network from address input
   function handleInputChange(value: string) {
     setInput(value);
-    const trimmed = value.trim();
-    if (trimmed.startsWith('T') && trimmed.length === 34) {
-      setNetwork('trx');
+    const detected = detectNetwork(value);
+    if (detected) {
+      setNetwork(detected);
     }
   }
 
@@ -214,8 +283,11 @@ export default function WalletTracker() {
     e.preventDefault();
     const raw = input.trim();
 
-    // Split addresses: for TRX single address, for EVM comma-separated
-    const addresses = network === 'trx'
+    // Determine if this network uses non-lowercased addresses
+    const noLowercase = network === 'btc' || network === 'sol' || network === 'trx';
+
+    // Split addresses based on network type
+    const addresses = noLowercase
       ? [raw].filter(Boolean)
       : raw.split(/[\s,]+/).map((a) => a.trim().toLowerCase()).filter(Boolean);
 
@@ -226,10 +298,26 @@ export default function WalletTracker() {
     }
 
     // Validate based on network
-    const evmPattern = /^0x[a-fA-F0-9]{40}$/;
+    const btcPattern = /^(1|3)[a-zA-Z0-9]{24,33}$|^bc1[a-zA-Z0-9]{25,62}$/;
+    const solPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const tronPattern = /^T[a-zA-Z0-9]{33}$/;
+    const evmPattern = /^0x[a-fA-F0-9]{40}$/;
 
-    if (network === 'trx') {
+    if (network === 'btc') {
+      const invalid = addresses.find((a) => !btcPattern.test(a));
+      if (invalid) {
+        setStatus('error');
+        setError(`Invalid Bitcoin address: ${invalid}`);
+        return;
+      }
+    } else if (network === 'sol') {
+      const invalid = addresses.find((a) => !solPattern.test(a));
+      if (invalid) {
+        setStatus('error');
+        setError(`Invalid Solana address: ${invalid}`);
+        return;
+      }
+    } else if (network === 'trx') {
       const invalid = addresses.find((a) => !tronPattern.test(a));
       if (invalid) {
         setStatus('error');
@@ -237,6 +325,7 @@ export default function WalletTracker() {
         return;
       }
     } else {
+      // All EVM networks
       const invalid = addresses.find((a) => !evmPattern.test(a));
       if (invalid) {
         setStatus('error');
@@ -286,20 +375,20 @@ export default function WalletTracker() {
   const nativeIn = stats?.totalNativeIn ?? stats?.totalEthIn ?? 0;
   const nativeOut = stats?.totalNativeOut ?? stats?.totalEthOut ?? 0;
 
-  const placeholder = network === 'trx'
-    ? 'TABC... (TRON address)'
-    : '0xABC..., 0xDEF... (comma-separated for multiple)';
+  const placeholder = getPlaceholder(network);
+
+  const isMoreNetwork = MORE_NETWORKS.includes(network);
 
   return (
     <div className="bg-slate-950 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
         {/* Network Tabs */}
-        <div className="flex items-center gap-1 mb-4 max-w-3xl mx-auto">
-          {(['eth', 'trx', 'bnb', 'polygon'] as const).map((n) => (
+        <div className="flex items-center gap-1 mb-4 max-w-3xl mx-auto flex-wrap">
+          {PRIMARY_NETWORKS.map((n) => (
             <button
               key={n}
-              onClick={() => setNetwork(n)}
+              onClick={() => { setNetwork(n); setMoreOpen(false); }}
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                 network === n
                   ? 'bg-brand-600 text-white'
@@ -309,6 +398,38 @@ export default function WalletTracker() {
               {NETWORK_LABELS[n]}
             </button>
           ))}
+
+          {/* More dropdown */}
+          <div className="relative" ref={moreRef}>
+            <button
+              onClick={() => setMoreOpen((prev) => !prev)}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-1 ${
+                isMoreNetwork
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {isMoreNetwork ? NETWORK_LABELS[network] : 'More'}
+              <ChevronDown size={14} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {moreOpen && (
+              <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[140px] py-1">
+                {MORE_NETWORKS.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => { setNetwork(n); setMoreOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors ${
+                      network === n
+                        ? 'bg-brand-600 text-white'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                    }`}
+                  >
+                    {NETWORK_LABELS[n]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search */}

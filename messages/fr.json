@@ -2,7 +2,7 @@
   "nav": { "services": "Services", "cases": "Cas", "pricing": "Tarifs", "about": "À propos", "blog": "Blog", "contact": "Contact", "tracker": "Suivi de Portefeuille", "graph": "Graphe de Transactions", "calculator": "Calculateur de Récupération", "report": "Rapport de Portefeuille", "scam_checker": "Verificateur d'Arnaques", "cta": "Évaluation Gratuite" },
   "hero": { "badge": "Enquêteurs blockchain certifiés · États-Unis", "title": "Nous Traçons\nles Cryptos Volées\nOù qu'elles Aillent", "highlight": "Cryptos Volées", "subtitle": "Chaque transaction laisse une trace permanente sur la blockchain. Nos enquêteurs certifiés la suivent et construisent des preuves admissibles en justice.", "cta_primary": "Évaluation Gratuite du Cas", "cta_secondary": "Comment ça Fonctionne", "note": "Consultation gratuite · Rapport initial en 48–72h · Sans récupération, sans honoraires sur certains cas" },
   "trust": { "certified": "Certifiés CTCE et CFE", "court": "Rapports Admissibles en Justice", "entity": "Entité Américaine", "speed": "Rapport en 48–72 Heures", "russian": "Équipe russophone disponible" },
-  "stats": { "illicit": "158 Md$", "illicit_label": "Flux crypto illicites en 2025", "searches": "50K+", "searches_label": "Recherches mensuelles d'aide aux États-Unis", "hours": "72h", "hours_label": "Délai jusqu'au premier rapport", "chains": "10+", "chains_label": "Blockchains couvertes incl. DeFi" },
+  "stats": { "illicit": "158 Md$", "illicit_label": "Flux crypto illicites en 2025", "searches": "50K+", "searches_label": "Recherches mensuelles d'aide aux États-Unis", "hours": "72h", "hours_label": "Délai jusqu'au premier rapport", "chains": "15+", "chains_label": "Blockchains: BTC, ETH, SOL, TRX et plus" },
   "services": {
     "tag": "Ce Que Nous Faisons",
     "title": "Forensique Blockchain\npour Chaque Situation",
@@ -24,18 +24,18 @@
   "tracker_section": { "tag": "Outil Gratuit", "title": "Suivi Gratuit de Portefeuille Ethereum", "subtitle": "Entrez n'importe quelle adresse de portefeuille et voyez instantanément l'historique complet des transactions — entrantes, sortantes, tokens et NFTs. Utilisé par les victimes de fraude, avocats et enquêteurs.", "feature1_title": "Historique Complet des Transactions", "feature1_desc": "Chaque transfert, token et mouvement NFT", "feature2_title": "Analyses Instantanées", "feature2_desc": "Total reçu, envoyé et nombre de transactions", "feature3_title": "Export CSV", "feature3_desc": "Téléchargez le rapport complet pour les procédures judiciaires", "cta": "Essayer le Suivi Gratuit", "note": "Sans inscription · Sans limites · Propulsé par l'intelligence blockchain" },
   "graph_page": {
     "badge": "Outil Gratuit d'Intelligence Blockchain",
-    "title": "Graphe de Flux de",
-    "title_highlight": "Transactions",
-    "subtitle": "Entrez n'importe quelle adresse Ethereum pour visualiser le flux complet des fonds. Notre outil identifie les exchanges, mixeurs et protocoles DeFi — cartographiant les transactions multi-sauts en temps réel. Utilisé par les enquêteurs, avocats et forces de l'ordre.",
+    "title": "Flux de Transactions Multi-Chaine",
+    "title_highlight": "Graphe",
+    "subtitle": "Entrez n'importe quelle adresse crypto pour visualiser le flux complet des fonds a travers Bitcoin, Ethereum, Solana, TRON, BNB Chain et plus. Notre outil identifie les exchanges, mixeurs et protocoles DeFi — cartographiant les transactions multi-sauts en temps reel. Utilise par les enqueteurs, avocats et forces de l'ordre.",
     "cta_title": "Besoin d'une enquête forensique professionnelle?",
     "cta_desc": "Nos enquêteurs certifiés créent des rapports pour tribunal avec attribution complète d'entités et documentation de chaîne de custody. Évaluation gratuite — sans obligation.",
     "cta_btn": "Obtenir une Évaluation Gratuite"
   },
   "tracker_page": {
     "badge": "Outil Gratuit de Forensique Blockchain",
-    "title": "Suivi Gratuit de Portefeuille",
-    "title_highlight": "Ethereum",
-    "subtitle": "Entrez n'importe quelle adresse de portefeuille Ethereum pour voir son historique complet sur la chaîne. Notre outil montre toutes les transactions entrantes et sortantes, les transferts de tokens ERC-20, les mouvements NFT et le volume total. Utilisé par les victimes de fraude, avocats et enquêteurs.",
+    "title": "Suivi Gratuit Multi-Chaine de",
+    "title_highlight": "Portefeuilles",
+    "subtitle": "Entrez n'importe quelle adresse de portefeuille crypto pour voir l'historique complet des transactions sur la chaine. Notre outil forensique multi-chaine prend en charge Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain (BEP20), Polygon (MATIC), Base, Arbitrum, Optimism, Avalanche et Fantom. Utilise par les enqueteurs, avocats et victimes de fraude crypto pour tracer les fonds voles sur toutes les blockchains majeures.",
     "cta_title": "Besoin d'aide pour tracer ces fonds professionnellement?",
     "cta_desc": "Nos enquêteurs certifiés créent des rapports pour tribunal avec documentation complète de chaîne de custody. Évaluation gratuite — sans obligation.",
     "cta_btn": "Obtenir une Évaluation Gratuite"
@@ -312,8 +312,8 @@
     "badge": "Outil de Securite Gratuit",
     "title": "Verificateur d'Adresses",
     "title_highlight": "Crypto Arnaques",
-    "subtitle": "Verifiez si une adresse de portefeuille crypto a ete signalee pour arnaque, fraude ou sanctions. Alimente par plusieurs bases de donnees dont Chainabuse, la liste OFAC SDN et le renseignement LedgerHound.",
-    "placeholder": "Entrez une adresse Ethereum (0x...)",
+    "subtitle": "Verifiez si une adresse de portefeuille crypto a ete signalee pour arnaque, fraude ou sanctions. Prend en charge Bitcoin, Ethereum, Solana, TRON et toutes les blockchains majeures. Alimente par plusieurs bases de donnees dont Chainabuse, la liste OFAC SDN et le renseignement LedgerHound.",
+    "placeholder": "Entrez n'importe quelle adresse de portefeuille (BTC, ETH, SOL, TRON...)",
     "check_btn": "Verifier l'Adresse",
     "checking": "Verification...",
     "error_invalid": "Veuillez entrer une adresse Ethereum valide (0x...)",
@@ -357,10 +357,22 @@
   },
   "networks": {
     "eth": "Ethereum",
+    "btc": "Bitcoin",
+    "sol": "Solana",
     "trx": "TRON",
     "bnb": "BNB Chain",
     "polygon": "Polygon",
+    "base": "Base",
+    "arb": "Arbitrum",
+    "op": "Optimism",
+    "avax": "Avalanche",
+    "ftm": "Fantom",
+    "linea": "Linea",
+    "zksync": "zkSync Era",
+    "scroll": "Scroll",
+    "mantle": "Mantle",
     "select": "Selectionner le Reseau",
-    "auto_detected": "Reseau detecte automatiquement"
+    "auto_detected": "Reseau detecte automatiquement",
+    "more": "Plus de chaines"
   }
 }

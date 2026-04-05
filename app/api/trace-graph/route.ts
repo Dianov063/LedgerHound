@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 
 type NetworkType = 'eth' | 'trx' | 'bnb' | 'polygon';
 
@@ -177,15 +178,15 @@ async function fetchTronGraphTransfers(address: string) {
 
     const transfer = { from, to, value, asset: 'TRX', hash, metadata: { blockTimestamp: timestamp } };
 
-    if (from.toLowerCase() === address.toLowerCase()) {
+    if (from === address) {
       outgoing.push(transfer);
     }
-    if (to.toLowerCase() === address.toLowerCase()) {
+    if (to === address) {
       incoming.push(transfer);
     }
   }
 
-  // Parse TRC20 token transactions
+  // Parse TRC20 token transactions (returns base58 addresses)
   const trc20Data = trc20Json.data || [];
   for (const tx of trc20Data) {
     const from = tx.from || '';
@@ -198,10 +199,10 @@ async function fetchTronGraphTransfers(address: string) {
 
     const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
 
-    if (from.toLowerCase() === address.toLowerCase()) {
+    if (from === address) {
       outgoing.push(transfer);
     }
-    if (to.toLowerCase() === address.toLowerCase()) {
+    if (to === address) {
       incoming.push(transfer);
     }
   }
@@ -213,77 +214,40 @@ async function fetchTronGraphTransfers(address: string) {
   };
 }
 
-function tronHexToBase58(hexAddress: string): string {
-  // TronGrid sometimes returns base58 directly, sometimes hex
-  if (hexAddress.startsWith('T')) return hexAddress;
-  // For hex addresses starting with 41, convert to base58
-  // This is a simplified approach - in production you'd use a proper tron-web library
-  // TronGrid API usually returns base58 in trc20 endpoints
-  return hexAddress;
+const BASE58_ALPHA = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const B58 = BigInt(58);
+const ZERO = BigInt(0);
+
+function tronHexToBase58(hex: string): string {
+  // Already base58
+  if (hex.startsWith('T')) return hex;
+  // Need 21-byte hex starting with 41
+  if (!hex.startsWith('41') || hex.length < 42) return hex;
+
+  const payload = Buffer.from(hex.slice(0, 42), 'hex'); // 21 bytes
+  const hash1 = createHash('sha256').update(payload).digest();
+  const hash2 = createHash('sha256').update(hash1).digest();
+  const checksum = hash2.slice(0, 4);
+  const full = Buffer.concat([payload, checksum]); // 25 bytes
+
+  let num = BigInt('0x' + full.toString('hex'));
+  const chars: string[] = [];
+  while (num > ZERO) {
+    chars.push(BASE58_ALPHA[Number(num % B58)]);
+    num = num / B58;
+  }
+  for (let i = 0; i < full.length; i++) {
+    if (full[i] === 0) chars.push('1');
+    else break;
+  }
+  return chars.reverse().join('');
 }
 
-// ---- BSC fetching via BscScan ----
+// ---- BSC fetching via Alchemy (BSCScan V1 deprecated, V2 needs paid plan) ----
+const ALCHEMY_BNB_URL = 'https://bnb-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 
 async function fetchBscGraphTransfers(address: string) {
-  const apiKey = process.env.BSCSCAN_API_KEY || '';
-
-  const [bnbRes, bep20Res] = await Promise.all([
-    fetch(`https://api.etherscan.io/v2/api?chainid=56&module=account&action=txlist&address=${address}&sort=desc&apikey=${apiKey}`),
-    fetch(`https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&address=${address}&sort=desc&apikey=${apiKey}`),
-  ]);
-
-  const bnbJson = await bnbRes.json();
-  const bep20Json = await bep20Res.json();
-
-  const outgoing: any[] = [];
-  const incoming: any[] = [];
-
-  // Parse native BNB transactions
-  const bnbTxs = (bnbJson.result || []).slice(0, 40);
-  for (const tx of bnbTxs) {
-    const from = (tx.from || '').toLowerCase();
-    const to = (tx.to || '').toLowerCase();
-    const value = parseFloat(tx.value || '0') / 1e18;
-    const hash = tx.hash || '';
-    const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
-
-    if (value === 0 && !tx.input?.startsWith('0x')) continue;
-
-    const transfer = { from, to, value, asset: 'BNB', hash, metadata: { blockTimestamp: timestamp } };
-
-    if (from === address.toLowerCase()) {
-      outgoing.push(transfer);
-    }
-    if (to === address.toLowerCase()) {
-      incoming.push(transfer);
-    }
-  }
-
-  // Parse BEP20 token transactions
-  const bep20Txs = (bep20Json.result || []).slice(0, 40);
-  for (const tx of bep20Txs) {
-    const from = (tx.from || '').toLowerCase();
-    const to = (tx.to || '').toLowerCase();
-    const decimals = parseInt(tx.tokenDecimal || '18', 10);
-    const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
-    const symbol = tx.tokenSymbol || 'TOKEN';
-    const hash = tx.hash || '';
-    const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
-
-    const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
-
-    if (from === address.toLowerCase()) {
-      outgoing.push(transfer);
-    }
-    if (to === address.toLowerCase()) {
-      incoming.push(transfer);
-    }
-  }
-
-  return {
-    outgoing: outgoing.slice(0, 20),
-    incoming: incoming.slice(0, 20),
-  };
+  return getAlchemyTransfersForAddress(ALCHEMY_BNB_URL, address);
 }
 
 // ---- Unified transfer fetcher ----

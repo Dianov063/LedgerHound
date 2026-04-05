@@ -36,8 +36,8 @@
     "searches_label": "Búsquedas mensuales de ayuda en EE.UU.",
     "hours": "72h",
     "hours_label": "Tiempo hasta el primer informe",
-    "chains": "10+",
-    "chains_label": "Blockchains cubiertos incl. DeFi"
+    "chains": "15+",
+    "chains_label": "Blockchains: BTC, ETH, SOL, TRX y mas"
   },
   "services": {
     "tag": "Qué Hacemos",
@@ -186,18 +186,18 @@
   },
   "graph_page": {
     "badge": "Herramienta Gratuita de Inteligencia Blockchain",
-    "title": "Grafo de Flujo de",
-    "title_highlight": "Transacciones",
-    "subtitle": "Ingrese cualquier dirección Ethereum para visualizar el flujo completo de fondos. Nuestro rastreador identifica exchanges, mixers y protocolos DeFi — mapeando transacciones multi-salto en tiempo real. Usado por investigadores de fraude, abogados y fuerzas del orden.",
+    "title": "Flujo de Transacciones Multi-Cadena",
+    "title_highlight": "Grafo",
+    "subtitle": "Ingrese cualquier direccion de criptomoneda para visualizar el flujo completo de fondos a traves de Bitcoin, Ethereum, Solana, TRON, BNB Chain y mas. Nuestro rastreador identifica exchanges, mixers y protocolos DeFi — mapeando transacciones multi-salto en tiempo real. Usado por investigadores de fraude, abogados y fuerzas del orden.",
     "cta_title": "¿Necesita una investigación forense profesional?",
     "cta_desc": "Nuestros investigadores certificados crean informes para tribunal con atribución completa de entidades y documentación de cadena de custodia. Evaluación gratuita — sin obligación.",
     "cta_btn": "Obtener Evaluación Gratuita"
   },
   "tracker_page": {
     "badge": "Herramienta Gratuita de Forensia Blockchain",
-    "title": "Rastreador Gratuito de Billeteras",
-    "title_highlight": "Ethereum",
-    "subtitle": "Ingrese cualquier dirección de billetera Ethereum para ver su historial completo en la cadena. Nuestra herramienta muestra todas las transacciones entrantes y salientes, transferencias de tokens ERC-20, movimientos de NFT y volumen total. Usado por víctimas de fraude, abogados e investigadores.",
+    "title": "Rastreador Gratuito Multi-Cadena de",
+    "title_highlight": "Billeteras",
+    "subtitle": "Ingrese cualquier direccion de billetera de criptomonedas para ver su historial completo de transacciones en cadena. Nuestra herramienta forense multi-cadena soporta Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain (BEP20), Polygon (MATIC), Base, Arbitrum, Optimism, Avalanche y Fantom. Utilizado por investigadores de fraude, abogados y victimas de estafas cripto para rastrear fondos robados en todas las blockchains principales.",
     "cta_title": "¿Necesita ayuda rastreando estos fondos profesionalmente?",
     "cta_desc": "Nuestros investigadores certificados crean informes para tribunal con documentación completa de cadena de custodia. Evaluación gratuita — sin obligación.",
     "cta_btn": "Obtener Evaluación Gratuita"
@@ -480,8 +480,8 @@
     "badge": "Herramienta de Seguridad Gratuita",
     "title": "Verificador de Direcciones",
     "title_highlight": "Cripto Estafas",
-    "subtitle": "Verifique si una direccion de billetera criptomoneda ha sido reportada por estafas, fraude o sanciones. Alimentado por multiples bases de datos incluyendo Chainabuse, lista OFAC SDN e inteligencia LedgerHound.",
-    "placeholder": "Ingrese direccion Ethereum (0x...)",
+    "subtitle": "Verifique si una direccion de billetera de criptomonedas ha sido reportada por estafas, fraude o sanciones. Soporta Bitcoin, Ethereum, Solana, TRON y todas las blockchains principales. Alimentado por multiples bases de datos incluyendo Chainabuse, lista OFAC SDN e inteligencia LedgerHound.",
+    "placeholder": "Ingrese cualquier direccion de billetera (BTC, ETH, SOL, TRON...)",
     "check_btn": "Verificar Direccion",
     "checking": "Verificando...",
     "error_invalid": "Ingrese una direccion Ethereum valida (0x...)",
@@ -525,10 +525,22 @@
   },
   "networks": {
     "eth": "Ethereum",
+    "btc": "Bitcoin",
+    "sol": "Solana",
     "trx": "TRON",
     "bnb": "BNB Chain",
     "polygon": "Polygon",
+    "base": "Base",
+    "arb": "Arbitrum",
+    "op": "Optimism",
+    "avax": "Avalanche",
+    "ftm": "Fantom",
+    "linea": "Linea",
+    "zksync": "zkSync Era",
+    "scroll": "Scroll",
+    "mantle": "Mantle",
     "select": "Seleccionar Red",
-    "auto_detected": "Red detectada automaticamente"
+    "auto_detected": "Red detectada automaticamente",
+    "more": "Mas cadenas"
   }
 }

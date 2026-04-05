@@ -90,6 +90,33 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: st
   '0x7e1116d3109f17bc5ec04c0d241ae637489e4ac2': { label: 'BSC Rug Pull', type: 'scam', category: 'Scam' },
   '0x9c2dc0c3cc2badde84b0025cf4df1c5af288d835': { label: 'BSC Honeypot Deployer', type: 'scam', category: 'Scam' },
   '0x6e47dfa22fe4c0e5cf7a24490e8eaab407d7f1d0': { label: 'BSC Phishing', type: 'scam', category: 'Scam' },
+
+  // ── Bitcoin Addresses ──
+  // Bitcoin Exchanges
+  '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo': { label: 'Binance BTC', type: 'exchange', category: 'Exchange' },
+  '3FHNBLobJnbCPujupTVaaeeMLDPFJRCXsX': { label: 'Coinbase BTC', type: 'exchange', category: 'Exchange' },
+  '3AfP9N8mHkNQWx3FfKMJg9RFhJhRGJkFBv': { label: 'Kraken BTC', type: 'exchange', category: 'Exchange' },
+  'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97': { label: 'Binance Cold BTC', type: 'exchange', category: 'Exchange' },
+  '3Cbq7aT1tY8kMxWLbitaG7yT6bPbKChq64': { label: 'Bitfinex BTC', type: 'exchange', category: 'Exchange' },
+  '385cR5DM96n1HvBDMzLHPYcw89fZAXULJP': { label: 'Binance BTC 2', type: 'exchange', category: 'Exchange' },
+  // Bitcoin Mixers/Scams
+  '1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF': { label: 'Bitcoin Fog (Mixer)', type: 'mixer', category: 'Mixer' },
+  '1FRmxkMPh5U7qHZKtYhYQfScDGBHbdBGpj': { label: 'Helix Mixer', type: 'mixer', category: 'Mixer' },
+  '12tkqA9xSoowkzoERHMWNKsTey55YEBqkv': { label: 'WannaCry Ransomware', type: 'ransomware', category: 'Ransomware' },
+  '115p7UMMngoj1pMvkpHijcRdfJNXj6LrLn': { label: 'CryptoLocker Ransomware', type: 'ransomware', category: 'Ransomware' },
+  '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa': { label: 'Satoshi (Genesis Block)', type: 'exchange', category: 'Historical' },
+  '1NDyJtNTjmwk5xPNhjgAMu4HDHigtobu1s': { label: 'BTC-e Exchange (Seized)', type: 'sanctioned', category: 'Sanctions' },
+
+  // ── Solana Addresses ──
+  // Solana Exchanges
+  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM': { label: 'Binance SOL', type: 'exchange', category: 'Exchange' },
+  '5tzFkiKscXHK5ZXCGbClgAGNBRDSBHGBfmfgUpBhFDqJ': { label: 'Coinbase SOL', type: 'exchange', category: 'Exchange' },
+  'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': { label: 'Binance SOL 2', type: 'exchange', category: 'Exchange' },
+  '2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S': { label: 'Kraken SOL', type: 'exchange', category: 'Exchange' },
+  // Solana DeFi
+  'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4': { label: 'Jupiter Aggregator', type: 'defi', category: 'DeFi' },
+  'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc': { label: 'Orca Whirlpool', type: 'defi', category: 'DeFi' },
+  // Solana Scams — placeholder for future additions
 };
 
 /* ── Rate limiting ── */
@@ -112,18 +139,20 @@ export async function POST(req: NextRequest) {
     const { address } = await req.json();
     const isEth = /^0x[a-fA-F0-9]{40}$/.test(address);
     const isTron = /^T[a-zA-Z0-9]{33}$/.test(address);
-    if (!address || (!isEth && !isTron)) {
-      return Response.json({ error: 'Invalid address. Supports Ethereum (0x...) and TRON (T...)' }, { status: 400 });
+    const isBtc = /^(1|3)[a-zA-Z0-9]{24,33}$|^bc1[a-zA-Z0-9]{25,62}$/.test(address);
+    const isSol = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+    if (!address || (!isEth && !isTron && !isBtc && !isSol)) {
+      return Response.json({ error: 'Invalid address. Supports Bitcoin (1.../3.../bc1...), Ethereum (0x...), Solana (base58), and TRON (T...)' }, { status: 400 });
     }
 
-    // TRON addresses are case-sensitive, ETH are lowercased
-    const addr = isTron ? address : address.toLowerCase();
+    // BTC and SOL addresses are case-sensitive; TRON is case-sensitive; ETH is lowercased
+    const addr = isEth ? address.toLowerCase() : address;
     const sources: { source: string; label: string; type: string; category: string }[] = [];
     let chainabuseReports = 0;
     let chainabuseCategories: string[] = [];
 
-    /* 1. Check internal DB (TRON is case-sensitive, ETH lowercased) */
-    const entity = KNOWN_ENTITIES[addr] || (isTron ? undefined : undefined);
+    /* 1. Check internal DB */
+    const entity = KNOWN_ENTITIES[addr];
     if (entity && entity.type !== 'exchange' && entity.type !== 'defi') {
       sources.push({
         source: 'LedgerHound DB',

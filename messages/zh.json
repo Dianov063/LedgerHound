@@ -2,7 +2,7 @@
   "nav": { "services": "服务", "cases": "案例", "pricing": "定价", "about": "关于我们", "blog": "博客", "contact": "联系", "tracker": "钱包追踪器", "graph": "交易图谱", "calculator": "恢复计算器", "report": "钱包报告", "scam_checker": "诈骗检查器", "cta": "免费评估" },
   "hero": { "badge": "认证区块链调查员 · 美国", "title": "追踪\n被盗加密货币\n无论它去向何处", "highlight": "被盗加密货币", "subtitle": "每笔交易都在区块链上留下永久痕迹。我们的认证调查员追踪它，并为律师、欺诈受害者和企业建立法庭证据。", "cta_primary": "免费案例评估", "cta_secondary": "了解工作原理", "note": "免费咨询 · 48–72小时初始报告 · 无恢复无费用" },
   "trust": { "certified": "CTCE和CFE认证", "court": "法庭可用报告", "entity": "美国实体", "speed": "48–72小时报告", "russian": "俄语团队" },
-  "stats": { "illicit": "$1580亿", "illicit_label": "2025年非法加密资金流", "searches": "5万+", "searches_label": "每月美国搜索量", "hours": "72小时", "hours_label": "首次报告时间", "chains": "10+", "chains_label": "支持的区块链包括DeFi" },
+  "stats": { "illicit": "$1580亿", "illicit_label": "2025年非法加密资金流", "searches": "5万+", "searches_label": "每月美国搜索量", "hours": "72小时", "hours_label": "首次报告时间", "chains": "15+", "chains_label": "支持区块链: BTC, ETH, SOL, TRX 等" },
   "services": {
     "tag": "我们的服务",
     "title": "适用于各种情况的\n区块链取证",
@@ -24,18 +24,18 @@
   "tracker_section": { "tag": "免费工具", "title": "免费以太坊钱包追踪器", "subtitle": "输入任何钱包地址，即时查看完整交易历史——入账、出账、代币和NFT。被欺诈受害者、律师和调查人员使用。", "feature1_title": "完整交易历史", "feature1_desc": "每笔转账、代币和NFT变动", "feature2_title": "即时分析", "feature2_desc": "总接收、发送和交易计数", "feature3_title": "导出CSV", "feature3_desc": "下载完整报告用于法律程序", "cta": "试用免费钱包追踪器", "note": "无需注册 · 无限制 · 区块链智能驱动" },
   "graph_page": {
     "badge": "免费区块链情报工具",
-    "title": "交易流向",
+    "title": "多链交易流向",
     "title_highlight": "图谱",
-    "subtitle": "输入任何以太坊地址，可视化完整资金流向。我们的图谱追踪器识别交易所、混币器和DeFi协议——实时映射多跳交易。被欺诈调查员、律师和执法机构使用。",
+    "subtitle": "输入任何加密货币地址，可视化通过Bitcoin、Ethereum、Solana、TRON、BNB Chain等网络的完整资金流向。我们的图谱追踪器识别交易所、混币器和DeFi协议——实时映射多跳交易。被欺诈调查员、律师和执法机构使用。",
     "cta_title": "需要专业的法证调查？",
     "cta_desc": "我们的认证调查员编制法庭报告，包含完整的实体归属和监管链文档。免费案例评估——无义务。",
     "cta_btn": "获取免费评估"
   },
   "tracker_page": {
     "badge": "免费区块链取证工具",
-    "title": "免费以太坊钱包",
+    "title": "免费多链钱包",
     "title_highlight": "追踪器",
-    "subtitle": "输入任何以太坊钱包地址，查看完整的链上历史记录。我们的区块链取证工具显示所有入账和出账交易、ERC-20代币转账、NFT变动和总交易量。被欺诈受害者、律师和调查人员使用。",
+    "subtitle": "输入任何加密货币钱包地址，查看完整的链上交易历史。我们的多链区块链取证工具支持Bitcoin (BTC)、Ethereum (ETH)、Solana (SOL)、TRON/TRC20、BNB Chain (BEP20)、Polygon (MATIC)、Base、Arbitrum、Optimism、Avalanche和Fantom。被欺诈调查员、律师和加密欺诈受害者用于在所有主要区块链上追踪被盗资金。",
     "cta_title": "需要专业追踪这些资金？",
     "cta_desc": "我们的认证调查员编制法庭报告，包含完整的监管链文档。免费案例评估——无义务。",
     "cta_btn": "获取免费评估"
@@ -312,8 +312,8 @@
     "badge": "免费安全工具",
     "title": "加密货币诈骗地址",
     "title_highlight": "检查器",
-    "subtitle": "检查加密货币钱包地址是否被举报为诈骗、欺诈或受到制裁。由多个数据库驱动，包括Chainabuse、OFAC SDN名单和LedgerHound情报。",
-    "placeholder": "输入以太坊地址 (0x...)",
+    "subtitle": "检查加密货币钱包地址是否被举报为诈骗、欺诈或受到制裁。支持Bitcoin、Ethereum、Solana、TRON及所有主要区块链。由多个数据库驱动，包括Chainabuse、OFAC SDN名单和LedgerHound情报。",
+    "placeholder": "输入任何钱包地址 (BTC, ETH, SOL, TRON...)",
     "check_btn": "检查地址",
     "checking": "检查中...",
     "error_invalid": "请输入有效的以太坊地址 (0x...)",
@@ -357,10 +357,22 @@
   },
   "networks": {
     "eth": "Ethereum",
+    "btc": "Bitcoin",
+    "sol": "Solana",
     "trx": "TRON",
     "bnb": "BNB Chain",
     "polygon": "Polygon",
+    "base": "Base",
+    "arb": "Arbitrum",
+    "op": "Optimism",
+    "avax": "Avalanche",
+    "ftm": "Fantom",
+    "linea": "Linea",
+    "zksync": "zkSync Era",
+    "scroll": "Scroll",
+    "mantle": "Mantle",
     "select": "选择网络",
-    "auto_detected": "已自动检测网络"
+    "auto_detected": "已自动检测网络",
+    "more": "更多链"
   }
 }
