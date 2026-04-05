@@ -28,6 +28,7 @@ interface ScamResult {
   categories: string[];
   chainabuseReports: number;
   entityInfo: { label: string; type: string } | null;
+  ofacWarning: string;
 }
 
 const RISK_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
@@ -265,14 +266,28 @@ function ScamCheckerInner() {
           {/* Flagged details */}
           {result.isFlagged && (
             <>
+              {/* OFAC Warning */}
+              {result.ofacWarning && (
+                <div className="bg-red-100 border-2 border-red-300 rounded-xl p-5 mb-4">
+                  <p className="text-sm font-bold text-red-900 flex items-center gap-2">
+                    <AlertTriangle size={18} className="flex-shrink-0" />
+                    {result.ofacWarning}
+                  </p>
+                </div>
+              )}
+
               {/* Categories */}
               {result.categories.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
                   <h3 className="text-sm font-semibold text-slate-900 mb-3">{t('categories')}</h3>
                   <div className="flex flex-wrap gap-2">
                     {result.categories.map((cat) => (
-                      <span key={cat} className="text-xs font-medium bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-full">
-                        {cat}
+                      <span key={cat} className={`text-xs font-medium px-3 py-1.5 rounded-full ${
+                        cat === 'OFAC Sanctioned'
+                          ? 'bg-red-200 text-red-900 border border-red-300 font-bold'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {cat === 'OFAC Sanctioned' ? `\u26A0\uFE0F ${cat}` : cat}
                       </span>
                     ))}
                   </div>

@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
     const isFlagged = sources.length > 0;
     let riskLevel: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'CLEAN';
     let riskScore = 0;
+    let ofacWarning = '';
 
     if (isFlagged) {
       const hasSanctions = sources.some(s => s.type === 'sanctioned');
@@ -146,27 +147,46 @@ export async function POST(req: NextRequest) {
       const hasMixer = sources.some(s => s.type === 'mixer');
       const hasDarknet = sources.some(s => s.type === 'darknet');
       const hasRansomware = sources.some(s => s.type === 'ransomware');
+      const hasCommunityOnly = sources.every(s => s.type === 'community_report');
 
-      if (hasSanctions) riskScore += 50;
-      if (hasScam) riskScore += 35;
-      if (hasRansomware) riskScore += 40;
-      if (hasDarknet) riskScore += 30;
-      if (hasMixer) riskScore += 25;
-      if (chainabuseReports > 0) riskScore += Math.min(chainabuseReports * 5, 30);
+      // OFAC sanctioned = instant CRITICAL (95-100)
+      if (hasSanctions) {
+        riskScore = 95;
+        ofacWarning = 'OFAC Sanctioned — US persons are prohibited from transacting with this address';
+      } else if (hasRansomware) {
+        riskScore = 85;
+      } else if (hasMixer) {
+        riskScore = 75;
+      } else if (hasScam) {
+        riskScore = 70;
+      } else if (hasDarknet) {
+        riskScore = 65;
+      } else if (hasCommunityOnly) {
+        riskScore = 40;
+      }
+
+      // Bump score for multiple signals
+      if (hasSanctions && hasScam) riskScore = 100;
+      if (chainabuseReports > 0 && !hasCommunityOnly) riskScore = Math.min(100, riskScore + 5);
+      if (chainabuseReports > 5) riskScore = Math.min(100, riskScore + 10);
 
       riskScore = Math.min(100, riskScore);
 
-      if (riskScore >= 80) riskLevel = 'CRITICAL';
-      else if (riskScore >= 55) riskLevel = 'HIGH';
-      else if (riskScore >= 30) riskLevel = 'MEDIUM';
+      if (riskScore >= 85) riskLevel = 'CRITICAL';
+      else if (riskScore >= 65) riskLevel = 'HIGH';
+      else if (riskScore >= 35) riskLevel = 'MEDIUM';
       else riskLevel = 'LOW';
     }
 
-    /* 5. Collect all categories */
+    /* 5. Collect all categories + OFAC badge */
     const categories = Array.from(new Set([
       ...sources.map(s => s.category),
       ...chainabuseCategories,
     ]));
+    // Ensure "OFAC Sanctioned" appears as a distinct category
+    if (sources.some(s => s.type === 'sanctioned') && !categories.includes('OFAC Sanctioned')) {
+      categories.unshift('OFAC Sanctioned');
+    }
 
     return Response.json({
       address: addr,
@@ -177,6 +197,7 @@ export async function POST(req: NextRequest) {
       categories,
       chainabuseReports,
       entityInfo,
+      ofacWarning,
     });
   } catch (err: any) {
     console.error('[scam-check]', err);
