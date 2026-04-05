@@ -43,12 +43,36 @@
     "tag": "Qué Hacemos",
     "title": "Forensia Blockchain\npara Cada Situación",
     "subtitle": "Desde estafas románticas hasta fraude corporativo — rastreamos criptomonedas y construimos inteligencia accionable para la recuperación legal.",
-    "tracing": { "title": "Rastreo de Activos Cripto", "desc": "Seguimos fondos a través de Bitcoin, Ethereum, Tron, BNB y otras cadenas. Mapeo de transacciones, análisis de clusters e identificación de exchanges.", "tag": "Más Popular" },
-    "litigation": { "title": "Apoyo en Litigios", "desc": "Informes para tribunal y servicios de testimonio experto para abogados. Ayudamos a construir casos respaldados por evidencia.", "tag": "Para Abogados" },
-    "romance": { "title": "Investigación de Estafas Románticas", "desc": "Pig butchering, plataformas de trading falsas, estafas de amor. Rastreamos a dónde fueron sus fondos.", "tag": "Para Víctimas" },
-    "law_enforcement": { "title": "Asistencia a Fuerzas del Orden", "desc": "Apoyamos investigaciones criminales con análisis blockchain, identificación de objetivos para citaciones y OSINT.", "tag": "Para Agencias" },
-    "corporate": { "title": "Fraude Corporativo y Empresarial", "desc": "Robo de empleados, fraude de inversión, pagos de ransomware — rastreamos fraude cripto con documentación completa.", "tag": "Para Empresas" },
-    "divorce": { "title": "Divorcio y Sucesiones", "desc": "Activos cripto ocultos en procedimientos de divorcio o herencias. Identificamos y valoramos tenencias de criptomonedas no declaradas.", "tag": "Derecho Familiar" }
+    "tracing": {
+      "title": "Rastreo de Activos Cripto",
+      "desc": "Seguimos fondos a través de Bitcoin, Ethereum, Tron, BNB y otras cadenas. Mapeo de transacciones, análisis de clusters e identificación de exchanges.",
+      "tag": "Más Popular"
+    },
+    "litigation": {
+      "title": "Apoyo en Litigios",
+      "desc": "Informes para tribunal y servicios de testimonio experto para abogados. Ayudamos a construir casos respaldados por evidencia.",
+      "tag": "Para Abogados"
+    },
+    "romance": {
+      "title": "Investigación de Estafas Románticas",
+      "desc": "Pig butchering, plataformas de trading falsas, estafas de amor. Rastreamos a dónde fueron sus fondos.",
+      "tag": "Para Víctimas"
+    },
+    "law_enforcement": {
+      "title": "Asistencia a Fuerzas del Orden",
+      "desc": "Apoyamos investigaciones criminales con análisis blockchain, identificación de objetivos para citaciones y OSINT.",
+      "tag": "Para Agencias"
+    },
+    "corporate": {
+      "title": "Fraude Corporativo y Empresarial",
+      "desc": "Robo de empleados, fraude de inversión, pagos de ransomware — rastreamos fraude cripto con documentación completa.",
+      "tag": "Para Empresas"
+    },
+    "divorce": {
+      "title": "Divorcio y Sucesiones",
+      "desc": "Activos cripto ocultos en procedimientos de divorcio o herencias. Identificamos y valoramos tenencias de criptomonedas no declaradas.",
+      "tag": "Derecho Familiar"
+    }
   },
   "russian_banner": {
     "title": "Говорим по-русски — без посредников",
@@ -318,8 +342,8 @@
     "badge": "Entrega Inmediata",
     "title": "Informe Forense",
     "title_highlight": "de Billetera — $49",
-    "subtitle": "Obtenga un informe forense automatizado de blockchain para cualquier billetera Ethereum. Puntuación de riesgo, análisis de transacciones, identificación de entidades y recomendaciones legales — entregado a su correo electrónico en minutos.",
-    "wallet_label": "Dirección de Billetera Ethereum",
+    "subtitle": "Obtenga un informe forense automatizado para cualquier billetera en Ethereum, Bitcoin, Solana, TRON, BNB Chain, Base, Arbitrum u Optimism. Puntuación de riesgo, análisis de transacciones, identificación de entidades y recomendaciones legales — entregado a su correo en minutos.",
+    "wallet_label": "Dirección de Billetera",
     "wallet_placeholder": "0x...",
     "email_label": "Su Dirección de Correo Electrónico",
     "email_placeholder": "you@example.com",
@@ -342,7 +366,7 @@
     "faq_2_q": "¿Es esto una investigación forense certificada?",
     "faq_2_a": "Este es un análisis preliminar automatizado. Para investigaciones forenses certificadas y listas para tribunal con testimonio experto, contáctenos para un servicio completo.",
     "faq_3_q": "¿Qué blockchains son compatibles?",
-    "faq_3_a": "Actualmente Ethereum y tokens ERC-20. Soporte para Bitcoin y otras cadenas próximamente.",
+    "faq_3_a": "Soportamos Ethereum, Bitcoin, Solana, TRON, BNB Chain, Base, Arbitrum y Optimism. Se agregan más cadenas regularmente.",
     "faq_4_q": "¿Puedo usar este informe en un tribunal?",
     "faq_4_a": "Este informe proporciona datos factuales de blockchain adecuados para revisión preliminar. Para presentaciones ante el tribunal, recomendamos nuestro servicio de investigación forense certificada.",
     "success_title": "¡Su Informe Se Está Generando!",
@@ -356,7 +380,8 @@
     "success_cta": "Obtener Evaluación Gratuita",
     "cta_title": "¿Necesita una Investigación Certificada?",
     "cta_desc": "Los informes automatizados son un excelente punto de partida. Para casos complejos que requieren testimonio judicial, metodología certificada y apoyo de abogados — nuestro equipo forense está listo.",
-    "cta_btn": "Contactar a Nuestro Equipo"
+    "cta_btn": "Contactar a Nuestro Equipo",
+    "network_label": "Seleccionar Red"
   },
   "privacy": {
     "title": "Política de Privacidad",
@@ -534,7 +559,6 @@
     "arb": "Arbitrum",
     "op": "Optimism",
     "avax": "Avalanche",
-
     "linea": "Linea",
     "zksync": "zkSync Era",
     "scroll": "Scroll",

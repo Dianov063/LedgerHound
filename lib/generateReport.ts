@@ -4,8 +4,28 @@ import { sendReport } from './sendReport';
 import { ReportDocument } from './reportPdf';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
+import { fetchBtcTransfers } from './bitcoin-tracker';
+import { fetchSolTransfers } from './solana-tracker';
+import { fetchTronTransfers } from './tron-tracker';
+import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
 
 const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+
+const NETWORK_LABELS: Record<string, string> = {
+  eth: 'Ethereum (ETH)', btc: 'Bitcoin (BTC)', sol: 'Solana (SOL)', trx: 'TRON (TRX)',
+  bnb: 'BNB Chain (BNB)', base: 'Base', arb: 'Arbitrum (ARB)', op: 'Optimism (OP)',
+  avax: 'Avalanche (AVAX)', linea: 'Linea', zksync: 'zkSync Era', scroll: 'Scroll',
+  mantle: 'Mantle', polygon: 'Polygon',
+};
+
+const NATIVE_CURRENCY: Record<string, string> = {
+  eth: 'ETH', btc: 'BTC', sol: 'SOL', trx: 'TRX', bnb: 'BNB',
+  base: 'ETH', arb: 'ETH', op: 'ETH', avax: 'AVAX', linea: 'ETH',
+  zksync: 'ETH', scroll: 'ETH', mantle: 'MNT', polygon: 'MATIC',
+};
+
+/** EVM chains that use etherscan-v2-tracker */
+const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
@@ -58,7 +78,7 @@ interface Transfer {
   to: string;
   value: number | null;
   asset: string | null;
-  hash: string;
+  hash?: string;
   category?: string;
   rawContract?: { value?: string; decimal?: string; address?: string };
   metadata?: { blockTimestamp?: string };
@@ -99,7 +119,7 @@ const SPAM_EXACT = new Set([
  * Fallback only when value is null: use rawContract.value (hex) ÷ 10^decimal.
  * Sanity cap: any single transfer > 1e15 is garbage data → return 0.
  */
-function safeValue(tx: Transfer): number {
+function safeValue(tx: Transfer | UnifiedTransfer): number {
   // Alchemy pre-converted value — use directly
   if (tx.value !== null && tx.value !== undefined) {
     const v = Number(tx.value);
@@ -128,7 +148,7 @@ function safeValue(tx: Transfer): number {
 }
 
 /** Check if a token is likely spam/airdrop */
-function isSpamToken(tx: Transfer): boolean {
+function isSpamToken(tx: Transfer | UnifiedTransfer): boolean {
   const asset = (tx.asset || '').trim();
 
   // No asset name or control characters → spam
@@ -159,7 +179,7 @@ function isSpamToken(tx: Transfer): boolean {
 }
 
 /** Filter out spam tokens — keep only transfers with meaningful value or known assets */
-function filterSpam(transfers: Transfer[]): Transfer[] {
+function filterSpam(transfers: (Transfer | UnifiedTransfer)[]): (Transfer | UnifiedTransfer)[] {
   return transfers.filter((tx) => {
     // Always keep ETH/native transfers
     if (tx.category === 'external') return true;
@@ -217,10 +237,74 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Pro
   return all;
 }
 
+/** Unified transfer type for all chains */
+interface UnifiedTransfer {
+  from: string;
+  to: string;
+  value: number | null;
+  asset: string | null;
+  category: string;
+  direction: 'IN' | 'OUT';
+  hash?: string;
+  rawContract?: { value?: string; decimal?: string; address?: string };
+  metadata?: { blockTimestamp?: string };
+}
+
+/**
+ * Fetch transfers from the correct chain tracker.
+ * Returns { incoming, outgoing } arrays in a unified format.
+ */
+async function fetchTransfersForNetwork(
+  address: string,
+  network: string,
+): Promise<{ incoming: UnifiedTransfer[]; outgoing: UnifiedTransfer[] }> {
+  if (network === 'btc') {
+    const { transfers } = await fetchBtcTransfers(address);
+    return {
+      incoming: transfers.filter((t) => t.direction === 'IN') as UnifiedTransfer[],
+      outgoing: transfers.filter((t) => t.direction === 'OUT') as UnifiedTransfer[],
+    };
+  }
+
+  if (network === 'sol') {
+    const { transfers } = await fetchSolTransfers(address);
+    return {
+      incoming: transfers.filter((t) => t.direction === 'IN') as UnifiedTransfer[],
+      outgoing: transfers.filter((t) => t.direction === 'OUT') as UnifiedTransfer[],
+    };
+  }
+
+  if (network === 'trx') {
+    const { transfers } = await fetchTronTransfers(address);
+    return {
+      incoming: transfers.filter((t) => t.direction === 'IN') as UnifiedTransfer[],
+      outgoing: transfers.filter((t) => t.direction === 'OUT') as UnifiedTransfer[],
+    };
+  }
+
+  if (EVM_CHAINS.has(network)) {
+    const { transfers } = await fetchEtherscanV2Transfers(address, network);
+    return {
+      incoming: transfers.filter((t) => t.direction === 'IN') as UnifiedTransfer[],
+      outgoing: transfers.filter((t) => t.direction === 'OUT') as UnifiedTransfer[],
+    };
+  }
+
+  // Default: Ethereum via Alchemy (most detailed)
+  const [outgoing, incoming] = await Promise.all([
+    fetchAllTransfers(address, 'from'),
+    fetchAllTransfers(address, 'to'),
+  ]);
+  return { incoming: incoming as unknown as UnifiedTransfer[], outgoing: outgoing as unknown as UnifiedTransfer[] };
+}
+
 export interface ReportData {
   walletAddress: string;
   caseId: string;
   date: string;
+  network: string;
+  networkLabel: string;
+  nativeCurrency: string;
   totalReceived: number;
   totalSent: number;
   netBalance: number;
@@ -250,19 +334,24 @@ export interface ReportData {
 export async function generateReport(
   walletAddress: string,
   email: string,
-  options?: { stripePaymentId?: string; amount?: number },
+  options?: { stripePaymentId?: string; amount?: number; network?: string },
 ) {
-  const address = walletAddress.toLowerCase();
+  const network = (options?.network || 'eth').toLowerCase();
+  const networkLabel = NETWORK_LABELS[network] || network.toUpperCase();
+  const nativeCurrency = NATIVE_CURRENCY[network] || 'ETH';
+  // Only lowercase for EVM addresses
+  const address = ['btc', 'sol', 'trx'].includes(network) ? walletAddress : walletAddress.toLowerCase();
   const caseId = `LH-${Date.now().toString(36).toUpperCase()}`;
   const date = new Date().toISOString().split('T')[0];
 
-  // Fetch all transfers and filter spam
-  const [rawOutgoing, rawIncoming] = await Promise.all([
-    fetchAllTransfers(address, 'from'),
-    fetchAllTransfers(address, 'to'),
-  ]);
-  const outgoing = filterSpam(rawOutgoing);
-  const incoming = filterSpam(rawIncoming);
+  console.log(`[generateReport] Starting report for ${network}: ${address}`);
+
+  // Fetch transfers from the correct chain
+  const { incoming: rawIncoming, outgoing: rawOutgoing } = await fetchTransfersForNetwork(address, network);
+
+  // Only apply spam filter for ETH (other chains have cleaner data)
+  const outgoing = network === 'eth' ? filterSpam(rawOutgoing) : rawOutgoing;
+  const incoming = network === 'eth' ? filterSpam(rawIncoming) : rawIncoming;
   const spamFiltered = (rawIncoming.length - incoming.length) + (rawOutgoing.length - outgoing.length);
 
   console.log(`[generateReport] Transfers: ${rawIncoming.length} in → ${incoming.length} clean, ${rawOutgoing.length} out → ${outgoing.length} clean (${spamFiltered} spam filtered)`);
@@ -275,11 +364,12 @@ export async function generateReport(
   const entityMap = new Map<string, { label: string; type: string; interactions: number }>();
   const timestamps: number[] = [];
 
-  /** Only count ETH/WETH toward totals — token values are different units */
-  const isEthLike = (tx: Transfer) =>
+  /** Only count native currency toward totals — token values are different units */
+  const nativeUpper = nativeCurrency.toUpperCase();
+  const isNativeLike = (tx: any) =>
     tx.category === 'external' ||
-    (tx.asset || '').toUpperCase() === 'ETH' ||
-    (tx.asset || '').toUpperCase() === 'WETH';
+    (tx.asset || '').toUpperCase() === nativeUpper ||
+    (nativeUpper === 'ETH' && (tx.asset || '').toUpperCase() === 'WETH');
 
   const processCounterparty = (addr: string, value: number) => {
     const lower = addr.toLowerCase();
@@ -299,17 +389,17 @@ export async function generateReport(
 
   for (const tx of incoming) {
     const val = safeValue(tx);
-    if (isEthLike(tx)) ethReceived += val;
+    if (isNativeLike(tx)) ethReceived += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.from) processCounterparty(tx.from, isEthLike(tx) ? val : 0);
+    if (tx.from) processCounterparty(tx.from, isNativeLike(tx) ? val : 0);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
   for (const tx of outgoing) {
     const val = safeValue(tx);
-    if (isEthLike(tx)) ethSent += val;
+    if (isNativeLike(tx)) ethSent += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.to) processCounterparty(tx.to, isEthLike(tx) ? val : 0);
+    if (tx.to) processCounterparty(tx.to, isNativeLike(tx) ? val : 0);
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -361,7 +451,7 @@ export async function generateReport(
     keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
   }
   if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
-  if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ETH across ${outgoing.filter((t) => t.category === 'external').length} native ETH transactions.`);
+  if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${outgoing.filter((t: any) => t.category === 'external').length} native transactions.`);
   if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
   if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
 
@@ -450,6 +540,9 @@ export async function generateReport(
     walletAddress: address,
     caseId,
     date,
+    network,
+    networkLabel,
+    nativeCurrency,
     totalReceived: round4(ethReceived),
     totalSent: round4(ethSent),
     netBalance: round4(ethReceived - ethSent),
@@ -498,7 +591,7 @@ export async function generateReport(
       caseId,
       walletAddress: address,
       email,
-      network: 'eth',
+      network,
       s3Key,
       downloadUrl,
       stripePaymentId: options?.stripePaymentId || '',

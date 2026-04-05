@@ -75,9 +75,12 @@ const CoverPage = ({ data }: { data: ReportData }) => (
       <Text style={{ fontSize: 28, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 40 }}>LedgerHound</Text>
       <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 6 }}>FORENSIC WALLET</Text>
       <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 30 }}>ANALYSIS REPORT</Text>
+      <View style={{ backgroundColor: '#eff6ff', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 16, marginBottom: 16 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue }}>{data.networkLabel || 'Ethereum (ETH)'}</Text>
+      </View>
       <View style={{ backgroundColor: '#f1f5f9', borderRadius: 8, padding: 20, width: 400, alignItems: 'center', marginBottom: 30 }}>
         <Text style={{ fontSize: 8, color: slate400, marginBottom: 4 }}>WALLET ADDRESS</Text>
-        <Text style={{ fontFamily: 'Courier', fontSize: 10, color: slate900 }}>{data.walletAddress}</Text>
+        <Text style={{ fontFamily: 'Courier', fontSize: data.walletAddress.length > 44 ? 8 : 10, color: slate900 }}>{data.walletAddress}</Text>
       </View>
       <View style={s.row}>
         <View style={{ alignItems: 'center', marginRight: 40 }}>
@@ -135,19 +138,19 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
     <Header data={data} />
     <Text style={s.h2}>Wallet Analytics</Text>
 
-    {/* ETH-only stats — most relevant for forensic analysis */}
+    {/* Native currency stats */}
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>ETH RECEIVED</Text>
-        <Text style={{ ...s.value, color: green }}>{fmtEth(data.ethReceived)} ETH</Text>
+        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} RECEIVED</Text>
+        <Text style={{ ...s.value, color: green }}>{fmtEth(data.ethReceived)} {data.nativeCurrency || 'ETH'}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>ETH SENT</Text>
-        <Text style={{ ...s.value, color: red }}>{fmtEth(data.ethSent)} ETH</Text>
+        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} SENT</Text>
+        <Text style={{ ...s.value, color: red }}>{fmtEth(data.ethSent)} {data.nativeCurrency || 'ETH'}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>ETH NET FLOW</Text>
-        <Text style={s.value}>{fmtEth(data.ethReceived - data.ethSent)} ETH</Text>
+        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} NET FLOW</Text>
+        <Text style={s.value}>{fmtEth(data.ethReceived - data.ethSent)} {data.nativeCurrency || 'ETH'}</Text>
       </View>
     </View>
 

@@ -6,6 +6,30 @@ const getStripe = () => {
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 
+const NETWORK_LABELS: Record<string, string> = {
+  eth: 'Ethereum', btc: 'Bitcoin', sol: 'Solana', trx: 'TRON',
+  bnb: 'BNB Chain', base: 'Base', arb: 'Arbitrum', op: 'Optimism',
+  avax: 'Avalanche', linea: 'Linea', zksync: 'zkSync', scroll: 'Scroll',
+  mantle: 'Mantle', polygon: 'Polygon',
+};
+
+const ADDRESS_VALIDATORS: Record<string, RegExp> = {
+  eth: /^0x[a-fA-F0-9]{40}$/,
+  btc: /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/,
+  sol: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
+  trx: /^T[a-zA-Z0-9]{33}$/,
+  bnb: /^0x[a-fA-F0-9]{40}$/,
+  base: /^0x[a-fA-F0-9]{40}$/,
+  arb: /^0x[a-fA-F0-9]{40}$/,
+  op: /^0x[a-fA-F0-9]{40}$/,
+  avax: /^0x[a-fA-F0-9]{40}$/,
+  linea: /^0x[a-fA-F0-9]{40}$/,
+  zksync: /^0x[a-fA-F0-9]{40}$/,
+  scroll: /^0x[a-fA-F0-9]{40}$/,
+  mantle: /^0x[a-fA-F0-9]{40}$/,
+  polygon: /^0x[a-fA-F0-9]{40}$/,
+};
+
 const rateLimit = new Map<string, { count: number; reset: number }>();
 
 export async function POST(req: NextRequest) {
@@ -22,17 +46,24 @@ export async function POST(req: NextRequest) {
       rateLimit.set(ip, { count: 1, reset: now + 3600000 });
     }
 
-    const { walletAddress, email } = await req.json();
+    const { walletAddress, email, network = 'eth' } = await req.json();
 
-    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      return NextResponse.json({ error: 'Invalid Ethereum address' }, { status: 400 });
+    const net = (network || 'eth').toLowerCase();
+    const validator = ADDRESS_VALIDATORS[net];
+    if (!validator) {
+      return NextResponse.json({ error: `Unsupported network: ${net}` }, { status: 400 });
+    }
+
+    if (!walletAddress || !validator.test(walletAddress)) {
+      return NextResponse.json({ error: `Invalid ${NETWORK_LABELS[net] || net} address` }, { status: 400 });
     }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    console.log('[checkout] Stripe key starts with:', process.env.STRIPE_SECRET_KEY?.slice(0, 12));
+    const networkLabel = NETWORK_LABELS[net] || net.toUpperCase();
+    const shortAddr = `${walletAddress.slice(0, 10)}...${walletAddress.slice(-6)}`;
 
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ['card'],
@@ -41,8 +72,8 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'LedgerHound Forensic Wallet Report',
-              description: `Automated forensic analysis for ${walletAddress.slice(0, 10)}...${walletAddress.slice(-6)}`,
+              name: `LedgerHound ${networkLabel} Forensic Report`,
+              description: `Automated forensic analysis for ${shortAddr} on ${networkLabel}`,
             },
             unit_amount: 4900,
           },
@@ -51,16 +82,18 @@ export async function POST(req: NextRequest) {
       ],
       mode: 'payment',
       metadata: {
-        walletAddress: walletAddress.toLowerCase(),
+        walletAddress: net === 'btc' || net === 'sol' || net === 'trx'
+          ? walletAddress
+          : walletAddress.toLowerCase(),
         email,
+        network: net,
       },
       customer_email: email,
       success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,
       cancel_url: `${req.nextUrl.origin}/report`,
     });
 
-    console.log('[checkout] Session created:', session.id);
-    console.log('[checkout] Session URL:', session.url?.slice(0, 60));
+    console.log(`[checkout] Session created for ${net}: ${session.id}`);
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

@@ -46,8 +46,9 @@ export async function POST(request: Request) {
     const session = event.data.object;
     const walletAddress = session.metadata?.walletAddress;
     const email = session.metadata?.email;
+    const network = session.metadata?.network || 'eth';
 
-    console.log('[webhook] Checkout completed — wallet:', walletAddress, 'email:', email);
+    console.log('[webhook] Checkout completed — wallet:', walletAddress, 'email:', email, 'network:', network);
 
     if (walletAddress && email) {
       try {
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
         const result = await generateReport(walletAddress, email, {
           stripePaymentId: paymentId,
           amount,
+          network,
         });
         console.log('[webhook] Report generated successfully, caseId:', result.caseId, 'downloadUrl:', result.downloadUrl ? 'yes' : 'no');
       } catch (err) {

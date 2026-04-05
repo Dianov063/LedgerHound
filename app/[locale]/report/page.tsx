@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
@@ -16,6 +16,39 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
+type Network = 'eth' | 'btc' | 'sol' | 'trx' | 'bnb' | 'base' | 'arb' | 'op';
+
+const NETWORKS: { id: Network; label: string; short: string }[] = [
+  { id: 'eth', label: 'Ethereum', short: 'ETH' },
+  { id: 'btc', label: 'Bitcoin', short: 'BTC' },
+  { id: 'sol', label: 'Solana', short: 'SOL' },
+  { id: 'trx', label: 'TRON', short: 'TRON' },
+  { id: 'bnb', label: 'BNB Chain', short: 'BNB' },
+  { id: 'base', label: 'Base', short: 'BASE' },
+  { id: 'arb', label: 'Arbitrum', short: 'ARB' },
+  { id: 'op', label: 'Optimism', short: 'OP' },
+];
+
+const VALIDATORS: Record<Network, RegExp> = {
+  eth: /^0x[a-fA-F0-9]{40}$/,
+  btc: /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/,
+  sol: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
+  trx: /^T[a-zA-Z0-9]{33}$/,
+  bnb: /^0x[a-fA-F0-9]{40}$/,
+  base: /^0x[a-fA-F0-9]{40}$/,
+  arb: /^0x[a-fA-F0-9]{40}$/,
+  op: /^0x[a-fA-F0-9]{40}$/,
+};
+
+function detectNetwork(addr: string): Network | null {
+  if (!addr || addr.length < 10) return null;
+  if (/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,}$/.test(addr)) return 'btc';
+  if (/^T[a-zA-Z0-9]{33}$/.test(addr)) return 'trx';
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr) && !addr.startsWith('0x')) return 'sol';
+  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) return 'eth';
+  return null;
+}
+
 export default function ReportPage() {
   const t = useTranslations('report');
   const locale = useLocale();
@@ -23,11 +56,19 @@ export default function ReportPage() {
 
   const [wallet, setWallet] = useState('');
   const [email, setEmail] = useState('');
+  const [network, setNetwork] = useState<Network>('eth');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
-  const isValidWallet = /^0x[a-fA-F0-9]{40}$/.test(wallet);
+  // Auto-detect network from address
+  useEffect(() => {
+    const detected = detectNetwork(wallet);
+    if (detected) setNetwork(detected);
+  }, [wallet]);
+
+  const isValidWallet = wallet.length > 0 && VALIDATORS[network]?.test(wallet);
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const canSubmit = isValidWallet && isValidEmail && !loading;
 
@@ -40,7 +81,7 @@ export default function ReportPage() {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: wallet, email }),
+        body: JSON.stringify({ walletAddress: wallet, email, network }),
       });
       const data = await res.json();
       if (data.error) {
@@ -62,6 +103,9 @@ export default function ReportPage() {
     q: t(`faq_${i + 1}_q`),
     a: t(`faq_${i + 1}_a`),
   }));
+
+  const mainNets = NETWORKS.slice(0, 5);
+  const moreNets = NETWORKS.slice(5);
 
   return (
     <div className="min-h-screen">
@@ -96,13 +140,66 @@ export default function ReportPage() {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Network Selector */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">{t('network_label')}</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {mainNets.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => setNetwork(n.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                            network === n.id
+                              ? 'bg-brand-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {n.short}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setShowMore(!showMore)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          moreNets.some((n) => n.id === network)
+                            ? 'bg-brand-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {showMore ? 'Less' : 'More'}
+                        {showMore ? <ChevronUp size={10} className="inline ml-1" /> : <ChevronDown size={10} className="inline ml-1" />}
+                      </button>
+                    </div>
+                    {showMore && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {moreNets.map((n) => (
+                          <button
+                            key={n.id}
+                            onClick={() => setNetwork(n.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                              network === n.id
+                                ? 'bg-brand-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {n.short}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('wallet_label')}</label>
                     <input
                       type="text"
                       value={wallet}
                       onChange={(e) => setWallet(e.target.value.trim())}
-                      placeholder={t('wallet_placeholder')}
+                      placeholder={
+                        network === 'btc' ? 'bc1... / 1... / 3...'
+                        : network === 'sol' ? 'Base58 address'
+                        : network === 'trx' ? 'T...'
+                        : '0x...'
+                      }
                       className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono transition-colors outline-none ${
                         wallet && !isValidWallet
                           ? 'border-red-300 bg-red-50'
@@ -112,7 +209,12 @@ export default function ReportPage() {
                       }`}
                     />
                     {wallet && !isValidWallet && (
-                      <p className="text-xs text-red-500 mt-1">Enter a valid Ethereum address (0x...)</p>
+                      <p className="text-xs text-red-500 mt-1">
+                        {network === 'btc' ? 'Enter a valid Bitcoin address'
+                          : network === 'sol' ? 'Enter a valid Solana address'
+                          : network === 'trx' ? 'Enter a valid TRON address (T...)'
+                          : 'Enter a valid EVM address (0x...)'}
+                      </p>
                     )}
                   </div>
 
