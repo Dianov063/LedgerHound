@@ -1,17 +1,83 @@
-// Etherscan V2 unified API — single endpoint for all supported EVM chains
-const ETHERSCAN_V2_BASE = 'https://api.etherscan.io/v2/api';
+// Chain-specific explorer APIs — each chain uses its own working free API
+// All return Etherscan-compatible format (status/message/result)
 
-export const ETHERSCAN_V2_CHAINS: Record<string, { chainId: number; name: string; nativeCurrency: string; explorer: string }> = {
-  bnb: { chainId: 56, name: 'BNB Chain', nativeCurrency: 'BNB', explorer: 'https://bscscan.com' },
-  base: { chainId: 8453, name: 'Base', nativeCurrency: 'ETH', explorer: 'https://basescan.org' },
-  arb: { chainId: 42161, name: 'Arbitrum One', nativeCurrency: 'ETH', explorer: 'https://arbiscan.io' },
-  op: { chainId: 10, name: 'Optimism', nativeCurrency: 'ETH', explorer: 'https://optimistic.etherscan.io' },
-  avax: { chainId: 43114, name: 'Avalanche C-Chain', nativeCurrency: 'AVAX', explorer: 'https://snowtrace.io' },
-  ftm: { chainId: 250, name: 'Fantom', nativeCurrency: 'FTM', explorer: 'https://ftmscan.com' },
-  linea: { chainId: 59144, name: 'Linea', nativeCurrency: 'ETH', explorer: 'https://lineascan.build' },
-  zksync: { chainId: 324, name: 'zkSync Era', nativeCurrency: 'ETH', explorer: 'https://era.zksync.network' },
-  scroll: { chainId: 534352, name: 'Scroll', nativeCurrency: 'ETH', explorer: 'https://scrollscan.com' },
-  mantle: { chainId: 5000, name: 'Mantle', nativeCurrency: 'MNT', explorer: 'https://mantlescan.xyz' },
+interface ChainConfig {
+  name: string;
+  nativeCurrency: string;
+  explorer: string;
+  /** Function to build the API base URL for this chain */
+  apiBase: (apiKey: string) => string;
+  /** Whether this chain's API needs an API key */
+  needsKey: boolean;
+  /** Native token decimals (default 18) */
+  decimals?: number;
+}
+
+export const ETHERSCAN_V2_CHAINS: Record<string, ChainConfig> = {
+  // ARB: Etherscan V2 free plan supports Arbitrum
+  arb: {
+    name: 'Arbitrum One',
+    nativeCurrency: 'ETH',
+    explorer: 'https://arbiscan.io',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=42161`,
+    needsKey: true,
+  },
+  // LINEA: Etherscan V2 free plan supports Linea
+  linea: {
+    name: 'Linea',
+    nativeCurrency: 'ETH',
+    explorer: 'https://lineascan.build',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=59144`,
+    needsKey: true,
+  },
+  // BASE: Blockscout (free, no key)
+  base: {
+    name: 'Base',
+    nativeCurrency: 'ETH',
+    explorer: 'https://basescan.org',
+    apiBase: () => `https://base.blockscout.com/api`,
+    needsKey: false,
+  },
+  // OP: Blockscout (free, no key)
+  op: {
+    name: 'Optimism',
+    nativeCurrency: 'ETH',
+    explorer: 'https://optimistic.etherscan.io',
+    apiBase: () => `https://explorer.optimism.io/api`,
+    needsKey: false,
+  },
+  // AVAX: Snowtrace (same Etherscan key)
+  avax: {
+    name: 'Avalanche C-Chain',
+    nativeCurrency: 'AVAX',
+    explorer: 'https://snowtrace.io',
+    apiBase: (key) => `https://api.snowtrace.io/api`,
+    needsKey: true,
+  },
+  // zkSync: Era block explorer (free, no key)
+  zksync: {
+    name: 'zkSync Era',
+    nativeCurrency: 'ETH',
+    explorer: 'https://era.zksync.network',
+    apiBase: () => `https://block-explorer-api.mainnet.zksync.io/api`,
+    needsKey: false,
+  },
+  // Scroll: Blockscout (free, no key)
+  scroll: {
+    name: 'Scroll',
+    nativeCurrency: 'ETH',
+    explorer: 'https://scrollscan.com',
+    apiBase: () => `https://scroll.blockscout.com/api`,
+    needsKey: false,
+  },
+  // Mantle: Routescan (free, no key)
+  mantle: {
+    name: 'Mantle',
+    nativeCurrency: 'MNT',
+    explorer: 'https://mantlescan.xyz',
+    apiBase: () => `https://api.routescan.io/v2/network/mainnet/evm/5000/etherscan/api`,
+    needsKey: false,
+  },
 };
 
 interface EvmTransfer {
@@ -35,59 +101,70 @@ export async function fetchEtherscanV2Transfers(
 }> {
   const chain = ETHERSCAN_V2_CHAINS[networkKey];
   if (!chain) {
-    console.log(`[etherscan-v2] Unknown network key: ${networkKey}`);
+    console.log(`[chain-tracker] Unknown network key: ${networkKey}`);
     return { transfers: [], stats: { total: 0, totalNativeIn: 0, totalNativeOut: 0 } };
   }
 
   const apiKey = process.env.ETHERSCAN_API_KEY || '';
   const addr = address.toLowerCase();
+  const base = chain.apiBase(apiKey);
 
-  console.log(`[etherscan-v2] Fetching for address: ${addr} on ${chain.name} (chainId=${chain.chainId})`);
-  console.log(`[etherscan-v2] API key present: ${!!apiKey}`);
+  console.log(`[chain-tracker] Fetching for ${addr} on ${chain.name} via ${base}`);
 
-  const baseParams = `chainid=${chain.chainId}&address=${addr}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+  // Build URLs — append apikey only if this chain needs it
+  const keyParam = chain.needsKey && apiKey ? `&apikey=${apiKey}` : '';
+  const separator = base.includes('?') ? '&' : '?';
+  const baseParams = `${separator}module=account&address=${addr}&startblock=0&endblock=99999999&page=1&offset=200&sort=desc${keyParam}`;
 
-  // Fetch native txs and token txs in parallel
-  const nativeUrl = `${ETHERSCAN_V2_BASE}?${baseParams}&module=account&action=txlist`;
-  const tokenUrl = `${ETHERSCAN_V2_BASE}?${baseParams}&module=account&action=tokentx`;
-
-  console.log(`[etherscan-v2] Fetching native txs and token txs in parallel...`);
+  const nativeUrl = `${base}${baseParams}&action=txlist`;
+  const tokenUrl = `${base}${baseParams}&action=tokentx`;
 
   let nativeData: { status: string; message: string; result: unknown } = { status: '0', message: '', result: [] };
   let tokenData: { status: string; message: string; result: unknown } = { status: '0', message: '', result: [] };
 
-  try {
-    const [nativeRes, tokenRes] = await Promise.all([fetch(nativeUrl), fetch(tokenUrl)]);
-    [nativeData, tokenData] = await Promise.all([nativeRes.json(), tokenRes.json()]);
-  } catch (err) {
-    console.error(`[etherscan-v2] Fetch error:`, err);
-    return { transfers: [], stats: { total: 0, totalNativeIn: 0, totalNativeOut: 0 } };
-  }
+  const fetchWithTimeout = async (url: string, label: string, timeoutMs = 15000) => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
+      clearTimeout(timer);
+      return await res.json();
+    } catch (err) {
+      console.error(`[chain-tracker] ${chain.name} ${label} fetch error:`, err);
+      return { status: '0', message: 'fetch error', result: [] };
+    }
+  };
+
+  [nativeData, tokenData] = await Promise.all([
+    fetchWithTimeout(nativeUrl, 'native'),
+    fetchWithTimeout(tokenUrl, 'token'),
+  ]);
 
   console.log(
-    `[etherscan-v2] Native response: status=${nativeData.status}, message=${nativeData.message}, results=${Array.isArray(nativeData.result) ? nativeData.result.length : typeof nativeData.result}`,
+    `[chain-tracker] ${chain.name} native: status=${nativeData.status}, results=${Array.isArray(nativeData.result) ? nativeData.result.length : typeof nativeData.result}`,
   );
   if (typeof nativeData.result === 'string') {
-    console.error(`[etherscan-v2] Native API error: ${nativeData.result}`);
+    console.error(`[chain-tracker] ${chain.name} native API error: ${nativeData.result}`);
   }
 
   console.log(
-    `[etherscan-v2] Token response: status=${tokenData.status}, message=${tokenData.message}, results=${Array.isArray(tokenData.result) ? tokenData.result.length : typeof tokenData.result}`,
+    `[chain-tracker] ${chain.name} token: status=${tokenData.status}, results=${Array.isArray(tokenData.result) ? tokenData.result.length : typeof tokenData.result}`,
   );
   if (typeof tokenData.result === 'string') {
-    console.error(`[etherscan-v2] Token API error: ${tokenData.result}`);
+    console.error(`[chain-tracker] ${chain.name} token API error: ${tokenData.result}`);
   }
 
   const transfers: EvmTransfer[] = [];
   let totalNativeIn = 0;
   let totalNativeOut = 0;
+  const nativeDecimals = chain.decimals ?? 18;
 
   // Process native transactions
   if (nativeData.status === '1' && Array.isArray(nativeData.result)) {
     for (const tx of nativeData.result) {
-      if (tx.isError === '1') continue; // skip failed txs
+      if (tx.isError === '1') continue;
       const to = (tx.to || '').toLowerCase();
-      const valueNative = parseFloat(tx.value || '0') / 1e18;
+      const valueNative = parseFloat(tx.value || '0') / Math.pow(10, nativeDecimals);
       const direction: 'IN' | 'OUT' = to === addr ? 'IN' : 'OUT';
 
       if (valueNative > 0) {
@@ -152,7 +229,7 @@ export async function fetchEtherscanV2Transfers(
     return db - da;
   });
 
-  console.log(`[etherscan-v2] ${chain.name}: ${transfers.length} transfers found`);
+  console.log(`[chain-tracker] ${chain.name}: ${transfers.length} transfers found`);
 
   return {
     transfers,

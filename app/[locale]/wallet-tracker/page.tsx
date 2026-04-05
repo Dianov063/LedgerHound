@@ -7,13 +7,16 @@ import { ArrowRight, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 export const metadata: Metadata = {
-  title: 'Free Ethereum Wallet Tracker | LedgerHound',
+  title: 'Free Multi-Chain Wallet Tracker — 14 Blockchains | LedgerHound',
   description:
-    'Track any Ethereum wallet address instantly. See complete transaction history, token transfers, and analytics. Free blockchain forensics tool by LedgerHound.',
+    'Track any wallet address across 14 blockchains: Bitcoin, Ethereum, Solana, TRON, BNB Chain, Polygon, Arbitrum, Base, Optimism, Avalanche, Linea, zkSync, Scroll, Mantle. Free blockchain forensics tool.',
   keywords: [
+    'multi-chain wallet tracker',
     'ethereum wallet tracker',
+    'bitcoin wallet tracker',
+    'solana wallet tracker',
+    'tron wallet tracker',
     'check wallet address',
-    'trace bitcoin wallet',
     'blockchain transaction history',
     'crypto wallet checker',
     'track crypto transactions',

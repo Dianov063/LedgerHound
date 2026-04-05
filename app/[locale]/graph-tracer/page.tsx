@@ -7,14 +7,15 @@ import { ArrowRight, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 export const metadata: Metadata = {
-  title: 'Free Transaction Flow Graph | Ethereum Fund Tracing | LedgerHound',
+  title: 'Free Multi-Chain Transaction Graph — 14 Blockchains | LedgerHound',
   description:
-    'Visualize Ethereum fund flows with our free transaction graph tool. Multi-hop tracing, known entity detection (exchanges, mixers, DeFi), and export capabilities. Used by investigators and attorneys.',
+    'Visualize fund flows across 14 blockchains with our free transaction graph tool. Supports BTC, ETH, SOL, TRON, and 10 EVM chains. Multi-hop tracing, known entity detection, and export capabilities.',
   keywords: [
-    'ethereum transaction graph',
+    'multi-chain transaction graph',
     'crypto fund flow visualization',
     'blockchain tracing tool',
     'trace crypto funds',
+    'bitcoin transaction graph',
     'ethereum flow chart',
     'crypto forensics tool',
     'transaction flow analysis',

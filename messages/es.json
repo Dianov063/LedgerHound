@@ -36,8 +36,8 @@
     "searches_label": "Búsquedas mensuales de ayuda en EE.UU.",
     "hours": "72h",
     "hours_label": "Tiempo hasta el primer informe",
-    "chains": "15+",
-    "chains_label": "Blockchains: BTC, ETH, SOL, TRX y mas"
+    "chains": "14",
+    "chains_label": "Blockchains: BTC, ETH, SOL, TRON y 10 más"
   },
   "services": {
     "tag": "Qué Hacemos",
@@ -197,7 +197,7 @@
     "badge": "Herramienta Gratuita de Forensia Blockchain",
     "title": "Rastreador Gratuito Multi-Cadena de",
     "title_highlight": "Billeteras",
-    "subtitle": "Ingrese cualquier direccion de billetera de criptomonedas para ver su historial completo de transacciones en cadena. Nuestra herramienta forense multi-cadena soporta Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain (BEP20), Polygon (MATIC), Base, Arbitrum, Optimism, Avalanche y Fantom. Utilizado por investigadores de fraude, abogados y victimas de estafas cripto para rastrear fondos robados en todas las blockchains principales.",
+    "subtitle": "Ingrese cualquier dirección de billetera de criptomonedas para ver su historial completo de transacciones en cadena. Nuestra herramienta forense multi-cadena soporta Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain, Polygon, Arbitrum, Base, Optimism, Avalanche, Linea, zkSync, Scroll y Mantle. Utilizado por investigadores de fraude, abogados y víctimas de estafas cripto para rastrear fondos robados en 14 blockchains.",
     "cta_title": "¿Necesita ayuda rastreando estos fondos profesionalmente?",
     "cta_desc": "Nuestros investigadores certificados crean informes para tribunal con documentación completa de cadena de custodia. Evaluación gratuita — sin obligación.",
     "cta_btn": "Obtener Evaluación Gratuita"
@@ -534,7 +534,7 @@
     "arb": "Arbitrum",
     "op": "Optimism",
     "avax": "Avalanche",
-    "ftm": "Fantom",
+
     "linea": "Linea",
     "zksync": "zkSync Era",
     "scroll": "Scroll",

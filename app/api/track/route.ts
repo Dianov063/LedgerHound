@@ -4,9 +4,9 @@ import { fetchSolTransfers } from '@/lib/solana-tracker';
 import { fetchTronTransfers } from '@/lib/tron-tracker';
 import { fetchEtherscanV2Transfers } from '@/lib/etherscan-v2-tracker';
 
-type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
-const VALID_NETWORKS: Network[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const VALID_NETWORKS: Network[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 const NATIVE_CURRENCY: Record<Network, string> = {
   btc: 'BTC',
@@ -19,7 +19,6 @@ const NATIVE_CURRENCY: Record<Network, string> = {
   arb: 'ETH',
   op: 'ETH',
   avax: 'AVAX',
-  ftm: 'FTM',
   linea: 'ETH',
   zksync: 'ETH',
   scroll: 'ETH',
@@ -43,14 +42,13 @@ const ADDRESS_PATTERNS: Record<Network, RegExp> = {
   arb: /^0x[a-fA-F0-9]{40}$/,
   op: /^0x[a-fA-F0-9]{40}$/,
   avax: /^0x[a-fA-F0-9]{40}$/,
-  ftm: /^0x[a-fA-F0-9]{40}$/,
   linea: /^0x[a-fA-F0-9]{40}$/,
   zksync: /^0x[a-fA-F0-9]{40}$/,
   scroll: /^0x[a-fA-F0-9]{40}$/,
   mantle: /^0x[a-fA-F0-9]{40}$/,
 };
 
-const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
   const res = await fetch(alchemyUrl, {
@@ -116,7 +114,6 @@ async function fetchTransfersForNetwork(
     case 'arb':
     case 'op':
     case 'avax':
-    case 'ftm':
     case 'linea':
     case 'zksync':
     case 'scroll':

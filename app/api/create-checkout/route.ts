@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         email,
       },
       customer_email: email,
-      success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,
       cancel_url: `${req.nextUrl.origin}/report`,
     });
 

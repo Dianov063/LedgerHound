@@ -51,8 +51,13 @@ export async function POST(request: Request) {
 
     if (walletAddress && email) {
       try {
-        await generateReport(walletAddress, email);
-        console.log('[webhook] Report generated successfully');
+        const paymentId = session.payment_intent || session.id || '';
+        const amount = session.amount_total || 4900;
+        const result = await generateReport(walletAddress, email, {
+          stripePaymentId: paymentId,
+          amount,
+        });
+        console.log('[webhook] Report generated successfully, caseId:', result.caseId, 'downloadUrl:', result.downloadUrl ? 'yes' : 'no');
       } catch (err) {
         console.error('[webhook] Report generation failed:', err);
       }

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 /* ---------- types ---------- */
-type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
 interface Transfer {
   hash: string;
@@ -43,7 +43,6 @@ const NATIVE_CURRENCY: Record<Network, string> = {
   arb: 'ETH',
   op: 'ETH',
   avax: 'AVAX',
-  ftm: 'FTM',
   linea: 'ETH',
   zksync: 'ETH',
   scroll: 'ETH',
@@ -61,7 +60,6 @@ const EXPLORER_TX_URL: Record<Network, (hash: string) => string> = {
   arb: (hash) => `https://arbiscan.io/tx/${hash}`,
   op: (hash) => `https://optimistic.etherscan.io/tx/${hash}`,
   avax: (hash) => `https://snowtrace.io/tx/${hash}`,
-  ftm: (hash) => `https://ftmscan.com/tx/${hash}`,
   linea: (hash) => `https://lineascan.build/tx/${hash}`,
   zksync: (hash) => `https://era.zksync.network/tx/${hash}`,
   scroll: (hash) => `https://scrollscan.com/tx/${hash}`,
@@ -79,7 +77,6 @@ const NETWORK_LABELS: Record<Network, string> = {
   arb: 'ARB',
   op: 'OP',
   avax: 'AVAX',
-  ftm: 'FTM',
   linea: 'LINEA',
   zksync: 'zkSYNC',
   scroll: 'SCROLL',
@@ -87,9 +84,9 @@ const NETWORK_LABELS: Record<Network, string> = {
 };
 
 const PRIMARY_NETWORKS: Network[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
-const MORE_NETWORKS: Network[] = ['avax', 'polygon', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const MORE_NETWORKS: Network[] = ['avax', 'polygon', 'linea', 'zksync', 'scroll', 'mantle'];
 
-const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 /* ---------- helpers ---------- */
 function shorten(addr: string) {
@@ -114,7 +111,7 @@ function toISODate(ts?: string) {
   return new Date(ts).toISOString().split('T')[0];
 }
 
-const EVM_NETWORK_SET = new Set<Network>(['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle']);
+const EVM_NETWORK_SET = new Set<Network>(['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
 
 /** Auto-detect only for unambiguous address formats (BTC, TRON, SOL).
  *  For 0x addresses, only switch to ETH if current tab is non-EVM. */
@@ -258,6 +255,7 @@ export default function WalletTracker() {
   }, [transfers, dirFilter, tokenFilter, dateFrom, dateTo]);
 
   const hasFilters = dirFilter !== 'ALL' || tokenFilter !== 'ALL' || dateFrom || dateTo;
+  const [displayLimit, setDisplayLimit] = useState(200);
 
   // extra stats
   const extraStats = useMemo(() => {
@@ -348,6 +346,7 @@ export default function WalletTracker() {
     setTokenFilter('ALL');
     setDateFrom('');
     setDateTo('');
+    setDisplayLimit(200);
 
     try {
       const res = await fetch('/api/track', {
@@ -612,7 +611,7 @@ export default function WalletTracker() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((tx, i) => (
+                    {filtered.slice(0, displayLimit).map((tx, i) => (
                       <tr
                         key={`${tx.hash}-${tx.direction}-${i}`}
                         className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors"
@@ -665,7 +664,20 @@ export default function WalletTracker() {
                 </table>
               </div>
 
-              {transfers.length >= 1000 && (
+              {filtered.length > displayLimit && (
+                <div className="px-5 py-3 text-center border-t border-slate-800">
+                  <p className="text-xs text-slate-500 mb-2">
+                    Showing {displayLimit} of {filtered.length} transactions
+                  </p>
+                  <button
+                    onClick={() => setDisplayLimit((prev) => prev + 200)}
+                    className="text-xs text-brand-500 hover:text-brand-400 font-medium px-4 py-1.5 border border-brand-500/30 rounded-lg hover:bg-brand-500/10 transition-colors"
+                  >
+                    Load 200 more
+                  </button>
+                </div>
+              )}
+              {transfers.length >= 1000 && filtered.length <= displayLimit && (
                 <div className="px-5 py-3 text-center text-xs text-slate-500 border-t border-slate-800">
                   Showing first 1,000 transactions per address. Contact us for full forensic analysis.
                 </div>

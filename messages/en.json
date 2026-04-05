@@ -36,8 +36,8 @@
     "searches_label": "Monthly US searches for help",
     "hours": "72h",
     "hours_label": "Time to first trace report",
-    "chains": "15+",
-    "chains_label": "Blockchains covered: BTC, ETH, SOL, TRX & more"
+    "chains": "14",
+    "chains_label": "Blockchains: BTC, ETH, SOL, TRON & 10 more"
   },
   "services": {
     "tag": "What We Do",
@@ -221,7 +221,7 @@
     "badge": "Free Blockchain Forensics Tool",
     "title": "Free Multi-Chain Wallet",
     "title_highlight": "Tracker",
-    "subtitle": "Enter any cryptocurrency wallet address to view its complete on-chain transaction history. Our multi-chain blockchain forensics tool supports Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain (BEP20), Polygon (MATIC), Base, Arbitrum, Optimism, Avalanche, and Fantom. Used by fraud investigators, attorneys, and crypto fraud victims to trace stolen funds across all major blockchains.",
+    "subtitle": "Enter any cryptocurrency wallet address to view its complete on-chain transaction history. Our multi-chain blockchain forensics tool supports Bitcoin (BTC), Ethereum (ETH), Solana (SOL), TRON/TRC20, BNB Chain, Polygon, Arbitrum, Base, Optimism, Avalanche, Linea, zkSync, Scroll, and Mantle. Used by fraud investigators, attorneys, and crypto fraud victims to trace stolen funds across 14 blockchains.",
     "cta_title": "Need help tracing these funds professionally?",
     "cta_desc": "Our certified investigators build court-ready reports with full chain-of-custody documentation. Free case evaluation — no obligation.",
     "cta_btn": "Get Free Case Evaluation"
@@ -558,7 +558,7 @@
     "arb": "Arbitrum",
     "op": "Optimism",
     "avax": "Avalanche",
-    "ftm": "Fantom",
+
     "linea": "Linea",
     "zksync": "zkSync Era",
     "scroll": "Scroll",

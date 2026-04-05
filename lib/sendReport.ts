@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
-export async function sendReport(email: string, walletAddress: string, pdfBuffer: Buffer, caseId: string) {
+export async function sendReport(email: string, walletAddress: string, pdfBuffer: Buffer, caseId: string, downloadUrl?: string) {
   const shortAddr = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
 
   await getResend().emails.send({
@@ -36,6 +36,20 @@ export async function sendReport(email: string, walletAddress: string, pdfBuffer
         <p style="color: #475569; line-height: 1.6;">
           Your automated forensic wallet report is attached as a PDF. The report includes risk scoring, transaction analysis, entity identification, and legal recommendations.
         </p>
+
+        ${downloadUrl ? `
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+          <p style="color: #166534; font-weight: 600; margin: 0 0 8px 0; font-size: 14px;">
+            Your report is also available for download:
+          </p>
+          <a href="${downloadUrl}" style="display: inline-block; background: #16a34a; color: white; font-weight: 600; font-size: 13px; padding: 10px 20px; border-radius: 8px; text-decoration: none;">
+            Download PDF Report
+          </a>
+          <p style="color: #6b7280; font-size: 11px; margin: 10px 0 0 0;">
+            Link valid for 7 days
+          </p>
+        </div>
+        ` : ''}
 
         <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px; margin: 24px 0;">
           <p style="color: #1e40af; font-weight: 600; margin: 0 0 8px 0; font-size: 14px;">

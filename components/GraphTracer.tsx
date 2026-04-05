@@ -92,10 +92,10 @@ const LOADING_STEPS = [
   'Step 3/3: Identifying entities...',
 ];
 
-type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
 const PRIMARY_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
-const MORE_NETWORKS: NetworkType[] = ['avax', 'polygon', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const MORE_NETWORKS: NetworkType[] = ['avax', 'polygon', 'linea', 'zksync', 'scroll', 'mantle'];
 
 const NETWORK_DISPLAY_LABELS: Record<NetworkType, string> = {
   btc: 'BTC',
@@ -108,14 +108,13 @@ const NETWORK_DISPLAY_LABELS: Record<NetworkType, string> = {
   arb: 'ARB',
   op: 'OP',
   avax: 'AVAX',
-  ftm: 'FTM',
   linea: 'LINEA',
   zksync: 'zkSYNC',
   scroll: 'SCROLL',
   mantle: 'MANTLE',
 };
 
-const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 function getExplorerBaseUrl(network: NetworkType): string {
   switch (network) {
@@ -139,8 +138,6 @@ function getExplorerBaseUrl(network: NetworkType): string {
       return 'https://optimistic.etherscan.io';
     case 'avax':
       return 'https://snowtrace.io';
-    case 'ftm':
-      return 'https://ftmscan.com';
     case 'linea':
       return 'https://lineascan.build';
     case 'zksync':
@@ -187,8 +184,6 @@ function getExplorerLabel(network: NetworkType): string {
       return 'View on Optimistic Etherscan';
     case 'avax':
       return 'View on Snowtrace';
-    case 'ftm':
-      return 'View on FTMScan';
     case 'linea':
       return 'View on LineaScan';
     case 'zksync':
@@ -327,7 +322,7 @@ export default function GraphTracer() {
             token: edge.token,
             hash: edge.hash,
             timestamp: edge.timestamp,
-            label: `${edge.value?.toFixed(4) || '0'} ${edge.token}`,
+            label: `${typeof edge.value === 'number' && isFinite(edge.value) ? edge.value.toFixed(4) : '0'} ${edge.token && !/[/:.<>]/.test(edge.token) ? edge.token : 'TOKEN'}`,
             edgeType: isOutgoing ? 'outgoing' : isIncoming ? 'incoming' : 'neutral',
           },
         });

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 
-type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'ftm' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
-const VALID_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
-const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle'];
+const VALID_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
+const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 const ALCHEMY_ETH_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 const ALCHEMY_POLYGON_URL = 'https://polygon-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
@@ -181,6 +181,17 @@ async function getAlchemyTransfersForAddress(alchemyUrl: string, address: string
 
 // ---- TRON fetching via TronGrid ----
 
+/** Sanitize token symbol — scam tokens often set their symbol to URLs/domains */
+function sanitizeTokenSymbol(raw: string): string {
+  if (!raw || typeof raw !== 'string') return 'TOKEN';
+  const s = raw.trim();
+  // Reject URLs, domains, paths, HTML
+  if (/[/:.<>]/.test(s) || s.length > 16 || /^https?/i.test(s) || /\.(com|io|org|net|xyz|co)/i.test(s)) {
+    return 'TOKEN';
+  }
+  return s;
+}
+
 async function fetchTronGraphTransfers(address: string) {
   const apiKey = process.env.TRONGRID_API_KEY || '';
   const headers: Record<string, string> = {};
@@ -228,7 +239,7 @@ async function fetchTronGraphTransfers(address: string) {
     const to = tx.to || '';
     const decimals = parseInt(tx.token_info?.decimals || '6', 10);
     const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
-    const symbol = tx.token_info?.symbol || 'TOKEN';
+    const symbol = sanitizeTokenSymbol(tx.token_info?.symbol);
     const hash = tx.transaction_id || '';
     const timestamp = tx.block_timestamp ? new Date(tx.block_timestamp).toISOString() : '';
 
@@ -408,22 +419,47 @@ async function fetchSolGraphTransfers(address: string) {
   return { outgoing: outgoing.slice(0, 20), incoming: incoming.slice(0, 20) };
 }
 
-// ---- EVM chains via Etherscan V2 ----
+// ---- EVM chains via chain-specific explorer APIs ----
 
-async function fetchEtherscanV2GraphTransfers(address: string, chainId: number) {
+const CHAIN_EXPLORER_APIS: Partial<Record<NetworkType, { base: string; needsKey: boolean; nativeCurrency: string }>> = {
+  arb:    { base: 'https://api.etherscan.io/v2/api?chainid=42161', needsKey: true, nativeCurrency: 'ETH' },
+  linea:  { base: 'https://api.etherscan.io/v2/api?chainid=59144', needsKey: true, nativeCurrency: 'ETH' },
+  base:   { base: 'https://base.blockscout.com/api', needsKey: false, nativeCurrency: 'ETH' },
+  op:     { base: 'https://explorer.optimism.io/api', needsKey: false, nativeCurrency: 'ETH' },
+  avax:   { base: 'https://api.snowtrace.io/api', needsKey: true, nativeCurrency: 'AVAX' },
+  zksync: { base: 'https://block-explorer-api.mainnet.zksync.io/api', needsKey: false, nativeCurrency: 'ETH' },
+  scroll: { base: 'https://scroll.blockscout.com/api', needsKey: false, nativeCurrency: 'ETH' },
+  mantle: { base: 'https://api.routescan.io/v2/network/mainnet/evm/5000/etherscan/api', needsKey: false, nativeCurrency: 'MNT' },
+};
+
+async function fetchChainExplorerGraphTransfers(address: string, network: NetworkType) {
+  const config = CHAIN_EXPLORER_APIS[network];
+  if (!config) return { outgoing: [], incoming: [] };
+
   const apiKey = process.env.ETHERSCAN_API_KEY || '';
   const addr = address.toLowerCase();
   const outgoing: any[] = [];
   const incoming: any[] = [];
 
   try {
-    const base = `https://api.etherscan.io/v2/api?chainid=${chainId}&address=${addr}&sort=desc&apikey=${apiKey}`;
-    const [nativeRes, tokenRes] = await Promise.all([
-      fetch(`${base}&module=account&action=txlist`),
-      fetch(`${base}&module=account&action=tokentx`),
+    const keyParam = config.needsKey && apiKey ? `&apikey=${apiKey}` : '';
+    const sep = config.base.includes('?') ? '&' : '?';
+    const baseParams = `${sep}module=account&address=${addr}&sort=desc&page=1&offset=40${keyParam}`;
+
+    const fetchSafe = async (url: string) => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 15000);
+        const res = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
+        clearTimeout(t);
+        return await res.json();
+      } catch { return { status: '0', result: [] }; }
+    };
+
+    const [nativeJson, tokenJson] = await Promise.all([
+      fetchSafe(`${config.base}${baseParams}&action=txlist`),
+      fetchSafe(`${config.base}${baseParams}&action=tokentx`),
     ]);
-    const nativeJson = await nativeRes.json();
-    const tokenJson = await tokenRes.json();
 
     // Native txs
     if (nativeJson.status === '1' && Array.isArray(nativeJson.result)) {
@@ -435,7 +471,7 @@ async function fetchEtherscanV2GraphTransfers(address: string, chainId: number) 
         const hash = tx.hash || '';
         const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
         if (value === 0) continue;
-        const transfer = { from, to, value, asset: 'NATIVE', hash, metadata: { blockTimestamp: timestamp } };
+        const transfer = { from, to, value, asset: config.nativeCurrency, hash, metadata: { blockTimestamp: timestamp } };
         if (from === addr) outgoing.push(transfer);
         if (to === addr) incoming.push(transfer);
       }
@@ -448,7 +484,7 @@ async function fetchEtherscanV2GraphTransfers(address: string, chainId: number) 
         const to = (tx.to || '').toLowerCase();
         const decimals = parseInt(tx.tokenDecimal || '18', 10);
         const value = parseFloat(tx.value || '0') / Math.pow(10, decimals);
-        const symbol = tx.tokenSymbol || 'TOKEN';
+        const symbol = sanitizeTokenSymbol(tx.tokenSymbol || 'TOKEN');
         const hash = tx.hash || '';
         const timestamp = tx.timeStamp ? new Date(parseInt(tx.timeStamp, 10) * 1000).toISOString() : '';
         const transfer = { from, to, value, asset: symbol, hash, metadata: { blockTimestamp: timestamp } };
@@ -457,16 +493,11 @@ async function fetchEtherscanV2GraphTransfers(address: string, chainId: number) 
       }
     }
   } catch (err) {
-    console.error(`[trace-graph] Etherscan V2 (chain ${chainId}) error:`, err);
+    console.error(`[trace-graph] ${network} explorer API error:`, err);
   }
 
   return { outgoing: outgoing.slice(0, 20), incoming: incoming.slice(0, 20) };
 }
-
-const CHAIN_IDS: Partial<Record<NetworkType, number>> = {
-  base: 8453, arb: 42161, op: 10, avax: 43114, ftm: 250,
-  linea: 59144, zksync: 324, scroll: 534352, mantle: 5000,
-};
 
 // ---- Unified transfer fetcher ----
 
@@ -485,9 +516,8 @@ async function getTransfersForAddress(network: NetworkType, address: string) {
     case 'bnb':
       return fetchBscGraphTransfers(address);
     default: {
-      // All other EVM chains via Etherscan V2
-      const chainId = CHAIN_IDS[network];
-      if (chainId) return fetchEtherscanV2GraphTransfers(address, chainId);
+      // All other EVM chains via chain-specific explorer APIs
+      if (CHAIN_EXPLORER_APIS[network]) return fetchChainExplorerGraphTransfers(address, network);
       return { outgoing: [], incoming: [] };
     }
   }
@@ -576,11 +606,12 @@ export async function POST(req: NextRequest) {
         toNode.totalIn += tx.value || 0;
         toNode.txCount++;
 
+        const nativeFallback = net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH';
         edges.push({
           source: key,
           target: toKey,
           value: tx.value || 0,
-          token: tx.asset || (net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH'),
+          token: sanitizeTokenSymbol(tx.asset) !== 'TOKEN' ? sanitizeTokenSymbol(tx.asset) : nativeFallback,
           hash: tx.hash || '',
           timestamp: tx.metadata?.blockTimestamp || '',
         });
@@ -596,11 +627,12 @@ export async function POST(req: NextRequest) {
         toNode.totalIn += tx.value || 0;
         toNode.txCount++;
 
+        const nativeFallbackIn = net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH';
         edges.push({
           source: fromKey,
           target: key,
           value: tx.value || 0,
-          token: tx.asset || (net === 'trx' ? 'TRX' : net === 'bnb' ? 'BNB' : net === 'polygon' ? 'MATIC' : 'ETH'),
+          token: sanitizeTokenSymbol(tx.asset) !== 'TOKEN' ? sanitizeTokenSymbol(tx.asset) : nativeFallbackIn,
           hash: tx.hash || '',
           timestamp: tx.metadata?.blockTimestamp || '',
         });

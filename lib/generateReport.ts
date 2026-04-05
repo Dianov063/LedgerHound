@@ -2,6 +2,8 @@ import React from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { ReportDocument } from './reportPdf';
+import { uploadReport, getReportDownloadUrl } from './s3-storage';
+import { logReport } from './reports-log';
 
 const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 
@@ -41,23 +43,70 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer'
 interface Transfer {
   from: string;
   to: string;
-  value: number;
+  value: number | null;
   asset: string;
   hash: string;
-  rawContract?: { value?: string; decimal?: string };
+  category?: string;
+  rawContract?: { value?: string; decimal?: string; address?: string };
   metadata?: { blockTimestamp?: string };
 }
 
 /**
- * Alchemy getAssetTransfers returns `value` in the token's native unit (ETH for
- * external, token-decimals for ERC-20). However, some transfers return `value`
- * as a raw big-integer (Wei-scale) when decimal info is missing. Any single-
- * transfer value > 1e12 is clearly Wei (there are only ~120M ETH in existence).
+ * Alchemy getAssetTransfers: `value` is normally in the token's native unit,
+ * but can be null for ERC-20s when Alchemy can't resolve decimals.
+ * Fallback: decode rawContract.value (hex Wei) with rawContract.decimal.
+ *
+ * For ETH (external), values > 1e12 are clearly in Wei (only ~120M ETH exist).
  */
 function safeValue(tx: Transfer): number {
-  const v = tx.value || 0;
+  // Try the high-level value first
+  let v = tx.value ?? 0;
+
+  // If value is 0/null but rawContract has data, compute from raw hex + decimals
+  if ((!v || v === 0) && tx.rawContract?.value) {
+    try {
+      const rawHex = tx.rawContract.value;
+      const rawBig = BigInt(rawHex);
+      const rawDec = tx.rawContract.decimal || '';
+      const decimals = rawDec.startsWith('0x') ? parseInt(rawDec, 16) : (parseInt(rawDec, 10) || 18);
+      v = Number(rawBig) / Math.pow(10, decimals);
+    } catch {
+      v = 0;
+    }
+  }
+
+  // Sanity check: if value looks like Wei (way too large for ETH), convert
   if (v > 1e12) return v / 1e18;
   return v;
+}
+
+/** Check if a token is likely spam/airdrop */
+function isSpamToken(tx: Transfer): boolean {
+  const asset = (tx.asset || '').trim();
+  // No asset name
+  if (!asset) return false;
+  // Known spam patterns: URLs, very long names, suspicious chars
+  if (/[/:.<>]/.test(asset) || asset.length > 20) return true;
+  if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
+  // Common airdrop spam token names
+  const spamNames = ['visit', 'claim', 'airdrop', 'reward', 'voucher', 'ticket', 'bonus', 'gift', 'free', 'disney', 'ukraine', 'windows'];
+  if (spamNames.some((s) => asset.toLowerCase().includes(s))) return true;
+  return false;
+}
+
+/** Filter out spam tokens — keep only transfers with meaningful value or known assets */
+function filterSpam(transfers: Transfer[]): Transfer[] {
+  return transfers.filter((tx) => {
+    // Always keep ETH/native transfers
+    if (tx.category === 'external') return true;
+    if ((tx.asset || '').toUpperCase() === 'ETH') return true;
+    // Filter obvious spam
+    if (isSpamToken(tx)) return false;
+    // Filter dust: if value rounds to 0.0000, skip
+    const val = safeValue(tx);
+    if (val > 0 && val < 0.0001) return false;
+    return true;
+  });
 }
 
 /** Format ETH value: max 4 decimals, with thousands separators for large numbers */
@@ -128,16 +177,24 @@ export interface ReportData {
   }[];
 }
 
-export async function generateReport(walletAddress: string, email: string) {
+export async function generateReport(
+  walletAddress: string,
+  email: string,
+  options?: { stripePaymentId?: string; amount?: number },
+) {
   const address = walletAddress.toLowerCase();
   const caseId = `LH-${Date.now().toString(36).toUpperCase()}`;
   const date = new Date().toISOString().split('T')[0];
 
-  // Fetch all transfers
-  const [outgoing, incoming] = await Promise.all([
+  // Fetch all transfers and filter spam
+  const [rawOutgoing, rawIncoming] = await Promise.all([
     fetchAllTransfers(address, 'from'),
     fetchAllTransfers(address, 'to'),
   ]);
+  const outgoing = filterSpam(rawOutgoing);
+  const incoming = filterSpam(rawIncoming);
+
+  console.log(`[generateReport] Transfers: ${rawIncoming.length} in (${incoming.length} after spam filter), ${rawOutgoing.length} out (${outgoing.length} after spam filter)`);
 
   // Calculate stats
   let totalReceived = 0;
@@ -283,9 +340,42 @@ export async function generateReport(walletAddress: string, email: string) {
   // Generate PDF
   const doc = React.createElement(ReportDocument, { data: reportData }) as any;
   const pdfBuffer = await renderToBuffer(doc);
+  const buf = Buffer.from(pdfBuffer);
 
-  // Send email
-  await sendReport(email, address, Buffer.from(pdfBuffer), caseId);
+  // Upload to S3 and get presigned download URL
+  let downloadUrl = '';
+  let s3Key = '';
+  try {
+    console.log(`[generateReport] S3 env check — bucket: ${process.env.AWS_S3_BUCKET || 'NOT SET'}, region: ${process.env.AWS_REGION || 'NOT SET'}, keyId: ${process.env.AWS_ACCESS_KEY_ID ? process.env.AWS_ACCESS_KEY_ID.slice(0, 8) + '...' : 'NOT SET'}`);
+    console.log(`[generateReport] PDF buffer size: ${buf.length} bytes`);
+    s3Key = await uploadReport(buf, caseId);
+    console.log(`[generateReport] S3 upload OK: ${s3Key}`);
+    downloadUrl = await getReportDownloadUrl(caseId);
+    console.log(`[generateReport] Presigned URL generated: ${downloadUrl.slice(0, 80)}...`);
+  } catch (err: any) {
+    console.error('[generateReport] S3 upload failed (continuing with email only):', err?.message || err);
+    console.error('[generateReport] S3 error name:', err?.name, 'code:', err?.$metadata?.httpStatusCode);
+  }
 
-  return reportData;
+  // Send email with download link
+  await sendReport(email, address, buf, caseId, downloadUrl);
+
+  // Log report to S3 (non-blocking — don't fail if this errors)
+  try {
+    await logReport({
+      caseId,
+      walletAddress: address,
+      email,
+      network: 'eth',
+      s3Key,
+      downloadUrl,
+      stripePaymentId: options?.stripePaymentId || '',
+      createdAt: new Date().toISOString(),
+      amount: options?.amount || 4900,
+    });
+  } catch (err) {
+    console.error('[generateReport] Failed to log report:', err);
+  }
+
+  return { ...reportData, downloadUrl, s3Key };
 }
