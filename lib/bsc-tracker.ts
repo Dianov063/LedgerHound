@@ -1,4 +1,5 @@
-const BSC_BASE = 'https://api.bscscan.com/api';
+// Etherscan V2 unified API — BscScan V1 is deprecated
+const BSC_BASE = 'https://api.etherscan.io/v2/api?chainid=56';
 
 interface BscTransfer {
   hash: string;
@@ -19,17 +20,25 @@ export async function fetchBscTransfers(address: string): Promise<{
   const apiKey = process.env.BSCSCAN_API_KEY || '';
   const addr = address.toLowerCase();
 
-  // Fetch BNB native transactions
-  const bnbRes = await fetch(
-    `${BSC_BASE}?module=account&action=txlist&address=${addr}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
-  );
-  const bnbData = await bnbRes.json();
+  console.log(`[bsc-tracker] Fetching for address: ${addr}`);
+  console.log(`[bsc-tracker] API key present: ${!!apiKey}`);
 
-  // Fetch BEP20 token transactions
-  const bep20Res = await fetch(
-    `${BSC_BASE}?module=account&action=tokentx&address=${addr}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`
-  );
+  // Fetch BNB native transactions via Etherscan V2
+  const bnbUrl = `${BSC_BASE}&module=account&action=txlist&address=${addr}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+  console.log(`[bsc-tracker] Fetching BNB txs...`);
+  const bnbRes = await fetch(bnbUrl);
+  const bnbData = await bnbRes.json();
+  console.log(`[bsc-tracker] BNB response: status=${bnbData.status}, message=${bnbData.message}, results=${Array.isArray(bnbData.result) ? bnbData.result.length : typeof bnbData.result}`);
+  if (typeof bnbData.result === 'string') {
+    console.error(`[bsc-tracker] BNB API error: ${bnbData.result}`);
+  }
+
+  // Fetch BEP20 token transactions via Etherscan V2
+  const bep20Url = `${BSC_BASE}&module=account&action=tokentx&address=${addr}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+  console.log(`[bsc-tracker] Fetching BEP20 txs...`);
+  const bep20Res = await fetch(bep20Url);
   const bep20Data = await bep20Res.json();
+  console.log(`[bsc-tracker] BEP20 response: status=${bep20Data.status}, message=${bep20Data.message}, results=${Array.isArray(bep20Data.result) ? bep20Data.result.length : typeof bep20Data.result}`);
 
   const transfers: BscTransfer[] = [];
   let totalNativeIn = 0;

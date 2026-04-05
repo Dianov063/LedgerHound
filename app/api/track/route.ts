@@ -74,11 +74,11 @@ async function fetchTransfersForNetwork(
     }
     case 'trx': {
       const results = await Promise.all(addresses.map((a) => fetchTronTransfers(a)));
-      return results.flat();
+      return results.flatMap((r) => r.transfers);
     }
     case 'bnb': {
       const results = await Promise.all(addresses.map((a) => fetchBscTransfers(a)));
-      return results.flat();
+      return results.flatMap((r) => r.transfers);
     }
     default:
       throw new Error(`Unsupported network: ${network}`);

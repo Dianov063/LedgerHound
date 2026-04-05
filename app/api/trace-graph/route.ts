@@ -228,8 +228,8 @@ async function fetchBscGraphTransfers(address: string) {
   const apiKey = process.env.BSCSCAN_API_KEY || '';
 
   const [bnbRes, bep20Res] = await Promise.all([
-    fetch(`https://api.bscscan.com/api?module=account&action=txlist&address=${address}&sort=desc&apikey=${apiKey}`),
-    fetch(`https://api.bscscan.com/api?module=account&action=tokentx&address=${address}&sort=desc&apikey=${apiKey}`),
+    fetch(`https://api.etherscan.io/v2/api?chainid=56&module=account&action=txlist&address=${address}&sort=desc&apikey=${apiKey}`),
+    fetch(`https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&address=${address}&sort=desc&apikey=${apiKey}`),
   ]);
 
   const bnbJson = await bnbRes.json();
