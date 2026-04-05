@@ -114,12 +114,17 @@ function toISODate(ts?: string) {
   return new Date(ts).toISOString().split('T')[0];
 }
 
-function detectNetwork(addr: string): Network | null {
+const EVM_NETWORK_SET = new Set<Network>(['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'ftm', 'linea', 'zksync', 'scroll', 'mantle']);
+
+/** Auto-detect only for unambiguous address formats (BTC, TRON, SOL).
+ *  For 0x addresses, only switch to ETH if current tab is non-EVM. */
+function detectNetwork(addr: string, currentNetwork: Network): Network | null {
   const trimmed = addr.trim();
   if (/^(1|3)[a-zA-Z0-9]{24,33}$/.test(trimmed) || trimmed.startsWith('bc1')) return 'btc';
   if (trimmed.startsWith('T') && trimmed.length === 34) return 'trx';
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed) && !trimmed.startsWith('0x') && !trimmed.startsWith('T')) return 'sol';
-  if (trimmed.startsWith('0x') && trimmed.length === 42) return 'eth';
+  // For 0x addresses, only auto-switch if user is on a non-EVM tab
+  if (trimmed.startsWith('0x') && trimmed.length === 42 && !EVM_NETWORK_SET.has(currentNetwork)) return 'eth';
   return null;
 }
 
@@ -225,7 +230,7 @@ export default function WalletTracker() {
   // auto-detect network from address input
   function handleInputChange(value: string) {
     setInput(value);
-    const detected = detectNetwork(value);
+    const detected = detectNetwork(value, network);
     if (detected) {
       setNetwork(detected);
     }
