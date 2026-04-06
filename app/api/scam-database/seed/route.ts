@@ -1,19 +1,34 @@
-import { NextRequest } from 'next/server';
-import { seedDatabase } from '@/lib/scam-db';
+import { NextRequest } from 'next/server'
+import { seedDatabase } from '@/lib/scam-db'
 
-export async function POST(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const password = searchParams.get('password');
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const password = searchParams.get('password')
 
   if (password !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    await seedDatabase();
-    return Response.json({ success: true, message: 'Database seeded with 10 platforms' });
-  } catch (err: any) {
-    console.error('[scam-database/seed]', err);
-    return Response.json({ error: err.message || 'Seed failed' }, { status: 500 });
+    await seedDatabase()
+    return Response.json({ success: true, message: 'Database seeded with 10 platforms' })
+  } catch (error: any) {
+    return Response.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json()
+  const { password } = body
+
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    await seedDatabase()
+    return Response.json({ success: true, message: 'Database seeded with 10 platforms' })
+  } catch (error: any) {
+    return Response.json({ error: error.message }, { status: 500 })
   }
 }
