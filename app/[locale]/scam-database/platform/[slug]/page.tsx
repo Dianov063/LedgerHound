@@ -37,6 +37,9 @@ interface ScamPlatform {
   victims: number;
   addresses: string[];
   verified: boolean;
+  trustScore: number;
+  staffVerified: boolean;
+  blockchainVerifiedCount: number;
   firstReported: string;
   lastReported: string;
 }
@@ -81,6 +84,23 @@ function shortAddr(addr: string) {
   return `${addr.slice(0, 10)}...${addr.slice(-6)}`;
 }
 
+function getTrustLabel(score: number): { label: string; color: string; emoji: string; bg: string; border: string; text: string } {
+  if (score >= 20) return { label: 'Confirmed Scam', color: 'red', emoji: '\ud83d\udea8', bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-700' };
+  if (score >= 10) return { label: 'Likely Scam', color: 'orange', emoji: '\ud83d\udd34', bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' };
+  if (score >= 4) return { label: 'Suspicious', color: 'yellow', emoji: '\u26a0\ufe0f', bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-700' };
+  return { label: 'Community Reported', color: 'gray', emoji: '', bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-600' };
+}
+
+function TrustScoreBadge({ score }: { score: number }) {
+  const t = getTrustLabel(score);
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${t.bg} ${t.text} px-3 py-1.5 rounded-full border ${t.border}`}>
+      {t.emoji && <span>{t.emoji}</span>}
+      {t.label} (Score: {score})
+    </span>
+  );
+}
+
 function TrustBadge({ tier }: { tier: 1 | 2 | 3 }) {
   if (tier === 3) return (
     <span className="inline-flex items-center gap-1 text-xs font-bold bg-brand-100 text-brand-700 px-2.5 py-1 rounded-full">
@@ -104,10 +124,7 @@ export default function PlatformPage() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
   const params = useParams();
-  const rawSlug = (params.slug as string) || '';
-
-  // Extract platform slug from "is-xxx-a-scam" pattern
-  const slug = rawSlug.replace(/^is-/, '').replace(/-a-scam$/, '');
+  const slug = (params.slug as string) || '';
 
   const [platform, setPlatform] = useState<ScamPlatform | null>(null);
   const [reports, setReports] = useState<SafeReport[]>([]);
@@ -121,6 +138,7 @@ export default function PlatformPage() {
   const [disputeSubmitted, setDisputeSubmitted] = useState(false);
 
   useEffect(() => {
+    if (!slug) return;
     fetch(`/api/scam-database/platform?slug=${encodeURIComponent(slug)}`)
       .then(r => r.json())
       .then(data => {
@@ -172,6 +190,8 @@ export default function PlatformPage() {
     );
   }
 
+  const trustInfo = getTrustLabel(platform.trustScore);
+
   const schemaClaimReview = {
     '@context': 'https://schema.org',
     '@type': 'ClaimReview',
@@ -218,10 +238,18 @@ export default function PlatformPage() {
       {/* Warning Hero */}
       <div className="pt-24 pb-8 bg-gradient-to-br from-red-50 to-white border-b border-red-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-100 border-2 border-red-300 rounded-2xl p-6 mb-6">
+          <div className={`${trustInfo.bg} border-2 ${trustInfo.border} rounded-2xl p-6 mb-6`}>
             <div className="flex items-start gap-3">
               <AlertTriangle className="text-red-600 flex-shrink-0 mt-1" size={24} />
               <div>
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <TrustScoreBadge score={platform.trustScore} />
+                  {platform.staffVerified && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold bg-brand-100 text-brand-700 px-2.5 py-1 rounded-full">
+                      <Lock size={10} /> Staff Verified
+                    </span>
+                  )}
+                </div>
                 <p className="font-display font-bold text-lg text-red-800">
                   {t('warning_prefix')} {platform.name} {t('warning_reported')} {platform.victims} {t('warning_victims')}
                 </p>
@@ -261,12 +289,9 @@ export default function PlatformPage() {
             <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">{t('stat_first_report')}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-            {platform.verified
-              ? <CheckCircle2 size={18} className="text-emerald-500 mx-auto mb-2" />
-              : <AlertTriangle size={18} className="text-amber-500 mx-auto mb-2" />
-            }
-            <p className="text-sm font-bold text-slate-900">{platform.verified ? t('status_verified') : t('status_reported')}</p>
-            <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">{t('stat_status')}</p>
+            <Shield size={18} className={`mx-auto mb-2 ${trustInfo.text}`} />
+            <p className={`text-sm font-bold ${trustInfo.text}`}>{trustInfo.label}</p>
+            <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Trust Score: {platform.trustScore}</p>
           </div>
         </div>
 

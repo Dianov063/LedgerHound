@@ -20,19 +20,17 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
-interface ScamPlatform {
+interface PlatformIndexEntry {
   slug: string;
   name: string;
-  urls: string[];
-  types: string[];
-  reportIds: string[];
-  totalLoss: number;
-  lossCurrency: string;
   victims: number;
-  addresses: string[];
+  totalLoss: number;
   verified: boolean;
-  firstReported: string;
+  trustScore: number;
+  types: string[];
+  urls: string[];
   lastReported: string;
+  addresses: string[];
 }
 
 interface Stats {
@@ -64,15 +62,22 @@ function formatDate(iso: string): string {
   } catch { return iso; }
 }
 
+function getTrustLabel(score: number): { label: string; bg: string; text: string; border: string } {
+  if (score >= 20) return { label: 'Confirmed Scam', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' };
+  if (score >= 10) return { label: 'Likely Scam', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' };
+  if (score >= 4) return { label: 'Suspicious', bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200' };
+  return { label: 'Reported', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+}
+
 export default function ScamDatabasePage() {
   const t = useTranslations('scamDatabase');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 
   const [stats, setStats] = useState<Stats | null>(null);
-  const [platforms, setPlatforms] = useState<ScamPlatform[]>([]);
+  const [platforms, setPlatforms] = useState<PlatformIndexEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<ScamPlatform[] | null>(null);
+  const [searchResults, setSearchResults] = useState<PlatformIndexEntry[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -250,30 +255,29 @@ export default function ScamDatabasePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentPlatforms.map(p => (
-                      <tr key={p.slug} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <Link href={`${base}/scam-database/is-${p.slug}-a-scam`} className="font-semibold text-brand-600 hover:underline">
-                            {p.name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-slate-500">
-                          {p.types.map(t => SCAM_TYPE_LABELS[t] || t).join(', ')}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold">{p.victims}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-red-600">{formatLoss(p.totalLoss)}</td>
-                        <td className="px-4 py-3">
-                          {p.verified ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-                              <CheckCircle2 size={10} /> Verified
+                    {recentPlatforms.map(p => {
+                      const trust = getTrustLabel(p.trustScore);
+                      return (
+                        <tr key={p.slug} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <Link href={`${base}/scam-database/platform/${p.slug}`} className="font-semibold text-brand-600 hover:underline">
+                              {p.name}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500">
+                            {p.types.map(t => SCAM_TYPE_LABELS[t] || t).join(', ')}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold">{p.victims}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-red-600">{formatLoss(p.totalLoss)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${trust.bg} ${trust.text} px-2 py-0.5 rounded-full border ${trust.border}`}>
+                              {trust.label}
                             </span>
-                          ) : (
-                            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Reported</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(p.lastReported)}</td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(p.lastReported)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -325,11 +329,12 @@ export default function ScamDatabasePage() {
   );
 }
 
-/* ── Platform Card Component ── */
-function PlatformCard({ platform: p, base }: { platform: ScamPlatform; base: string }) {
+/* -- Platform Card Component -- */
+function PlatformCard({ platform: p, base }: { platform: PlatformIndexEntry; base: string }) {
+  const trust = getTrustLabel(p.trustScore);
   return (
     <Link
-      href={`${base}/scam-database/is-${p.slug}-a-scam`}
+      href={`${base}/scam-database/platform/${p.slug}`}
       className="block bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all"
     >
       <div className="flex items-start justify-between mb-3">
@@ -341,11 +346,9 @@ function PlatformCard({ platform: p, base }: { platform: ScamPlatform; base: str
                 {SCAM_TYPE_LABELS[t] || t}
               </span>
             ))}
-            {p.verified && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-                <CheckCircle2 size={9} /> Verified
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${trust.bg} ${trust.text} px-2 py-0.5 rounded-full border ${trust.border}`}>
+              {trust.label}
+            </span>
           </div>
         </div>
         <div className="text-right flex-shrink-0">

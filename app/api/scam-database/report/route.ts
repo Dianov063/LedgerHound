@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { saveReport, isTxidUsed } from '@/lib/scam-db';
+import { saveReport, isTxidUsed, calcRecoveryScore } from '@/lib/scam-db';
 import type { ScamType } from '@/lib/scam-db';
 
 const VALID_TYPES: ScamType[] = ['fake_exchange', 'pig_butchering', 'rug_pull', 'phishing', 'ponzi', 'other'];
@@ -110,11 +110,20 @@ export async function POST(req: NextRequest) {
       trustTier,
     });
 
+    /* Calculate recovery score */
+    const recoveryScore = calcRecoveryScore({
+      lossDate: report.lossDate,
+      blockchainConfirmed: report.blockchainConfirmed,
+      network: report.network,
+      lossAmount: report.lossAmount,
+    });
+
     return Response.json({
       reportId: id,
       trustTier: report.trustTier,
       verified: report.blockchainConfirmed,
       verifiedTxData,
+      recoveryScore,
       message: blockchainConfirmed
         ? 'Report submitted and blockchain-verified. It will be reviewed by our team.'
         : 'Report submitted. It will be reviewed by our team.',

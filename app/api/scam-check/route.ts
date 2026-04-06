@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { getAddressIndex } from '@/lib/scam-db';
 
 /* ── Known entities (same as graph-tracer & report) ── */
 const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: string }> = {
@@ -162,7 +163,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    /* 2. Check Chainabuse (public API, no key needed) */
+    /* 2. Check LedgerHound Scam Database (address index) */
+    let scamDbPlatforms: string[] = [];
+    try {
+      const addrIndex = await getAddressIndex(addr);
+      if (addrIndex && addrIndex.platforms.length > 0) {
+        scamDbPlatforms = addrIndex.platformNames;
+        sources.push({
+          source: 'LedgerHound Scam Database',
+          label: `Reported in ${addrIndex.reports.length} report(s) — ${addrIndex.platformNames.join(', ')}`,
+          type: 'scam',
+          category: 'Scam',
+        });
+      }
+    } catch {
+      // Scam database check failed — continue without it
+    }
+
+    /* 3. Check Chainabuse (public API, no key needed) */
     try {
       const caRes = await fetch(
         `https://api.chainabuse.com/v0/reports?address=${addr}`,
@@ -191,13 +209,13 @@ export async function POST(req: NextRequest) {
       // Chainabuse timeout/error — continue without it
     }
 
-    /* 3. Determine entity info for clean addresses */
+    /* 4. Determine entity info for clean addresses */
     let entityInfo: { label: string; type: string } | null = null;
     if (entity && (entity.type === 'exchange' || entity.type === 'defi')) {
       entityInfo = { label: entity.label, type: entity.type };
     }
 
-    /* 4. Calculate risk */
+    /* 5. Calculate risk */
     const isFlagged = sources.length > 0;
     let riskLevel: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'CLEAN';
     let riskScore = 0;
@@ -240,7 +258,7 @@ export async function POST(req: NextRequest) {
       else riskLevel = 'LOW';
     }
 
-    /* 5. Collect all categories + OFAC badge */
+    /* 6. Collect all categories + OFAC badge */
     const categories = Array.from(new Set([
       ...sources.map(s => s.category),
       ...chainabuseCategories,
@@ -260,6 +278,7 @@ export async function POST(req: NextRequest) {
       chainabuseReports,
       entityInfo,
       ofacWarning,
+      scamDbPlatforms,
     });
   } catch (err: any) {
     console.error('[scam-check]', err);

@@ -90,6 +90,11 @@ interface TxResult {
   gasCost: number;
   gasCurrency: string;
   explorerUrl: string;
+  scamWarning?: {
+    platforms: string[];
+    totalLoss: number;
+    reports: number;
+  };
 }
 
 export default function TxLookupPage() {
@@ -303,6 +308,29 @@ function TxLookupContent() {
                   </div>
                 );
               })()}
+
+              {/* Scam Warning Banner */}
+              {result.scamWarning && (
+                <div className="bg-red-50 border-b-2 border-red-300 px-6 py-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-red-800 text-sm">
+                        Recipient address found in LedgerHound Scam Database
+                      </p>
+                      <p className="text-red-700 text-xs mt-1">
+                        Associated with: <strong>{result.scamWarning.platforms.join(', ')}</strong> — {result.scamWarning.reports} report(s), total losses: ${result.scamWarning.totalLoss.toLocaleString()}
+                      </p>
+                      <Link
+                        href={`${base}/scam-checker?address=${encodeURIComponent(result.to)}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-red-700 hover:text-red-900 mt-2 underline"
+                      >
+                        <Shield size={11} /> Full Scam Check
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Details */}
               <div className="p-6 space-y-4">

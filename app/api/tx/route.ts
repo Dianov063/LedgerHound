@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAddressIndex } from '@/lib/scam-db';
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY || 'OAymykkPw_Oi3LINBgrqZ';
 
@@ -360,7 +361,24 @@ export async function POST(req: NextRequest) {
       result = await fetchEVMTxAuto(trimmedHash);
     }
 
-    return NextResponse.json(result);
+    // Check if "to" address is in scam database
+    let scamWarning: { platforms: string[]; totalLoss: number; reports: number } | null = null;
+    if (result.to) {
+      try {
+        const addrIndex = await getAddressIndex(result.to);
+        if (addrIndex && addrIndex.platforms.length > 0) {
+          scamWarning = {
+            platforms: addrIndex.platformNames,
+            totalLoss: addrIndex.totalLoss,
+            reports: addrIndex.reports.length,
+          };
+        }
+      } catch {
+        // Scam DB check failed — continue without it
+      }
+    }
+
+    return NextResponse.json({ ...result, scamWarning });
   } catch (err: any) {
     console.error('[tx] Error:', err);
     return NextResponse.json({ error: err.message || 'Failed to fetch transaction' }, { status: 500 });

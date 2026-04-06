@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { listAllReports, updateReportStatus, listDisputes, rebuildAggregates } from '@/lib/scam-db';
+import { listAllReports, updateReportStatus, listDisputes } from '@/lib/scam-db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -39,11 +39,6 @@ export async function POST(req: NextRequest) {
       }
       await updateReportStatus(reportId, status, trustTier);
       return Response.json({ success: true, message: `Report ${reportId} updated to ${status}` });
-    }
-
-    if (action === 'rebuild') {
-      await rebuildAggregates();
-      return Response.json({ success: true, message: 'Aggregates rebuilt' });
     }
 
     return Response.json({ error: 'Unknown action' }, { status: 400 });

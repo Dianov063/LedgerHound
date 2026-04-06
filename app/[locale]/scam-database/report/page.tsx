@@ -192,16 +192,50 @@ export default function ReportScamPage() {
               </div>
 
               {/* Recovery Score */}
-              <div className="bg-brand-50 border border-brand-200 rounded-xl p-6 mb-6">
-                <h3 className="font-display font-bold text-lg text-slate-900 mb-2">{t('recovery_title')}</h3>
-                <p className="text-slate-600 text-sm mb-4">{t('recovery_desc')}</p>
-                <Link
-                  href={`${base}/free-evaluation`}
-                  className="inline-flex items-center gap-2 bg-brand-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-brand-700 transition-colors"
-                >
-                  {t('recovery_cta')} <ArrowRight size={16} />
-                </Link>
-              </div>
+              {submitResult.recoveryScore && (
+                <div className="bg-brand-50 border border-brand-200 rounded-xl p-6 mb-6 text-left">
+                  <h3 className="font-display font-bold text-lg text-slate-900 mb-3">{t('recovery_title')}</h3>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="35" fill="none" stroke="#e2e8f0" strokeWidth="6" />
+                        <circle
+                          cx="40" cy="40" r="35" fill="none"
+                          stroke={submitResult.recoveryScore.score >= 60 ? '#059669' : submitResult.recoveryScore.score >= 40 ? '#d97706' : '#dc2626'}
+                          strokeWidth="6"
+                          strokeDasharray={`${(submitResult.recoveryScore.score / 100) * 220} 220`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center font-bold text-lg text-slate-900">
+                        {submitResult.recoveryScore.score}%
+                      </span>
+                    </div>
+                    <div>
+                      <p className={`font-bold text-base ${
+                        submitResult.recoveryScore.score >= 60 ? 'text-emerald-700' :
+                        submitResult.recoveryScore.score >= 40 ? 'text-amber-700' : 'text-red-700'
+                      }`}>
+                        {submitResult.recoveryScore.label}
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-4">
+                    {submitResult.recoveryScore.details.map((d: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                        <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0 text-brand-500" />
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href={`${base}/free-evaluation`}
+                    className="inline-flex items-center gap-2 bg-brand-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-brand-700 transition-colors"
+                  >
+                    {t('recovery_cta')} <ArrowRight size={16} />
+                  </Link>
+                </div>
+              )}
 
               <Link href={`${base}/scam-database`} className="text-sm text-brand-600 font-semibold hover:underline">
                 {t('back_to_database')}
