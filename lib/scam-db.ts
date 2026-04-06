@@ -536,8 +536,6 @@ export async function seedDatabase(): Promise<void> {
   // ── Phase 1: Build everything in memory (zero S3 calls) ──
   const now = new Date().toISOString();
   const allPlatforms: ScamPlatform[] = [];
-  const allReports: { key: string; data: ScamReport }[] = [];
-  const allAddresses: { key: string; data: AddressIndex }[] = [];
   const platformIndex: PlatformIndexEntry[] = [];
   let totalReports = 0;
   let totalLoss = 0;
@@ -550,11 +548,6 @@ export async function seedDatabase(): Promise<void> {
     const loss = (r.lossAmount || 30000) * victims;
     const verifiedCount = r.blockchainConfirmed ? Math.floor(victims * 0.6) : 0;
 
-    // Build report
-    const report: ScamReport = { ...r, id, createdAt: now };
-    allReports.push({ key: `reports/${id}.json`, data: report });
-
-    // Build platform
     const urls = [r.platformUrl, ...(r.platformUrls || [])].filter(Boolean) as string[];
     const platform: ScamPlatform = {
       slug, name: r.platformName, urls, types: [r.platformType],
@@ -569,7 +562,6 @@ export async function seedDatabase(): Promise<void> {
     platform.verified = platform.trustScore >= 10;
     allPlatforms.push(platform);
 
-    // Build index entry
     platformIndex.push({
       slug, name: r.platformName, victims, totalLoss: loss,
       verified: platform.verified, trustScore: platform.trustScore,
@@ -577,52 +569,35 @@ export async function seedDatabase(): Promise<void> {
       lastReported: now, addresses: r.scamAddress ? [r.scamAddress] : [],
     });
 
-    // Build address index
-    if (r.scamAddress) {
-      allAddresses.push({
-        key: `addresses/${r.scamAddress.toLowerCase()}.json`,
-        data: {
-          address: r.scamAddress, platforms: [slug],
-          platformNames: [r.platformName], reports: [id],
-          totalLoss: loss, networks: r.network ? [r.network] : [],
-          firstSeen: r.lossDate || now, lastSeen: now,
-        },
-      });
-    }
-
     totalReports += victims;
     totalLoss += loss;
     totalVerified += verifiedCount;
-    console.log(`[seed] Built: ${slug} (${victims} victims, score=${platform.trustScore})`);
   }
 
-  // Build stats
   const stats: ScamStats = {
     totalReports, totalPlatforms: allPlatforms.length,
     totalLoss, blockchainVerified: totalVerified,
     updatedAt: now,
   };
 
-  // ── Phase 2: Write everything to S3 in parallel ──
-  console.log(`[seed] Writing ${allReports.length} reports + ${allPlatforms.length} platforms + index + stats to S3...`);
+  console.log(`[seed] Built ${allPlatforms.length} platforms in memory. Writing to S3...`);
 
-  const writes: Promise<void>[] = [
-    // Index files (most important — written first)
+  // ── Phase 2: Write to S3 in small sequential batches ──
+  // Write indexes first (most critical — pages read these)
+  await Promise.all([
     s3Put('index/platforms.json', platformIndex),
     s3Put('index/stats.json', stats),
-    // Platform detail files
-    ...allPlatforms.map(p => s3Put(`platforms/${p.slug}.json`, p)),
-    // Report files
-    ...allReports.map(r => s3Put(r.key, r.data)),
-    // Address index files
-    ...allAddresses.map(a => s3Put(a.key, a.data)),
-  ];
+  ]);
+  console.log('[seed] Wrote index/platforms.json + index/stats.json');
 
-  await Promise.all(writes);
+  // Write platform detail files in batches of 4
+  for (let i = 0; i < allPlatforms.length; i += 4) {
+    const batch = allPlatforms.slice(i, i + 4);
+    await Promise.all(batch.map(p => s3Put(`platforms/${p.slug}.json`, p)));
+    console.log(`[seed] Wrote platforms batch ${Math.floor(i / 4) + 1}: ${batch.map(p => p.slug).join(', ')}`);
+  }
 
-  console.log(`[seed] Done! Wrote ${writes.length} S3 objects in parallel.`);
-  console.log(`[seed] Stats: ${stats.totalReports} reports, ${stats.totalPlatforms} platforms, $${stats.totalLoss} loss, ${stats.blockchainVerified} verified`);
-  console.log(`[seed] Platforms: ${platformIndex.map(p => p.slug).join(', ')}`);
+  console.log(`[seed] Done! ${stats.totalPlatforms} platforms, ${stats.totalReports} reports, $${stats.totalLoss} loss`);
 }
 
 /* ── Delete report + platform cleanup ── */
