@@ -52,6 +52,7 @@ export default function Navbar() {
     { href: `${prefix}/scam-checker`, label: t('scam_checker'), badge: 'NEW' },
     { href: `${prefix}/report`, label: t('report'), badge: '$49' },
     { href: `${prefix}/tx-lookup`, label: t('tx'), badge: undefined },
+    { href: `${prefix}/scam-database`, label: t('scam_db'), badge: 'NEW' },
   ];
 
   return (

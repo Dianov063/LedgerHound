@@ -23,6 +23,8 @@ const pages = [
   { path: '/report', priority: 0.9, changeFreq: 'weekly' },
   { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
   { path: '/tx-lookup', priority: 0.9, changeFreq: 'weekly' },
+  { path: '/scam-database', priority: 0.9, changeFreq: 'daily' },
+  { path: '/scam-database/report', priority: 0.8, changeFreq: 'weekly' },
   { path: '/privacy', priority: 0.3, changeFreq: 'yearly' },
   { path: '/terms', priority: 0.3, changeFreq: 'yearly' },
   { path: '/disclaimer', priority: 0.3, changeFreq: 'yearly' },
