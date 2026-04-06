@@ -24,9 +24,10 @@ import {
   FileText,
 } from 'lucide-react';
 
-type Network = 'eth' | 'btc' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op';
+type Network = 'auto' | 'eth' | 'btc' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op';
 
 const NETWORKS: { id: Network; label: string; short: string }[] = [
+  { id: 'auto', label: 'Auto-Detect', short: 'AUTO' },
   { id: 'eth', label: 'Ethereum', short: 'ETH' },
   { id: 'btc', label: 'Bitcoin', short: 'BTC' },
   { id: 'sol', label: 'Solana', short: 'SOL' },
@@ -39,10 +40,10 @@ const NETWORKS: { id: Network; label: string; short: string }[] = [
 
 function detectNetworkFromHash(hash: string): Network {
   const h = hash.trim();
-  if (/^0x[a-fA-F0-9]{64}$/.test(h)) return 'eth';
+  if (/^0x[a-fA-F0-9]{64}$/.test(h)) return 'auto'; // Could be any EVM chain
   if (/^[a-fA-F0-9]{64}$/.test(h)) return 'btc';
   if (/^[1-9A-HJ-NP-Za-km-z]{85,90}$/.test(h)) return 'sol';
-  return 'eth';
+  return 'auto';
 }
 
 function shortAddr(addr: string) {
@@ -106,7 +107,7 @@ function TxLookupContent() {
 
   const searchParams = useSearchParams();
   const [hashInput, setHashInput] = useState('');
-  const [network, setNetwork] = useState<Network>('eth');
+  const [network, setNetwork] = useState<Network>('auto');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<TxResult | null>(null);
@@ -254,13 +255,23 @@ function TxLookupContent() {
                   className="px-6 py-3 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                 >
                   {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                  {t('search_btn')}
+                  {loading ? (network === 'auto' ? 'Searching...' : t('search_btn')) : t('search_btn')}
                 </button>
               </div>
             </div>
 
+            {/* Loading status */}
+            {loading && (
+              <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3 text-sm text-brand-700 flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin flex-shrink-0" />
+                {network === 'auto'
+                  ? 'Searching across all EVM chains (ETH, BNB, Base, Polygon, Arbitrum, Optimism)...'
+                  : `Searching on ${NETWORKS.find(n => n.id === network)?.label || network}...`}
+              </div>
+            )}
+
             {/* Error */}
-            {error && (
+            {error && !loading && (
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-start gap-2">
                 <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
                 {error}
@@ -278,10 +289,15 @@ function TxLookupContent() {
                 return (
                   <div className={`${cfg.bg} ${cfg.border} border-b px-6 py-4 flex items-center gap-3`}>
                     <Icon size={24} className={cfg.color} />
-                    <div>
-                      <p className={`font-display font-bold text-lg ${cfg.color}`}>
-                        Transaction {cfg.label}
-                      </p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`font-display font-bold text-lg ${cfg.color}`}>
+                          Transaction {cfg.label}
+                        </p>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-white/80 border border-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                          Found on: {result.networkLabel}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-500">{result.networkLabel} Network</p>
                     </div>
                   </div>

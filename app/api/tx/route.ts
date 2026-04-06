@@ -300,6 +300,32 @@ async function fetchSOLTx(hash: string) {
   };
 }
 
+/* ── Auto-detect EVM chain by trying all in parallel ── */
+const EVM_CHAIN_ORDER = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op'];
+
+async function fetchEVMTxAuto(hash: string): Promise<any> {
+  // Try all EVM chains in parallel
+  const results = await Promise.allSettled(
+    EVM_CHAIN_ORDER.map((net) => fetchEVMTx(hash, net))
+  );
+
+  // Return first successful result
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      return r.value;
+    }
+  }
+
+  // All failed — throw the first error
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      throw new Error(r.reason?.message || 'Transaction not found on any EVM chain');
+    }
+  }
+
+  throw new Error('Transaction not found on any EVM chain');
+}
+
 /* ── Route handler ── */
 export async function POST(req: NextRequest) {
   try {
@@ -310,19 +336,28 @@ export async function POST(req: NextRequest) {
     }
 
     const net = (network || 'eth').toLowerCase();
+    const trimmedHash = hash.trim();
 
     let result;
     if (net === 'btc') {
-      result = await fetchBTCTx(hash.trim());
+      result = await fetchBTCTx(trimmedHash);
     } else if (net === 'trx') {
-      result = await fetchTRONTx(hash.trim());
+      result = await fetchTRONTx(trimmedHash);
     } else if (net === 'sol') {
-      result = await fetchSOLTx(hash.trim());
+      result = await fetchSOLTx(trimmedHash);
+    } else if (net === 'auto') {
+      // Auto-detect: try all EVM chains in parallel
+      result = await fetchEVMTxAuto(trimmedHash);
     } else if (ALCHEMY_URLS[net]) {
-      result = await fetchEVMTx(hash.trim(), net);
+      // Try the specific chain first; if not found, try all EVM chains
+      try {
+        result = await fetchEVMTx(trimmedHash, net);
+      } catch {
+        result = await fetchEVMTxAuto(trimmedHash);
+      }
     } else {
-      // Default to ETH
-      result = await fetchEVMTx(hash.trim(), 'eth');
+      // Unknown network — auto-detect across all EVM chains
+      result = await fetchEVMTxAuto(trimmedHash);
     }
 
     return NextResponse.json(result);
