@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { listAllReports, updateReportStatus, listDisputes } from '@/lib/scam-db';
+import { listAllReports, updateReportStatus, listDisputes, deleteReportAndPlatform } from '@/lib/scam-db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, reportId, status, trustTier } = await req.json();
+    const body = await req.json();
+    const { action, reportId, status, trustTier, platformSlug } = body;
 
     if (action === 'updateStatus') {
       if (!reportId || !status) {
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
       }
       await updateReportStatus(reportId, status, trustTier);
       return Response.json({ success: true, message: `Report ${reportId} updated to ${status}` });
+    }
+
+    if (action === 'deleteReportAndPlatform') {
+      if (!reportId || !platformSlug) {
+        return Response.json({ error: 'Missing reportId or platformSlug' }, { status: 400 });
+      }
+      const result = await deleteReportAndPlatform(reportId, platformSlug);
+      return Response.json({ success: true, ...result });
     }
 
     return Response.json({ error: 'Unknown action' }, { status: 400 });

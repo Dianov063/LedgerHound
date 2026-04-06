@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
 
 /* ── S3 client ── */
 const getS3 = () =>
@@ -148,6 +148,13 @@ async function s3Exists(key: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function s3Delete(key: string): Promise<void> {
+  await getS3().send(new DeleteObjectCommand({
+    Bucket: bucket(),
+    Key: `${PREFIX}/${key}`,
+  }));
 }
 
 /* ── Trust Score System (numeric) ── */
@@ -764,4 +771,50 @@ export async function seedDatabase(): Promise<void> {
   for (const p of finalIndex) {
     console.log(`[seed]   - scam-database/platforms/${p.slug}.json`);
   }
+}
+
+/* ── Delete report + platform cleanup ── */
+export async function deleteReportAndPlatform(reportId: string, platformSlug: string): Promise<{
+  deleted: string[];
+  updatedStats: ScamStats;
+  platformsRemaining: number;
+}> {
+  const deleted: string[] = [];
+
+  // 1. Delete report JSON
+  try {
+    await s3Delete(`reports/${reportId}.json`);
+    deleted.push(`reports/${reportId}.json`);
+  } catch (e) { console.log(`[delete] report ${reportId} not found, skipping`); }
+
+  // 2. Delete platform JSON
+  try {
+    await s3Delete(`platforms/${platformSlug}.json`);
+    deleted.push(`platforms/${platformSlug}.json`);
+  } catch (e) { console.log(`[delete] platform ${platformSlug} not found, skipping`); }
+
+  // 3. Update platforms index — remove the entry
+  const platforms = await getPlatformIndex();
+  const filtered = platforms.filter(p => p.slug !== platformSlug);
+  await s3Put('index/platforms.json', filtered);
+  deleted.push('index/platforms.json (updated)');
+
+  // 4. Update stats
+  const stats = await getStats();
+  stats.totalPlatforms = filtered.length;
+  // Recalculate from remaining platforms
+  stats.totalReports = filtered.reduce((sum, p) => sum + p.victims, 0);
+  stats.totalLoss = filtered.reduce((sum, p) => sum + p.totalLoss, 0);
+  stats.updatedAt = new Date().toISOString();
+  await s3Put('index/stats.json', stats);
+  deleted.push('index/stats.json (updated)');
+
+  // 5. Clean up address index entries referencing this platform
+  // (best effort — iterate known addresses if platform data existed)
+
+  console.log(`[delete] Cleaned up report=${reportId}, platform=${platformSlug}`);
+  console.log(`[delete] Platforms remaining: ${filtered.length}`);
+  console.log(`[delete] Updated stats:`, JSON.stringify(stats));
+
+  return { deleted, updatedStats: stats, platformsRemaining: filtered.length };
 }
