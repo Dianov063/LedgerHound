@@ -403,6 +403,16 @@ export default function ScamDatabasePage() {
         <div className="mt-12 bg-slate-50 border border-slate-200 rounded-xl p-6 text-xs text-slate-500 leading-relaxed">
           <p className="font-semibold text-slate-600 mb-2">{t('disclaimer_title')}</p>
           <p>{t('disclaimer_text')}</p>
+          <p className="mt-3">
+            To dispute a listing,{' '}
+            <Link href={`${base}/scam-database/dispute`} className="text-brand-600 hover:underline font-medium">
+              click here
+            </Link>.
+            We respond within 7 business days per our{' '}
+            <Link href={`${base}/legal/dispute-policy`} className="text-brand-600 hover:underline font-medium">
+              DMCA/Section 230 compliance policy
+            </Link>.
+          </p>
         </div>
       </div>
 

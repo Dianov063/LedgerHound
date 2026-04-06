@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
-import { listAllReports, updateReportStatus, listDisputes, deleteReportAndPlatform } from '@/lib/scam-db';
+import { listAllReports, updateReportStatus, listDisputes, deleteReportAndPlatform, updateDisputeStatus, getDispute } from '@/lib/scam-db';
+import { sendDisputeResolution } from '@/lib/dispute-emails';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action, reportId, status, trustTier, platformSlug } = body;
+    const { action, reportId, status, trustTier, platformSlug, disputeId, resolutionNote, sendEmail } = body;
 
     if (action === 'updateStatus') {
       if (!reportId || !status) {
@@ -48,6 +49,37 @@ export async function POST(req: NextRequest) {
       }
       const result = await deleteReportAndPlatform(reportId, platformSlug);
       return Response.json({ success: true, ...result });
+    }
+
+    if (action === 'updateDispute') {
+      if (!disputeId || !status) {
+        return Response.json({ error: 'Missing disputeId or status' }, { status: 400 });
+      }
+      if (!['pending', 'under_review', 'resolved', 'rejected'].includes(status)) {
+        return Response.json({ error: 'Invalid status' }, { status: 400 });
+      }
+
+      const updated = await updateDisputeStatus(disputeId, status, resolutionNote);
+      if (!updated) {
+        return Response.json({ error: 'Dispute not found' }, { status: 404 });
+      }
+
+      // Send resolution email if requested
+      if (sendEmail && ['resolved', 'rejected'].includes(status) && updated.contactEmail) {
+        try {
+          await sendDisputeResolution(
+            updated.contactEmail,
+            disputeId,
+            updated.platformSlug || 'unknown',
+            status as 'resolved' | 'rejected',
+            resolutionNote || ''
+          );
+        } catch (emailErr) {
+          console.error('[admin] Failed to send dispute email:', emailErr);
+        }
+      }
+
+      return Response.json({ success: true, dispute: updated });
     }
 
     return Response.json({ error: 'Unknown action' }, { status: 400 });

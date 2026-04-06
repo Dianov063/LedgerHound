@@ -9,6 +9,8 @@ import { fetchSolTransfers } from './solana-tracker';
 import { fetchTronTransfers } from './tron-tracker';
 import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
 import { getAddressIndex } from './scam-db';
+import { buildGraphData, type GraphData } from './generateGraphData';
+import QRCode from 'qrcode';
 
 const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 
@@ -316,6 +318,7 @@ export interface ScamDbMatch {
   platformSlugs: string[];
   totalLoss: number;
   reports: number;
+  qrDataUri?: string; // Pre-generated QR code data URI for PDF
 }
 
 export interface ReportData {
@@ -354,6 +357,7 @@ export interface ReportData {
     value: number;
     token: string;
   }[];
+  graphData: GraphData | null;
 }
 
 export async function generateReport(
@@ -476,6 +480,16 @@ export async function generateReport(
     });
     await Promise.all(lookups);
   } catch { /* scam DB unavailable — continue without it */ }
+
+  // Generate QR codes for scam DB matches (for PDF)
+  for (const m of scamDbMatches) {
+    if (m.platformSlugs.length > 0) {
+      try {
+        const url = `https://www.ledgerhound.vip/scam-database/platform/${m.platformSlugs[0]}`;
+        m.qrDataUri = await QRCode.toDataURL(url, { width: 80, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } });
+      } catch { /* QR generation failed — skip */ }
+    }
+  }
 
   // ── Risk score (improved with OFAC + scam DB) ──
   let riskScore = 50; // baseline
@@ -656,6 +670,12 @@ export async function generateReport(
     keyFindings,
     recommendations,
     transactions: allTxs,
+    graphData: buildGraphData({
+      walletAddress: address,
+      transactions: allTxs,
+      identifiedEntities: identifiedEntities.map(e => ({ address: e.address, label: e.label, type: e.type })),
+      nativeCurrency,
+    }),
   };
 
   // Generate PDF

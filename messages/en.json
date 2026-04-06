@@ -13,7 +13,8 @@
     "cta": "Free Evaluation",
     "scam_checker": "Scam Checker",
     "tx": "TX Lookup",
-    "scam_db": "Scam Database"
+    "scam_db": "Scam Database",
+    "emergency": "Emergency"
   },
   "hero": {
     "badge": "Certified Blockchain Investigators · US-Based",

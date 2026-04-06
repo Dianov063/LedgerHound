@@ -13,7 +13,8 @@
     "scam_checker": "Verificador de Estafas",
     "cta": "Evaluación Gratuita",
     "tx": "Buscar TX",
-    "scam_db": "Base de Estafas"
+    "scam_db": "Base de Estafas",
+    "emergency": "SOS"
   },
   "hero": {
     "badge": "Investigadores de blockchain certificados · EE.UU.",

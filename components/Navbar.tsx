@@ -53,6 +53,7 @@ export default function Navbar() {
     { href: `${prefix}/report`, label: t('report'), badge: '$49' },
     { href: `${prefix}/tx-lookup`, label: t('tx'), badge: undefined },
     { href: `${prefix}/scam-database`, label: t('scam_db'), badge: 'NEW' },
+    { href: `${prefix}/emergency`, label: t('emergency'), badge: 'SOS' },
   ];
 
   return (

@@ -13,7 +13,8 @@
     "scam_checker": "Verificateur d'Arnaques",
     "cta": "Évaluation Gratuite",
     "tx": "Recherche TX",
-    "scam_db": "Base Arnaques"
+    "scam_db": "Base Arnaques",
+    "emergency": "Urgence"
   },
   "hero": {
     "badge": "Enquêteurs blockchain certifiés · États-Unis",

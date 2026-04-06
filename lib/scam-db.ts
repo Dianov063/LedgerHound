@@ -95,7 +95,13 @@ export interface ScamDispute {
   reportId?: string;
   contactEmail: string;
   reason: string;
-  status: 'pending' | 'reviewed' | 'resolved';
+  relationship?: string;
+  evidenceType?: string;
+  evidenceFiles?: string[];
+  status: 'pending' | 'under_review' | 'resolved' | 'rejected';
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNote?: string;
 }
 
 /* ── Helpers ── */
@@ -464,6 +470,31 @@ export async function listDisputes(): Promise<ScamDispute[]> {
     ContinuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
   } while (ContinuationToken);
   return disputes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/* ── Update dispute status ── */
+export async function updateDisputeStatus(
+  disputeId: string,
+  status: ScamDispute['status'],
+  resolutionNote?: string,
+): Promise<ScamDispute | null> {
+  const existing = await s3Get(`disputes/${disputeId}.json`) as ScamDispute | null;
+  if (!existing) return null;
+
+  const updated: ScamDispute = {
+    ...existing,
+    status,
+    resolvedAt: ['resolved', 'rejected'].includes(status) ? new Date().toISOString() : existing.resolvedAt,
+    resolutionNote: resolutionNote || existing.resolutionNote,
+  };
+
+  await s3Put(`disputes/${disputeId}.json`, updated);
+  return updated;
+}
+
+/* ── Get single dispute ── */
+export async function getDispute(disputeId: string): Promise<ScamDispute | null> {
+  return await s3Get(`disputes/${disputeId}.json`) as ScamDispute | null;
 }
 
 /* ── Recovery score calculator ── */

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image } from '@react-pdf/renderer';
 import { fmtEth, type ReportData } from './generateReport';
+import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 
 const blue = '#2563eb';
 const slate900 = '#0f172a';
@@ -11,7 +12,7 @@ const green = '#16a34a';
 const amber = '#d97706';
 
 const darkRed = '#7f1d1d';
-const TOTAL_PAGES = 7;
+const TOTAL_PAGES = 8;
 
 const s = StyleSheet.create({
   page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 },
@@ -141,14 +142,29 @@ const SummaryPage = ({ data }: { data: ReportData }) => (
       </View>
     </View>
 
-    {/* Scam Database Matches */}
+    {/* Scam Database Matches with QR codes */}
     {data.scamDbMatches && data.scamDbMatches.length > 0 && (
       <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 6 }}>Linked to LedgerHound Scam Database</Text>
         {data.scamDbMatches.map((m, i) => (
-          <Text key={i} style={{ fontSize: 9, color: slate600, marginBottom: 2 }}>
-            {'\u26A0\uFE0F'} {shortAddr(m.address)} — {m.platformNames.join(', ')} ({m.reports} reports, ${m.totalLoss.toLocaleString()} losses)
-          </Text>
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            {m.qrDataUri && (
+              <Image src={m.qrDataUri} style={{ width: 36, height: 36, marginRight: 8 }} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9, color: slate900, fontFamily: 'Helvetica-Bold' }}>
+                {m.platformNames.join(', ')}
+              </Text>
+              <Text style={{ fontSize: 8, color: slate600 }}>
+                {shortAddr(m.address)} — {m.reports} reports, ${m.totalLoss.toLocaleString()} losses
+              </Text>
+              {m.platformSlugs[0] && (
+                <Text style={{ fontSize: 7, color: blue }}>
+                  www.ledgerhound.vip/scam-database/platform/{m.platformSlugs[0]}
+                </Text>
+              )}
+            </View>
+          </View>
         ))}
       </View>
     )}
@@ -218,10 +234,14 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
 
     {data.inactiveDays > 365 && (
       <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#fde68a' }}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>Wallet Inactive</Text>
-        <Text style={{ fontSize: 8, color: slate600 }}>
-          Last activity: {data.lastActivity} ({data.inactiveDays} days ago). Funds may have been moved to other wallets or lost access.
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>Wallet Inactive — {data.inactiveDays} Days</Text>
+        <Text style={{ fontSize: 8, color: slate600, marginBottom: 4 }}>
+          Last activity: {data.lastActivity}. This wallet has shown no on-chain activity for {data.inactiveDays} days. Possible explanations:
         </Text>
+        <Text style={{ fontSize: 8, color: slate600, paddingLeft: 8, marginBottom: 1 }}>{'\u2022'} Loss of private key access</Text>
+        <Text style={{ fontSize: 8, color: slate600, paddingLeft: 8, marginBottom: 1 }}>{'\u2022'} Intentional cooling-off period by bad actor</Text>
+        <Text style={{ fontSize: 8, color: slate600, paddingLeft: 8, marginBottom: 1 }}>{'\u2022'} Funds moved to different wallet (check Graph Tracer)</Text>
+        <Text style={{ fontSize: 8, color: slate600, paddingLeft: 8 }}>{'\u2022'} Abandoned after achieving objectives</Text>
       </View>
     )}
 
@@ -300,7 +320,146 @@ const EntitiesPage = ({ data }: { data: ReportData }) => (
   </Page>
 );
 
-// Page 5: Transaction History
+// Page 5: Fund Flow Graph
+const ArrowHead = ({ x, y, ux, uy, color }: { x: number; y: number; ux: number; uy: number; color: string }) => {
+  const size = 5;
+  const px = -uy; const py = ux; // perpendicular
+  const x1 = x - ux * size + px * size * 0.5;
+  const y1 = y - uy * size + py * size * 0.5;
+  const x2 = x - ux * size - px * size * 0.5;
+  const y2 = y - uy * size - py * size * 0.5;
+  return <Line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: color, strokeWidth: 0 }} />;
+};
+
+const FundFlowPage = ({ data }: { data: ReportData }) => {
+  const graph = data.graphData;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Fund Flow Graph</Text>
+      <Text style={{ ...s.p, marginBottom: 12 }}>
+        Visual representation of fund movements between the analyzed wallet and its top counterparties by transaction volume.
+      </Text>
+
+      {graph ? (
+        <View>
+          {/* SVG Graph */}
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            <Svg width={graph.width} height={graph.height} viewBox={`0 0 ${graph.width} ${graph.height}`}>
+              {/* Background */}
+              <Rect x={0} y={0} width={graph.width} height={graph.height} rx={8} style={{ fill: '#f8fafc' }} />
+
+              {/* Edges */}
+              {graph.edges.map((edge, i) => {
+                const color = edge.direction === 'OUT' ? red : green;
+                const dx = edge.x2 - edge.x1;
+                const dy = edge.y2 - edge.y1;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const ux = dist > 0 ? dx / dist : 0;
+                const uy = dist > 0 ? dy / dist : 0;
+                // Arrow triangle path
+                const ax = edge.x2;
+                const ay = edge.y2;
+                const aSize = 6;
+                const px = -uy;
+                const py = ux;
+                const triPath = `M ${ax} ${ay} L ${ax - ux * aSize + px * aSize * 0.4} ${ay - uy * aSize + py * aSize * 0.4} L ${ax - ux * aSize - px * aSize * 0.4} ${ay - uy * aSize - py * aSize * 0.4} Z`;
+
+                return (
+                  <G key={`edge-${i}`}>
+                    <Line
+                      x1={edge.x1} y1={edge.y1}
+                      x2={edge.x2 - ux * 4} y2={edge.y2 - uy * 4}
+                      style={{ stroke: color, strokeWidth: 1.2, strokeOpacity: 0.6 }}
+                    />
+                  </G>
+                );
+              })}
+
+              {/* Nodes */}
+              {graph.nodes.map((node, i) => {
+                const color = getNodeColor(node.type);
+                return (
+                  <G key={`node-${i}`}>
+                    {/* Outer ring */}
+                    <Circle cx={node.x} cy={node.y} r={node.radius + 2} style={{ fill: 'white', stroke: color, strokeWidth: 1.5 }} />
+                    {/* Inner fill */}
+                    <Circle cx={node.x} cy={node.y} r={node.radius} style={{ fill: color, fillOpacity: 0.15 }} />
+                    {/* Center dot */}
+                    <Circle cx={node.x} cy={node.y} r={3} style={{ fill: color }} />
+                  </G>
+                );
+              })}
+            </Svg>
+          </View>
+
+          {/* Node labels (outside SVG for proper PDF text rendering) */}
+          <View style={{ ...s.table, marginBottom: 12 }}>
+            <View style={s.tableHeader}>
+              <Text style={{ ...s.th, width: '8%' }}>#</Text>
+              <Text style={{ ...s.th, width: '32%' }}>Label</Text>
+              <Text style={{ ...s.th, width: '20%' }}>Type</Text>
+              <Text style={{ ...s.th, width: '20%' }}>Volume</Text>
+              <Text style={{ ...s.th, width: '20%' }}>Direction</Text>
+            </View>
+            {graph.nodes.filter(n => n.type !== 'source').map((node, i) => {
+              const edge = graph.edges.find(e => e.fromId === node.id || e.toId === node.id);
+              return (
+                <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                  <Text style={{ ...s.td, width: '8%' }}>{i + 1}</Text>
+                  <Text style={{ ...s.td, width: '32%', fontFamily: 'Helvetica-Bold' }}>{node.label}</Text>
+                  <Text style={{ ...s.td, width: '20%', color: getNodeColor(node.type) }}>{node.type.toUpperCase()}</Text>
+                  <Text style={{ ...s.td, width: '20%' }}>{edge?.label || '—'}</Text>
+                  <Text style={{ ...s.td, width: '20%', color: edge?.direction === 'IN' ? green : red }}>{edge?.direction || '—'}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Legend */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
+            {[
+              { label: 'Your Wallet', color: '#1a7de9' },
+              { label: 'Exchange', color: '#00c853' },
+              { label: 'Mixer', color: '#ff1744' },
+              { label: 'DeFi', color: '#7c3aed' },
+              { label: 'Scam', color: '#ff6d00' },
+              { label: 'Scam DB', color: '#8B0000' },
+              { label: 'Unknown', color: '#546e7a' },
+            ].map((item, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
+                <Text style={{ fontSize: 7, color: slate600 }}>{item.label}</Text>
+              </View>
+            ))}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 12, height: 2, backgroundColor: green }} />
+              <Text style={{ fontSize: 7, color: slate600 }}>Incoming</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 12, height: 2, backgroundColor: red }} />
+              <Text style={{ fontSize: 7, color: slate600 }}>Outgoing</Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={s.card}>
+          <Text style={s.p}>
+            Fund flow graph could not be generated for this wallet. This may occur when the wallet has very few transactions or all counterparties are filtered as dust.
+          </Text>
+          <Text style={{ fontSize: 9, color: blue, marginTop: 4 }}>
+            For an interactive fund flow visualization, visit www.ledgerhound.vip/graph-tracer
+          </Text>
+        </View>
+      )}
+
+      <Footer data={data} pageNum={5} />
+    </Page>
+  );
+};
+
+// Page 6: Transaction History
 const TransactionsPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page} wrap>
     <Header data={data} />
@@ -334,22 +493,54 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
       </Text>
     )}
 
-    <Footer data={data} pageNum={5} />
+    <Footer data={data} pageNum={6} />
   </Page>
 );
 
-// Page 6: Legal Recommendations
+// Page 7: Legal Recommendations
 const LegalPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
     <Header data={data} />
     <Text style={s.h2}>Legal Recommendations</Text>
+
+    {/* OFAC Compliance Notice */}
+    {data.ofacWarning && (
+      <View style={{ backgroundColor: '#7f1d1d', borderRadius: 6, padding: 12, marginBottom: 12 }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 4 }}>OFAC COMPLIANCE NOTICE</Text>
+        <Text style={{ fontSize: 8, color: '#fecaca', lineHeight: 1.5 }}>
+          Interaction with addresses on the SDN (Specially Designated Nationals) list triggers blocking obligations for financial institutions under 31 CFR 501. Tier-1 exchanges will likely reject deposits from this wallet without prior remediation. Consult OFAC compliance counsel before attempting any further transactions.
+        </Text>
+      </View>
+    )}
+
+    {/* Recovery Action Plan */}
+    {data.recoveryScore >= 60 && (
+      <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0' }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 4 }}>HIGH RECOVERY PROBABILITY</Text>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 4 }}>
+          Funds detected on KYC-compliant exchange(s). Recommended immediate steps:
+        </Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>1. File police report immediately (within 72 hours of discovery)</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>2. Request Preservation Letter through attorney to freeze exchange accounts</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>3. Submit SAR reference to exchange compliance department</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>4. Consider civil asset recovery proceedings in parallel</Text>
+      </View>
+    )}
+    {data.recoveryScore < 35 && (
+      <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>LOW RECOVERY PROBABILITY</Text>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>
+          Funds passed through mixing services or were distributed across multiple wallets. Recovery requires extensive legal resources and specialized demixing analysis. Consider cost-benefit analysis before proceeding with legal action. Professional forensic investigation may still uncover traceable paths.
+        </Text>
+      </View>
+    )}
 
     {data.identifiedEntities.some((e) => e.type === 'exchange') && (
       <View style={{ ...s.card, marginBottom: 12 }}>
         <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>Subpoena Target Identified</Text>
         {data.identifiedEntities.filter((e) => e.type === 'exchange').map((e, i) => (
           <Text key={i} style={{ fontSize: 10, color: slate900, marginBottom: 2 }}>
-            • {e.label} ({shortAddr(e.address)}) — {e.interactions} interaction(s)
+            {'\u2022'} {e.label} ({shortAddr(e.address)}) — {e.interactions} interaction(s)
           </Text>
         ))}
         <Text style={{ fontSize: 9, color: slate600, marginTop: 8, lineHeight: 1.4 }}>
@@ -385,11 +576,11 @@ const LegalPage = ({ data }: { data: ReportData }) => (
       </Text>
     </View>
 
-    <Footer data={data} pageNum={6} />
+    <Footer data={data} pageNum={7} />
   </Page>
 );
 
-// Page 7: Disclaimer
+// Page 8: Disclaimer
 const DisclaimerPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
     <Header data={data} />
@@ -424,7 +615,7 @@ const DisclaimerPage = ({ data }: { data: ReportData }) => (
       <Text style={{ fontSize: 9, color: slate400 }}>+1 (833) 559-1334</Text>
     </View>
 
-    <Footer data={data} pageNum={7} />
+    <Footer data={data} pageNum={8} />
   </Page>
 );
 
@@ -434,6 +625,7 @@ export const ReportDocument = ({ data }: { data: ReportData }) => (
     <SummaryPage data={data} />
     <AnalyticsPage data={data} />
     <EntitiesPage data={data} />
+    <FundFlowPage data={data} />
     <TransactionsPage data={data} />
     <LegalPage data={data} />
     <DisclaimerPage data={data} />
