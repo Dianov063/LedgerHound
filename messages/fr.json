@@ -11,7 +11,8 @@
     "calculator": "Calculateur de Récupération",
     "report": "Rapport de Portefeuille",
     "scam_checker": "Verificateur d'Arnaques",
-    "cta": "Évaluation Gratuite"
+    "cta": "Évaluation Gratuite",
+    "tx": "Recherche TX"
   },
   "hero": {
     "badge": "Enquêteurs blockchain certifiés · États-Unis",
@@ -566,5 +567,25 @@
     "select": "Selectionner le Reseau",
     "auto_detected": "Reseau detecte automatiquement",
     "more": "Plus de chaines"
+  },
+  "tx": {
+    "badge": "Recherche de transactions multi-chaînes",
+    "title": "Recherche de",
+    "title_highlight": "Transactions",
+    "subtitle": "Entrez n'importe quel hash de transaction pour voir instantanément ses détails sur Ethereum, Bitcoin, Solana, TRON, BNB Chain et plus.",
+    "network_label": "Sélectionner le réseau",
+    "hash_label": "Hash de transaction",
+    "hash_placeholder": "Collez le hash de la transaction (0x... ou base58)",
+    "search_btn": "Rechercher",
+    "track_wallet": "Suivre le portefeuille",
+    "view_explorer": "Voir sur l'explorateur de blocs",
+    "track_sender": "Suivre l'expéditeur",
+    "track_receiver": "Suivre le destinataire",
+    "trace_funds": "Tracer les fonds",
+    "check_scam": "Vérifier l'arnaque",
+    "get_report": "Obtenir le rapport",
+    "cta_title": "Besoin d'une enquête complète ?",
+    "cta_desc": "Nos analystes forensiques tracent les fonds volés à travers les chaînes et préparent des dossiers de preuves pour les avocats et les forces de l'ordre.",
+    "cta_btn": "Évaluation gratuite du dossier"
   }
 }

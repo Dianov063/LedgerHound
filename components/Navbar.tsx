@@ -51,6 +51,7 @@ export default function Navbar() {
     { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: 'NEW' },
     { href: `${prefix}/scam-checker`, label: t('scam_checker'), badge: 'NEW' },
     { href: `${prefix}/report`, label: t('report'), badge: '$49' },
+    { href: `${prefix}/tx-lookup`, label: t('tx'), badge: undefined },
   ];
 
   return (

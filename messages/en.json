@@ -11,7 +11,8 @@
     "calculator": "Recovery Calculator",
     "report": "Wallet Report",
     "cta": "Free Evaluation",
-    "scam_checker": "Scam Checker"
+    "scam_checker": "Scam Checker",
+    "tx": "TX Lookup"
   },
   "hero": {
     "badge": "Certified Blockchain Investigators · US-Based",
@@ -566,5 +567,25 @@
     "select": "Select Network",
     "auto_detected": "Network auto-detected",
     "more": "More chains"
+  },
+  "tx": {
+    "badge": "Multi-Chain Transaction Lookup",
+    "title": "Transaction",
+    "title_highlight": "Lookup",
+    "subtitle": "Enter any transaction hash to instantly view its details across Ethereum, Bitcoin, Solana, TRON, BNB Chain, and more.",
+    "network_label": "Select Network",
+    "hash_label": "Transaction Hash",
+    "hash_placeholder": "Paste transaction hash (0x... or base58)",
+    "search_btn": "Look Up",
+    "track_wallet": "Track Wallet",
+    "view_explorer": "View on Block Explorer",
+    "track_sender": "Track Sender",
+    "track_receiver": "Track Receiver",
+    "trace_funds": "Trace Funds",
+    "check_scam": "Check Scam",
+    "get_report": "Get Report",
+    "cta_title": "Need a Full Investigation?",
+    "cta_desc": "Our forensic analysts trace stolen funds across chains and build court-ready evidence packages for attorneys and law enforcement.",
+    "cta_btn": "Get Free Case Evaluation"
   }
 }

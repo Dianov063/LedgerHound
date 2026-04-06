@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useRef, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import {
   Search, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight,
   Copy, Check, ExternalLink, Activity, TrendingDown, TrendingUp, Hash,
-  Download, X, Calendar, Coins, BarChart3, ChevronDown,
+  Download, X, Calendar, Coins, BarChart3, ChevronDown, Wallet,
 } from 'lucide-react';
 
 /* ---------- types ---------- */
@@ -194,6 +196,12 @@ function exportCSV(transfers: Transfer[], multiAddress: boolean) {
 
 /* ========== PAGE ========== */
 export default function WalletTracker() {
+  const locale = useLocale();
+  const router = useRouter();
+  const base = locale === 'en' ? '' : `/${locale}`;
+  const [searchMode, setSearchMode] = useState<'address' | 'txhash'>('address');
+  const [txHashInput, setTxHashInput] = useState('');
+  const [txNetwork, setTxNetwork] = useState<'eth' | 'btc' | 'sol' | 'trx' | 'bnb' | 'base' | 'arb' | 'op'>('eth');
   const [input, setInput] = useState('');
   const [network, setNetwork] = useState<Network>('eth');
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -383,10 +391,107 @@ export default function WalletTracker() {
 
   const isMoreNetwork = MORE_NETWORKS.includes(network);
 
+  const TX_NETWORKS = [
+    { id: 'eth' as const, label: 'ETH' },
+    { id: 'btc' as const, label: 'BTC' },
+    { id: 'sol' as const, label: 'SOL' },
+    { id: 'trx' as const, label: 'TRON' },
+    { id: 'bnb' as const, label: 'BNB' },
+    { id: 'base' as const, label: 'BASE' },
+    { id: 'arb' as const, label: 'ARB' },
+    { id: 'op' as const, label: 'OP' },
+  ];
+
+  function handleTxHashSearch(e: FormEvent) {
+    e.preventDefault();
+    const h = txHashInput.trim();
+    if (!h) return;
+    router.push(`${base}/tx-lookup?hash=${encodeURIComponent(h)}&network=${txNetwork}`);
+  }
+
+  function handleTxHashChange(val: string) {
+    setTxHashInput(val);
+    const h = val.trim();
+    if (h.length > 10) {
+      if (/^0x[a-fA-F0-9]{64}$/.test(h)) setTxNetwork('eth');
+      else if (/^[a-fA-F0-9]{64}$/.test(h)) setTxNetwork('btc');
+      else if (/^[1-9A-HJ-NP-Za-km-z]{85,90}$/.test(h)) setTxNetwork('sol');
+    }
+  }
+
   return (
     <div className="bg-slate-950 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
+        {/* Mode Toggle */}
+        <div className="flex items-center justify-center gap-1 mb-6 max-w-3xl mx-auto">
+          <button
+            onClick={() => setSearchMode('address')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+              searchMode === 'address'
+                ? 'bg-brand-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <Wallet size={14} /> Address Lookup
+          </button>
+          <button
+            onClick={() => setSearchMode('txhash')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+              searchMode === 'txhash'
+                ? 'bg-brand-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <Hash size={14} /> TX Hash Lookup
+          </button>
+        </div>
+
+        {/* TX Hash Search Mode */}
+        {searchMode === 'txhash' ? (
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center gap-1 mb-4 flex-wrap">
+              {TX_NETWORKS.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => setTxNetwork(n.id)}
+                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                    txNetwork === n.id
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {n.label}
+                </button>
+              ))}
+            </div>
+            <form onSubmit={handleTxHashSearch} className="mb-10">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Hash size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={txHashInput}
+                    onChange={(e) => handleTxHashChange(e.target.value)}
+                    placeholder="Paste transaction hash (0x... or base58)"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-sm font-mono text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!txHashInput.trim()}
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center gap-2 whitespace-nowrap"
+                >
+                  <Search size={16} /> Look Up TX
+                </button>
+              </div>
+            </form>
+            <div className="text-center text-slate-500 text-sm">
+              Enter a transaction hash to view full details, trace funds, and check for scam connections.
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Network Tabs */}
         <div className="flex items-center gap-1 mb-4 max-w-3xl mx-auto flex-wrap">
           {PRIMARY_NETWORKS.map((n) => (
@@ -690,6 +795,8 @@ export default function WalletTracker() {
           <div className="text-center py-16">
             <p className="text-slate-500 text-sm">No transactions found for this address.</p>
           </div>
+        )}
+        </>
         )}
 
       </div>

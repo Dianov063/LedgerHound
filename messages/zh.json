@@ -11,7 +11,8 @@
     "calculator": "恢复计算器",
     "report": "钱包报告",
     "scam_checker": "诈骗检查器",
-    "cta": "免费评估"
+    "cta": "免费评估",
+    "tx": "交易查询"
   },
   "hero": {
     "badge": "认证区块链调查员 · 美国",
@@ -566,5 +567,25 @@
     "select": "选择网络",
     "auto_detected": "已自动检测网络",
     "more": "更多链"
+  },
+  "tx": {
+    "badge": "多链交易查询",
+    "title": "交易",
+    "title_highlight": "查询",
+    "subtitle": "输入任何交易哈希，即可查看以太坊、比特币、Solana、TRON、BNB Chain等网络的交易详情。",
+    "network_label": "选择网络",
+    "hash_label": "交易哈希",
+    "hash_placeholder": "粘贴交易哈希（0x... 或 base58）",
+    "search_btn": "查询",
+    "track_wallet": "追踪钱包",
+    "view_explorer": "在区块浏览器中查看",
+    "track_sender": "追踪发送方",
+    "track_receiver": "追踪接收方",
+    "trace_funds": "追踪资金",
+    "check_scam": "诈骗检查",
+    "get_report": "获取报告",
+    "cta_title": "需要全面调查？",
+    "cta_desc": "我们的取证分析师追踪跨链被盗资金，为律师和执法机构准备法庭级证据。",
+    "cta_btn": "免费案件评估"
   }
 }

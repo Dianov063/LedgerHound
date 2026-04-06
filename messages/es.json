@@ -11,7 +11,8 @@
     "calculator": "Calculadora de Recuperación",
     "report": "Informe de Billetera",
     "scam_checker": "Verificador de Estafas",
-    "cta": "Evaluación Gratuita"
+    "cta": "Evaluación Gratuita",
+    "tx": "Buscar TX"
   },
   "hero": {
     "badge": "Investigadores de blockchain certificados · EE.UU.",
@@ -566,5 +567,25 @@
     "select": "Seleccionar Red",
     "auto_detected": "Red detectada automaticamente",
     "more": "Mas cadenas"
+  },
+  "tx": {
+    "badge": "Búsqueda de transacciones multicadena",
+    "title": "Búsqueda de",
+    "title_highlight": "Transacciones",
+    "subtitle": "Ingrese cualquier hash de transacción para ver instantáneamente sus detalles en Ethereum, Bitcoin, Solana, TRON, BNB Chain y más.",
+    "network_label": "Seleccionar red",
+    "hash_label": "Hash de transacción",
+    "hash_placeholder": "Pegue el hash de la transacción (0x... o base58)",
+    "search_btn": "Buscar",
+    "track_wallet": "Rastrear billetera",
+    "view_explorer": "Ver en explorador de bloques",
+    "track_sender": "Rastrear remitente",
+    "track_receiver": "Rastrear receptor",
+    "trace_funds": "Rastrear fondos",
+    "check_scam": "Verificar estafa",
+    "get_report": "Obtener informe",
+    "cta_title": "¿Necesita una investigación completa?",
+    "cta_desc": "Nuestros analistas forenses rastrean fondos robados a través de cadenas y construyen paquetes de evidencia listos para tribunales.",
+    "cta_btn": "Evaluación gratuita del caso"
   }
 }
