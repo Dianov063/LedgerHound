@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-const SITE_URL = 'https://ledgerhound.com';
+const SITE_URL = 'https://www.ledgerhound.vip';
 const locales = ['en', 'ru', 'es', 'zh', 'fr', 'ar'] as const;
 
 /**
