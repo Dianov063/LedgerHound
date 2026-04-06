@@ -66,11 +66,15 @@ async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
   return json.result?.transfers || [];
 }
 
-async function fetchAlchemyForAddress(address: string, alchemyUrl: string) {
+async function fetchAlchemyForAddress(address: string, alchemyUrl: string, network: string = 'eth') {
+  // 'internal' category only supported for ETH and MATIC/Polygon via Alchemy
+  const supportsInternal = network === 'eth' || network === 'polygon';
   const baseParams = {
     fromBlock: '0x0',
     toBlock: 'latest',
-    category: ['external', 'internal', 'erc20', 'erc721', 'erc1155'],
+    category: supportsInternal
+      ? ['external', 'internal', 'erc20', 'erc721', 'erc1155']
+      : ['external', 'erc20', 'erc721', 'erc1155'],
     withMetadata: true,
     maxCount: '0x3e8',
   };
@@ -99,7 +103,7 @@ async function fetchTransfersForNetwork(
     case 'polygon':
     case 'bnb': {
       const url = ALCHEMY_URLS[network];
-      const results = await Promise.all(addresses.map((a) => fetchAlchemyForAddress(a, url)));
+      const results = await Promise.all(addresses.map((a) => fetchAlchemyForAddress(a, url, network)));
       return results.flat();
     }
     case 'sol': {
