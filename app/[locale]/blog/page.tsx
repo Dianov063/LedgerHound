@@ -6,6 +6,15 @@ import { Clock } from 'lucide-react';
 
 const blogPosts = [
   {
+    slug: 'how-to-identify-fake-crypto-trading-platform',
+    category: 'Guide',
+    title: 'How to Identify a Fake Crypto Trading Platform in 2026',
+    excerpt: 'Fake exchanges have become the most effective tool for organized fraud networks. $17 billion lost in 2025. Learn the 10 warning signs and what to do if you\'ve already sent money.',
+    date: 'April 5, 2026',
+    readTime: '8 min read',
+    featured: true,
+  },
+  {
     slug: 'how-to-trace-stolen-bitcoin',
     category: 'Guide',
     title: 'How to Trace Stolen Bitcoin and Cryptocurrency: A Step-by-Step Guide',
@@ -51,7 +60,7 @@ export default function BlogPage() {
       {/* Articles */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {blogPosts.map((post) => (
               <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="card group hover:border-brand-200 transition-colors">
                 <div className="flex items-center gap-2 mb-3">

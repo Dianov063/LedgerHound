@@ -28,6 +28,7 @@ const pages = [
 ];
 
 const blogPosts = [
+  '/blog/how-to-identify-fake-crypto-trading-platform',
   '/blog/how-to-trace-stolen-bitcoin',
   '/blog/pig-butchering-scam-recovery',
 ];
