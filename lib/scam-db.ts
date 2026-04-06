@@ -303,11 +303,22 @@ export async function saveDispute(dispute: Omit<ScamDispute, 'id' | 'createdAt' 
 /* ── Read data ── */
 export async function getPlatformIndex(): Promise<PlatformIndexEntry[]> {
   const data = await s3Get('index/platforms.json');
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) {
+    console.log('[platforms] Loaded', data.length, 'platforms from S3');
+    return data;
+  }
+  console.log('[platforms] No platform index found in S3 (key: scam-database/index/platforms.json)');
+  return [];
 }
 
 export async function getStats(): Promise<ScamStats> {
-  return (await s3Get('index/stats.json')) || defaultStats();
+  const data = await s3Get('index/stats.json');
+  if (data) {
+    console.log('[stats] Loaded from S3:', JSON.stringify(data));
+    return data;
+  }
+  console.log('[stats] No stats found in S3, returning defaults');
+  return defaultStats();
 }
 
 export async function getPlatformBySlug(slug: string): Promise<ScamPlatform | null> {
