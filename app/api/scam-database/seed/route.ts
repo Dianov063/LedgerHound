@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { seedDatabase } from '@/lib/scam-db'
+import { seedDatabase, getPlatformIndex, getStats } from '@/lib/scam-db'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -10,25 +10,56 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    console.log('[seed/route] GET seed called')
     await seedDatabase()
-    return Response.json({ success: true, message: 'Database seeded with 10 platforms' })
+
+    // Return verification data
+    const index = await getPlatformIndex()
+    const stats = await getStats()
+
+    return Response.json({
+      success: true,
+      message: `Database seeded with ${index.length} platforms`,
+      platforms: index.map(p => ({ slug: p.slug, name: p.name, victims: p.victims, trustScore: p.trustScore })),
+      stats,
+    })
   } catch (error: any) {
-    return Response.json({ error: error.message }, { status: 500 })
+    console.error('[seed/route] Error:', error)
+    return Response.json({ error: error.message, stack: error.stack?.split('\n').slice(0, 5) }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { password } = body
+  let password: string | null = null
+
+  try {
+    const body = await request.json()
+    password = body.password
+  } catch {
+    // If body parsing fails, check query params
+    const { searchParams } = new URL(request.url)
+    password = searchParams.get('password')
+  }
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
+    console.log('[seed/route] POST seed called')
     await seedDatabase()
-    return Response.json({ success: true, message: 'Database seeded with 10 platforms' })
+
+    const index = await getPlatformIndex()
+    const stats = await getStats()
+
+    return Response.json({
+      success: true,
+      message: `Database seeded with ${index.length} platforms`,
+      platforms: index.map(p => ({ slug: p.slug, name: p.name, victims: p.victims, trustScore: p.trustScore })),
+      stats,
+    })
   } catch (error: any) {
-    return Response.json({ error: error.message }, { status: 500 })
+    console.error('[seed/route] Error:', error)
+    return Response.json({ error: error.message, stack: error.stack?.split('\n').slice(0, 5) }, { status: 500 })
   }
 }

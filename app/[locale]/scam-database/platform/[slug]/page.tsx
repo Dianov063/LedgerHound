@@ -181,9 +181,31 @@ export default function PlatformPage() {
   if (notFound || !platform) {
     return (
       <div className="min-h-screen"><Navbar />
-        <div className="pt-32 text-center">
-          <h1 className="text-2xl font-bold text-slate-900 mb-4">{t('platform_not_found')}</h1>
-          <Link href={`${base}/scam-database`} className="text-brand-600 font-semibold hover:underline">{t('back_to_database')}</Link>
+        <div className="pt-32 pb-16">
+          <div className="max-w-xl mx-auto px-4 text-center">
+            <AlertTriangle size={48} className="mx-auto text-amber-400 mb-4" />
+            <h1 className="text-2xl font-bold text-slate-900 mb-3">{t('platform_not_found')}</h1>
+            <p className="text-slate-500 mb-2 text-sm">
+              The platform <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-mono text-xs">{slug}</code> was not found in our database.
+            </p>
+            <p className="text-slate-500 mb-6 text-sm">
+              It may not have been reported yet, or the database may need to be initialized.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href={`${base}/scam-database`}
+                className="inline-flex items-center justify-center gap-2 bg-brand-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-brand-700 transition-colors"
+              >
+                <Shield size={16} /> {t('back_to_database')}
+              </Link>
+              <Link
+                href={`${base}/scam-database/report`}
+                className="inline-flex items-center justify-center gap-2 border border-slate-200 text-slate-700 font-semibold px-6 py-3 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <Flag size={16} /> Report This Platform
+              </Link>
+            </div>
+          </div>
         </div>
         <Footer />
       </div>

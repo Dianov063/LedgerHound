@@ -292,6 +292,23 @@ export default function ScamDatabasePage() {
           </div>
         )}
 
+        {/* Empty state — database not seeded yet */}
+        {!loading && platforms.length === 0 && searchResults === null && (
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-10 text-center mb-12">
+            <Database size={40} className="mx-auto text-slate-300 mb-4" />
+            <h2 className="font-display font-bold text-xl text-slate-700 mb-2">Database Initializing</h2>
+            <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">
+              The scam database is being populated. Community reports and verified scam platforms will appear here shortly.
+            </p>
+            <Link
+              href={`${base}/scam-database/report`}
+              className="inline-flex items-center gap-2 bg-red-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Shield size={16} /> {t('report_cta_btn')}
+            </Link>
+          </div>
+        )}
+
         {/* Report CTA */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 text-center">
           <Shield className="mx-auto text-red-200 mb-4" size={32} />

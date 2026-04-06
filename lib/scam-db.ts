@@ -487,11 +487,17 @@ export function calcRecoveryScore(report: {
 
 /* ── Seed data (realistic victim counts from DFPI/FBI data) ── */
 export async function seedDatabase(): Promise<void> {
+  console.log('[seed] Starting seed...');
+  console.log('[seed] Bucket:', bucket(), 'Region:', process.env.AWS_REGION || 'eu-central-1');
+
+  // Check if already seeded
   const existing = await getPlatformIndex();
   if (existing.length > 0) {
-    console.log('[scam-db] Database already seeded, skipping');
+    console.log('[seed] Database already seeded with', existing.length, 'platforms, skipping');
     return;
   }
+
+  console.log('[seed] No existing platforms found, seeding now...');
 
   const seedPlatforms: { report: Omit<ScamReport, 'id' | 'createdAt'>; extraVictims: number }[] = [
     {
@@ -686,41 +692,65 @@ export async function seedDatabase(): Promise<void> {
     },
   ];
 
+  let seededCount = 0;
   for (const { report, extraVictims } of seedPlatforms) {
-    // Save the "first" report normally
-    await saveReport(report);
-
-    // Simulate extra victims by directly updating platform + index + stats
     const slug = slugify(report.platformName);
-    const platform = await getPlatformBySlug(slug);
-    if (platform) {
-      platform.victims += extraVictims;
-      platform.totalLoss += extraVictims * (report.lossAmount || 30000);
-      platform.blockchainVerifiedCount += Math.floor(extraVictims * 0.6);
-      platform.trustScore = calcTrustScore(platform);
-      platform.verified = platform.trustScore >= 10;
-      await s3Put(`platforms/${slug}.json`, platform);
+    console.log(`[seed] Seeding platform ${seededCount + 1}/${seedPlatforms.length}: ${slug}`);
 
-      // Update index
-      const index = await getPlatformIndex();
-      const idx = index.findIndex(p => p.slug === slug);
-      if (idx >= 0) {
-        index[idx].victims = platform.victims;
-        index[idx].totalLoss = platform.totalLoss;
-        index[idx].trustScore = platform.trustScore;
-        index[idx].verified = platform.verified;
-        await s3Put('index/platforms.json', index);
+    try {
+      // Save the "first" report normally
+      const { id } = await saveReport(report);
+      console.log(`[seed] Saved report ${id} for ${slug}`);
+
+      // Simulate extra victims by directly updating platform + index + stats
+      const platform = await getPlatformBySlug(slug);
+      if (platform) {
+        platform.victims += extraVictims;
+        platform.totalLoss += extraVictims * (report.lossAmount || 30000);
+        platform.blockchainVerifiedCount += Math.floor(extraVictims * 0.6);
+        platform.trustScore = calcTrustScore(platform);
+        platform.verified = platform.trustScore >= 10;
+        await s3Put(`platforms/${slug}.json`, platform);
+        console.log(`[seed] Updated platform ${slug}: ${platform.victims} victims, score=${platform.trustScore}`);
+
+        // Update index
+        const index = await getPlatformIndex();
+        const idx = index.findIndex(p => p.slug === slug);
+        if (idx >= 0) {
+          index[idx].victims = platform.victims;
+          index[idx].totalLoss = platform.totalLoss;
+          index[idx].trustScore = platform.trustScore;
+          index[idx].verified = platform.verified;
+          await s3Put('index/platforms.json', index);
+        }
+
+        // Update stats
+        const stats = await getStats();
+        stats.totalReports += extraVictims;
+        stats.totalLoss += extraVictims * (report.lossAmount || 30000);
+        stats.blockchainVerified += Math.floor(extraVictims * 0.6);
+        stats.updatedAt = new Date().toISOString();
+        await s3Put('index/stats.json', stats);
+      } else {
+        console.log(`[seed] WARNING: platform ${slug} not found after saveReport`);
       }
-
-      // Update stats
-      const stats = await getStats();
-      stats.totalReports += extraVictims;
-      stats.totalLoss += extraVictims * (report.lossAmount || 30000);
-      stats.blockchainVerified += Math.floor(extraVictims * 0.6);
-      stats.updatedAt = new Date().toISOString();
-      await s3Put('index/stats.json', stats);
+      seededCount++;
+    } catch (err: any) {
+      console.error(`[seed] ERROR seeding ${slug}:`, err.message || err);
+      throw err; // Re-throw to surface in API response
     }
   }
 
-  console.log(`[scam-db] Seeded ${seedPlatforms.length} platforms with realistic data`);
+  // Verify final state
+  const finalIndex = await getPlatformIndex();
+  const finalStats = await getStats();
+  console.log(`[seed] Done! Seeded ${seededCount} platforms.`);
+  console.log(`[seed] Final index: ${finalIndex.length} platforms`);
+  console.log(`[seed] Final stats: ${finalStats.totalReports} reports, $${finalStats.totalLoss} total loss`);
+  console.log(`[seed] S3 files created:`);
+  console.log(`[seed]   - scam-database/index/platforms.json`);
+  console.log(`[seed]   - scam-database/index/stats.json`);
+  for (const p of finalIndex) {
+    console.log(`[seed]   - scam-database/platforms/${p.slug}.json`);
+  }
 }
