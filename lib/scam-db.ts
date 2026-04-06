@@ -536,6 +536,7 @@ export async function seedDatabase(): Promise<void> {
   // ── Phase 1: Build everything in memory (zero S3 calls) ──
   const now = new Date().toISOString();
   const allPlatforms: ScamPlatform[] = [];
+  const allAddresses: { key: string; data: AddressIndex }[] = [];
   const platformIndex: PlatformIndexEntry[] = [];
   let totalReports = 0;
   let totalLoss = 0;
@@ -569,6 +570,19 @@ export async function seedDatabase(): Promise<void> {
       lastReported: now, addresses: r.scamAddress ? [r.scamAddress] : [],
     });
 
+    // Build address index (needed for scam-check, graph-tracer, report lookups)
+    if (r.scamAddress) {
+      allAddresses.push({
+        key: `addresses/${r.scamAddress.toLowerCase()}.json`,
+        data: {
+          address: r.scamAddress, platforms: [slug],
+          platformNames: [r.platformName], reports: [id],
+          totalLoss: loss, networks: r.network ? [r.network] : [],
+          firstSeen: r.lossDate || now, lastSeen: now,
+        },
+      });
+    }
+
     totalReports += victims;
     totalLoss += loss;
     totalVerified += verifiedCount;
@@ -595,6 +609,12 @@ export async function seedDatabase(): Promise<void> {
     const batch = allPlatforms.slice(i, i + 4);
     await Promise.all(batch.map(p => s3Put(`platforms/${p.slug}.json`, p)));
     console.log(`[seed] Wrote platforms batch ${Math.floor(i / 4) + 1}: ${batch.map(p => p.slug).join(', ')}`);
+  }
+
+  // Write address index files (needed for scam-check, graph-tracer, report cross-ref)
+  if (allAddresses.length > 0) {
+    await Promise.all(allAddresses.map(a => s3Put(a.key, a.data)));
+    console.log(`[seed] Wrote ${allAddresses.length} address index files`);
   }
 
   console.log(`[seed] Done! ${stats.totalPlatforms} platforms, ${stats.totalReports} reports, $${stats.totalLoss} loss`);
