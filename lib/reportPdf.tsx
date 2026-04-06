@@ -10,6 +10,7 @@ const red = '#dc2626';
 const green = '#16a34a';
 const amber = '#d97706';
 
+const darkRed = '#7f1d1d';
 const TOTAL_PAGES = 7;
 
 const s = StyleSheet.create({
@@ -63,9 +64,16 @@ const shortAddr = (addr: string) =>
 const truncToken = (t: string) => (t.length > 8 ? t.slice(0, 7) + '…' : t);
 
 const riskColor = (score: number) => {
+  if (score >= 85) return darkRed;
   if (score >= 70) return red;
   if (score >= 40) return amber;
   return green;
+};
+
+const recoveryColor = (score: number) => {
+  if (score >= 60) return green;
+  if (score >= 35) return amber;
+  return red;
 };
 
 // Page 1: Cover
@@ -105,20 +113,51 @@ const SummaryPage = ({ data }: { data: ReportData }) => (
     <Header data={data} />
     <Text style={s.h2}>Executive Summary</Text>
 
-    {/* Big prominent risk score */}
-    <View style={{ alignItems: 'center', marginBottom: 20, padding: 20, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-      <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RISK ASSESSMENT</Text>
-      <View style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: riskColor(data.riskScore), alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 32, fontFamily: 'Helvetica-Bold', color: riskColor(data.riskScore) }}>{data.riskScore}</Text>
+    {/* OFAC Warning Banner */}
+    {data.ofacWarning && (
+      <View style={{ backgroundColor: '#7f1d1d', borderRadius: 6, padding: 12, marginBottom: 16 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 4 }}>OFAC SANCTIONS ALERT</Text>
+        <Text style={{ fontSize: 9, color: '#fecaca', lineHeight: 1.4 }}>
+          This wallet has interacted with OFAC-sanctioned addresses. US persons are prohibited from transacting with sanctioned entities under penalty of law.
+        </Text>
       </View>
-      <Text style={{ ...s.badge, backgroundColor: riskColor(data.riskScore), color: 'white', fontSize: 11, paddingHorizontal: 14, paddingVertical: 5 }}>{data.riskLabel}</Text>
+    )}
+
+    {/* Risk + Recovery scores side by side */}
+    <View style={{ ...s.row, marginBottom: 20, gap: 12 }}>
+      <View style={{ flex: 1, alignItems: 'center', padding: 16, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RISK ASSESSMENT</Text>
+        <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 3, borderColor: riskColor(data.riskScore), alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+          <Text style={{ fontSize: 26, fontFamily: 'Helvetica-Bold', color: riskColor(data.riskScore) }}>{data.riskScore}</Text>
+        </View>
+        <Text style={{ ...s.badge, backgroundColor: riskColor(data.riskScore), color: 'white', fontSize: 9, paddingHorizontal: 10, paddingVertical: 4 }}>{data.riskLabel}</Text>
+      </View>
+      <View style={{ flex: 1, alignItems: 'center', padding: 16, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RECOVERY PROBABILITY</Text>
+        <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 3, borderColor: recoveryColor(data.recoveryScore), alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+          <Text style={{ fontSize: 26, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryScore) }}>{data.recoveryScore}</Text>
+        </View>
+        <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', maxWidth: 180 }}>{data.recoveryLabel}</Text>
+      </View>
     </View>
+
+    {/* Scam Database Matches */}
+    {data.scamDbMatches && data.scamDbMatches.length > 0 && (
+      <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 6 }}>Linked to LedgerHound Scam Database</Text>
+        {data.scamDbMatches.map((m, i) => (
+          <Text key={i} style={{ fontSize: 9, color: slate600, marginBottom: 2 }}>
+            {'\u26A0\uFE0F'} {shortAddr(m.address)} — {m.platformNames.join(', ')} ({m.reports} reports, ${m.totalLoss.toLocaleString()} losses)
+          </Text>
+        ))}
+      </View>
+    )}
 
     <View style={s.sectionDivider} />
 
     <Text style={s.h3}>Key Findings</Text>
     {data.keyFindings.map((f, i) => (
-      <Text key={i} style={s.bullet}>• {f}</Text>
+      <Text key={i} style={s.bullet}>{'\u2022'} {f}</Text>
     ))}
 
     <View style={s.sectionDivider} />
@@ -173,8 +212,17 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
 
     {data.spamFiltered > 0 && (
       <Text style={{ fontSize: 8, color: slate400, fontStyle: 'italic', marginBottom: 8 }}>
-        * Totals include ETH and major tokens only. {data.spamFiltered} spam/airdrop token transfers filtered out.
+        * Totals include {data.nativeCurrency || 'ETH'} and major tokens only. {data.spamFiltered} spam/airdrop token transfers filtered out.
       </Text>
+    )}
+
+    {data.inactiveDays > 365 && (
+      <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#fde68a' }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>Wallet Inactive</Text>
+        <Text style={{ fontSize: 8, color: slate600 }}>
+          Last activity: {data.lastActivity} ({data.inactiveDays} days ago). Funds may have been moved to other wallets or lost access.
+        </Text>
+      </View>
     )}
 
     <View style={s.sectionDivider} />
@@ -185,7 +233,7 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
         <Text style={{ ...s.th, width: '40%' }}>Address</Text>
         <Text style={{ ...s.th, width: '20%' }}>Entity</Text>
         <Text style={{ ...s.th, width: '20%' }}>Interactions</Text>
-        <Text style={{ ...s.th, width: '20%' }}>Volume (ETH)</Text>
+        <Text style={{ ...s.th, width: '20%' }}>Volume ({data.nativeCurrency || 'ETH'})</Text>
       </View>
       {data.topCounterparties.map((cp, i) => (
         <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>

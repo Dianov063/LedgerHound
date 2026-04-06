@@ -8,6 +8,7 @@ import { fetchBtcTransfers } from './bitcoin-tracker';
 import { fetchSolTransfers } from './solana-tracker';
 import { fetchTronTransfers } from './tron-tracker';
 import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
+import { getAddressIndex } from './scam-db';
 
 const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
 
@@ -48,10 +49,21 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer'
   '0x77134cbc06cb00b66f4c7e623d5fdbf6777635ec': { label: 'Bitfinex', type: 'exchange' },
   '0x6262998ced04146fa42253a5c0af90ca02dfd2a3': { label: 'Crypto.com', type: 'exchange' },
   '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange' },
-  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash', type: 'mixer' },
-  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 2', type: 'mixer' },
-  '0x910cbd523d972eb0a6f4cae4618ad62622b39dbf': { label: 'Tornado Cash 3', type: 'mixer' },
-  '0xa160cdab225685da1d56aa342ad8841c3b53f291': { label: 'Tornado Cash 4', type: 'mixer' },
+  // OFAC-Sanctioned Mixers (Tornado Cash)
+  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash (OFAC)', type: 'mixer' },
+  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 0.1 ETH (OFAC)', type: 'mixer' },
+  '0x910cbd523d972eb0a6f4cae4618ad62622b39dbf': { label: 'Tornado Cash 10 ETH (OFAC)', type: 'mixer' },
+  '0xa160cdab225685da1d56aa342ad8841c3b53f291': { label: 'Tornado Cash 100 ETH (OFAC)', type: 'mixer' },
+  '0xd90e2f925da726b50c4ed8d0fb90ad053324f31b': { label: 'Tornado Cash 1 ETH (OFAC)', type: 'mixer' },
+  '0xd4b88df4d29f5cedd6857912842cff3b20c8cfa3': { label: 'Tornado Cash 1000 DAI (OFAC)', type: 'mixer' },
+  '0xfd8610d20aa15b7b2e3be39b396a1bc3516c7144': { label: 'Tornado Cash 10000 DAI (OFAC)', type: 'mixer' },
+  '0x23773e65ed146a459791799d01336db287f25334': { label: 'Tornado Cash Governance (OFAC)', type: 'mixer' },
+  // OFAC-Sanctioned Entities (Lazarus Group, Blender, Sinbad)
+  '0x8589427373d6d84e98730d7795d8f6f8731fda16': { label: 'Ronin Bridge Exploiter (Lazarus/OFAC)', type: 'scam' },
+  '0x098b716b8aaf21512996dc57eb0615e2383e2f96': { label: 'Ronin Bridge Exploiter 2 (OFAC)', type: 'scam' },
+  '0xc455f7fd3e0e12afd51fba5c106909934d8a0e4a': { label: 'Blender.io (OFAC)', type: 'mixer' },
+  '0x36dd7b862746fddfa5108aeb58fc831ae3961230': { label: 'Sinbad.io (OFAC)', type: 'mixer' },
+  // Other Mixers
   '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer' },
   '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': { label: 'Uniswap V2', type: 'defi' },
   '0xe592427a0aece92de3edee1f18e0157c05861564': { label: 'Uniswap V3', type: 'defi' },
@@ -298,6 +310,14 @@ async function fetchTransfersForNetwork(
   return { incoming: incoming as unknown as UnifiedTransfer[], outgoing: outgoing as unknown as UnifiedTransfer[] };
 }
 
+export interface ScamDbMatch {
+  address: string;
+  platformNames: string[];
+  platformSlugs: string[];
+  totalLoss: number;
+  reports: number;
+}
+
 export interface ReportData {
   walletAddress: string;
   caseId: string;
@@ -315,10 +335,15 @@ export interface ReportData {
   spamFiltered: number;
   firstActivity: string;
   lastActivity: string;
+  inactiveDays: number;
   topCounterparties: { address: string; label: string; count: number; volume: number }[];
   identifiedEntities: { address: string; label: string; type: string; interactions: number }[];
   riskScore: number;
   riskLabel: string;
+  recoveryScore: number;
+  recoveryLabel: string;
+  ofacWarning: boolean;
+  scamDbMatches: ScamDbMatch[];
   keyFindings: string[];
   recommendations: string[];
   transactions: {
@@ -424,44 +449,110 @@ export async function generateReport(
     ...data,
   }));
 
-  // Risk score
+  // ── OFAC detection ──
+  const OFAC_KEYWORDS = ['OFAC', 'Lazarus', 'Blender.io', 'Sinbad.io'];
+  const ofacEntities = identifiedEntities.filter(e =>
+    OFAC_KEYWORDS.some(kw => e.label.includes(kw))
+  );
+  const ofacWarning = ofacEntities.length > 0;
+
+  // ── Scam Database cross-reference ──
+  const scamDbMatches: ScamDbMatch[] = [];
+  const counterpartyAddresses = Array.from(counterpartyMap.keys()).slice(0, 30);
+  try {
+    const lookups = counterpartyAddresses.map(async (addr) => {
+      try {
+        const data = await getAddressIndex(addr);
+        if (data && data.platforms.length > 0) {
+          scamDbMatches.push({
+            address: addr,
+            platformNames: data.platformNames,
+            platformSlugs: data.platforms,
+            totalLoss: data.totalLoss,
+            reports: data.reports.length,
+          });
+        }
+      } catch { /* skip individual lookup errors */ }
+    });
+    await Promise.all(lookups);
+  } catch { /* scam DB unavailable — continue without it */ }
+
+  // ── Risk score (improved with OFAC + scam DB) ──
   let riskScore = 50; // baseline
   const hasMixer = identifiedEntities.some((e) => e.type === 'mixer');
   const hasExchange = identifiedEntities.some((e) => e.type === 'exchange');
   const hasScam = identifiedEntities.some((e) => e.type === 'scam');
 
-  if (hasMixer) riskScore += 30;
-  if (hasScam) riskScore += 25;
-  if (!hasExchange && ethSent > 10) riskScore += 10;
-  if (hasExchange) riskScore -= 20;
-  if (outgoing.length + incoming.length < 5) riskScore -= 15;
+  if (ofacWarning) riskScore = 95; // OFAC = instant CRITICAL
+  else {
+    if (hasMixer) riskScore += 30;
+    if (hasScam) riskScore += 25;
+    if (scamDbMatches.length > 0) riskScore += 20; // Scam DB match
+    if (!hasExchange && ethSent > 10) riskScore += 10;
+    if (hasExchange) riskScore -= 20;
+    if (outgoing.length + incoming.length < 5) riskScore -= 15;
+  }
 
   riskScore = Math.max(0, Math.min(100, riskScore));
 
   let riskLabel: string;
-  if (riskScore >= 70) riskLabel = 'HIGH RISK';
+  if (riskScore >= 85) riskLabel = 'CRITICAL RISK';
+  else if (riskScore >= 70) riskLabel = 'HIGH RISK';
   else if (riskScore >= 40) riskLabel = 'MODERATE RISK';
   else riskLabel = 'LOW RISK';
 
+  // ── Recovery score ──
+  let recoveryScore = 30; // baseline
+  const kycExchanges = identifiedEntities.filter(e => e.type === 'exchange');
+  if (kycExchanges.length > 0) recoveryScore += 40; // Funds on KYC exchange
+  if (hasMixer) recoveryScore -= 25; // Through mixer = much harder
+  if (outgoing.length + incoming.length < 20) recoveryScore += 10; // Simple flow
+  if (ethSent < 1) recoveryScore += 5; // Small amount not distributed far
+
+  recoveryScore = Math.max(5, Math.min(90, recoveryScore));
+
+  let recoveryLabel: string;
+  if (recoveryScore >= 60) recoveryLabel = 'HIGH — Funds likely on KYC exchange, subpoena possible';
+  else if (recoveryScore >= 35) recoveryLabel = 'MEDIUM — Some exchange interaction, partial recovery possible';
+  else recoveryLabel = 'LOW — Funds obfuscated through mixer or distributed';
+
+  // ── Last activity / inactivity check ──
+  const inactiveDays = timestamps.length > 0
+    ? Math.floor((Date.now() - timestamps[timestamps.length - 1]) / 86400000)
+    : 0;
+
   // Key findings
   const keyFindings: string[] = [];
+  if (ofacWarning) {
+    keyFindings.push(`CRITICAL: Wallet interacted with OFAC-sanctioned address(es): ${ofacEntities.map(e => e.label).join(', ')}. US persons are prohibited from transacting with these addresses.`);
+  }
   if (hasMixer) keyFindings.push('Interactions with known mixer/tumbler services detected (Tornado Cash or similar). This is a significant risk indicator.');
   if (hasExchange) {
     const exchanges = identifiedEntities.filter((e) => e.type === 'exchange').map((e) => e.label);
     keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
   }
   if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
+  if (scamDbMatches.length > 0) {
+    for (const m of scamDbMatches) {
+      keyFindings.push(`Counterparty ${m.address.slice(0, 10)}... linked to "${m.platformNames.join(', ')}" in LedgerHound Scam Database (${m.reports} reports, $${m.totalLoss.toLocaleString()} total losses).`);
+    }
+  }
   if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${outgoing.filter((t: any) => t.category === 'external').length} native transactions.`);
+  if (inactiveDays > 365) keyFindings.push(`Wallet inactive for ${inactiveDays} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`);
   if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
   if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
 
   // Recommendations
   const recommendations: string[] = [];
+  if (ofacWarning) {
+    recommendations.push('IMMEDIATE: Cease all interactions with this wallet. OFAC-sanctioned addresses carry severe legal penalties for US persons.');
+  }
   if (hasExchange) {
     const exchanges = identifiedEntities.filter((e) => e.type === 'exchange').map((e) => e.label);
     recommendations.push(`Subpoena target identified: ${exchanges[0]}. Attorney can file discovery request for account holder information.`);
   }
   if (hasMixer) recommendations.push('Mixer usage detected. Professional demixing analysis recommended to trace funds through mixing service.');
+  if (scamDbMatches.length > 0) recommendations.push('Counterparty addresses found in LedgerHound Scam Database. Existing victim reports may strengthen your legal case.');
   recommendations.push('File FBI IC3 report at ic3.gov if not already done.');
   recommendations.push('For court-ready certified investigation with expert testimony, contact LedgerHound at contact@ledgerhound.vip.');
 
@@ -553,10 +644,15 @@ export async function generateReport(
     spamFiltered,
     firstActivity,
     lastActivity,
+    inactiveDays,
     topCounterparties,
     identifiedEntities,
     riskScore,
     riskLabel,
+    recoveryScore,
+    recoveryLabel,
+    ofacWarning,
+    scamDbMatches,
     keyFindings,
     recommendations,
     transactions: allTxs,
