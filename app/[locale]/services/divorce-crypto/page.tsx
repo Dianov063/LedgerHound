@@ -31,7 +31,7 @@ export default function DivorceCryptoPage() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <div className="pt-24 pb-16 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+      <div className="pt-28 pb-16 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
             <Link href={base || '/'} className="hover:text-brand-600">Home</Link>

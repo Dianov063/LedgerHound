@@ -119,7 +119,7 @@ export default function ScamDatabasePage() {
       <Navbar />
 
       {/* Hero */}
-      <div className="pt-24 pb-16 bg-gradient-to-br from-red-50 via-slate-50 to-white border-b border-slate-100">
+      <div className="pt-28 pb-16 bg-gradient-to-br from-red-50 via-slate-50 to-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-2 rounded-full mb-6">
             <Database size={12} />

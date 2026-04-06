@@ -50,7 +50,7 @@ export default function FreeEvaluationPage() {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <div className="pt-24 pb-20">
+      <div className="pt-28 pb-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-start">
 

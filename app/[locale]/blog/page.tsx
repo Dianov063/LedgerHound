@@ -69,7 +69,7 @@ export default function BlogPage() {
     <div className="min-h-screen">
       <Navbar />
 
-      <div className="pt-24 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+      <div className="pt-28 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="section-tag">{t('tag')}</p>
           <div>

@@ -106,7 +106,7 @@ function ReportSuccessContent() {
     <div className="min-h-screen">
       <Navbar />
 
-      <div className="pt-24 pb-20 bg-gradient-to-br from-slate-50 to-white min-h-[80vh] flex items-center">
+      <div className="pt-28 pb-20 bg-gradient-to-br from-slate-50 to-white min-h-[80vh] flex items-center">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           {/* Success Icon */}
           <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-100 rounded-full mb-6">

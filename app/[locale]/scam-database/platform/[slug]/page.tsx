@@ -258,7 +258,7 @@ export default function PlatformPage() {
       <Script id="schema-faq" type="application/ld+json">{JSON.stringify(schemaFAQ)}</Script>
 
       {/* Warning Hero */}
-      <div className="pt-24 pb-8 bg-gradient-to-br from-red-50 to-white border-b border-red-200">
+      <div className="pt-28 pb-8 bg-gradient-to-br from-red-50 to-white border-b border-red-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={`${trustInfo.bg} border-2 ${trustInfo.border} rounded-2xl p-6 mb-6`}>
             <div className="flex items-start gap-3">

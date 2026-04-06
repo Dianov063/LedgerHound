@@ -169,7 +169,7 @@ export default function ReportScamPage() {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <div className="pt-24 pb-16">
+        <div className="pt-28 pb-16">
           <div className="max-w-2xl mx-auto px-4">
             <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
               <CheckCircle2 className="mx-auto text-emerald-500 mb-4" size={48} />
@@ -253,7 +253,7 @@ export default function ReportScamPage() {
       <Navbar />
 
       {/* Header */}
-      <div className="pt-24 pb-8 bg-gradient-to-br from-red-50 to-white border-b border-slate-100">
+      <div className="pt-28 pb-8 bg-gradient-to-br from-red-50 to-white border-b border-slate-100">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h1 className="font-display font-bold text-3xl text-slate-900 mb-3">{t('report_title')}</h1>
           <p className="text-slate-600 text-sm">{t('report_subtitle')}</p>
