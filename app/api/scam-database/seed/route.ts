@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { seedDatabase, getPlatformIndex, getStats, deleteReportAndPlatform } from '@/lib/scam-db'
 
+export const maxDuration = 60 // seconds — prevent Vercel 10s timeout
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const password = searchParams.get('password')

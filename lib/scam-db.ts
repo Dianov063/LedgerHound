@@ -504,273 +504,125 @@ export function calcRecoveryScore(report: {
 }
 
 /* ── Seed data (realistic victim counts from DFPI/FBI data) ── */
+/* Optimized: builds everything in memory first, then writes to S3 in
+   parallel batches. Total S3 writes ≈ 12 (10 platforms + index + stats)
+   instead of ~70 sequential reads+writes.                              */
 export async function seedDatabase(): Promise<void> {
   console.log('[seed] Starting seed...');
   console.log('[seed] Bucket:', bucket(), 'Region:', process.env.AWS_REGION || 'eu-central-1');
 
   // Check if already seeded
   const existing = await getPlatformIndex();
-  if (existing.length > 0) {
+  if (existing.length >= 10) {
     console.log('[seed] Database already seeded with', existing.length, 'platforms, skipping');
     return;
   }
 
-  console.log('[seed] No existing platforms found, seeding now...');
+  console.log('[seed] Building seed data in memory...');
 
-  const seedPlatforms: { report: Omit<ScamReport, 'id' | 'createdAt'>; extraVictims: number }[] = [
-    {
-      report: {
-        platformName: 'CryptoTrade Pro',
-        platformUrl: 'cryptotradepro.com',
-        platformUrls: ['cryptotrade-pro.net', 'ctpro.trading'],
-        platformType: 'pig_butchering',
-        scamAddress: '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b',
-        network: 'eth',
-        lossAmount: 48000,
-        lossCurrency: 'USD',
-        lossDate: '2025-11-15',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Romance scam operation posing as a crypto trading platform. Victims contacted via WhatsApp and directed to deposit for "guaranteed returns." Platform showed fake profits before blocking withdrawals.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 46,
-    },
-    {
-      report: {
-        platformName: 'BitInvestment Club',
-        platformUrl: 'bitinvestmentclub.io',
-        platformUrls: ['bitinvestclub.com', 'bit-investment.club'],
-        platformType: 'fake_exchange',
-        scamAddress: '0x3cffd56b47b7b41c56258d9c7731abadc360e460',
-        network: 'eth',
-        lossAmount: 38000,
-        lossCurrency: 'USD',
-        lossDate: '2025-10-20',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Fake cryptocurrency exchange. Users could deposit but never withdraw. Customer support demanded "tax payments" or "verification fees."',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 22,
-    },
-    {
-      report: {
-        platformName: 'CoinProfit AI',
-        platformUrl: 'coinprofit-ai.com',
-        platformUrls: ['coinprofitai.net'],
-        platformType: 'pig_butchering',
-        scamAddress: 'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy',
-        network: 'trx',
-        lossAmount: 45000,
-        lossCurrency: 'USD',
-        lossDate: '2025-12-01',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'AI-themed pig butchering scam. Victims directed to send USDT via TRON network. Withdrawal attempts failed with demands for "tax clearance certificates."',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 30,
-    },
-    {
-      report: {
-        platformName: 'MetaTrader Crypto Pro',
-        platformUrl: 'metatrader-crypto.net',
-        platformUrls: ['mt5-crypto.com', 'metatraderpro-crypto.com'],
-        platformType: 'fake_exchange',
-        scamAddress: '0x19aa5fe80d33a56d56c78e82ea5e50e5d80b4dff',
-        network: 'eth',
-        lossAmount: 31000,
-        lossCurrency: 'USD',
-        lossDate: '2025-09-10',
-        verified: true,
-        blockchainConfirmed: false,
-        description: 'Impersonating MetaTrader. Scammers used similar branding to trick users into depositing crypto.',
-        status: 'verified',
-        trustTier: 2,
-      },
-      extraVictims: 17,
-    },
-    {
-      report: {
-        platformName: 'CryptoYield Platform',
-        platformUrl: 'cryptoyield.finance',
-        platformUrls: ['crypto-yield.io'],
-        platformType: 'ponzi',
-        scamAddress: '0x56eddb7aa87536c09ccc2793473599fd21a8b17f',
-        network: 'eth',
-        lossAmount: 47000,
-        lossCurrency: 'USD',
-        lossDate: '2025-08-05',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Ponzi scheme promising 5% daily returns. Platform collapsed when inflows slowed, leaving 800+ victims.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 88,
-    },
-    {
-      report: {
-        platformName: 'TradingPro.ai',
-        platformUrl: 'tradingpro.ai',
-        platformUrls: ['tradingpro-app.com'],
-        platformType: 'pig_butchering',
-        scamAddress: 'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG',
-        network: 'trx',
-        lossAmount: 52000,
-        lossCurrency: 'USD',
-        lossDate: '2025-11-25',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Sophisticated pig butchering using TRON/USDT. Victims groomed via Telegram before directing to fake trading dashboard.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 14,
-    },
-    {
-      report: {
-        platformName: 'CoinBase Pro Trade',
-        platformUrl: 'coinbasepro-trade.com',
-        platformUrls: ['coinbase-protrade.com', 'coinbase-pro-trading.com'],
-        platformType: 'phishing',
-        scamAddress: '0xef3a930e1ffffffacd2b664822cb7d1c51e0c36e',
-        network: 'eth',
-        lossAmount: 50000,
-        lossCurrency: 'USD',
-        lossDate: '2025-07-12',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Phishing site impersonating Coinbase Pro. Used typosquatting and Google Ads. Stole credentials and drained wallets automatically.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 61,
-    },
-    {
-      report: {
-        platformName: 'BTC Cloud Mining Pro',
-        platformUrl: 'btcminingcloud.com',
-        platformUrls: ['btc-cloudmining.pro'],
-        platformType: 'ponzi',
-        scamAddress: '0x707012c9cf97c4c3a481603f98d593ecd3a44621',
-        network: 'eth',
-        lossAmount: 50000,
-        lossCurrency: 'USD',
-        lossDate: '2025-06-20',
-        verified: true,
-        blockchainConfirmed: false,
-        description: 'Cloud mining Ponzi claiming proprietary ASIC farms. No actual mining operations existed.',
-        status: 'verified',
-        trustTier: 2,
-      },
-      extraVictims: 133,
-    },
-    {
-      report: {
-        platformName: 'CryptoFX Global Markets',
-        platformUrl: 'cryptofxmarkets.com',
-        platformUrls: ['cfx-markets.io', 'cryptofx-global.com'],
-        platformType: 'fake_exchange',
-        scamAddress: '0x39d908dac893cbcb53cc86e0ecc369aa4def1a29',
-        network: 'eth',
-        lossAmount: 39000,
-        lossCurrency: 'USD',
-        lossDate: '2025-10-01',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'Fake forex/crypto exchange targeting Eastern Europe and CIS countries. Funds traced to Binance and Huobi deposit addresses.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 27,
-    },
-    {
-      report: {
-        platformName: 'DeFi Yield Optimizer',
-        platformUrl: 'defiyieldprotocol.io',
-        platformUrls: ['defi-yield-optimizer.finance'],
-        platformType: 'rug_pull',
-        scamAddress: '0x0681d8db095565fe8a346fa0277bffde9c0edbbf',
-        network: 'eth',
-        lossAmount: 44000,
-        lossCurrency: 'USD',
-        lossDate: '2025-05-15',
-        verified: true,
-        blockchainConfirmed: true,
-        description: 'DeFi rug pull. Smart contract had hidden admin withdraw. Developers removed liquidity in single transaction.',
-        status: 'verified',
-        trustTier: 3,
-      },
-      extraVictims: 202,
-    },
+  const SEED: { r: Omit<ScamReport, 'id' | 'createdAt'>; extra: number }[] = [
+    { r: { platformName: 'CryptoTrade Pro', platformUrl: 'cryptotradepro.com', platformUrls: ['cryptotrade-pro.net', 'ctpro.trading'], platformType: 'pig_butchering', scamAddress: '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b', network: 'eth', lossAmount: 48000, lossCurrency: 'USD', lossDate: '2025-11-15', verified: true, blockchainConfirmed: true, description: 'Romance scam operation posing as a crypto trading platform. Victims contacted via WhatsApp and directed to deposit for "guaranteed returns." Platform showed fake profits before blocking withdrawals.', status: 'verified', trustTier: 3 }, extra: 46 },
+    { r: { platformName: 'BitInvestment Club', platformUrl: 'bitinvestmentclub.io', platformUrls: ['bitinvestclub.com', 'bit-investment.club'], platformType: 'fake_exchange', scamAddress: '0x3cffd56b47b7b41c56258d9c7731abadc360e460', network: 'eth', lossAmount: 38000, lossCurrency: 'USD', lossDate: '2025-10-20', verified: true, blockchainConfirmed: true, description: 'Fake cryptocurrency exchange. Users could deposit but never withdraw. Customer support demanded "tax payments" or "verification fees."', status: 'verified', trustTier: 3 }, extra: 22 },
+    { r: { platformName: 'CoinProfit AI', platformUrl: 'coinprofit-ai.com', platformUrls: ['coinprofitai.net'], platformType: 'pig_butchering', scamAddress: 'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy', network: 'trx', lossAmount: 45000, lossCurrency: 'USD', lossDate: '2025-12-01', verified: true, blockchainConfirmed: true, description: 'AI-themed pig butchering scam. Victims directed to send USDT via TRON network. Withdrawal attempts failed with demands for "tax clearance certificates."', status: 'verified', trustTier: 3 }, extra: 30 },
+    { r: { platformName: 'MetaTrader Crypto Pro', platformUrl: 'metatrader-crypto.net', platformUrls: ['mt5-crypto.com', 'metatraderpro-crypto.com'], platformType: 'fake_exchange', scamAddress: '0x19aa5fe80d33a56d56c78e82ea5e50e5d80b4dff', network: 'eth', lossAmount: 31000, lossCurrency: 'USD', lossDate: '2025-09-10', verified: true, blockchainConfirmed: false, description: 'Impersonating MetaTrader. Scammers used similar branding to trick users into depositing crypto.', status: 'verified', trustTier: 2 }, extra: 17 },
+    { r: { platformName: 'CryptoYield Platform', platformUrl: 'cryptoyield.finance', platformUrls: ['crypto-yield.io'], platformType: 'ponzi', scamAddress: '0x56eddb7aa87536c09ccc2793473599fd21a8b17f', network: 'eth', lossAmount: 47000, lossCurrency: 'USD', lossDate: '2025-08-05', verified: true, blockchainConfirmed: true, description: 'Ponzi scheme promising 5% daily returns. Platform collapsed when inflows slowed, leaving 800+ victims.', status: 'verified', trustTier: 3 }, extra: 88 },
+    { r: { platformName: 'TradingPro.ai', platformUrl: 'tradingpro.ai', platformUrls: ['tradingpro-app.com'], platformType: 'pig_butchering', scamAddress: 'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG', network: 'trx', lossAmount: 52000, lossCurrency: 'USD', lossDate: '2025-11-25', verified: true, blockchainConfirmed: true, description: 'Sophisticated pig butchering using TRON/USDT. Victims groomed via Telegram before directing to fake trading dashboard.', status: 'verified', trustTier: 3 }, extra: 14 },
+    { r: { platformName: 'CoinBase Pro Trade', platformUrl: 'coinbasepro-trade.com', platformUrls: ['coinbase-protrade.com', 'coinbase-pro-trading.com'], platformType: 'phishing', scamAddress: '0xef3a930e1ffffffacd2b664822cb7d1c51e0c36e', network: 'eth', lossAmount: 50000, lossCurrency: 'USD', lossDate: '2025-07-12', verified: true, blockchainConfirmed: true, description: 'Phishing site impersonating Coinbase Pro. Used typosquatting and Google Ads. Stole credentials and drained wallets automatically.', status: 'verified', trustTier: 3 }, extra: 61 },
+    { r: { platformName: 'BTC Cloud Mining Pro', platformUrl: 'btcminingcloud.com', platformUrls: ['btc-cloudmining.pro'], platformType: 'ponzi', scamAddress: '0x707012c9cf97c4c3a481603f98d593ecd3a44621', network: 'eth', lossAmount: 50000, lossCurrency: 'USD', lossDate: '2025-06-20', verified: true, blockchainConfirmed: false, description: 'Cloud mining Ponzi claiming proprietary ASIC farms. No actual mining operations existed.', status: 'verified', trustTier: 2 }, extra: 133 },
+    { r: { platformName: 'CryptoFX Global Markets', platformUrl: 'cryptofxmarkets.com', platformUrls: ['cfx-markets.io', 'cryptofx-global.com'], platformType: 'fake_exchange', scamAddress: '0x39d908dac893cbcb53cc86e0ecc369aa4def1a29', network: 'eth', lossAmount: 39000, lossCurrency: 'USD', lossDate: '2025-10-01', verified: true, blockchainConfirmed: true, description: 'Fake forex/crypto exchange targeting Eastern Europe and CIS countries. Funds traced to Binance and Huobi deposit addresses.', status: 'verified', trustTier: 3 }, extra: 27 },
+    { r: { platformName: 'DeFi Yield Optimizer', platformUrl: 'defiyieldprotocol.io', platformUrls: ['defi-yield-optimizer.finance'], platformType: 'rug_pull', scamAddress: '0x0681d8db095565fe8a346fa0277bffde9c0edbbf', network: 'eth', lossAmount: 44000, lossCurrency: 'USD', lossDate: '2025-05-15', verified: true, blockchainConfirmed: true, description: 'DeFi rug pull. Smart contract had hidden admin withdraw. Developers removed liquidity in single transaction.', status: 'verified', trustTier: 3 }, extra: 202 },
   ];
 
-  let seededCount = 0;
-  for (const { report, extraVictims } of seedPlatforms) {
-    const slug = slugify(report.platformName);
-    console.log(`[seed] Seeding platform ${seededCount + 1}/${seedPlatforms.length}: ${slug}`);
+  // ── Phase 1: Build everything in memory (zero S3 calls) ──
+  const now = new Date().toISOString();
+  const allPlatforms: ScamPlatform[] = [];
+  const allReports: { key: string; data: ScamReport }[] = [];
+  const allAddresses: { key: string; data: AddressIndex }[] = [];
+  const platformIndex: PlatformIndexEntry[] = [];
+  let totalReports = 0;
+  let totalLoss = 0;
+  let totalVerified = 0;
 
-    try {
-      // Save the "first" report normally
-      const { id } = await saveReport(report);
-      console.log(`[seed] Saved report ${id} for ${slug}`);
+  for (const { r, extra } of SEED) {
+    const slug = slugify(r.platformName);
+    const id = generateId();
+    const victims = 1 + extra;
+    const loss = (r.lossAmount || 30000) * victims;
+    const verifiedCount = r.blockchainConfirmed ? Math.floor(victims * 0.6) : 0;
 
-      // Simulate extra victims by directly updating platform + index + stats
-      const platform = await getPlatformBySlug(slug);
-      if (platform) {
-        platform.victims += extraVictims;
-        platform.totalLoss += extraVictims * (report.lossAmount || 30000);
-        platform.blockchainVerifiedCount += Math.floor(extraVictims * 0.6);
-        platform.trustScore = calcTrustScore(platform);
-        platform.verified = platform.trustScore >= 10;
-        await s3Put(`platforms/${slug}.json`, platform);
-        console.log(`[seed] Updated platform ${slug}: ${platform.victims} victims, score=${platform.trustScore}`);
+    // Build report
+    const report: ScamReport = { ...r, id, createdAt: now };
+    allReports.push({ key: `reports/${id}.json`, data: report });
 
-        // Update index
-        const index = await getPlatformIndex();
-        const idx = index.findIndex(p => p.slug === slug);
-        if (idx >= 0) {
-          index[idx].victims = platform.victims;
-          index[idx].totalLoss = platform.totalLoss;
-          index[idx].trustScore = platform.trustScore;
-          index[idx].verified = platform.verified;
-          await s3Put('index/platforms.json', index);
-        }
+    // Build platform
+    const urls = [r.platformUrl, ...(r.platformUrls || [])].filter(Boolean) as string[];
+    const platform: ScamPlatform = {
+      slug, name: r.platformName, urls, types: [r.platformType],
+      reportIds: [id], totalLoss: loss, lossCurrency: 'USD',
+      victims, addresses: r.scamAddress ? [r.scamAddress] : [],
+      verified: false, trustScore: 0,
+      staffVerified: r.trustTier === 3,
+      blockchainVerifiedCount: verifiedCount,
+      firstReported: r.lossDate || now, lastReported: now,
+    };
+    platform.trustScore = calcTrustScore(platform);
+    platform.verified = platform.trustScore >= 10;
+    allPlatforms.push(platform);
 
-        // Update stats
-        const stats = await getStats();
-        stats.totalReports += extraVictims;
-        stats.totalLoss += extraVictims * (report.lossAmount || 30000);
-        stats.blockchainVerified += Math.floor(extraVictims * 0.6);
-        stats.updatedAt = new Date().toISOString();
-        await s3Put('index/stats.json', stats);
-      } else {
-        console.log(`[seed] WARNING: platform ${slug} not found after saveReport`);
-      }
-      seededCount++;
-    } catch (err: any) {
-      console.error(`[seed] ERROR seeding ${slug}:`, err.message || err);
-      throw err; // Re-throw to surface in API response
+    // Build index entry
+    platformIndex.push({
+      slug, name: r.platformName, victims, totalLoss: loss,
+      verified: platform.verified, trustScore: platform.trustScore,
+      types: [r.platformType], urls,
+      lastReported: now, addresses: r.scamAddress ? [r.scamAddress] : [],
+    });
+
+    // Build address index
+    if (r.scamAddress) {
+      allAddresses.push({
+        key: `addresses/${r.scamAddress.toLowerCase()}.json`,
+        data: {
+          address: r.scamAddress, platforms: [slug],
+          platformNames: [r.platformName], reports: [id],
+          totalLoss: loss, networks: r.network ? [r.network] : [],
+          firstSeen: r.lossDate || now, lastSeen: now,
+        },
+      });
     }
+
+    totalReports += victims;
+    totalLoss += loss;
+    totalVerified += verifiedCount;
+    console.log(`[seed] Built: ${slug} (${victims} victims, score=${platform.trustScore})`);
   }
 
-  // Verify final state
-  const finalIndex = await getPlatformIndex();
-  const finalStats = await getStats();
-  console.log(`[seed] Done! Seeded ${seededCount} platforms.`);
-  console.log(`[seed] Final index: ${finalIndex.length} platforms`);
-  console.log(`[seed] Final stats: ${finalStats.totalReports} reports, $${finalStats.totalLoss} total loss`);
-  console.log(`[seed] S3 files created:`);
-  console.log(`[seed]   - scam-database/index/platforms.json`);
-  console.log(`[seed]   - scam-database/index/stats.json`);
-  for (const p of finalIndex) {
-    console.log(`[seed]   - scam-database/platforms/${p.slug}.json`);
-  }
+  // Build stats
+  const stats: ScamStats = {
+    totalReports, totalPlatforms: allPlatforms.length,
+    totalLoss, blockchainVerified: totalVerified,
+    updatedAt: now,
+  };
+
+  // ── Phase 2: Write everything to S3 in parallel ──
+  console.log(`[seed] Writing ${allReports.length} reports + ${allPlatforms.length} platforms + index + stats to S3...`);
+
+  const writes: Promise<void>[] = [
+    // Index files (most important — written first)
+    s3Put('index/platforms.json', platformIndex),
+    s3Put('index/stats.json', stats),
+    // Platform detail files
+    ...allPlatforms.map(p => s3Put(`platforms/${p.slug}.json`, p)),
+    // Report files
+    ...allReports.map(r => s3Put(r.key, r.data)),
+    // Address index files
+    ...allAddresses.map(a => s3Put(a.key, a.data)),
+  ];
+
+  await Promise.all(writes);
+
+  console.log(`[seed] Done! Wrote ${writes.length} S3 objects in parallel.`);
+  console.log(`[seed] Stats: ${stats.totalReports} reports, ${stats.totalPlatforms} platforms, $${stats.totalLoss} loss, ${stats.blockchainVerified} verified`);
+  console.log(`[seed] Platforms: ${platformIndex.map(p => p.slug).join(', ')}`);
 }
 
 /* ── Delete report + platform cleanup ── */
