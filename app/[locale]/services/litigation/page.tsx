@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Scale, CheckCircle2, ArrowRight, ChevronRight, FileText } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services/litigation',
+    title: "Litigation Support & Expert Witness | Blockchain Forensics | LedgerHound",
+    description: "Court-ready blockchain forensic reports and expert witness testimony. We support attorneys with cryptocurrency evidence for civil and criminal litigation.",
+    keywords: ["crypto expert witness","blockchain litigation support","court ready crypto report"],
+  });
+}
 
 export default function LitigationPage() {
   const locale = useLocale();

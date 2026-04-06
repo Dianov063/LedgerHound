@@ -1,27 +1,20 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WalletTracker from '@/components/WalletTracker';
 import { ArrowRight, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Free Multi-Chain Wallet Tracker — 14 Blockchains | LedgerHound',
-  description:
-    'Track any wallet address across 14 blockchains: Bitcoin, Ethereum, Solana, TRON, BNB Chain, Polygon, Arbitrum, Base, Optimism, Avalanche, Linea, zkSync, Scroll, Mantle. Free blockchain forensics tool.',
-  keywords: [
-    'multi-chain wallet tracker',
-    'ethereum wallet tracker',
-    'bitcoin wallet tracker',
-    'solana wallet tracker',
-    'tron wallet tracker',
-    'check wallet address',
-    'blockchain transaction history',
-    'crypto wallet checker',
-    'track crypto transactions',
-  ],
-};
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/wallet-tracker',
+    title: 'Free Multi-Chain Wallet Tracker \u2014 14 Blockchains | LedgerHound',
+    description: 'Track any wallet address across 14 blockchains: Bitcoin, Ethereum, Solana, TRON, BNB Chain, Polygon, Arbitrum, Base, Optimism, Avalanche, Linea, zkSync, Scroll, Mantle. Free blockchain forensics tool.',
+    keywords: ['multi-chain wallet tracker', 'ethereum wallet tracker', 'bitcoin wallet tracker', 'solana wallet tracker', 'tron wallet tracker', 'check wallet address', 'blockchain transaction history', 'crypto wallet checker', 'track crypto transactions'],
+  });
+}
 
 export default function WalletTrackerPage() {
   const t = useTranslations('tracker_page');

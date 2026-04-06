@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Search, Scale, Heart, Shield, Building2, Users, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services',
+    title: "Blockchain Investigation Services | LedgerHound",
+    description: "Comprehensive blockchain forensics services: crypto tracing, fraud investigation, divorce crypto analysis, litigation support, and romance scam recovery.",
+    keywords: ["blockchain investigation services","crypto forensics services"],
+  });
+}
 
 export default function ServicesPage() {
   const t = useTranslations('services');

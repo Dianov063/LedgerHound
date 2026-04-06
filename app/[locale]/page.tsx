@@ -7,6 +7,18 @@ import {
   ArrowRight, CheckCircle2, ChevronRight, Star,
   Clock, FileText, Phone, Lock, BarChart3, Download,
 } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '',
+    title: "LedgerHound | Crypto Asset Tracing & Blockchain Forensics",
+    description: "Certified blockchain investigators tracing stolen cryptocurrency for fraud victims, attorneys, and businesses. Court-ready reports. Free case evaluation.",
+    keywords: ["crypto tracing","blockchain forensics","stolen cryptocurrency","crypto recovery","blockchain investigation"],
+  });
+}
 
 export default function HomePage() {
   const t = useTranslations();

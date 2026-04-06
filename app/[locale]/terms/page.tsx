@@ -1,13 +1,16 @@
-import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useTranslations } from 'next-intl';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Terms of Service | LedgerHound',
-  description:
-    'LedgerHound terms of service. Legal terms governing the use of USPROJECT LLC blockchain forensics services.',
-};
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/terms',
+    title: 'Terms of Service | LedgerHound',
+    description: 'LedgerHound terms of service. Legal terms governing the use of USPROJECT LLC blockchain forensics services.',
+  });
+}
 
 export default function TermsPage() {
   const t = useTranslations('terms');

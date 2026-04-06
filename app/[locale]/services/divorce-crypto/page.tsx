@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Users, CheckCircle2, ArrowRight, ChevronRight } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services/divorce-crypto',
+    title: "Cryptocurrency in Divorce & Estates | Hidden Crypto Forensics | LedgerHound",
+    description: "Expert blockchain forensics for divorce and estate proceedings. We uncover hidden cryptocurrency wallets, trace transfers, and provide court-admissible reports.",
+    keywords: ["crypto divorce","hidden cryptocurrency","divorce crypto forensics","estate crypto investigation"],
+  });
+}
 
 export default function DivorceCryptoPage() {
   const locale = useLocale();

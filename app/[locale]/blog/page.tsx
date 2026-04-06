@@ -3,6 +3,8 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Clock } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
 
 const blogPosts = [
   {
@@ -46,6 +48,17 @@ const blogPosts = [
 const categoryColors: Record<string, string> = {
   Guide: 'bg-blue-50 text-blue-700 border-blue-100',
 };
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/blog',
+    title: "Blog | Crypto Forensics & Blockchain Security | LedgerHound",
+    description: "Expert insights on cryptocurrency scams, blockchain forensics, crypto recovery, and blockchain security from LedgerHound investigators.",
+    keywords: ["crypto forensics blog","blockchain security blog","crypto scam news"],
+  });
+}
 
 export default function BlogPage() {
   const t = useTranslations('blog');

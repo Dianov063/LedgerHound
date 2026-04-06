@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Building2, CheckCircle2, ArrowRight, ChevronRight } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services/corporate-fraud',
+    title: "Corporate Crypto Fraud Investigation | LedgerHound",
+    description: "Enterprise-grade blockchain forensics for corporate fraud, embezzlement, insider threats, and cryptocurrency theft investigation.",
+    keywords: ["corporate crypto fraud","blockchain investigation corporate","crypto embezzlement"],
+  });
+}
 
 export default function CorporateFraudPage() {
   const locale = useLocale();

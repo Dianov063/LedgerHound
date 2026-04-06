@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Search, CheckCircle2, ArrowRight, Shield, Clock, FileText, ChevronRight } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services/crypto-tracing',
+    title: "Cryptocurrency Tracing Service | Trace Stolen Crypto | LedgerHound",
+    description: "Professional cryptocurrency tracing across Bitcoin, Ethereum, TRON, and 10+ blockchains. We trace stolen funds to exchange deposit addresses for legal recovery.",
+    keywords: ["crypto tracing","trace stolen crypto","cryptocurrency investigation","bitcoin tracing"],
+  });
+}
 
 export default function CryptoTracingPage() {
   const locale = useLocale();

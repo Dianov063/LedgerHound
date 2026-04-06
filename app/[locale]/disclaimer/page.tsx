@@ -1,12 +1,16 @@
 import { useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata = {
-  title: 'Legal Disclaimer | LedgerHound',
-  description:
-    'Legal disclaimer for LedgerHound blockchain forensics services by USPROJECT LLC. Not a law firm. No guarantee of recovery.',
-};
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/disclaimer',
+    title: 'Legal Disclaimer | LedgerHound',
+    description: 'Legal disclaimer for LedgerHound blockchain forensics services by USPROJECT LLC. Not a law firm. No guarantee of recovery.',
+  });
+}
 
 export default function DisclaimerPage() {
   const t = useTranslations('disclaimer');

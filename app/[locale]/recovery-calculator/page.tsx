@@ -1,24 +1,20 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import RecoveryCalculator from '@/components/RecoveryCalculator';
 import { ArrowRight, Shield, Calculator } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Crypto Recovery Chances Calculator | LedgerHound',
-  description:
-    'Find out your chances of recovering stolen cryptocurrency. Free assessment based on case details — used by fraud victims and attorneys.',
-  keywords: [
-    'crypto recovery calculator',
-    'stolen cryptocurrency recovery chances',
-    'bitcoin recovery assessment',
-    'crypto fraud recovery',
-    'blockchain tracing chances',
-    'crypto scam recovery odds',
-  ],
-};
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/recovery-calculator',
+    title: 'Crypto Recovery Chances Calculator | LedgerHound',
+    description: 'Find out your chances of recovering stolen cryptocurrency. Free assessment based on case details \u2014 used by fraud victims and attorneys.',
+    keywords: ['crypto recovery calculator', 'stolen cryptocurrency recovery chances', 'bitcoin recovery assessment', 'crypto fraud recovery', 'blockchain tracing chances', 'crypto scam recovery odds'],
+  });
+}
 
 export default function RecoveryCalculatorPage() {
   const t = useTranslations('calculator');

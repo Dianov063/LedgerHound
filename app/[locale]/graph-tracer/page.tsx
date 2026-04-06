@@ -1,26 +1,20 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import GraphTracer from '@/components/GraphTracer';
 import { ArrowRight, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Free Multi-Chain Transaction Graph — 14 Blockchains | LedgerHound',
-  description:
-    'Visualize fund flows across 14 blockchains with our free transaction graph tool. Supports BTC, ETH, SOL, TRON, and 10 EVM chains. Multi-hop tracing, known entity detection, and export capabilities.',
-  keywords: [
-    'multi-chain transaction graph',
-    'crypto fund flow visualization',
-    'blockchain tracing tool',
-    'trace crypto funds',
-    'bitcoin transaction graph',
-    'ethereum flow chart',
-    'crypto forensics tool',
-    'transaction flow analysis',
-  ],
-};
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/graph-tracer',
+    title: 'Free Multi-Chain Transaction Graph \u2014 14 Blockchains | LedgerHound',
+    description: 'Visualize fund flows across 14 blockchains with our free transaction graph tool. Supports BTC, ETH, SOL, TRON, and 10 EVM chains. Multi-hop tracing, known entity detection, and export capabilities.',
+    keywords: ['multi-chain transaction graph', 'crypto fund flow visualization', 'blockchain tracing tool', 'trace crypto funds', 'bitcoin transaction graph', 'ethereum flow chart', 'crypto forensics tool', 'transaction flow analysis'],
+  });
+}
 
 export default function GraphTracerPage() {
   const t = useTranslations('graph_page');

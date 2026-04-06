@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Shield, Award, Users, Globe, ArrowRight } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/about',
+    title: "About LedgerHound | Blockchain Forensics Experts",
+    description: "Meet the certified blockchain forensics team at LedgerHound. Years of experience tracing stolen cryptocurrency across Bitcoin, Ethereum, TRON, and 10+ networks.",
+    keywords: ["about ledgerhound","blockchain forensics team","crypto investigators"],
+  });
+}
 
 export default function AboutPage() {
   const locale = useLocale();

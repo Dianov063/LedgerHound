@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CheckCircle2, ArrowRight, Shield } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/cases',
+    title: "Case Studies | Crypto Recovery Success Stories | LedgerHound",
+    description: "Real blockchain forensics case studies: cryptocurrency tracing, scam recovery, and fund identification results for our clients.",
+    keywords: ["crypto recovery case studies","blockchain forensics results"],
+  });
+}
 
 export default function CasesPage() {
   const t = useTranslations('cases');

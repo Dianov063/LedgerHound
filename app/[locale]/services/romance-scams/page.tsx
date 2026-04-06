@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Heart, CheckCircle2, ArrowRight, AlertTriangle, ChevronRight } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/services/romance-scams',
+    title: "Romance Scam & Pig Butchering Recovery | LedgerHound",
+    description: "Specialized recovery assistance for romance scam and pig butchering victims. We trace cryptocurrency sent to scammers and identify exchange deposit points.",
+    keywords: ["romance scam recovery","pig butchering scam","crypto romance scam","pig butchering recovery"],
+  });
+}
 
 export default function RomanceScamsPage() {
   const locale = useLocale();

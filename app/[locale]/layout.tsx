@@ -48,17 +48,10 @@ export async function generateMetadata({
   return {
     title: titles[locale] || titles.en,
     description: descriptions[locale] || descriptions.en,
-    alternates: {
-      canonical: `https://ledgerhound.com/${locale === 'en' ? '' : locale}`,
-      languages: {
-        'en': 'https://ledgerhound.com',
-        'ru': 'https://ledgerhound.com/ru',
-        'es': 'https://ledgerhound.com/es',
-        'zh': 'https://ledgerhound.com/zh',
-        'fr': 'https://ledgerhound.com/fr',
-        'ar': 'https://ledgerhound.com/ar',
-      },
-    },
+    metadataBase: new URL('https://ledgerhound.com'),
+    // NOTE: Do NOT set alternates.canonical here — it would incorrectly
+    // canonicalize ALL child pages to the root URL. Each page must set
+    // its own canonical via generateMetadata() or layout.tsx.
   };
 }
 

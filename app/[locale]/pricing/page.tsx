@@ -3,6 +3,19 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CheckCircle2, ArrowRight, HelpCircle } from 'lucide-react';
+import { makeMetadata } from '@/lib/metadata';
+
+
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/pricing',
+    title: "Pricing | Crypto Tracing & Blockchain Investigation | LedgerHound",
+    description: "Transparent pricing for cryptocurrency tracing, blockchain forensics, and court-ready investigation reports. Free initial case evaluation.",
+    keywords: ["crypto tracing pricing","blockchain investigation cost","crypto forensics pricing"],
+  });
+}
 
 export default function PricingPage() {
   const t = useTranslations('pricing');
