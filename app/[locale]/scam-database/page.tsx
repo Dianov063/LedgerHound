@@ -309,6 +309,71 @@ export default function ScamDatabasePage() {
           </div>
         )}
 
+        {/* How We Verify Scams */}
+        <section className="mb-12 bg-white border border-slate-200 rounded-2xl p-8">
+          <h2 className="font-display font-bold text-2xl text-slate-900 mb-2 text-center">How We Verify Scams</h2>
+          <p className="text-slate-500 text-sm text-center mb-8 max-w-2xl mx-auto">
+            Every platform in our database goes through a multi-layer verification process. Trust scores are calculated automatically based on community reports, blockchain evidence, and staff review.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200">
+                  Community Reported
+                </span>
+                <span className="text-xs text-slate-400 font-mono">0–3</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Initial reports from community members. Platform has been flagged but not yet independently confirmed.
+              </p>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1 text-xs font-bold bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full border border-yellow-200">
+                  Suspicious
+                </span>
+                <span className="text-xs text-slate-400 font-mono">4–9</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Multiple reports received. Pattern of complaints suggests potential fraud but investigation is ongoing.
+              </p>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1 text-xs font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
+                  Likely Scam
+                </span>
+                <span className="text-xs text-slate-400 font-mono">10–19</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Strong evidence of fraud. Multiple victims, consistent patterns, and/or blockchain-verified transactions.
+              </p>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1 text-xs font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full border border-red-200">
+                  Confirmed Scam
+                </span>
+                <span className="text-xs text-slate-400 font-mono">20+</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Verified by our investigation team. Blockchain evidence confirmed, fund flows traced, and platform behavior documented.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 size={20} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800 mb-1">Blockchain Verified</p>
+                <p className="text-xs text-emerald-700 leading-relaxed">
+                  Reports with this badge include a verified transaction hash confirmed on the blockchain. This provides irrefutable on-chain evidence that funds were sent to the reported address, strengthening the case for legal action and exchange freezes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Report CTA */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 text-center">
           <Shield className="mx-auto text-red-200 mb-4" size={32} />

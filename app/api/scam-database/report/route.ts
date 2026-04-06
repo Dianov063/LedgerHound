@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
     const entry = rateLimit.get(ip);
     if (entry && entry.reset > now) {
-      if (entry.count >= 10) {
-        return Response.json({ error: 'Rate limit exceeded. Maximum 10 reports per hour.' }, { status: 429 });
+      if (entry.count >= 3) {
+        return Response.json({ error: 'Too many reports. Try again in 1 hour.' }, { status: 429 });
       }
       entry.count++;
     } else {

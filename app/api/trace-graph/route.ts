@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
+import { getAddressIndex } from '@/lib/scam-db';
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
@@ -528,10 +529,11 @@ async function getTransfersForAddress(network: NetworkType, address: string) {
 interface GraphNode {
   id: string;
   label: string;
-  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'scam' | 'intermediate' | 'unknown';
+  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'scam' | 'scam_database' | 'intermediate' | 'unknown';
   totalIn: number;
   totalOut: number;
   txCount: number;
+  scamInfo?: { platforms: string[]; totalLoss: number; reports: number };
 }
 
 interface GraphEdge {
@@ -656,8 +658,30 @@ export async function POST(req: NextRequest) {
     ensureNode(rootAddr, true);
     await traceHop(rootAddr, 1);
 
+    // Enrich nodes with scam database lookups (best-effort, non-blocking)
+    try {
+      const unknownNodes = Array.from(nodes.values()).filter(
+        n => n.type === 'unknown' || n.type === 'intermediate' || n.type === 'scam'
+      );
+      const lookups = unknownNodes.slice(0, 15).map(async (node) => {
+        try {
+          const addrData = await getAddressIndex(node.id);
+          if (addrData && addrData.platforms.length > 0) {
+            node.type = 'scam_database';
+            node.label = `${addrData.platformNames[0]} \u26A0\uFE0F`;
+            node.scamInfo = {
+              platforms: addrData.platformNames,
+              totalLoss: addrData.totalLoss,
+              reports: addrData.reports.length,
+            };
+          }
+        } catch { /* skip individual lookup errors */ }
+      });
+      await Promise.all(lookups);
+    } catch { /* scam DB enrichment failed — continue without it */ }
+
     const knownEntities = Array.from(nodes.values())
-      .filter((n) => n.type === 'exchange' || n.type === 'mixer' || n.type === 'defi' || n.type === 'scam')
+      .filter((n) => n.type === 'exchange' || n.type === 'mixer' || n.type === 'defi' || n.type === 'scam' || n.type === 'scam_database')
       .map((n) => n.label);
 
     return NextResponse.json({

@@ -52,17 +52,17 @@ const seedPlatformSlugs = [
 ];
 
 /* Try to fetch dynamic platforms from S3 at build time */
-async function getDynamicPlatformSlugs(): Promise<string[]> {
+async function getDynamicPlatforms(): Promise<{ slug: string; lastReported?: string }[]> {
   try {
     const { getPlatformIndex } = await import('@/lib/scam-db');
     const platforms = await getPlatformIndex();
     if (platforms.length > 0) {
-      return platforms.map(p => p.slug);
+      return platforms.map(p => ({ slug: p.slug, lastReported: p.lastReported }));
     }
   } catch {
     // S3 not available at build time — fall back to seed list
   }
-  return seedPlatformSlugs;
+  return seedPlatformSlugs.map(slug => ({ slug }));
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -111,16 +111,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Scam database platform pages (dynamic from S3 + seed fallback)
-  const platformSlugs = await getDynamicPlatformSlugs();
-  for (const slug of platformSlugs) {
+  const dynamicPlatforms = await getDynamicPlatforms();
+  for (const { slug, lastReported } of dynamicPlatforms) {
     const path = `/scam-database/platform/${slug}`;
     for (const locale of locales) {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
         url: `${baseUrl}${localePath}${path}`,
-        lastModified: new Date(),
+        lastModified: lastReported ? new Date(lastReported) : new Date(),
         changeFrequency: 'weekly',
-        priority: 0.7,
+        priority: 0.8,
         alternates: {
           languages: Object.fromEntries(
             locales.map((l) => [

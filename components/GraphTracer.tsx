@@ -23,10 +23,11 @@ import {
 interface GraphNode {
   id: string;
   label: string;
-  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'scam' | 'intermediate' | 'unknown';
+  type: 'source' | 'exchange' | 'mixer' | 'defi' | 'scam' | 'scam_database' | 'intermediate' | 'unknown';
   totalIn: number;
   totalOut: number;
   txCount: number;
+  scamInfo?: { platforms: string[]; totalLoss: number; reports: number };
 }
 
 interface GraphEdge {
@@ -53,6 +54,7 @@ const NODE_COLORS: Record<string, string> = {
   mixer: '#ff1744',
   defi: '#7c3aed',
   scam: '#ff6d00',
+  scam_database: '#8B0000',
   intermediate: '#546e7a',
   unknown: '#546e7a',
 };
@@ -63,6 +65,7 @@ const NODE_SIZES: Record<string, number> = {
   mixer: 35,
   defi: 32,
   scam: 38,
+  scam_database: 42,
   intermediate: 25,
   unknown: 25,
 };
@@ -73,6 +76,7 @@ const NODE_LABELS: Record<string, string> = {
   mixer: 'Mixer / High Risk',
   defi: 'DeFi Protocol',
   scam: 'Flagged / Scam',
+  scam_database: 'Known Scam (DB)',
   intermediate: 'Unknown Wallet',
   unknown: 'Unknown Wallet',
 };
@@ -83,6 +87,7 @@ const LEGEND_ITEMS = [
   { color: '#ff1744', label: 'Mixer / High Risk', emoji: '🔴' },
   { color: '#7c3aed', label: 'DeFi Protocol', emoji: '🟣' },
   { color: '#ff6d00', label: 'Flagged / Scam', emoji: '🟠' },
+  { color: '#8B0000', label: 'Known Scam (DB)', emoji: '💀' },
   { color: '#546e7a', label: 'Unknown Wallet', emoji: '⚪' },
 ];
 
@@ -830,6 +835,24 @@ export default function GraphTracer() {
                 <p className="text-white font-semibold text-sm mb-1">{selectedNode.label}</p>
                 <p className="text-slate-600 font-mono text-xs break-all">{selectedNode.id}</p>
               </div>
+
+              {/* Scam Database Warning */}
+              {selectedNode.type === 'scam_database' && selectedNode.scamInfo && (
+                <div className="bg-red-950 border border-red-800 rounded-xl p-4 mb-6">
+                  <p className="text-red-400 font-bold text-sm flex items-center gap-2 mb-2">
+                    <AlertTriangle size={14} /> Known Scam Address
+                  </p>
+                  <p className="text-red-300 text-xs mb-1">
+                    Platform: <span className="font-semibold text-white">{selectedNode.scamInfo.platforms.join(', ')}</span>
+                  </p>
+                  <p className="text-red-300 text-xs mb-1">
+                    Total losses: <span className="font-semibold text-white">${(selectedNode.scamInfo.totalLoss || 0).toLocaleString()}</span>
+                  </p>
+                  <p className="text-red-300 text-xs">
+                    Reports: <span className="font-semibold text-white">{selectedNode.scamInfo.reports}</span>
+                  </p>
+                </div>
+              )}
 
               {/* Stats grid */}
               <div className="grid grid-cols-3 gap-3 mb-6">

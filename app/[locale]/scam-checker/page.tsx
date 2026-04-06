@@ -29,6 +29,7 @@ interface ScamResult {
   chainabuseReports: number;
   entityInfo: { label: string; type: string } | null;
   ofacWarning: string;
+  scamDbPlatforms: string[];
 }
 
 const RISK_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
@@ -291,6 +292,25 @@ function ScamCheckerInner() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Scam Database Match */}
+              {result.scamDbPlatforms && result.scamDbPlatforms.length > 0 && (
+                <div className="bg-red-100 border-2 border-red-300 rounded-xl p-5 mb-4">
+                  <p className="text-sm font-bold text-red-900 flex items-center gap-2 mb-2">
+                    <AlertTriangle size={16} className="text-red-600" />
+                    Found in LedgerHound Scam Database
+                  </p>
+                  <p className="text-sm text-red-800 mb-3">
+                    Associated with: <span className="font-semibold">{result.scamDbPlatforms.join(', ')}</span>
+                  </p>
+                  <a
+                    href={`${prefix}/scam-database`}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 hover:text-red-900 transition-colors"
+                  >
+                    View Platform Reports <ArrowRight size={12} />
+                  </a>
                 </div>
               )}
 
