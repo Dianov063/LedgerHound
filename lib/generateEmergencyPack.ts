@@ -92,14 +92,19 @@ export interface GeneratePackInput {
   email: string;
   victimName: string;
   lossAmount: number;
+  lossCurrency?: string;
   scamType: string;
   walletAddress: string;
+  victimWallet?: string;
   txHashes: string[];
   description: string;
   txDate?: string;
   platformName?: string;
+  platformUrl?: string;
   network?: string;
   contactMethod?: string;
+  victimPhone?: string;
+  victimState?: string;
   enrichment?: EnrichmentData;
 }
 
@@ -121,14 +126,19 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     email,
     victimName,
     lossAmount,
+    lossCurrency: inputCurrency,
     scamType,
     walletAddress,
+    victimWallet,
     txHashes,
     description,
     txDate,
     platformName,
+    platformUrl,
     network: inputNetwork,
     contactMethod,
+    victimPhone,
+    victimState,
   } = input;
 
   // Load research for the country
@@ -192,14 +202,18 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     date: new Date().toISOString().split('T')[0],
     victimName: victimName || '',
     victimEmail: email,
+    victimPhone: victimPhone || '',
+    state: victimState || '',
     country: code,
     incidentDate,
     lossAmount: lossAmount || 0,
-    lossCurrency: 'USD',
+    lossCurrency: inputCurrency || 'USD',
     cryptoType,
     scammerAddress: walletAddress || '',
+    sourceWallet: victimWallet || '',
     txid: txHashes?.[0] || '',
     platformName: platformName || '',
+    platformUrl: platformUrl || '',
     network: networkName,
     scamType: scamType || '',
     description: description || '',

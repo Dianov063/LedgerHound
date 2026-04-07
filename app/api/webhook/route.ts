@@ -99,6 +99,11 @@ export async function POST(request: Request) {
         const txDate = saved?.txDate || '';
         const detectedNetwork = saved?.detectedNetwork || session.metadata?.network || 'eth';
         const contactMethod = saved?.contactMethod || '';
+        const victimPhone = saved?.victimPhone || '';
+        const victimState = saved?.victimState || '';
+        const platformUrl = saved?.platformUrl || '';
+        const victimWallet = saved?.victimWallet || '';
+        const lossCurrency = saved?.lossCurrency || 'USD';
         const userLossAmount = saved?.lossAmount
           ? parseFloat(String(saved.lossAmount))
           : session.metadata?.lossAmount
@@ -148,14 +153,19 @@ export async function POST(request: Request) {
           email,
           victimName: session.customer_details?.name || '',
           lossAmount,
+          lossCurrency,
           scamType,
           walletAddress: walletAddress || '',
+          victimWallet,
           txHashes: txid ? [txid] : [],
           description,
           txDate,
           platformName,
+          platformUrl,
           network: detectedNetwork,
           contactMethod,
+          victimPhone,
+          victimState,
           enrichment,
         });
         console.log('[webhook] Emergency Pack generated:', packResult.templates?.length, 'templates');

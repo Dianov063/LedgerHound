@@ -86,6 +86,16 @@ const CONTACT_METHODS = [
   'Other',
 ];
 
+const COUNTRY_CURRENCIES: Record<string, string> = {
+  US: 'USD', CA: 'USD', SG: 'USD', AE: 'USD',
+  UK: 'GBP',
+  DE: 'EUR', FR: 'EUR', NL: 'EUR', ES: 'EUR', IT: 'EUR', CH: 'CHF',
+  RU: 'RUB', UA: 'UAH', KZ: 'KZT',
+  AU: 'AUD',
+};
+
+const COUNTRIES_WITH_STATES = ['US', 'DE', 'AU'];
+
 function detectNetwork(addr: string): string {
   if (!addr || addr.length < 10) return '';
   if (/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,}$/.test(addr)) return 'btc';
@@ -107,15 +117,20 @@ export default function EmergencyPage() {
     country: '',
     lossAmount: '',
     lossBracket: '',
+    lossCurrency: 'USD',
+    victimState: '',
     walletAddress: '',
+    victimWallet: '',
     txid: '',
     txDate: '',
     platformName: '',
+    platformUrl: '',
     detectedNetwork: '',
     scamType: '',
     description: '',
     contactMethod: '',
     email: '',
+    victimPhone: '',
   });
   const [route, setRoute] = useState<'EMERGENCY' | 'URGENT' | 'AGGREGATOR' | null>(null);
   const [analysis, setAnalysis] = useState<any>(null);
@@ -133,6 +148,13 @@ export default function EmergencyPage() {
     const net = detectNetwork(form.walletAddress);
     if (net) set({ detectedNetwork: net });
   }, [form.walletAddress, set]);
+
+  /* auto-set currency from country */
+  useEffect(() => {
+    if (form.country) {
+      set({ lossCurrency: COUNTRY_CURRENCIES[form.country] || 'USD' });
+    }
+  }, [form.country, set]);
 
   /* auto-set bracket from amount */
   useEffect(() => {
@@ -350,13 +372,31 @@ export default function EmergencyPage() {
                     </select>
                   </div>
 
+                  {/* State/Region — for US, DE, AU */}
+                  {COUNTRIES_WITH_STATES.includes(form.country) && (
+                    <div className="mb-5">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        State / Region
+                      </label>
+                      <input
+                        type="text"
+                        value={form.victimState}
+                        onChange={(e) => set({ victimState: e.target.value })}
+                        placeholder={form.country === 'US' ? 'e.g. California' : form.country === 'DE' ? 'e.g. Bayern' : 'e.g. New South Wales'}
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
+
                   {/* Amount */}
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       How much did you lose?
                     </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                        {form.lossCurrency === 'USD' ? '$' : form.lossCurrency === 'GBP' ? '\u00A3' : form.lossCurrency === 'EUR' ? '\u20AC' : ''}
+                      </span>
                       <input
                         type="number"
                         min="0"
@@ -365,7 +405,7 @@ export default function EmergencyPage() {
                         placeholder="0"
                         className={`${inputCls} pl-8`}
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">USD</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{form.lossCurrency}</span>
                     </div>
                   </div>
 
@@ -479,6 +519,28 @@ export default function EmergencyPage() {
                     className={inputCls}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">Platform URL (optional)</label>
+                  <input
+                    type="text"
+                    value={form.platformUrl}
+                    onChange={(e) => set({ platformUrl: e.target.value })}
+                    placeholder="e.g. cryptotradepro.com"
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">Your Wallet Address (optional)</label>
+                  <input
+                    type="text"
+                    value={form.victimWallet}
+                    onChange={(e) => set({ victimWallet: e.target.value })}
+                    placeholder="The wallet you sent funds FROM"
+                    className={`${inputCls} font-mono text-sm`}
+                  />
+                </div>
               </div>
 
               <div className="mt-8 flex justify-between">
@@ -562,7 +624,7 @@ export default function EmergencyPage() {
               )}
 
               {/* Email */}
-              <div className="mb-6">
+              <div className="mb-5">
                 <label className="block text-sm text-slate-500 mb-2">
                   Your email <span className="text-red-400">*</span>
                 </label>
@@ -571,6 +633,18 @@ export default function EmergencyPage() {
                   value={form.email}
                   onChange={(e) => set({ email: e.target.value })}
                   placeholder="you@email.com"
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-500 mb-2">Phone number (optional)</label>
+                <input
+                  type="tel"
+                  value={form.victimPhone}
+                  onChange={(e) => set({ victimPhone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
                   className={inputCls}
                 />
               </div>
