@@ -46,10 +46,10 @@ export default function Navbar() {
     { href: `${prefix}/blog`, label: t('blog') },
   ];
   const toolLinks = [
-    { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: 'FREE' },
-    { href: `${prefix}/graph-tracer`, label: t('graph'), badge: 'NEW' },
-    { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: 'NEW' },
-    { href: `${prefix}/scam-checker`, label: t('scam_checker'), badge: 'NEW' },
+    { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: undefined },
+    { href: `${prefix}/graph-tracer`, label: t('graph'), badge: undefined },
+    { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: undefined },
+    { href: `${prefix}/scam-checker`, label: t('scam_checker'), badge: undefined },
     { href: `${prefix}/report`, label: t('report'), badge: '$49' },
     { href: `${prefix}/tx-lookup`, label: t('tx'), badge: undefined },
     { href: `${prefix}/scam-database`, label: t('scam_db'), badge: 'NEW' },

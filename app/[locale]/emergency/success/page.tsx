@@ -25,7 +25,7 @@ function EmergencySuccessContent() {
   const platformSlug = searchParams.get('platform_slug') || '';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen">
       <Navbar />
 
       <main className="pt-28 pb-20 px-4">
@@ -65,14 +65,14 @@ function EmergencyPackSuccess({ caseId }: { caseId: string }) {
 
       {/* Case ID */}
       {caseId && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl px-6 py-4 mb-8 inline-block">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl px-6 py-4 mb-8 inline-block">
           <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Case ID</p>
           <p className="font-mono text-brand-400 text-sm">{caseId}</p>
         </div>
       )}
 
       {/* What's included */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 text-left">
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8 text-left">
         <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
           <FileText size={18} className="text-brand-400" />
           What&apos;s included
@@ -87,7 +87,7 @@ function EmergencyPackSuccess({ caseId }: { caseId: string }) {
           ].map((item) => (
             <li key={item} className="flex items-start gap-3">
               <CheckCircle2 size={16} className="text-emerald-400 mt-0.5 shrink-0" />
-              <span className="text-slate-300 text-sm">{item}</span>
+              <span className="text-slate-600 text-sm">{item}</span>
             </li>
           ))}
         </ul>
@@ -102,7 +102,7 @@ function EmergencyPackSuccess({ caseId }: { caseId: string }) {
       {/* Back link */}
       <Link
         href="/emergency"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
         Back to Emergency Response
@@ -136,7 +136,7 @@ function SummaryReportSuccess({
 
       {/* Case ID */}
       {caseId && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl px-6 py-4 mb-8 inline-block">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl px-6 py-4 mb-8 inline-block">
           <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Case ID</p>
           <p className="font-mono text-brand-400 text-sm">{caseId}</p>
         </div>
@@ -161,7 +161,7 @@ function SummaryReportSuccess({
       {/* Back link */}
       <Link
         href="/emergency"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
         Back to Emergency Response
@@ -199,7 +199,7 @@ function GroupJoinedSuccess({
 
       {/* Progress stats */}
       {(victims || totalLoss) && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8">
           <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 justify-center">
             <Users size={18} className="text-purple-400" />
             Current Progress
@@ -207,7 +207,7 @@ function GroupJoinedSuccess({
           <div className="flex items-center justify-center gap-8">
             {victims && (
               <div>
-                <p className="text-3xl font-bold text-white">{victims}</p>
+                <p className="text-3xl font-bold text-slate-900">{victims}</p>
                 <p className="text-slate-500 text-sm">victims</p>
               </div>
             )}
@@ -224,7 +224,7 @@ function GroupJoinedSuccess({
       {/* Back link */}
       <Link
         href="/emergency"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
         Back to Emergency Response
@@ -249,7 +249,7 @@ function GenericSuccess({ caseId }: { caseId: string }) {
       </p>
 
       {caseId && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl px-6 py-4 mb-8 inline-block">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl px-6 py-4 mb-8 inline-block">
           <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Case ID</p>
           <p className="font-mono text-brand-400 text-sm">{caseId}</p>
         </div>
@@ -258,7 +258,7 @@ function GenericSuccess({ caseId }: { caseId: string }) {
       <div className="block">
         <Link
           href="/emergency"
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
         >
           <ArrowLeft size={16} />
           Back to Emergency Response

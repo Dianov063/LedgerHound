@@ -266,7 +266,7 @@ export default function EmergencyPage() {
 
   /* ───────── render ───────── */
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen">
       <Navbar />
 
       <div className="pt-28 pb-20">
@@ -277,7 +277,7 @@ export default function EmergencyPage() {
               <span>Step {Math.min(step, 7)} of 7</span>
               <span>{progress}%</span>
             </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-brand-600 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
@@ -300,11 +300,11 @@ export default function EmergencyPage() {
                     className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all ${
                       form.country === c.code
                         ? 'border-brand-600 bg-brand-600/10'
-                        : 'border-slate-700 bg-slate-900 hover:border-slate-600'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
                     <span className="text-2xl">{c.flag}</span>
-                    <span className="text-xs text-slate-300 text-center leading-tight">
+                    <span className="text-xs text-slate-600 text-center leading-tight">
                       {c.name}
                     </span>
                   </button>
@@ -331,7 +331,7 @@ export default function EmergencyPage() {
               </h2>
 
               <div className="mb-6">
-                <label className="block text-sm text-slate-400 mb-2">Amount (USD)</label>
+                <label className="block text-sm text-slate-500 mb-2">Amount (USD)</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
                   <input
@@ -340,7 +340,7 @@ export default function EmergencyPage() {
                     value={form.lossAmount}
                     onChange={(e) => set({ lossAmount: e.target.value })}
                     placeholder="0"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg pl-8 pr-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -355,7 +355,7 @@ export default function EmergencyPage() {
                     className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
                       form.lossBracket === b.label
                         ? 'border-brand-600 bg-brand-600/10 text-brand-400'
-                        : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                     }`}
                   >
                     {b.label}
@@ -366,7 +366,7 @@ export default function EmergencyPage() {
               <div className="flex justify-between">
                 <button
                   onClick={() => setStep(1)}
-                  className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -391,7 +391,7 @@ export default function EmergencyPage() {
               <div className="space-y-5">
                 {/* wallet address */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">
+                  <label className="block text-sm text-slate-500 mb-2">
                     Wallet Address{' '}
                     {form.detectedNetwork && (
                       <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
@@ -404,44 +404,44 @@ export default function EmergencyPage() {
                     value={form.walletAddress}
                     onChange={(e) => set({ walletAddress: e.target.value })}
                     placeholder="0x... or bc1... or T..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
                   />
                 </div>
 
                 {/* txid */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">Transaction Hash</label>
+                  <label className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
                   <input
                     type="text"
                     value={form.txid}
                     onChange={(e) => set({ txid: e.target.value })}
                     placeholder="TXID (optional)"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
                   />
                 </div>
 
                 {/* date */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">
+                  <label className="block text-sm text-slate-500 mb-2">
                     When did this happen? <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="date"
                     value={form.txDate}
                     onChange={(e) => set({ txDate: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
                   />
                 </div>
 
                 {/* platform */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">Platform Name</label>
+                  <label className="block text-sm text-slate-500 mb-2">Platform Name</label>
                   <input
                     type="text"
                     value={form.platformName}
                     onChange={(e) => set({ platformName: e.target.value })}
                     placeholder="e.g. CryptoTrade Pro"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -449,7 +449,7 @@ export default function EmergencyPage() {
               <div className="mt-8 flex justify-between">
                 <button
                   onClick={() => setStep(2)}
-                  className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -479,11 +479,11 @@ export default function EmergencyPage() {
                     className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all ${
                       form.scamType === s.id
                         ? 'border-brand-600 bg-brand-600/10'
-                        : 'border-slate-700 bg-slate-900 hover:border-slate-600'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
                     <span className="text-3xl">{s.emoji}</span>
-                    <span className="text-sm text-slate-300 text-center leading-tight">
+                    <span className="text-sm text-slate-600 text-center leading-tight">
                       {s.label}
                     </span>
                   </button>
@@ -493,7 +493,7 @@ export default function EmergencyPage() {
               <div className="mt-8 flex justify-between">
                 <button
                   onClick={() => setStep(3)}
-                  className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -517,13 +517,13 @@ export default function EmergencyPage() {
 
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">Your description</label>
+                  <label className="block text-sm text-slate-500 mb-2">Your description</label>
                   <textarea
                     rows={5}
                     value={form.description}
                     onChange={(e) => set({ description: e.target.value })}
                     placeholder="Describe what happened, include any relevant details..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
                   />
                   <div className="flex justify-end mt-1">
                     <span
@@ -539,13 +539,13 @@ export default function EmergencyPage() {
                 {/* US-only contact method */}
                 {form.country === 'US' && (
                   <div>
-                    <label className="block text-sm text-slate-400 mb-2">
+                    <label className="block text-sm text-slate-500 mb-2">
                       How were you contacted?
                     </label>
                     <select
                       value={form.contactMethod}
                       onChange={(e) => set({ contactMethod: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                      className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
                     >
                       <option value="">Select...</option>
                       {CONTACT_METHODS.map((m) => (
@@ -559,7 +559,7 @@ export default function EmergencyPage() {
 
                 {/* email */}
                 <div>
-                  <label className="block text-sm text-slate-400 mb-2">
+                  <label className="block text-sm text-slate-500 mb-2">
                     Your email <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -567,7 +567,7 @@ export default function EmergencyPage() {
                     value={form.email}
                     onChange={(e) => set({ email: e.target.value })}
                     placeholder="you@email.com"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -575,7 +575,7 @@ export default function EmergencyPage() {
               <div className="mt-8 flex justify-between">
                 <button
                   onClick={() => setStep(4)}
-                  className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -620,7 +620,7 @@ export default function EmergencyPage() {
                     }`}
                   >
                     <CheckCircle2 size={20} className="text-emerald-400 flex-shrink-0" />
-                    <span className="text-slate-300">{text}</span>
+                    <span className="text-slate-600">{text}</span>
                   </div>
                 ))}
               </div>
@@ -635,19 +635,19 @@ export default function EmergencyPage() {
           {step === 7 && route === 'EMERGENCY' && (
             <div>
               {/* urgent banner */}
-              <div className="bg-emerald-900/30 border border-emerald-600/40 rounded-xl p-6 mb-8 text-center">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8 text-center">
                 <Zap size={28} className="mx-auto text-emerald-400 mb-3" />
-                <h2 className="font-display font-bold text-2xl sm:text-3xl text-emerald-300 mb-2">
+                <h2 className="font-display font-bold text-2xl sm:text-3xl text-emerald-700 mb-2">
                   URGENT: Funds can still be frozen!
                 </h2>
-                <p className="text-slate-400 text-sm">Act immediately to maximize recovery chances</p>
+                <p className="text-slate-500 text-sm">Act immediately to maximize recovery chances</p>
               </div>
 
               {/* score + details */}
               <div className="grid sm:grid-cols-3 gap-4 mb-8">
                 {/* recovery score */}
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
                     Recovery Score
                   </span>
                   <div className="relative w-24 h-24 flex items-center justify-center">
@@ -657,7 +657,7 @@ export default function EmergencyPage() {
                         cy="50"
                         r="42"
                         stroke="currentColor"
-                        className="text-slate-800"
+                        className="text-slate-200"
                         strokeWidth="8"
                         fill="none"
                       />
@@ -680,18 +680,18 @@ export default function EmergencyPage() {
                 </div>
 
                 {/* destination */}
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
                     Destination
                   </span>
-                  <span className="text-lg font-semibold text-white">
+                  <span className="text-lg font-semibold text-slate-900">
                     {analysis?.exchange || 'Exchange detected'}
                   </span>
                 </div>
 
                 {/* time remaining */}
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
                     Time Remaining
                   </span>
                   <Clock size={20} className="text-amber-400 mb-1" />
@@ -702,10 +702,10 @@ export default function EmergencyPage() {
               </div>
 
               {/* emergency pack card */}
-              <div className="bg-slate-900 border border-emerald-600/30 rounded-xl p-6 sm:p-8 mb-8">
+              <div className="bg-white border border-emerald-200 shadow-sm rounded-xl p-6 sm:p-8 mb-8">
                 <div className="flex items-center gap-3 mb-5">
                   <Shield size={24} className="text-emerald-400" />
-                  <h3 className="font-display font-bold text-xl text-white">
+                  <h3 className="font-display font-bold text-xl text-slate-900">
                     Emergency Preservation Pack
                   </h3>
                 </div>
@@ -724,7 +724,7 @@ export default function EmergencyPage() {
                         size={18}
                         className="text-emerald-400 flex-shrink-0 mt-0.5"
                       />
-                      <span className="text-slate-300 text-sm">{item}</span>
+                      <span className="text-slate-600 text-sm">{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -749,30 +749,30 @@ export default function EmergencyPage() {
           {step === 7 && route === 'AGGREGATOR' && (
             <div>
               {/* header */}
-              <div className="bg-amber-900/20 border border-amber-600/30 rounded-xl p-6 mb-8 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
                 <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
-                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-300 mb-2">
+                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
                   Direct freeze unlikely ({analysis?.daysSince ?? '?'} days ago)
                 </h2>
-                <p className="text-lg font-semibold text-white mt-3">
+                <p className="text-lg font-semibold text-slate-900 mt-3">
                   BUT: You&apos;re not alone!
                 </p>
               </div>
 
               {/* stats */}
               <div className="grid sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 text-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
                     Platform
                   </span>
-                  <span className="text-white font-semibold">
+                  <span className="text-slate-900 font-semibold">
                     {analysis?.scamDbMatch?.name || form.platformName || 'Unknown'}
                   </span>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 text-center">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
                   <Users size={18} className="mx-auto text-brand-400 mb-1" />
-                  <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
                     Victims in Group
                   </span>
                   <span className="text-white font-semibold text-lg">
@@ -780,8 +780,8 @@ export default function EmergencyPage() {
                   </span>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 text-center">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
                     Total Losses
                   </span>
                   <span className="text-white font-semibold text-lg">
@@ -791,14 +791,14 @@ export default function EmergencyPage() {
               </div>
 
               {/* threshold progress */}
-              <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 mb-8">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 mb-8">
                 <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-slate-400">Threshold for legal action</span>
-                  <span className="text-white font-semibold">
+                  <span className="text-slate-900 font-semibold">
                     ${(analysis?.threshold ?? 500000).toLocaleString()}
                   </span>
                 </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-amber-500 rounded-full transition-all duration-700"
                     style={{
@@ -810,7 +810,7 @@ export default function EmergencyPage() {
                   />
                 </div>
                 <div className="text-right mt-1">
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-400">
                     {Math.min(
                       100,
                       Math.round(
@@ -841,7 +841,7 @@ export default function EmergencyPage() {
                 <button
                   disabled={checkoutLoading}
                   onClick={() => handleCheckout('summary_report')}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 disabled:opacity-50 text-slate-900 font-semibold py-3 rounded-lg transition-colors"
                 >
                   {checkoutLoading ? (
                     <Loader2 size={20} className="animate-spin" />
@@ -858,18 +858,18 @@ export default function EmergencyPage() {
           {step === 7 && route === 'URGENT' && (
             <div>
               {/* warning banner */}
-              <div className="bg-amber-900/20 border border-amber-600/30 rounded-xl p-6 mb-8 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
                 <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
-                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-300 mb-2">
+                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
                   Chances reduced but not zero. Act within 24 hours.
                 </h2>
               </div>
 
               {/* emergency pack card */}
-              <div className="bg-slate-900 border border-amber-600/30 rounded-xl p-6 sm:p-8 mb-8">
+              <div className="bg-white border border-amber-200 shadow-sm rounded-xl p-6 sm:p-8 mb-8">
                 <div className="flex items-center gap-3 mb-5">
                   <Shield size={24} className="text-amber-400" />
-                  <h3 className="font-display font-bold text-xl text-white">
+                  <h3 className="font-display font-bold text-xl text-slate-900">
                     Emergency Preservation Pack
                   </h3>
                 </div>
@@ -888,7 +888,7 @@ export default function EmergencyPage() {
                         size={18}
                         className="text-amber-400 flex-shrink-0 mt-0.5"
                       />
-                      <span className="text-slate-300 text-sm">{item}</span>
+                      <span className="text-slate-600 text-sm">{item}</span>
                     </li>
                   ))}
                 </ul>

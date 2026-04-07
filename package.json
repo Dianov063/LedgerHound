@@ -6,9 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "legal:research": "npx tsx scripts/legal-packs/research-agent.ts",
+    "legal:research-all": "npx tsx scripts/legal-packs/research-all.ts",
+    "legal:generate": "npx tsx scripts/legal-packs/template-generator.ts",
+    "legal:generate-all": "npx tsx scripts/legal-packs/generate-all.ts",
+    "legal:validate": "npx tsx scripts/legal-packs/validator-agent.ts",
+    "legal:validate-all": "npx tsx scripts/legal-packs/validate-all.ts",
+    "legal:refresh": "npx tsx scripts/legal-packs/refresh-pipeline.ts",
+    "legal:refresh-all": "npx tsx scripts/legal-packs/refresh-all.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "@aws-sdk/client-s3": "^3.1024.0",
     "@aws-sdk/s3-request-presigner": "^3.1024.0",
     "@react-pdf/renderer": "^4.3.2",
@@ -16,14 +25,17 @@
     "@types/qrcode": "^1.5.6",
     "clsx": "^2.1.1",
     "cytoscape": "^3.33.1",
+    "dotenv": "^17.4.1",
     "lucide-react": "^0.383.0",
     "next": "14.2.5",
     "next-intl": "^3.15.3",
+    "openai": "^6.33.0",
     "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
     "resend": "^6.10.0",
-    "stripe": "^22.0.0"
+    "stripe": "^22.0.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^20",
