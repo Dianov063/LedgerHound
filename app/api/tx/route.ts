@@ -387,8 +387,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ...result, scamWarning });
-  } catch (err: any) {
-    console.error('[tx] Error:', err);
-    return NextResponse.json({ error: err.message || 'Failed to fetch transaction' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch transaction';
+    console.error('[tx] Error:', message);
+    const isNotFound = message.toLowerCase().includes('not found');
+    return NextResponse.json({ error: message }, { status: isNotFound ? 404 : 500 });
   }
 }
