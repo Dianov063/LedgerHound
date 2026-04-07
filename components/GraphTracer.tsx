@@ -98,11 +98,13 @@ const LOADING_STEPS = [
 ];
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type NetworkOrAuto = NetworkType | 'auto';
 
-const PRIMARY_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
+const PRIMARY_NETWORKS: NetworkOrAuto[] = ['auto', 'btc', 'eth', 'sol', 'trx', 'bnb', 'base', 'arb', 'op'];
 const MORE_NETWORKS: NetworkType[] = ['avax', 'polygon', 'linea', 'zksync', 'scroll', 'mantle'];
 
-const NETWORK_DISPLAY_LABELS: Record<NetworkType, string> = {
+const NETWORK_DISPLAY_LABELS: Record<NetworkOrAuto, string> = {
+  auto: 'AUTO',
   btc: 'BTC',
   eth: 'ETH',
   sol: 'SOL',
@@ -214,8 +216,10 @@ function isValidAddress(network: NetworkType, addr: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/i.test(addr);
 }
 
-function getPlaceholder(network: NetworkType): string {
+function getPlaceholder(network: NetworkOrAuto): string {
   switch (network) {
+    case 'auto':
+      return 'Enter any address — network will be auto-detected';
     case 'btc':
       return 'Enter Bitcoin address (1..., 3..., bc1...)';
     case 'sol':
@@ -251,7 +255,7 @@ function shouldPreserveCase(network: NetworkType): boolean {
 export default function GraphTracer() {
   const t = useTranslations('graph');
   const [address, setAddress] = useState('');
-  const [network, setNetwork] = useState<NetworkType>('eth');
+  const [network, setNetwork] = useState<NetworkOrAuto>('auto');
   const [depth, setDepth] = useState(2);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -263,7 +267,7 @@ export default function GraphTracer() {
   const cyRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceAddressRef = useRef<string>('');
-  const networkRef = useRef<NetworkType>('eth');
+  const networkRef = useRef<NetworkOrAuto>('auto');
   const moreDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close "More" dropdown when clicking outside
@@ -476,7 +480,12 @@ export default function GraphTracer() {
   }, [data, layout, initCytoscape]);
 
   const handleTrace = async () => {
-    if (!address || !isValidAddress(network, address)) {
+    // For auto mode, accept any valid address format
+    if (!address) {
+      setError(t('error_invalid'));
+      return;
+    }
+    if (network !== 'auto' && !isValidAddress(network, address)) {
       setError(t('error_invalid'));
       return;
     }
@@ -485,7 +494,7 @@ export default function GraphTracer() {
     setError('');
     setData(null);
     setSelectedNode(null);
-    sourceAddressRef.current = shouldPreserveCase(network) ? address : address.toLowerCase();
+    sourceAddressRef.current = network === 'auto' ? address : (shouldPreserveCase(network) ? address : address.toLowerCase());
     networkRef.current = network;
 
     // Animate loading steps
@@ -502,6 +511,12 @@ export default function GraphTracer() {
 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Trace failed');
+
+      // If auto-detect was used, update network to the detected one
+      if (network === 'auto' && json.detectedNetwork) {
+        setNetwork(json.detectedNetwork);
+        networkRef.current = json.detectedNetwork;
+      }
 
       setLoadingStep(2);
       await new Promise((r) => setTimeout(r, 500));
@@ -538,7 +553,8 @@ export default function GraphTracer() {
     link.click();
   };
 
-  const currentNetwork = networkRef.current;
+  // After auto-detect resolves, networkRef will be set to the actual network
+  const currentNetwork = (networkRef.current === 'auto' ? 'eth' : networkRef.current) as NetworkType;
 
   return (
     <div className="bg-slate-950 min-h-screen">
@@ -566,12 +582,12 @@ export default function GraphTracer() {
               <button
                 onClick={() => setMoreOpen(!moreOpen)}
                 className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                  MORE_NETWORKS.includes(network)
+                  (MORE_NETWORKS as string[]).includes(network)
                     ? 'bg-brand-600 text-white'
                     : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
-                {MORE_NETWORKS.includes(network) ? NETWORK_DISPLAY_LABELS[network] : 'More'}
+                {(MORE_NETWORKS as string[]).includes(network) ? NETWORK_DISPLAY_LABELS[network] : 'More'}
                 <ChevronDown size={12} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
               </button>
               {moreOpen && (

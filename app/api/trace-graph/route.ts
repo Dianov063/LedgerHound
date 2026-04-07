@@ -4,8 +4,9 @@ import { getAddressIndex } from '@/lib/scam-db';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
+type NetworkOrAuto = NetworkType | 'auto';
 
-const VALID_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
+const VALID_NETWORKS: NetworkOrAuto[] = ['auto', 'btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 function getAlchemyKey(): string {
@@ -549,13 +550,47 @@ interface GraphEdge {
   timestamp: string;
 }
 
+// ---- Auto-detect: try EVM chains in parallel, return first with data ----
+
+const AUTO_EVM_ORDER: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op'];
+
+async function autoDetectEVMNetwork(address: string): Promise<NetworkType> {
+  const results = await Promise.allSettled(
+    AUTO_EVM_ORDER.map(async (net) => {
+      const { outgoing, incoming } = await getTransfersForAddress(net, address.toLowerCase());
+      if (outgoing.length === 0 && incoming.length === 0) throw new Error('No data');
+      return net;
+    })
+  );
+  for (const r of results) {
+    if (r.status === 'fulfilled') return r.value;
+  }
+  return 'eth'; // fallback
+}
+
 // ---- Route handler ----
 
 export async function POST(req: NextRequest) {
   try {
     const { address, depth = 1, network = 'eth' } = await req.json();
 
-    const net: NetworkType = VALID_NETWORKS.includes(network) ? network as NetworkType : 'eth';
+    let net: NetworkType;
+    if (network === 'auto') {
+      // For 0x addresses, auto-detect EVM chain; for others, detect by format
+      if (/^0x[a-fA-F0-9]{40}$/i.test(address)) {
+        net = await autoDetectEVMNetwork(address);
+      } else if (/^T[a-zA-Z0-9]{33}$/.test(address)) {
+        net = 'trx';
+      } else if (/^(1|3)[a-zA-Z0-9]{24,33}$/.test(address) || /^bc1[a-zA-Z0-9]{25,62}$/.test(address)) {
+        net = 'btc';
+      } else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+        net = 'sol';
+      } else {
+        net = 'eth';
+      }
+    } else {
+      net = (VALID_NETWORKS.includes(network) ? network : 'eth') as NetworkType;
+    }
 
     if (!address || !isValidAddress(net, address)) {
       return NextResponse.json({ error: `Invalid ${net.toUpperCase()} address` }, { status: 400 });
@@ -695,6 +730,7 @@ export async function POST(req: NextRequest) {
       totalNodes: nodes.size,
       totalEdges: edges.length,
       maxReached: nodes.size >= MAX_NODES,
+      detectedNetwork: net,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Trace failed' }, { status: 500 });
