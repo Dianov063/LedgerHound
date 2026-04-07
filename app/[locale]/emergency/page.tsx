@@ -146,25 +146,21 @@ export default function EmergencyPage() {
   const stepValid = (): boolean => {
     switch (step) {
       case 1:
-        return form.country !== '';
+        return form.country !== '' && form.lossAmount !== '';
       case 2:
-        return form.lossAmount !== '' && form.lossBracket !== '';
-      case 3:
         return form.walletAddress.length >= 10 && form.txDate !== '';
-      case 4:
-        return form.scamType !== '';
-      case 5:
-        return form.description.length >= 100 && form.email.length > 3;
+      case 3:
+        return form.scamType !== '' && form.description.length >= 100 && form.email.length > 3;
       default:
         return true;
     }
   };
 
-  /* ── analysis checklist animation (step 6) ── */
+  /* ── analysis checklist animation (step 4) ── */
   const [visibleChecks, setVisibleChecks] = useState(0);
 
   useEffect(() => {
-    if (step !== 6) return;
+    if (step !== 4) return;
     setVisibleChecks(0);
     const items = 5;
     let count = 0;
@@ -173,7 +169,7 @@ export default function EmergencyPage() {
       setVisibleChecks(count);
       if (count >= items) {
         clearInterval(interval);
-        setTimeout(() => setStep(7), 600);
+        setTimeout(() => setStep(5), 600);
       }
     }, 600);
     return () => clearInterval(interval);
@@ -205,7 +201,7 @@ export default function EmergencyPage() {
       });
     }
     setAnalyzing(false);
-    setStep(6);
+    setStep(4);
   };
 
   /* ── checkout handler ── */
@@ -262,108 +258,230 @@ export default function EmergencyPage() {
   };
 
   /* ── progress bar ── */
-  const progress = Math.round((Math.min(step, 7) / 7) * 100);
+  const totalSteps = 5;
+  const progress = Math.round((Math.min(step, totalSteps) / totalSteps) * 100);
 
   /* ───────── render ───────── */
+  const inputCls = 'w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent';
+
   return (
     <div className="min-h-screen">
       <Navbar />
 
       <div className="pt-28 pb-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* progress bar */}
-          <div className="mb-10">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>Step {Math.min(step, 7)} of 7</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-600 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* ═══════ STEP 1: Country ═══════ */}
-          {step === 1 && (
-            <div>
-              <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                Where are you located?
-              </h2>
-
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                {COUNTRIES.map((c) => (
-                  <button
-                    key={c.code}
-                    onClick={() => set({ country: c.code })}
-                    className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all ${
-                      form.country === c.code
-                        ? 'border-brand-600 bg-brand-600/10'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="text-2xl">{c.flag}</span>
-                    <span className="text-xs text-slate-600 text-center leading-tight">
-                      {c.name}
-                    </span>
-                  </button>
-                ))}
+          {/* progress bar — hidden on step 1 landing */}
+          {step > 1 && (
+            <div className="mb-10">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                <span>Step {Math.min(step, totalSteps)} of {totalSteps}</span>
+                <span>{progress}%</span>
               </div>
-
-              <div className="mt-8 flex justify-end">
-                <button
-                  disabled={!stepValid()}
-                  onClick={() => setStep(2)}
-                  className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-                >
-                  Next <ArrowRight size={16} />
-                </button>
+              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-600 rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
             </div>
           )}
 
-          {/* ═══════ STEP 2: Loss Amount ═══════ */}
+          {/* ═══════ STEP 1: Hero + Country + Amount ═══════ */}
+          {step === 1 && (
+            <div>
+              {/* Hero */}
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-1.5 rounded-full text-sm font-medium mb-5">
+                  <AlertTriangle size={14} />
+                  Time-sensitive — act now
+                </div>
+                <h1 className="font-display font-bold text-3xl sm:text-4xl text-slate-900 mb-3">
+                  Were You Scammed? Act Now.
+                </h1>
+                <p className="text-slate-500 text-lg max-w-xl mx-auto">
+                  Get your Emergency Recovery Pack — ready in 2 minutes
+                </p>
+              </div>
+
+              {/* Value proposition — 3 columns */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+                <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-sm">
+                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <FileText size={20} className="text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Police Report</h3>
+                  <p className="text-xs text-slate-500">Ready-to-file complaint for your country</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-sm">
+                  <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <Shield size={20} className="text-amber-600" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Freeze Request</h3>
+                  <p className="text-xs text-slate-500">Letter to exchange to freeze funds</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-sm">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle2 size={20} className="text-emerald-600" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Action Plan</h3>
+                  <p className="text-xs text-slate-500">Step-by-step recovery instructions</p>
+                </div>
+              </div>
+
+              {/* Compact form */}
+              <div className="max-w-lg mx-auto">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
+                  {/* Country dropdown */}
+                  <div className="mb-5">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Where are you located?
+                    </label>
+                    <select
+                      value={form.country}
+                      onChange={(e) => set({ country: e.target.value })}
+                      className={inputCls}
+                    >
+                      <option value="">Select country...</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      How much did you lose?
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.lossAmount}
+                        onChange={(e) => set({ lossAmount: e.target.value })}
+                        placeholder="0"
+                        className={`${inputCls} pl-8`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">USD</span>
+                    </div>
+                  </div>
+
+                  {/* CTA button */}
+                  <button
+                    disabled={!stepValid()}
+                    onClick={() => setStep(2)}
+                    className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg text-base transition-colors"
+                  >
+                    Analyze My Case <ArrowRight size={16} />
+                  </button>
+                </div>
+
+                {/* Trust bar */}
+                <div className="flex items-center justify-center gap-6 mt-5 text-xs text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <Shield size={12} /> Encrypted
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Zap size={12} /> Instant
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 size={12} /> 500+ helped
+                  </span>
+                </div>
+              </div>
+
+              {/* How It Works */}
+              <div className="mt-14 max-w-lg mx-auto">
+                <h3 className="font-display font-semibold text-lg text-slate-900 text-center mb-6">
+                  How It Works
+                </h3>
+                <div className="space-y-4">
+                  {[
+                    'Enter transaction details',
+                    'We trace where your funds went',
+                    'Get your recovery probability score',
+                    'Download ready-to-use legal documents',
+                  ].map((text, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-bold text-brand-600">{i + 1}</span>
+                      </div>
+                      <span className="text-sm text-slate-600">{text}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-center text-xs text-slate-400 mt-5">
+                  Takes 2 minutes &middot; Documents ready instantly
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════ STEP 2: Transaction Data ═══════ */}
           {step === 2 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                How much did you lose?
+                Enter transaction details
               </h2>
 
-              <div className="mb-6">
-                <label className="block text-sm text-slate-500 mb-2">Amount (USD)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">
+                    Wallet Address{' '}
+                    {form.detectedNetwork && (
+                      <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
+                        {form.detectedNetwork.toUpperCase()} detected
+                      </span>
+                    )}
+                  </label>
                   <input
-                    type="number"
-                    min="0"
-                    value={form.lossAmount}
-                    onChange={(e) => set({ lossAmount: e.target.value })}
-                    placeholder="0"
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg pl-8 pr-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
+                    type="text"
+                    value={form.walletAddress}
+                    onChange={(e) => set({ walletAddress: e.target.value })}
+                    placeholder="0x... or bc1... or T..."
+                    className={`${inputCls} font-mono text-sm`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
+                  <input
+                    type="text"
+                    value={form.txid}
+                    onChange={(e) => set({ txid: e.target.value })}
+                    placeholder="TXID (optional)"
+                    className={`${inputCls} font-mono text-sm`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">
+                    When did this happen? <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={form.txDate}
+                    onChange={(e) => set({ txDate: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-500 mb-2">Platform Name</label>
+                  <input
+                    type="text"
+                    value={form.platformName}
+                    onChange={(e) => set({ platformName: e.target.value })}
+                    placeholder="e.g. CryptoTrade Pro"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                {BRACKETS.map((b) => (
-                  <button
-                    key={b.label}
-                    onClick={() =>
-                      set({ lossBracket: b.label, lossAmount: String(b.mid) })
-                    }
-                    className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                      form.lossBracket === b.label
-                        ? 'border-brand-600 bg-brand-600/10 text-brand-400'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex justify-between">
+              <div className="mt-8 flex justify-between">
                 <button
                   onClick={() => setStep(1)}
                   className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
@@ -381,200 +499,85 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {/* ═══════ STEP 3: Transaction Data ═══════ */}
+          {/* ═══════ STEP 3: Scam Type + Description + Email ═══════ */}
           {step === 3 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                Enter transaction details
+                Tell us what happened
               </h2>
 
-              <div className="space-y-5">
-                {/* wallet address */}
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">
-                    Wallet Address{' '}
-                    {form.detectedNetwork && (
-                      <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
-                        {form.detectedNetwork.toUpperCase()} detected
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    value={form.walletAddress}
-                    onChange={(e) => set({ walletAddress: e.target.value })}
-                    placeholder="0x... or bc1... or T..."
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
-                  />
-                </div>
-
-                {/* txid */}
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
-                  <input
-                    type="text"
-                    value={form.txid}
-                    onChange={(e) => set({ txid: e.target.value })}
-                    placeholder="TXID (optional)"
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent font-mono text-sm"
-                  />
-                </div>
-
-                {/* date */}
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">
-                    When did this happen? <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={form.txDate}
-                    onChange={(e) => set({ txDate: e.target.value })}
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
-                  />
-                </div>
-
-                {/* platform */}
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">Platform Name</label>
-                  <input
-                    type="text"
-                    value={form.platformName}
-                    onChange={(e) => set({ platformName: e.target.value })}
-                    placeholder="e.g. CryptoTrade Pro"
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 flex justify-between">
-                <button
-                  onClick={() => setStep(2)}
-                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
-                >
-                  <ArrowLeft size={16} /> Back
-                </button>
-                <button
-                  disabled={!stepValid()}
-                  onClick={() => setStep(4)}
-                  className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-                >
-                  Next <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ═══════ STEP 4: Scam Type ═══════ */}
-          {step === 4 && (
-            <div>
-              <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                How did this happen?
-              </h2>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {SCAM_TYPES.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => set({ scamType: s.id })}
-                    className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all ${
-                      form.scamType === s.id
-                        ? 'border-brand-600 bg-brand-600/10'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="text-3xl">{s.emoji}</span>
-                    <span className="text-sm text-slate-600 text-center leading-tight">
-                      {s.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-8 flex justify-between">
-                <button
-                  onClick={() => setStep(3)}
-                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
-                >
-                  <ArrowLeft size={16} /> Back
-                </button>
-                <button
-                  disabled={!stepValid()}
-                  onClick={() => setStep(5)}
-                  className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-                >
-                  Next <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ═══════ STEP 5: Description ═══════ */}
-          {step === 5 && (
-            <div>
-              <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                Briefly describe what happened
-              </h2>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">Your description</label>
-                  <textarea
-                    rows={5}
-                    value={form.description}
-                    onChange={(e) => set({ description: e.target.value })}
-                    placeholder="Describe what happened, include any relevant details..."
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
-                  />
-                  <div className="flex justify-end mt-1">
-                    <span
-                      className={`text-xs ${
-                        form.description.length >= 100 ? 'text-emerald-400' : 'text-slate-500'
+              {/* Scam type grid */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-500 mb-3">Type of scam</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {SCAM_TYPES.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => set({ scamType: s.id })}
+                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                        form.scamType === s.id
+                          ? 'border-brand-600 bg-brand-600/10'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      {form.description.length} / 100 min
-                    </span>
-                  </div>
-                </div>
-
-                {/* US-only contact method */}
-                {form.country === 'US' && (
-                  <div>
-                    <label className="block text-sm text-slate-500 mb-2">
-                      How were you contacted?
-                    </label>
-                    <select
-                      value={form.contactMethod}
-                      onChange={(e) => set({ contactMethod: e.target.value })}
-                      className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
-                    >
-                      <option value="">Select...</option>
-                      {CONTACT_METHODS.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* email */}
-                <div>
-                  <label className="block text-sm text-slate-500 mb-2">
-                    Your email <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => set({ email: e.target.value })}
-                    placeholder="you@email.com"
-                    className="w-full bg-white border border-slate-200 shadow-sm rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent"
-                  />
+                      <span className="text-xl">{s.emoji}</span>
+                      <span className="text-xs text-slate-600 leading-tight">{s.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="mt-8 flex justify-between">
+              {/* Description */}
+              <div className="mb-5">
+                <label className="block text-sm text-slate-500 mb-2">Describe what happened</label>
+                <textarea
+                  rows={4}
+                  value={form.description}
+                  onChange={(e) => set({ description: e.target.value })}
+                  placeholder="Describe what happened, include any relevant details..."
+                  className={`${inputCls} resize-none`}
+                />
+                <div className="flex justify-end mt-1">
+                  <span className={`text-xs ${form.description.length >= 100 ? 'text-emerald-500' : 'text-slate-400'}`}>
+                    {form.description.length} / 100 min
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact method — US only */}
+              {form.country === 'US' && (
+                <div className="mb-5">
+                  <label className="block text-sm text-slate-500 mb-2">How were you contacted?</label>
+                  <select
+                    value={form.contactMethod}
+                    onChange={(e) => set({ contactMethod: e.target.value })}
+                    className={inputCls}
+                  >
+                    <option value="">Select...</option>
+                    {CONTACT_METHODS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Email */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-500 mb-2">
+                  Your email <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => set({ email: e.target.value })}
+                  placeholder="you@email.com"
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="flex justify-between">
                 <button
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(2)}
                   className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
@@ -590,7 +593,7 @@ export default function EmergencyPage() {
                     </>
                   ) : (
                     <>
-                      <Search size={16} /> Analyze
+                      <Search size={16} /> Analyze My Case
                     </>
                   )}
                 </button>
@@ -598,8 +601,8 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {/* ═══════ STEP 6: Animated Analysis ═══════ */}
-          {step === 6 && (
+          {/* ═══════ STEP 4: Animated Analysis ═══════ */}
+          {step === 4 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-10 text-center">
                 Analyzing your case...
@@ -631,8 +634,8 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {/* ═══════ STEP 7: Results ═══════ */}
-          {step === 7 && route === 'EMERGENCY' && (
+          {/* ═══════ STEP 5: Results ═══════ */}
+          {step === 5 && route === 'EMERGENCY' && (
             <div>
               {/* urgent banner */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8 text-center">
@@ -746,7 +749,7 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {step === 7 && route === 'AGGREGATOR' && (
+          {step === 5 && route === 'AGGREGATOR' && (
             <div>
               {/* header */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
@@ -775,7 +778,7 @@ export default function EmergencyPage() {
                   <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
                     Victims in Group
                   </span>
-                  <span className="text-white font-semibold text-lg">
+                  <span className="text-slate-900 font-semibold text-lg">
                     {analysis?.victimCount ?? 0}
                   </span>
                 </div>
@@ -784,7 +787,7 @@ export default function EmergencyPage() {
                   <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
                     Total Losses
                   </span>
-                  <span className="text-white font-semibold text-lg">
+                  <span className="text-slate-900 font-semibold text-lg">
                     ${(analysis?.totalLoss ?? 0).toLocaleString()}
                   </span>
                 </div>
@@ -855,7 +858,7 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {step === 7 && route === 'URGENT' && (
+          {step === 5 && route === 'URGENT' && (
             <div>
               {/* warning banner */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
