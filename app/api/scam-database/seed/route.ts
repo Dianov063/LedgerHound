@@ -6,14 +6,15 @@ export const maxDuration = 60 // seconds — prevent Vercel 10s timeout
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const password = searchParams.get('password')
+  const force = searchParams.get('force') === 'true'
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    console.log('[seed/route] GET seed called')
-    await seedDatabase()
+    console.log('[seed/route] GET seed called, force:', force)
+    await seedDatabase(force)
 
     // Return verification data
     const index = await getPlatformIndex()
@@ -58,14 +59,17 @@ export async function DELETE(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let password: string | null = null
+  let force = false
 
   try {
     const body = await request.json()
     password = body.password
+    force = body.force === true
   } catch {
     // If body parsing fails, check query params
     const { searchParams } = new URL(request.url)
     password = searchParams.get('password')
+    force = searchParams.get('force') === 'true'
   }
 
   if (password !== process.env.ADMIN_PASSWORD) {
@@ -73,8 +77,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.log('[seed/route] POST seed called')
-    await seedDatabase()
+    console.log('[seed/route] POST seed called, force:', force)
+    await seedDatabase(force)
 
     const index = await getPlatformIndex()
     const stats = await getStats()

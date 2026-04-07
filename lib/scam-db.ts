@@ -538,14 +538,14 @@ export function calcRecoveryScore(report: {
 /* Optimized: builds everything in memory first, then writes to S3 in
    parallel batches. Total S3 writes ≈ 12 (10 platforms + index + stats)
    instead of ~70 sequential reads+writes.                              */
-export async function seedDatabase(): Promise<void> {
+export async function seedDatabase(force = false): Promise<void> {
   console.log('[seed] Starting seed...');
   console.log('[seed] Bucket:', bucket(), 'Region:', process.env.AWS_REGION || 'eu-central-1');
 
-  // Check if already seeded
+  // Check if already seeded (skip unless force=true)
   const existing = await getPlatformIndex();
-  if (existing.length >= 10) {
-    console.log('[seed] Database already seeded with', existing.length, 'platforms, skipping');
+  if (!force && existing.length >= 10) {
+    console.log('[seed] Database already seeded with', existing.length, 'platforms, skipping (use force=true to re-seed)');
     return;
   }
 
