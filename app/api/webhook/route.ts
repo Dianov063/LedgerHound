@@ -108,7 +108,40 @@ export async function POST(request: Request) {
 
         console.log('[webhook] Generating Emergency Pack — case:', caseId, 'country:', country, 'lossAmount:', lossAmount);
 
-        // 1. Generate 4 legal PDFs (police complaint, preservation letter, regulator complaint, action guide)
+        // 1. Generate Forensic Report FIRST to get enrichment data
+        let enrichment: any = {};
+        if (walletAddress) {
+          try {
+            const paymentId = session.payment_intent || session.id || '';
+            const reportResult = await generateReport(walletAddress, email, {
+              stripePaymentId: paymentId,
+              amount: session.amount_total || 7900,
+              network: detectedNetwork,
+            });
+            console.log('[webhook] Forensic Report generated, caseId:', reportResult.caseId);
+
+            // Extract enrichment data for legal pack
+            const exchanges = (reportResult.identifiedEntities || []).filter((e: any) => e.type === 'exchange');
+            enrichment = {
+              forensicCaseId: reportResult.caseId,
+              riskScore: reportResult.riskScore,
+              recoveryScore: reportResult.recoveryScore,
+              recoveryLabel: reportResult.recoveryLabel,
+              identifiedExchanges: exchanges.map((e: any) => ({
+                name: e.label,
+                address: e.address,
+              })),
+              mixerDetected: (reportResult.identifiedEntities || []).some((e: any) => e.type === 'mixer'),
+              ofacWarning: reportResult.ofacWarning,
+              hops: reportResult.graphData?.nodes?.length || 0,
+              keyFindings: reportResult.keyFindings || [],
+            };
+          } catch (err) {
+            console.error('[webhook] Forensic Report failed, continuing with legal pack:', err);
+          }
+        }
+
+        // 2. Generate Emergency Pack with enrichment
         const packResult = await generateEmergencyPack({
           caseId,
           countryCode: country,
@@ -123,19 +156,9 @@ export async function POST(request: Request) {
           platformName,
           network: detectedNetwork,
           contactMethod,
+          enrichment,
         });
         console.log('[webhook] Emergency Pack generated:', packResult.templates?.length, 'templates');
-
-        // 2. Also generate Forensic Report if wallet address provided
-        if (walletAddress) {
-          const paymentId = session.payment_intent || session.id || '';
-          const reportResult = await generateReport(walletAddress, email, {
-            stripePaymentId: paymentId,
-            amount: session.amount_total || 7900,
-            network: detectedNetwork,
-          });
-          console.log('[webhook] Forensic Report also generated, caseId:', reportResult.caseId);
-        }
 
       } else if (product === 'summary_report') {
         /* ── Summary Report: just the Forensic Report ── */

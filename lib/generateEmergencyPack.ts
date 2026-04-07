@@ -25,13 +25,6 @@ const getS3 = () =>
 const bucket = () => process.env.AWS_S3_BUCKET!;
 const PREFIX = 'legal-packs';
 
-const TEMPLATE_TYPES: TemplateType[] = [
-  'police-complaint',
-  'preservation-letter',
-  'regulator-complaint',
-  'action-guide',
-];
-
 const TEMPLATE_LABELS: Record<TemplateType, string> = {
   'police-complaint': 'Police Complaint',
   'preservation-letter': 'Preservation Letter',
@@ -81,6 +74,18 @@ async function getPresignedUrl(key: string): Promise<string> {
   return getSignedUrl(getS3(), command, { expiresIn: 86400 }); // 24 hours
 }
 
+export interface EnrichmentData {
+  forensicCaseId?: string;
+  riskScore?: number;
+  recoveryScore?: number;
+  recoveryLabel?: string;
+  identifiedExchanges?: { name: string; address: string }[];
+  mixerDetected?: boolean;
+  ofacWarning?: boolean;
+  hops?: number;
+  keyFindings?: string[];
+}
+
 export interface GeneratePackInput {
   caseId: string;
   countryCode: string;
@@ -95,6 +100,7 @@ export interface GeneratePackInput {
   platformName?: string;
   network?: string;
   contactMethod?: string;
+  enrichment?: EnrichmentData;
 }
 
 export interface GeneratePackResult {
@@ -172,6 +178,14 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     daysOld <= 90 ? '30-60 days for legal proceedings' :
     '90+ days — focus on law enforcement';
 
+  // Use enrichment from Forensic Report if available, fallback to self-calculated
+  const enrichment = input.enrichment || {};
+  const finalRecoveryScore = enrichment.recoveryScore ?? recovery.score;
+  const finalRiskScore = enrichment.riskScore ?? recovery.score;
+  const identifiedExchanges = enrichment.identifiedExchanges || [];
+  const mixerDetected = enrichment.mixerDetected ?? false;
+  const hops = enrichment.hops ?? 0;
+
   // Build CaseData
   const caseData: CaseData = {
     caseId,
@@ -191,30 +205,67 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     description: description || '',
     contactMethod: contactMethod || '',
     // Recovery analysis fields
-    recoveryScore: recovery.score,
+    recoveryScore: finalRecoveryScore,
     riskLevel,
     urgencyLevel,
     timeWindow,
     daysOld,
+    hops,
+    detectedExchange: identifiedExchanges.map(e => e.name).join(', '),
+    exchangeSupportsLE: identifiedExchanges.length > 0,
+    mixerDetected,
   };
 
-  // Render all 4 template PDFs
+  // Render template PDFs
   const templates: { type: TemplateType; label: string; key: string; url: string }[] = [];
 
-  for (const templateType of TEMPLATE_TYPES) {
+  // Standard templates (always generated)
+  const STANDARD_TEMPLATES: TemplateType[] = ['police-complaint', 'regulator-complaint', 'action-guide'];
+
+  for (const templateType of STANDARD_TEMPLATES) {
     const doc = getDocumentElement(templateType, research, caseData);
     const buffer = await renderToBuffer(doc);
     const pdfBuffer = Buffer.from(buffer);
-
     const key = await saveCasePdf(caseId, templateType, pdfBuffer);
     const url = await getPresignedUrl(key);
+    templates.push({ type: templateType, label: TEMPLATE_LABELS[templateType], key, url });
+  }
 
-    templates.push({
-      type: templateType,
-      label: TEMPLATE_LABELS[templateType],
-      key,
-      url,
-    });
+  // Preservation Letters — one per identified exchange + one generic
+  if (identifiedExchanges.length > 0) {
+    for (const exchange of identifiedExchanges) {
+      // Look up compliance email from research data
+      const exchangeContact = research.exchangeContacts?.find(
+        (c) => c.name.toLowerCase() === exchange.name.toLowerCase()
+      );
+      const exchangeData = {
+        name: exchange.name,
+        address: exchange.address,
+        complianceEmail: exchangeContact?.complianceEmail || `compliance@${exchange.name.toLowerCase().replace(/\s+/g, '')}.com`,
+        lawEnforcementPortal: exchangeContact?.lawEnforcementPortal || '',
+      };
+      const exchangeCaseData = { ...caseData, exchange: exchange.name, exchangeAddress: exchange.address, exchangeEmail: exchangeData.complianceEmail };
+      const doc = getDocumentElement('preservation-letter', research, exchangeCaseData);
+      const buffer = await renderToBuffer(doc);
+      const pdfBuffer = Buffer.from(buffer);
+      const slug = exchange.name.toLowerCase().replace(/\s+/g, '-');
+      const key = await saveCasePdf(caseId, `preservation-letter-${slug}`, pdfBuffer);
+      const url = await getPresignedUrl(key);
+      templates.push({
+        type: 'preservation-letter' as TemplateType,
+        label: `Preservation Letter — ${exchange.name}`,
+        key,
+        url,
+      });
+    }
+  } else {
+    // Generic preservation letter if no exchanges identified
+    const doc = getDocumentElement('preservation-letter', research, caseData);
+    const buffer = await renderToBuffer(doc);
+    const pdfBuffer = Buffer.from(buffer);
+    const key = await saveCasePdf(caseId, 'preservation-letter', pdfBuffer);
+    const url = await getPresignedUrl(key);
+    templates.push({ type: 'preservation-letter' as TemplateType, label: 'Preservation Letter', key, url });
   }
 
   // Send email with download links

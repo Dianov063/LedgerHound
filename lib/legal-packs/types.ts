@@ -110,6 +110,8 @@ export interface CaseData {
   exchangeSupportsLE?: boolean;
   mixerDetected?: boolean;
   finalDestination?: string;
+  exchangeAddress?: string;
+  exchangeEmail?: string;
 }
 
 export type TemplateType = 'police-complaint' | 'preservation-letter' | 'regulator-complaint' | 'action-guide';
