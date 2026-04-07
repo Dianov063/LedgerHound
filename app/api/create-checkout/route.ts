@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import logger from '@/lib/logger';
 
 const getStripe = () => {
   // @ts-expect-error Stripe types mismatch with ESM default import
@@ -30,7 +31,9 @@ const ADDRESS_VALIDATORS: Record<string, RegExp> = {
   polygon: /^0x[a-fA-F0-9]{40}$/,
 };
 
+const RATE_LIMIT_WINDOW = 3600000;
 const rateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
       }
       entry.count++;
     } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
     const { walletAddress, email, network = 'eth' } = await req.json();
@@ -93,11 +96,11 @@ export async function POST(req: NextRequest) {
       cancel_url: `${req.nextUrl.origin}/report`,
     });
 
-    console.log(`[checkout] Session created for ${net}: ${session.id}`);
+    logger.info({ network: net, sessionId: session.id }, '[checkout] Session created');
 
     return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    console.error('Checkout error:', err);
-    return NextResponse.json({ error: err.message || 'Failed to create checkout' }, { status: 500 });
+  } catch (err: unknown) {
+    logger.error({ err }, '[checkout] Error');
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to create checkout' }, { status: 500 });
   }
 }

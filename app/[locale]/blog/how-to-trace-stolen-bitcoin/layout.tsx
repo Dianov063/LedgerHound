@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/blog/how-to-trace-stolen-bitcoin',
-    title: "How to Trace Stolen Bitcoin: Complete Guide | LedgerHound",
-    description: "Step-by-step guide on tracing stolen Bitcoin using blockchain forensics. Learn how investigators follow the money across the Bitcoin network.",
+    title: "How to Trace Stolen Bitcoin | LedgerHound",
+    description: "Step-by-step guide to tracing stolen Bitcoin using blockchain forensics.",
     keywords: ["trace stolen bitcoin","bitcoin tracing guide","stolen crypto recovery"],
   });
 }

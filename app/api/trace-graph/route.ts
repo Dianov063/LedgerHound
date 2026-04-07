@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { getAddressIndex } from '@/lib/scam-db';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
 const VALID_NETWORKS: NetworkType[] = ['btc', 'eth', 'sol', 'trx', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 const EVM_NETWORKS: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
-const ALCHEMY_ETH_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
-const ALCHEMY_POLYGON_URL = 'https://polygon-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+function getAlchemyKey(): string {
+  const key = process.env.ALCHEMY_API_KEY;
+  if (!key) throw new Error('ALCHEMY_API_KEY not configured');
+  return key;
+}
+
+const getAlchemyEthUrl = () => `https://eth-mainnet.g.alchemy.com/v2/${getAlchemyKey()}`;
+const getAlchemyPolygonUrl = () => `https://polygon-mainnet.g.alchemy.com/v2/${getAlchemyKey()}`;
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   // Binance
@@ -153,7 +160,7 @@ function isValidAddress(network: NetworkType, addr: string): boolean {
 // ---- Alchemy-based fetching (ETH / Polygon) ----
 
 async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
-  const res = await fetch(alchemyUrl, {
+  const res = await fetchWithTimeout(alchemyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] }),
@@ -199,8 +206,8 @@ async function fetchTronGraphTransfers(address: string) {
   if (apiKey) headers['TRON-PRO-API-KEY'] = apiKey;
 
   const [trxRes, trc20Res] = await Promise.all([
-    fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions?limit=200&only_confirmed=true`, { headers }),
-    fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=200&only_confirmed=true`, { headers }),
+    fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${address}/transactions?limit=200&only_confirmed=true`, { headers }),
+    fetchWithTimeout(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=200&only_confirmed=true`, { headers }),
   ]);
 
   const trxJson = await trxRes.json();
@@ -291,10 +298,10 @@ function tronHexToBase58(hex: string): string {
 }
 
 // ---- BSC fetching via Alchemy (BSCScan V1 deprecated, V2 needs paid plan) ----
-const ALCHEMY_BNB_URL = 'https://bnb-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+const getAlchemyBnbUrl = () => `https://bnb-mainnet.g.alchemy.com/v2/${getAlchemyKey()}`;
 
 async function fetchBscGraphTransfers(address: string) {
-  return getAlchemyTransfersForAddress(ALCHEMY_BNB_URL, address);
+  return getAlchemyTransfersForAddress(getAlchemyBnbUrl(), address);
 }
 
 // ---- Bitcoin fetching via Blockstream ----
@@ -304,7 +311,7 @@ async function fetchBtcGraphTransfers(address: string) {
   const incoming: any[] = [];
 
   try {
-    const res = await fetch(`https://blockstream.info/api/address/${address}/txs`);
+    const res = await fetchWithTimeout(`https://blockstream.info/api/address/${address}/txs`);
     if (!res.ok) return { outgoing, incoming };
     const txs: any[] = await res.json();
 
@@ -374,7 +381,7 @@ async function fetchSolGraphTransfers(address: string) {
 
   try {
     // Get recent signatures
-    const sigRes = await fetch(rpcUrl, {
+    const sigRes = await fetchWithTimeout(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignaturesForAddress', params: [address, { limit: 30 }] }),
@@ -384,7 +391,7 @@ async function fetchSolGraphTransfers(address: string) {
 
     for (const sig of sigs.slice(0, 20)) {
       try {
-        const txRes = await fetch(rpcUrl, {
+        const txRes = await fetchWithTimeout(rpcUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }] }),
@@ -449,10 +456,7 @@ async function fetchChainExplorerGraphTransfers(address: string, network: Networ
 
     const fetchSafe = async (url: string) => {
       try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 15000);
-        const res = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
-        clearTimeout(t);
+        const res = await fetchWithTimeout(url, { redirect: 'follow' }, 15000);
         return await res.json();
       } catch { return { status: '0', result: [] }; }
     };
@@ -507,11 +511,11 @@ async function getTransfersForAddress(network: NetworkType, address: string) {
     case 'btc':
       return fetchBtcGraphTransfers(address);
     case 'eth':
-      return getAlchemyTransfersForAddress(ALCHEMY_ETH_URL, address);
+      return getAlchemyTransfersForAddress(getAlchemyEthUrl(), address);
     case 'sol':
       return fetchSolGraphTransfers(address);
     case 'polygon':
-      return getAlchemyTransfersForAddress(ALCHEMY_POLYGON_URL, address);
+      return getAlchemyTransfersForAddress(getAlchemyPolygonUrl(), address);
     case 'trx':
       return fetchTronGraphTransfers(address);
     case 'bnb':

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import logger from '@/lib/logger';
 
 const getS3 = () =>
   new S3Client({
@@ -22,7 +23,9 @@ const getStripe = () => {
 };
 
 /* ── Rate limiter: 5/hour per IP ── */
+const RATE_LIMIT_WINDOW = 3600000;
 const rateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
 
 /* ── Product definitions ── */
 const PRODUCTS = {
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
       }
       entry.count++;
     } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
     /* ── Parse body ── */
@@ -138,10 +141,10 @@ export async function POST(req: NextRequest) {
           ServerSideEncryption: 'aws:kms',
         }),
       );
-      console.log(`[emergency/checkout] Case data saved to S3 for ${caseId}`);
-    } catch (s3Err: any) {
-      console.error('[emergency/checkout] Failed to save case data to S3:', s3Err.message);
-      // Continue with checkout — data loss is better than blocking payment
+      logger.info({ caseId }, '[emergency/checkout] Case data saved to S3');
+    } catch (s3Err: unknown) {
+      logger.error({ err: s3Err }, '[emergency/checkout] Failed to save case data to S3');
+      return NextResponse.json({ error: 'Unable to save case data. Please try again.' }, { status: 500 });
     }
 
     /* ── Create Stripe checkout session ── */
@@ -179,13 +182,13 @@ export async function POST(req: NextRequest) {
       cancel_url: `${req.nextUrl.origin}/emergency`,
     });
 
-    console.log(`[emergency/checkout] Session created: ${session.id} for case ${caseId}, product ${product}`);
+    logger.info({ sessionId: session.id, caseId, product }, '[emergency/checkout] Session created');
 
     return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    console.error('[emergency/checkout] Error:', err);
+  } catch (err: unknown) {
+    logger.error({ err }, '[emergency/checkout] Error');
     return NextResponse.json(
-      { error: err.message || 'Failed to create checkout session' },
+      { error: err instanceof Error ? err.message : 'Failed to create checkout session' },
       { status: 500 },
     );
   }

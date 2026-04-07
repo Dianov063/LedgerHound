@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/blog/pig-butchering-scam-recovery',
-    title: "Pig Butchering Scam Recovery: What Victims Can Do | LedgerHound",
-    description: "Comprehensive guide for pig butchering scam victims. Learn how blockchain forensics can help trace stolen cryptocurrency and support recovery efforts.",
+    title: "Pig Butchering Scam Recovery Guide | LedgerHound",
+    description: "Complete guide to recovering from pig butchering cryptocurrency scams.",
     keywords: ["pig butchering scam recovery","romance scam crypto","pig butchering help"],
   });
 }

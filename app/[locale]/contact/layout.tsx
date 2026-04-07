@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/contact',
-    title: "Contact LedgerHound | Blockchain Forensics Consultation",
-    description: "Contact our blockchain forensics team for a free case evaluation. We respond within 24 hours.",
+    title: "Contact Us | LedgerHound",
+    description: "Get in touch with LedgerHound for crypto fraud recovery assistance.",
     keywords: ["contact ledgerhound","crypto investigation contact"],
   });
 }

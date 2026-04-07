@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { fetchBtcTransfers } from '@/lib/bitcoin-tracker';
 import { fetchSolTransfers } from '@/lib/solana-tracker';
 import { fetchTronTransfers } from '@/lib/tron-tracker';
@@ -25,11 +26,20 @@ const NATIVE_CURRENCY: Record<Network, string> = {
   mantle: 'MNT',
 };
 
-const ALCHEMY_URLS: Record<'eth' | 'polygon' | 'bnb', string> = {
-  eth: 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ',
-  polygon: 'https://polygon-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ',
-  bnb: 'https://bnb-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ',
-};
+function getAlchemyKey(): string {
+  const key = process.env.ALCHEMY_API_KEY;
+  if (!key) throw new Error('ALCHEMY_API_KEY not configured');
+  return key;
+}
+
+function getAlchemyUrls(): Record<'eth' | 'polygon' | 'bnb', string> {
+  const key = getAlchemyKey();
+  return {
+    eth: `https://eth-mainnet.g.alchemy.com/v2/${key}`,
+    polygon: `https://polygon-mainnet.g.alchemy.com/v2/${key}`,
+    bnb: `https://bnb-mainnet.g.alchemy.com/v2/${key}`,
+  };
+}
 
 const ADDRESS_PATTERNS: Record<Network, RegExp> = {
   btc: /^(1|3)[a-zA-Z0-9]{24,33}$|^bc1[a-zA-Z0-9]{25,62}$/,
@@ -51,7 +61,7 @@ const ADDRESS_PATTERNS: Record<Network, RegExp> = {
 const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
 async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
-  const res = await fetch(alchemyUrl, {
+  const res = await fetchWithTimeout(alchemyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -96,23 +106,39 @@ async function fetchTransfersForNetwork(
 ): Promise<any[]> {
   switch (network) {
     case 'btc': {
-      const results = await Promise.all(addresses.map((a) => fetchBtcTransfers(a)));
-      return results.flatMap((r) => r.transfers);
+      const settled = await Promise.allSettled(addresses.map((a) => fetchBtcTransfers(a)));
+      const failed = settled.filter(r => r.status === 'rejected');
+      if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} BTC address fetches failed`);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchBtcTransfers>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value.transfers);
     }
     case 'eth':
     case 'polygon':
     case 'bnb': {
-      const url = ALCHEMY_URLS[network];
-      const results = await Promise.all(addresses.map((a) => fetchAlchemyForAddress(a, url, network)));
-      return results.flat();
+      const url = getAlchemyUrls()[network];
+      const settled = await Promise.allSettled(addresses.map((a) => fetchAlchemyForAddress(a, url, network)));
+      const failed = settled.filter(r => r.status === 'rejected');
+      if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} ${network} address fetches failed`);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchAlchemyForAddress>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value);
     }
     case 'sol': {
-      const results = await Promise.all(addresses.map((a) => fetchSolTransfers(a)));
-      return results.flatMap((r) => r.transfers);
+      const settled = await Promise.allSettled(addresses.map((a) => fetchSolTransfers(a)));
+      const failed = settled.filter(r => r.status === 'rejected');
+      if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} SOL address fetches failed`);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchSolTransfers>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value.transfers);
     }
     case 'trx': {
-      const results = await Promise.all(addresses.map((a) => fetchTronTransfers(a)));
-      return results.flatMap((r) => r.transfers);
+      const settled = await Promise.allSettled(addresses.map((a) => fetchTronTransfers(a)));
+      const failed = settled.filter(r => r.status === 'rejected');
+      if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} TRX address fetches failed`);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchTronTransfers>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value.transfers);
     }
     case 'base':
     case 'arb':
@@ -122,8 +148,12 @@ async function fetchTransfersForNetwork(
     case 'zksync':
     case 'scroll':
     case 'mantle': {
-      const results = await Promise.all(addresses.map((a) => fetchEtherscanV2Transfers(a, network)));
-      return results.flatMap((r) => r.transfers);
+      const settled = await Promise.allSettled(addresses.map((a) => fetchEtherscanV2Transfers(a, network)));
+      const failed = settled.filter(r => r.status === 'rejected');
+      if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} ${network} address fetches failed`);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchEtherscanV2Transfers>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value.transfers);
     }
     default:
       throw new Error(`Unsupported network: ${network}`);

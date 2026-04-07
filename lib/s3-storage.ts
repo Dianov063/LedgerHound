@@ -26,6 +26,7 @@ export async function uploadReport(pdfBuffer: Buffer, caseId: string): Promise<s
       Key: key,
       Body: pdfBuffer,
       ContentType: 'application/pdf',
+      ServerSideEncryption: 'aws:kms',
       Metadata: { caseid: caseId },
     }),
   );

@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/free-evaluation',
-    title: "Free Case Evaluation | Crypto Recovery Assessment | LedgerHound",
-    description: "Get a free evaluation of your cryptocurrency recovery case. Our blockchain forensics experts assess traceability, recovery potential, and next steps.",
+    title: "Free Case Evaluation | LedgerHound",
+    description: "Get a free evaluation of your cryptocurrency fraud case.",
     keywords: ["free crypto recovery evaluation","crypto case assessment"],
   });
 }

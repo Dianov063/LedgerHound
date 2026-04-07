@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { fetchWithTimeout } from './fetch-timeout';
 
 const TRONGRID_BASE = 'https://api.trongrid.io';
 
@@ -73,7 +74,7 @@ export async function fetchTronTransfers(address: string): Promise<{
   // Fetch TRX native transfers
   const trxUrl = `${TRONGRID_BASE}/v1/accounts/${address}/transactions?limit=200&only_confirmed=true`;
   console.log(`[tron-tracker] Fetching TRX: ${trxUrl}`);
-  const trxRes = await fetch(trxUrl, { headers });
+  const trxRes = await fetchWithTimeout(trxUrl, { headers });
   let trxData: any = {};
   if (trxRes.ok) {
     trxData = await trxRes.json();
@@ -86,7 +87,7 @@ export async function fetchTronTransfers(address: string): Promise<{
   // Fetch TRC20 token transfers
   const trc20Url = `${TRONGRID_BASE}/v1/accounts/${address}/transactions/trc20?limit=200&only_confirmed=true`;
   console.log(`[tron-tracker] Fetching TRC20: ${trc20Url}`);
-  const trc20Res = await fetch(trc20Url, { headers });
+  const trc20Res = await fetchWithTimeout(trc20Url, { headers });
   let trc20Data: any = {};
   if (trc20Res.ok) {
     trc20Data = await trc20Res.json();

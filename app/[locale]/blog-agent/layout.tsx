@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/blog-agent',
-    title: 'Blog Agent | LedgerHound',
-    description: 'Internal blog generation tool.',
+    title: 'Blog | LedgerHound',
+    description: 'Latest insights on cryptocurrency fraud recovery and blockchain forensics.',
     noIndex: true,
   });
 }

@@ -62,6 +62,7 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
 
 export default function BlogPage() {
   const t = useTranslations('blog');
+  const tp = useTranslations('blog_page');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 
@@ -108,11 +109,11 @@ export default function BlogPage() {
       {/* Newsletter */}
       <section className="py-16 bg-slate-50 border-t border-slate-100">
         <div className="max-w-xl mx-auto px-4 text-center">
-          <h2 className="font-display font-bold text-2xl text-slate-900 mb-3">Stay Updated on Crypto Fraud</h2>
-          <p className="text-slate-600 text-sm mb-6">Get our latest guides, case studies, and fraud alerts delivered to your inbox. No spam, unsubscribe anytime.</p>
+          <h2 className="font-display font-bold text-2xl text-slate-900 mb-3">{tp('newsletter_title')}</h2>
+          <p className="text-slate-600 text-sm mb-6">{tp('newsletter_desc')}</p>
           <div className="flex gap-3">
-            <input type="email" placeholder="Your email address" className="input flex-1" />
-            <button className="btn-primary whitespace-nowrap">Subscribe</button>
+            <input type="email" placeholder={tp('newsletter_placeholder')} className="input flex-1" />
+            <button className="btn-primary whitespace-nowrap">{tp('newsletter_btn')}</button>
           </div>
         </div>
       </section>

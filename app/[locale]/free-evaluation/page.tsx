@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -11,6 +11,7 @@ const WEB3FORMS_KEY = '823f6807-8207-4f91-8d04-113c27f0b7e0';
 
 export default function FreeEvaluationPage() {
   const locale = useLocale();
+  const t = useTranslations('evaluation_page');
   const base = locale === 'en' ? '' : `/${locale}`;
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
@@ -40,10 +41,10 @@ export default function FreeEvaluationPage() {
   }
 
   const whatHappens = [
-    { step: '1', title: 'Submit Your Information', desc: 'Fill out the form with your wallet address, transaction details, and a brief description of what happened.' },
-    { step: '2', title: 'We Review Your Case', desc: 'A certified investigator reviews your submission within 24 hours and assesses traceability.' },
-    { step: '3', title: 'You Get an Honest Assessment', desc: 'We contact you with a clear evaluation: what we can find, how long it takes, and what it costs.' },
-    { step: '4', title: 'You Decide', desc: 'No pressure. You decide if you want to proceed. If not — you paid nothing.' },
+    { step: '1', title: t('step1_title'), desc: t('step1_desc') },
+    { step: '2', title: t('step2_title'), desc: t('step2_desc') },
+    { step: '3', title: t('step3_title'), desc: t('step3_desc') },
+    { step: '4', title: t('step4_title'), desc: t('step4_desc') },
   ];
 
   return (
@@ -56,12 +57,12 @@ export default function FreeEvaluationPage() {
 
             {/* Left - Info */}
             <div className="pt-4">
-              <p className="section-tag">Free · No Obligation · Confidential</p>
+              <p className="section-tag">{t('tag')}</p>
               <h1 className="font-display font-bold text-4xl lg:text-5xl text-slate-900 leading-tight mb-5">
-                Free Case<br /><span className="text-brand-600">Evaluation</span>
+                {t('title_line1')}<br /><span className="text-brand-600">{t('title_line2')}</span>
               </h1>
               <p className="text-lg text-slate-600 leading-relaxed mb-8">
-                Tell us what happened. We'll tell you if your funds are traceable, what evidence we can build, and exactly what it will cost — within 24 hours.
+                {t('subtitle')}
               </p>
 
               <div className="space-y-4 mb-8">
@@ -80,10 +81,10 @@ export default function FreeEvaluationPage() {
 
               <div className="bg-white border border-slate-100 rounded-2xl p-5 space-y-3">
                 {[
-                  { icon: Lock, text: 'Completely confidential — your information is never shared' },
-                  { icon: Shield, text: 'No obligation — you decide if you want to proceed' },
-                  { icon: Clock, text: 'Response within 24 hours — often sooner' },
-                  { icon: CheckCircle2, text: 'Honest assessment — we\'ll tell you if we can\'t help' },
+                  { icon: Lock, text: t('guarantee_confidential') },
+                  { icon: Shield, text: t('guarantee_no_obligation') },
+                  { icon: Clock, text: t('guarantee_response') },
+                  { icon: CheckCircle2, text: t('guarantee_honest') },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-3 text-sm text-slate-700">
                     <Icon size={15} className="text-brand-600 flex-shrink-0" />
@@ -94,7 +95,7 @@ export default function FreeEvaluationPage() {
 
               <div className="mt-6 flex items-center gap-3 text-sm text-slate-500">
                 <Phone size={14} className="text-brand-500" />
-                <span>Prefer to call?</span>
+                <span>{t('prefer_call')}</span>
                 <a href="tel:+18335591334" className="text-brand-600 font-semibold hover:underline">+1 (833) 559-1334</a>
                 <span className="text-slate-300">·</span>
                 <span className="text-brand-600 font-semibold">Говорим по-русски</span>
@@ -103,17 +104,17 @@ export default function FreeEvaluationPage() {
 
             {/* Right - Form */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-6 sm:p-8">
-              <h2 className="font-display font-bold text-2xl text-slate-900 mb-1">Submit Your Case</h2>
-              <p className="text-sm text-slate-500 mb-6">Fields marked with * are required</p>
+              <h2 className="font-display font-bold text-2xl text-slate-900 mb-1">{t('form_title')}</h2>
+              <p className="text-sm text-slate-500 mb-6">{t('form_required_note')}</p>
 
               {status === 'success' ? (
                 <div className="text-center py-12">
                   <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
-                  <h3 className="font-display font-bold text-xl text-slate-900 mb-2">Case Submitted!</h3>
-                  <p className="text-slate-600 text-sm mb-2">A certified investigator will review your case and contact you within 24 hours.</p>
-                  <p className="text-slate-400 text-xs mb-6">Check your email (including spam folder) for our response.</p>
+                  <h3 className="font-display font-bold text-xl text-slate-900 mb-2">{t('success_title')}</h3>
+                  <p className="text-slate-600 text-sm mb-2">{t('success_desc')}</p>
+                  <p className="text-slate-400 text-xs mb-6">{t('success_check_email')}</p>
                   <button onClick={() => setStatus('idle')} className="text-brand-600 text-sm font-semibold hover:underline">
-                    Submit another case
+                    {t('success_another')}
                   </button>
                 </div>
               ) : (
@@ -122,71 +123,71 @@ export default function FreeEvaluationPage() {
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">First Name *</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_first_name')}</label>
                       <input type="text" name="firstName" required className="input" placeholder="John" />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Name *</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_last_name')}</label>
                       <input type="text" name="lastName" required className="input" placeholder="Smith" />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_email')}</label>
                     <input type="email" name="email" required className="input" placeholder="john@example.com" />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone (optional)</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_phone')}</label>
                     <input type="tel" name="phone" className="input" placeholder="+1 (555) 000-0000" />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Approximate Amount Lost *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_amount_lost')}</label>
                     <select name="amountLost" required className="input bg-white">
-                      <option value="">Select range...</option>
-                      <option>Under $10,000</option>
-                      <option>$10,000 – $50,000</option>
-                      <option>$50,000 – $100,000</option>
-                      <option>$100,000 – $500,000</option>
-                      <option>Over $500,000</option>
+                      <option value="">{t('amount_select')}</option>
+                      <option>{t('amount_under_10k')}</option>
+                      <option>{t('amount_10k_50k')}</option>
+                      <option>{t('amount_50k_100k')}</option>
+                      <option>{t('amount_100k_500k')}</option>
+                      <option>{t('amount_over_500k')}</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Type of Incident *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_incident_type')}</label>
                     <select name="incidentType" required className="input bg-white">
-                      <option value="">Select type...</option>
-                      <option>Romance / Pig Butchering Scam</option>
-                      <option>Fake Trading Platform</option>
-                      <option>Hacked Wallet / Exchange</option>
-                      <option>Investment Fraud</option>
-                      <option>Divorce — Hidden Crypto</option>
-                      <option>Business / Employee Theft</option>
-                      <option>Ransomware Payment</option>
-                      <option>Other</option>
+                      <option value="">{t('incident_select')}</option>
+                      <option>{t('incident_romance')}</option>
+                      <option>{t('incident_fake_platform')}</option>
+                      <option>{t('incident_hacked')}</option>
+                      <option>{t('incident_investment')}</option>
+                      <option>{t('incident_divorce')}</option>
+                      <option>{t('incident_business')}</option>
+                      <option>{t('incident_ransomware')}</option>
+                      <option>{t('incident_other')}</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Wallet Address or Transaction Hash</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_wallet')}</label>
                     <input type="text" name="walletAddress" className="input font-mono text-sm" placeholder="bc1q... or 0x..." />
-                    <p className="text-xs text-slate-400 mt-1">If you don't have this, describe what you do have in the box below.</p>
+                    <p className="text-xs text-slate-400 mt-1">{t('wallet_hint')}</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Describe What Happened *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_description')}</label>
                     <textarea
                       required
                       rows={5}
                       name="description"
                       className="input resize-none"
-                      placeholder="Tell us what happened: how you met the scammer, what platform was involved, how money was sent, and any other details you have..."
+                      placeholder={t('description_placeholder')}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Language</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('label_language')}</label>
                     <select name="language" className="input bg-white">
                       <option>English</option>
                       <option>Русский (Russian)</option>
@@ -200,14 +201,14 @@ export default function FreeEvaluationPage() {
                   <div className="flex items-start gap-3">
                     <input type="checkbox" id="consent" name="consent" required className="mt-1 accent-brand-600" />
                     <label htmlFor="consent" className="text-xs text-slate-500 leading-relaxed">
-                      I understand that this is a forensic investigation service, not a law firm, and that LedgerHound does not provide legal advice. I consent to being contacted about my case.
+                      {t('consent_text')}
                     </label>
                   </div>
 
                   {status === 'error' && (
                     <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg p-3">
                       <AlertCircle size={16} />
-                      <span>Something went wrong. Please try again or email us at contact@ledgerhound.vip</span>
+                      <span>{t('error_message')}</span>
                     </div>
                   )}
 
@@ -217,15 +218,15 @@ export default function FreeEvaluationPage() {
                     className="btn-primary w-full justify-center text-base py-3.5 disabled:opacity-60"
                   >
                     {status === 'loading' ? (
-                      <><Loader2 size={16} className="animate-spin" /> Submitting...</>
+                      <><Loader2 size={16} className="animate-spin" /> {t('submitting')}</>
                     ) : (
-                      'Submit Free Evaluation Request'
+                      t('submit_btn')
                     )}
                   </button>
 
                   <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1.5">
                     <Lock size={11} />
-                    Your information is confidential and encrypted. We respond within 24 hours.
+                    {t('form_secure_note')}
                   </p>
                 </form>
               )}

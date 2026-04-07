@@ -4,8 +4,8 @@ import Footer from '@/components/Footer';
 import { Scale, Clock, Shield, FileText, Mail, AlertTriangle } from 'lucide-react';
 
 export const metadata = {
-  title: 'Dispute Policy — LedgerHound',
-  description: 'LedgerHound Scam Database dispute process, timeline, and policy for Section 230 compliance.',
+  title: 'Dispute Policy | LedgerHound',
+  description: 'LedgerHound dispute resolution policy for scam database listings.',
 };
 
 export default function DisputePolicyPage() {

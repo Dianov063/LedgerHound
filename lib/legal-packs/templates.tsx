@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { CountryResearch, CaseData } from './types';
+import { getPdfTranslations, type PdfTranslations } from './pdf-i18n';
 
 /* Register Noto Sans — FULL font files with Latin + Cyrillic + Greek + Vietnamese */
 Font.register({
@@ -56,9 +57,9 @@ const DocHeader = ({ title, subtitle, caseData }: { title: string; subtitle: str
   </View>
 );
 
-const DocFooter = ({ caseData, pageLabel }: { caseData: CaseData; pageLabel: string }) => (
+const DocFooter = ({ caseData, pageLabel, t }: { caseData: CaseData; pageLabel: string; t?: PdfTranslations }) => (
   <View style={s.footer} fixed>
-    <Text>Prepared with LedgerHound · ledgerhound.vip · {caseData.caseId}</Text>
+    <Text>{(t?.common.prepared_with || 'Prepared with LedgerHound')} · ledgerhound.vip · {caseData.caseId}</Text>
     <Text>{pageLabel}</Text>
   </View>
 );
@@ -88,135 +89,150 @@ const shortAddr = (addr: string) =>
   addr && addr.length > 20 ? `${addr.slice(0, 10)}...${addr.slice(-8)}` : addr || '';
 
 /* ─── Scam type matching ─── */
-const scamTypes: [string, string[]][] = [
-  ['Romance Scam / Pig Butchering', ['romance', 'pig']],
-  ['Fake Investment Platform', ['fake', 'platform']],
-  ['Ponzi / Pyramid Scheme', ['ponzi', 'pyramid', 'investment']],
-  ['Phishing / Wallet Drain', ['phishing', 'drain']],
-  ['Rug Pull / Exit Scam', ['rug', 'exit']],
+const scamKeywords: [string, string[]][] = [
+  ['romance', ['romance', 'pig']],
+  ['investment', ['fake', 'platform']],
+  ['ponzi', ['ponzi', 'pyramid', 'investment']],
+  ['phishing', ['phishing', 'drain']],
+  ['rugpull', ['rug', 'exit']],
 ];
 
 const isScamChecked = (scamType: string, keywords: string[]) =>
   scamType ? keywords.some(k => scamType.toLowerCase().includes(k)) : false;
 
-const fraudTypeLocalized = (scamType: string) => {
-  for (const [label, kws] of scamTypes) {
+const getLocalizedScamTypes = (t: PdfTranslations): [string, string[]][] => [
+  [t.police.fraud_romance, ['romance', 'pig']],
+  [t.police.fraud_investment, ['fake', 'platform']],
+  [t.police.fraud_ponzi, ['ponzi', 'pyramid', 'investment']],
+  [t.police.fraud_phishing, ['phishing', 'drain']],
+  [t.police.fraud_rugpull, ['rug', 'exit']],
+];
+
+const fraudTypeLocalized = (scamType: string, t?: PdfTranslations) => {
+  const types = t ? getLocalizedScamTypes(t) : getLocalizedScamTypes(getPdfTranslations('en'));
+  for (const [label, kws] of types) {
     if (isScamChecked(scamType, kws)) return label;
   }
   return scamType || 'Unknown';
 };
 
+/* ─── Helper: interpolate {name}, {platform}, {police} in translation strings ─── */
+const interp = (str: string, vars: Record<string, string>) =>
+  Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, v), str);
+
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT 1: POLICE COMPLAINT
+   DOCUMENT 1: POLICE COMPLAINT (localized)
    ═══════════════════════════════════════════════════════════════ */
 export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryResearch; caseData: CaseData }) => {
+  const t = getPdfTranslations(caseData.country);
   const score = caseData.recoveryScore ?? 0;
-  const exchanges = caseData.detectedExchange || 'None';
+  const exchanges = caseData.detectedExchange || t.common.none;
   const riskScore = caseData.recoveryScore ?? 0;
+  const scamTypes = getLocalizedScamTypes(t);
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <DocHeader title="POLICE COMPLAINT" subtitle="Cryptocurrency Fraud Report" caseData={caseData} />
+        <DocHeader title={t.police.title} subtitle={t.police.subtitle} caseData={caseData} />
 
         {/* FILING INFORMATION */}
-        <SectionTitle>FILING INFORMATION</SectionTitle>
-        <Field label="Filing with" value={research.policeAgency.name} />
-        <Field label="Jurisdiction" value={research.policeAgency.jurisdiction} />
-        <Field label="Online portal" value={research.policeAgency.url} />
-        <Field label="Reference" value={caseData.caseId} />
+        <SectionTitle>{t.police.filing_info}</SectionTitle>
+        <Field label={t.police.filing_with} value={research.policeAgency.name} />
+        <Field label={t.police.jurisdiction} value={research.policeAgency.jurisdiction} />
+        <Field label={t.police.online_portal} value={research.policeAgency.url} />
+        <Field label={t.police.reference} value={caseData.caseId} />
 
         {/* COMPLAINANT */}
-        <SectionTitle>COMPLAINANT</SectionTitle>
-        <Field label="Full Name" value={caseData.victimName} />
-        <Field label="Email" value={caseData.victimEmail} />
-        <Field label="Phone" value={caseData.victimPhone || '[OPTIONAL]'} />
-        <Field label="Country" value={caseData.country} />
-        <Field label="State/Region" value={caseData.state || 'N/A'} />
+        <SectionTitle>{t.police.complainant}</SectionTitle>
+        <Field label={t.police.full_name} value={caseData.victimName} />
+        <Field label={t.police.email} value={caseData.victimEmail} />
+        <Field label={t.police.phone} value={caseData.victimPhone || t.common.optional} />
+        <Field label={t.police.country} value={caseData.country} />
+        <Field label={t.police.state_region} value={caseData.state || 'N/A'} />
 
         {/* INCIDENT DETAILS */}
-        <SectionTitle>INCIDENT DETAILS</SectionTitle>
-        <Field label="Date of Incident" value={caseData.incidentDate} />
-        <Field label="Amount Lost" value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
-        <Field label="Cryptocurrency" value={caseData.cryptoType} />
-        <Field label="Network" value={caseData.network} />
-        <Field label="Fraud Type" value={fraudTypeLocalized(caseData.scamType)} />
+        <SectionTitle>{t.police.incident_details}</SectionTitle>
+        <Field label={t.police.date_of_incident} value={caseData.incidentDate} />
+        <Field label={t.police.amount_lost} value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
+        <Field label={t.police.cryptocurrency} value={caseData.cryptoType} />
+        <Field label={t.police.network} value={caseData.network} />
+        <Field label={t.police.fraud_type} value={fraudTypeLocalized(caseData.scamType, t)} />
         <View style={s.thinSep} />
-        <Field label="Platform Name" value={caseData.platformName || '[UNKNOWN]'} />
-        <Field label="Platform URL" value={caseData.platformUrl || '[UNKNOWN]'} />
+        <Field label={t.police.platform_name} value={caseData.platformName || t.common.unknown} />
+        <Field label={t.police.platform_url} value={caseData.platformUrl || t.common.unknown} />
 
         {/* TRANSACTION EVIDENCE */}
-        <SectionTitle>TRANSACTION EVIDENCE</SectionTitle>
-        <Field label="Scammer Wallet" value={caseData.scammerAddress} mono />
-        <Field label="Transaction Hash" value={caseData.txid} mono />
-        <Field label="Date/Time" value={caseData.txDateTime || caseData.incidentDate} />
-        <Field label="My Wallet" value={caseData.sourceWallet || '[See attached records]'} mono />
+        <SectionTitle>{t.police.transaction_evidence}</SectionTitle>
+        <Field label={t.police.scammer_wallet} value={caseData.scammerAddress} mono />
+        <Field label={t.police.transaction_hash} value={caseData.txid} mono />
+        <Field label={t.police.datetime} value={caseData.txDateTime || caseData.incidentDate} />
+        <Field label={t.police.my_wallet} value={caseData.sourceWallet || t.common.see_attached} mono />
 
         {/* BLOCKCHAIN VERIFICATION */}
-        <SectionTitle>BLOCKCHAIN VERIFICATION (by LedgerHound)</SectionTitle>
+        <SectionTitle>{t.police.blockchain_verification}</SectionTitle>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Field label="Risk Score" value={`${riskScore}/100`} />
-          <Field label="Recovery Probability" value={`${score}%`} />
-          <Field label="Exchanges Identified" value={exchanges} />
-          <Field label="Full Report" value={`ledgerhound.vip/case/${caseData.caseId}`} />
+          <Field label={t.police.risk_score} value={`${riskScore}/100`} />
+          <Field label={t.police.recovery_probability} value={`${score}%`} />
+          <Field label={t.police.exchanges_identified} value={exchanges} />
+          <Field label={t.police.full_report} value={`ledgerhound.vip/case/${caseData.caseId}`} />
         </View>
 
-        <DocFooter caseData={caseData} pageLabel="Police Complaint — Page 1" />
+        <DocFooter caseData={caseData} pageLabel={`${t.police.title} — ${t.common.page} 1`} t={t} />
       </Page>
 
       {/* PAGE 2 */}
       <Page size="A4" style={s.page}>
         {/* TYPE OF FRAUD */}
-        <SectionTitle>TYPE OF FRAUD</SectionTitle>
+        <SectionTitle>{t.police.type_of_fraud}</SectionTitle>
         {scamTypes.map(([label, kws]) => (
           <Checkbox key={label} label={label} checked={isScamChecked(caseData.scamType, kws)} />
         ))}
-        <Checkbox label={`Other: ${!scamTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) ? (caseData.scamType || '___') : '___'}`} checked={!scamTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) && !!caseData.scamType} />
+        <Checkbox label={`${t.police.fraud_other}: ${!scamTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) ? (caseData.scamType || '___') : '___'}`} checked={!scamTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) && !!caseData.scamType} />
 
         {/* DESCRIPTION */}
-        <SectionTitle>DESCRIPTION</SectionTitle>
+        <SectionTitle>{t.police.description}</SectionTitle>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 12, minHeight: 60 }}>
-          {caseData.description || 'Please describe how you were contacted, what was promised, and when you realized it was fraud.'}
+          {caseData.description || t.police.description_placeholder}
         </Text>
 
         {/* APPLICABLE LAW */}
-        <SectionTitle>APPLICABLE LAW</SectionTitle>
-        <Text style={{ fontSize: 9, color: slate600, marginBottom: 4 }}>This complaint is filed under:</Text>
+        <SectionTitle>{t.police.applicable_law}</SectionTitle>
+        <Text style={{ fontSize: 9, color: slate600, marginBottom: 4 }}>{t.police.filed_under}</Text>
         <Text style={{ fontSize: 9, color: slate900, lineHeight: 1.6, marginBottom: 8 }}>{research.legalBasis.criminalCode}</Text>
-        <Field label="Statute of Limitations" value={research.legalBasis.statuteOfLimitations} />
+        <Field label={t.police.statute_of_limitations} value={research.legalBasis.statuteOfLimitations} />
 
         {/* EVIDENCE CHECKLIST */}
-        <SectionTitle>EVIDENCE CHECKLIST</SectionTitle>
-        <Checkbox label="Blockchain transaction proof (LedgerHound verified)" checked />
-        <Checkbox label="Screenshots of communications" />
-        <Checkbox label="Platform screenshots" />
-        <Checkbox label="Bank/exchange statements" />
-        <Checkbox label="Other: _______________" />
+        <SectionTitle>{t.police.evidence_checklist}</SectionTitle>
+        <Checkbox label={t.police.evidence_blockchain} checked />
+        <Checkbox label={t.police.evidence_screenshots} />
+        <Checkbox label={t.police.evidence_platform} />
+        <Checkbox label={t.police.evidence_bank} />
+        <Checkbox label={`${t.police.evidence_other}: _______________`} />
 
         {/* DECLARATION */}
-        <SectionTitle>DECLARATION</SectionTitle>
+        <SectionTitle>{t.police.declaration}</SectionTitle>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 20 }}>
-          I, {caseData.victimName || '[NAME]'}, declare under penalty of perjury that the information provided in this complaint is true and accurate to the best of my knowledge.
+          {interp(t.police.declaration_text, { name: caseData.victimName || '[NAME]' })}
         </Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
           <View>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 20 }}>_______________________</Text>
-            <Text style={{ fontSize: 8, color: slate400 }}>Signature</Text>
+            <Text style={{ fontSize: 8, color: slate400 }}>{t.police.signature}</Text>
           </View>
           <View>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 20 }}>_______________________</Text>
-            <Text style={{ fontSize: 8, color: slate400 }}>Date</Text>
+            <Text style={{ fontSize: 8, color: slate400 }}>{t.police.date}</Text>
           </View>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel="Police Complaint — Page 2" />
+        <DocFooter caseData={caseData} pageLabel={`${t.police.title} — ${t.common.page} 2`} t={t} />
       </Page>
     </Document>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT 2: PRESERVATION LETTER
+   DOCUMENT 2: PRESERVATION LETTER (always English)
    Generated PER EXCHANGE (or generic if no exchanges identified)
    ═══════════════════════════════════════════════════════════════ */
 export const PreservationLetterDoc = ({ research, caseData }: { research: CountryResearch; caseData: CaseData }) => {
@@ -323,119 +339,123 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT 3: REGULATOR COMPLAINT
+   DOCUMENT 3: REGULATOR COMPLAINT (localized)
    ═══════════════════════════════════════════════════════════════ */
 export const RegulatorComplaintDoc = ({ research, caseData }: { research: CountryResearch; caseData: CaseData }) => {
-  const exchanges = caseData.detectedExchange || 'Under investigation';
+  const t = getPdfTranslations(caseData.country);
+  const exchanges = caseData.detectedExchange || t.common.under_investigation;
 
-  /* Violation type checkboxes based on fraud type */
+  /* Violation type checkboxes — localized */
   const violationTypes: [string, string[]][] = [
-    ['Unregistered securities offering', ['investment', 'ico', 'token']],
-    ['Investment fraud', ['investment', 'fake', 'platform', 'romance', 'pig']],
-    ['Market manipulation', ['manipulation', 'pump']],
-    ['Unlicensed money transmission', ['exchange', 'transmission']],
-    ['Misleading advertising', ['misleading', 'advertising']],
-    ['Ponzi/pyramid scheme', ['ponzi', 'pyramid']],
+    [t.regulator.violation_unregistered, ['investment', 'ico', 'token']],
+    [t.regulator.violation_investment, ['investment', 'fake', 'platform', 'romance', 'pig']],
+    [t.regulator.violation_manipulation, ['manipulation', 'pump']],
+    [t.regulator.violation_unlicensed, ['exchange', 'transmission']],
+    [t.regulator.violation_misleading, ['misleading', 'advertising']],
+    [t.regulator.violation_ponzi, ['ponzi', 'pyramid']],
   ];
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <DocHeader title="FINANCIAL REGULATOR COMPLAINT" subtitle="Cryptocurrency Investment Fraud" caseData={caseData} />
+        <DocHeader title={t.regulator.title} subtitle={t.regulator.subtitle} caseData={caseData} />
 
         {/* REGULATORY BODY */}
-        <SectionTitle>REGULATORY BODY</SectionTitle>
-        <Field label="Filing with" value={research.financialRegulator.name} />
-        <Field label="Online portal" value={research.financialRegulator.url} />
-        <Field label="Scope" value={research.financialRegulator.scope} />
+        <SectionTitle>{t.regulator.regulatory_body}</SectionTitle>
+        <Field label={t.regulator.filing_with} value={research.financialRegulator.name} />
+        <Field label={t.regulator.online_portal} value={research.financialRegulator.url} />
+        <Field label={t.regulator.scope} value={research.financialRegulator.scope} />
 
         {/* COMPLAINANT */}
-        <SectionTitle>COMPLAINANT</SectionTitle>
-        <Field label="Name" value={caseData.victimName} />
-        <Field label="Email" value={caseData.victimEmail} />
-        <Field label="Country" value={caseData.country} />
-        <Field label="Police Report" value={caseData.policeReportNumber || 'To be filed'} />
+        <SectionTitle>{t.regulator.complainant}</SectionTitle>
+        <Field label={t.regulator.name} value={caseData.victimName} />
+        <Field label={t.regulator.email} value={caseData.victimEmail} />
+        <Field label={t.regulator.country} value={caseData.country} />
+        <Field label={t.regulator.police_report} value={caseData.policeReportNumber || t.common.pending} />
 
         {/* SUBJECT OF COMPLAINT */}
-        <SectionTitle>SUBJECT OF COMPLAINT</SectionTitle>
-        <Field label="Platform/Entity" value={caseData.platformName || '[UNKNOWN]'} />
-        <Field label="Website" value={caseData.platformUrl || '[UNKNOWN]'} />
-        <Field label="Type of Activity" value={fraudTypeLocalized(caseData.scamType)} />
-        <Field label="Period" value={`${caseData.incidentDate} to ${caseData.date}`} />
+        <SectionTitle>{t.regulator.subject_of_complaint}</SectionTitle>
+        <Field label={t.regulator.platform_entity} value={caseData.platformName || t.common.unknown} />
+        <Field label={t.regulator.website} value={caseData.platformUrl || t.common.unknown} />
+        <Field label={t.regulator.type_of_activity} value={fraudTypeLocalized(caseData.scamType, t)} />
+        <Field label={t.regulator.period} value={`${caseData.incidentDate} to ${caseData.date}`} />
 
         {/* FINANCIAL DETAILS */}
-        <SectionTitle>FINANCIAL DETAILS</SectionTitle>
-        <Field label="Amount Lost" value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
-        <Field label="Cryptocurrency" value={`${caseData.cryptoType} on ${caseData.network}`} />
-        <Field label="Payment Method" value={caseData.paymentMethod || 'Cryptocurrency transfer'} />
+        <SectionTitle>{t.regulator.financial_details}</SectionTitle>
+        <Field label={t.regulator.amount_lost} value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
+        <Field label={t.regulator.cryptocurrency} value={`${caseData.cryptoType} on ${caseData.network}`} />
+        <Field label={t.regulator.payment_method} value={caseData.paymentMethod || t.regulator.crypto_transfer} />
 
         {/* NATURE OF VIOLATION */}
-        <SectionTitle>NATURE OF VIOLATION</SectionTitle>
+        <SectionTitle>{t.regulator.nature_of_violation}</SectionTitle>
         {violationTypes.map(([label, kws]) => (
           <Checkbox key={label} label={label} checked={isScamChecked(caseData.scamType, kws)} />
         ))}
-        <Checkbox label={`Other: ${caseData.scamType || '___'}`} checked={!violationTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) && !!caseData.scamType} />
+        <Checkbox label={`${t.regulator.violation_other}: ${caseData.scamType || '___'}`} checked={!violationTypes.some(([, kws]) => isScamChecked(caseData.scamType, kws)) && !!caseData.scamType} />
 
         {/* DESCRIPTION */}
-        <SectionTitle>DESCRIPTION</SectionTitle>
+        <SectionTitle>{t.regulator.description}</SectionTitle>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 8, minHeight: 40 }}>
-          {caseData.description || '[Please describe the fraudulent activity]'}
+          {caseData.description || t.common.to_be_filled}
         </Text>
 
-        <DocFooter caseData={caseData} pageLabel="Regulator Complaint — Page 1" />
+        <DocFooter caseData={caseData} pageLabel={`${t.regulator.title} — ${t.common.page} 1`} t={t} />
       </Page>
 
       {/* PAGE 2 */}
       <Page size="A4" style={s.page}>
         {/* EVIDENCE SUMMARY */}
-        <SectionTitle>EVIDENCE SUMMARY</SectionTitle>
+        <SectionTitle>{t.regulator.evidence_summary}</SectionTitle>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
           <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-            {'\u2022'} Blockchain evidence verified by LedgerHound (Case: {caseData.caseId}){'\n'}
-            {'\u2022'} Transaction traced to: {exchanges}{'\n'}
-            {'\u2022'} Police complaint filed with {research.policeAgency.name}
+            {'\u2022'} {t.regulator.blockchain_verified} (Case: {caseData.caseId}){'\n'}
+            {'\u2022'} {t.regulator.transaction_traced}: {exchanges}{'\n'}
+            {'\u2022'} {t.regulator.police_filed} {research.policeAgency.name}
           </Text>
         </View>
 
         {/* OTHER VICTIMS */}
-        <SectionTitle>OTHER VICTIMS</SectionTitle>
-        <Checkbox label="I am aware of other victims" checked={!!caseData.otherVictimsCount} />
-        <Checkbox label={`Estimated number of victims: ${caseData.otherVictimsCount || '___'}`} />
-        <Checkbox label={`Total estimated losses: $${caseData.totalEstimatedLosses?.toLocaleString() || '___'}`} />
+        <SectionTitle>{t.regulator.other_victims}</SectionTitle>
+        <Checkbox label={t.regulator.aware_of_victims} checked={!!caseData.otherVictimsCount} />
+        <Checkbox label={`${t.regulator.estimated_victims}: ${caseData.otherVictimsCount || '___'}`} />
+        <Checkbox label={`${t.regulator.total_losses}: $${caseData.totalEstimatedLosses?.toLocaleString() || '___'}`} />
 
         {/* REQUESTED ACTION */}
-        <SectionTitle>REQUESTED ACTION</SectionTitle>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>1. Investigation of {caseData.platformName || '[Platform]'}</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>2. Enforcement action if violations confirmed</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>3. Coordination with {research.policeAgency.name}</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 12, paddingLeft: 4 }}>4. Public warning to prevent additional victims</Text>
+        <SectionTitle>{t.regulator.requested_action}</SectionTitle>
+        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>1. {interp(t.regulator.action_investigate, { platform: caseData.platformName || '[Platform]' })}</Text>
+        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>2. {t.regulator.action_enforcement}</Text>
+        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>3. {interp(t.regulator.action_coordination, { police: research.policeAgency.name })}</Text>
+        <Text style={{ fontSize: 9, color: slate900, marginBottom: 12, paddingLeft: 4 }}>4. {t.regulator.action_warning}</Text>
 
         {/* DECLARATION */}
-        <SectionTitle>DECLARATION</SectionTitle>
+        <SectionTitle>{t.regulator.declaration}</SectionTitle>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 20 }}>
-          I, {caseData.victimName || '[NAME]'}, declare under penalty of perjury that the information provided is true and accurate to the best of my knowledge.
+          {interp(t.regulator.declaration_text, { name: caseData.victimName || '[NAME]' })}
         </Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
           <View>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 20 }}>_______________________</Text>
-            <Text style={{ fontSize: 8, color: slate400 }}>Signature</Text>
+            <Text style={{ fontSize: 8, color: slate400 }}>{t.regulator.signature}</Text>
           </View>
           <View>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 20 }}>_______________________</Text>
-            <Text style={{ fontSize: 8, color: slate400 }}>Date</Text>
+            <Text style={{ fontSize: 8, color: slate400 }}>{t.regulator.date}</Text>
           </View>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel="Regulator Complaint — Page 2" />
+        <DocFooter caseData={caseData} pageLabel={`${t.regulator.title} — ${t.common.page} 2`} t={t} />
       </Page>
     </Document>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DOCUMENT 4: EMERGENCY RECOVERY ACTION GUIDE (3 pages)
+   DOCUMENT 4: EMERGENCY RECOVERY ACTION GUIDE (3 pages, localized)
    ═══════════════════════════════════════════════════════════════ */
 export const ActionGuideDoc = ({ research, caseData }: { research: CountryResearch; caseData: CaseData }) => {
+  const t = getPdfTranslations(caseData.country);
+  const ag = t.action_guide;
+
   const score = caseData.recoveryScore ?? 45;
   const riskLevel = caseData.riskLevel ?? 'medium';
   const daysOld = caseData.daysOld ?? 0;
@@ -472,24 +492,15 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
     </View>
   );
 
-  /* Loss-based recommendation */
+  /* Loss-based recommendation — localized */
   const getLossAdvice = () => {
-    if (lossUSD < 1000) return {
-      tier: 'SMALL LOSS (< $1,000)',
-      advice: 'Complete Steps 1-4. Legal fees likely exceed recovery. Focus on reporting to prevent future victims. Join victim group if available.',
-    };
+    if (lossUSD < 1000) return { tier: ag.loss_small_title, advice: ag.loss_small_text };
     if (lossUSD < 10000) return {
-      tier: 'MEDIUM LOSS ($1,000 - $10,000)',
-      advice: `Complete Steps 1-4. Consider small claims court${research.hasSmallClaims ? ` (threshold: ${research.smallClaimsThreshold})` : ''}. Preservation letters may recover funds without litigation.`,
+      tier: ag.loss_medium_title,
+      advice: research.hasSmallClaims ? `${ag.loss_medium_text} (${research.smallClaimsThreshold})` : ag.loss_medium_text,
     };
-    if (lossUSD < 50000) return {
-      tier: 'SIGNIFICANT LOSS ($10,000 - $50,000)',
-      advice: 'Complete Steps 1-4. Consult attorney experienced in crypto fraud. Civil suit may be viable. Consider LedgerHound Full Investigation.',
-    };
-    return {
-      tier: 'MAJOR LOSS (> $50,000)',
-      advice: 'Complete Steps 1-4 IMMEDIATELY. Retain attorney ASAP. Request emergency asset freeze via court order. LedgerHound Full Investigation recommended. Civil recovery likely viable.',
-    };
+    if (lossUSD < 50000) return { tier: ag.loss_significant_title, advice: ag.loss_significant_text };
+    return { tier: ag.loss_major_title, advice: ag.loss_major_text };
   };
   const lossAdvice = getLossAdvice();
 
@@ -497,69 +508,69 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
     <Document>
       {/* ─── PAGE 1: Summary + Recovery Analysis + Steps 1-2 ─── */}
       <Page size="A4" style={s.page}>
-        <DocHeader title="EMERGENCY RECOVERY ACTION GUIDE" subtitle="Personalized Recovery Plan" caseData={caseData} />
+        <DocHeader title={ag.title} subtitle={ag.subtitle} caseData={caseData} />
 
         {/* CASE SUMMARY */}
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Text style={{ fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 6 }}>YOUR CASE SUMMARY</Text>
-          <Field label="Victim" value={caseData.victimName} />
-          <Field label="Loss Amount" value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
-          <Field label="Date of Loss" value={caseData.incidentDate} />
-          <Field label="Fraud Type" value={fraudTypeLocalized(caseData.scamType)} />
+          <Text style={{ fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 6 }}>{ag.case_summary}</Text>
+          <Field label={ag.victim} value={caseData.victimName} />
+          <Field label={ag.loss_amount} value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
+          <Field label={ag.date_of_loss} value={caseData.incidentDate} />
+          <Field label={ag.fraud_type} value={fraudTypeLocalized(caseData.scamType, t)} />
         </View>
 
         {/* RECOVERY ANALYSIS */}
-        <SectionTitle>RECOVERY ANALYSIS</SectionTitle>
+        <SectionTitle>{ag.recovery_analysis}</SectionTitle>
         <View style={{ flexDirection: 'row', marginBottom: 10, gap: 12 }}>
           {/* Score circle */}
           <View style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: getRiskColor(riskLevel), alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 20, fontFamily: 'NotoSans', fontWeight: 700, color: getRiskColor(riskLevel) }}>{score}%</Text>
-            <Text style={{ fontSize: 6, color: slate400 }}>RECOVERY</Text>
+            <Text style={{ fontSize: 6, color: slate400 }}>{ag.recovery}</Text>
           </View>
           {/* Stats */}
           <View style={{ flex: 1 }}>
-            <Field label="Risk Score" value={`${score}/100 (${riskLevel.toUpperCase()})`} />
-            <Field label="Fund Status" value={hasExchanges ? `KYC exchange detected: ${identifiedExchanges}` : mixerDetected ? 'Funds mixed — reduced traceability' : 'No KYC exchange detected yet'} />
-            <Field label="Exchanges Found" value={hasExchanges ? 'YES' : 'NO'} />
+            <Field label={ag.risk_score} value={`${score}/100 (${riskLevel.toUpperCase()})`} />
+            <Field label={ag.fund_status} value={hasExchanges ? `${ag.exchange_detected}: ${identifiedExchanges}` : mixerDetected ? ag.mixer_warning : ag.no_exchange} />
+            <Field label={ag.exchanges_found} value={hasExchanges ? t.common.yes : t.common.no} />
           </View>
         </View>
 
         {/* Exchange status box */}
         {hasExchanges ? (
           <View style={{ backgroundColor: '#f0fdf4', borderRadius: 4, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#86efac' }}>
-            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: green, marginBottom: 2 }}>{'\u2713'} POSITIVE: Funds detected on KYC exchange(s): {identifiedExchanges}</Text>
-            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>This significantly increases recovery chances. Exchanges can be compelled to freeze assets and provide account holder information via subpoena.</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: green, marginBottom: 2 }}>{'\u2713'} {ag.exchange_positive}: {identifiedExchanges}</Text>
+            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.exchange_positive_text}</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: '#fffbeb', borderRadius: 4, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
-            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 2 }}>{'\u26A0'} CAUTION: No KYC exchanges identified yet.</Text>
-            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>Funds may be in private wallets or unregulated platforms. Recovery will require deeper investigation.</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 2 }}>{'\u26A0'} {ag.no_exchange_caution}</Text>
+            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.no_exchange_caution_text}</Text>
           </View>
         )}
 
         {/* CRITICAL WINDOW */}
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 4, padding: 8, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 2 }}>{'\u23F0'} CRITICAL WINDOW</Text>
-          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>The first 24-72 hours are critical. Exchanges are more likely to freeze assets BEFORE funds are withdrawn. EVERY HOUR OF DELAY REDUCES YOUR CHANCES.</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 2 }}>{'\u23F0'} {ag.critical_window}</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.critical_window_text}</Text>
         </View>
 
         {/* STEP 1 */}
-        <Text style={{ fontSize: 13, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 8, textAlign: 'center' as any }}>5-STEP ACTION PLAN</Text>
+        <Text style={{ fontSize: 13, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 8, textAlign: 'center' as any }}>{ag.action_plan}</Text>
 
-        <StepBox num={1} title="REPORT TO POLICE" timing="TODAY" why="Creates official record required by exchanges and courts. Without it, your case has no legal standing.">
+        <StepBox num={1} title={ag.step1_title} timing={ag.step1_when} why={ag.step1_why}>
           <Field label="WHERE" value={research.policeAgency.name} />
           <Field label="URL" value={research.policeAgency.url} />
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 8, marginTop: 4 }}>
-            1. Use attached "Police Complaint" document{'\n'}2. Submit online or in person{'\n'}3. SAVE your complaint reference number
+            {ag.step1_instructions}
           </Text>
-          <Field label="Expected response" value={research.policeAgency.responseTime} />
+          <Field label={ag.expected_response} value={research.policeAgency.responseTime} />
         </StepBox>
 
         {/* STEP 2 */}
-        <StepBox num={2} title="NOTIFY EXCHANGES" timing="TODAY" why="Exchanges can freeze accounts within HOURS. This prevents scammer from withdrawing your funds.">
+        <StepBox num={2} title={ag.step2_title} timing={ag.step2_when} why={ag.step2_why}>
           {hasExchanges ? (
             <View style={{ marginBottom: 4 }}>
-              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>SEND PRESERVATION LETTER TO:</Text>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>{ag.send_to}</Text>
               {identifiedExchanges.split(', ').map((name: string) => {
                 const contact = research.exchangeContacts?.find(c => c.name.toLowerCase() === name.toLowerCase());
                 return (
@@ -571,79 +582,79 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
               })}
             </View>
           ) : (
-            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>No exchanges identified yet. If you discover exchange involvement, send the attached Preservation Letter immediately.</Text>
+            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.step2_no_exchange}</Text>
           )}
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 8, marginTop: 4 }}>
-            1. Use attached "Preservation Letter" document{'\n'}2. Include your police report reference{'\n'}3. Send via email AND certified mail if possible{'\n'}4. Follow up in 24-48 hours if no response
+            {ag.step2_instructions}
           </Text>
         </StepBox>
 
-        <DocFooter caseData={caseData} pageLabel="Action Guide — Page 1" />
+        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 1`} t={t} />
       </Page>
 
       {/* ─── PAGE 2: Steps 3-5 + Additional Agencies ─── */}
       <Page size="A4" style={s.page}>
         {/* STEP 3 */}
-        <StepBox num={3} title="REPORT TO FINANCIAL REGULATOR" timing="THIS WEEK" why="Regulatory complaints trigger investigations. Multiple complaints about same entity lead to enforcement action.">
+        <StepBox num={3} title={ag.step3_title} timing={ag.step3_when} why={ag.step3_why}>
           <Field label="WHERE" value={research.financialRegulator.name} />
           <Field label="URL" value={research.financialRegulator.url} />
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 8, marginTop: 4 }}>
-            1. Use attached "Regulator Complaint" document{'\n'}2. Reference your police report number{'\n'}3. Submit online
+            {ag.step3_instructions}
           </Text>
         </StepBox>
 
         {/* STEP 4 */}
-        <StepBox num={4} title="PRESERVE ALL EVIDENCE" timing="ONGOING" why="Digital evidence disappears. Scammers delete profiles, platforms go offline, chats expire.">
-          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>SAVE NOW:</Text>
-          <Checkbox label="Screenshots of ALL conversations" />
-          <Checkbox label="Transaction receipts and confirmations" />
-          <Checkbox label="All wallet addresses involved" />
-          <Checkbox label="Platform URLs and screenshots" />
-          <Checkbox label="Complete timeline with dates" />
-          <Checkbox label="Exported chat histories (WhatsApp, Telegram, email)" />
-          <Checkbox label="Social media profiles of scammer" />
-          <Checkbox label="Bank statements showing fiat transfers" />
-          <Text style={{ fontSize: 8, color: slate600, marginTop: 4 }}>STORAGE: Use cloud backup (Google Drive, iCloud). NOT on same device that may be compromised.</Text>
+        <StepBox num={4} title={ag.step4_title} timing={ag.step4_when} why={ag.step4_why}>
+          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>{ag.save_now}</Text>
+          <Checkbox label={ag.evidence_screenshots} />
+          <Checkbox label={ag.evidence_receipts} />
+          <Checkbox label={ag.evidence_wallets} />
+          <Checkbox label={ag.evidence_platform} />
+          <Checkbox label={ag.evidence_timeline} />
+          <Checkbox label={ag.evidence_chats} />
+          <Checkbox label={ag.evidence_social} />
+          <Checkbox label={ag.evidence_bank} />
+          <Text style={{ fontSize: 8, color: slate600, marginTop: 4 }}>{ag.evidence_storage}</Text>
         </StepBox>
 
         {/* STEP 5 */}
-        <StepBox num={5} title="EVALUATE LEGAL OPTIONS" timing="1-2 WEEKS" why="Civil litigation can recover funds even when criminal prosecution stalls.">
+        <StepBox num={5} title={ag.step5_title} timing={ag.step5_when} why={ag.step5_why}>
           <View style={{ backgroundColor: '#f1f5f9', borderRadius: 4, padding: 8, marginBottom: 6 }}>
             <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 2 }}>{lossAdvice.tier}</Text>
             <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{lossAdvice.advice}</Text>
           </View>
-          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginTop: 4, marginBottom: 4 }}>CIVIL REMEDIES IN {caseData.country}:</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginTop: 4, marginBottom: 4 }}>{ag.civil_remedies_in} {caseData.country}:</Text>
           {research.legalBasis.civilRemedies.map((r, i) => (
             <Text key={i} style={{ fontSize: 8, color: slate600, marginBottom: 2, paddingLeft: 8 }}>{'\u2022'} {r}</Text>
           ))}
-          <Field label="Statute of Limitations" value={research.legalBasis.statuteOfLimitations} />
+          <Field label={ag.statute_of_limitations} value={research.legalBasis.statuteOfLimitations} />
         </StepBox>
 
         {/* ADDITIONAL AGENCIES */}
-        <SectionTitle>ADDITIONAL AGENCIES</SectionTitle>
+        <SectionTitle>{ag.additional_agencies}</SectionTitle>
         {(research.additionalAgencies || []).map((agency, i) => (
           <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 6, marginBottom: 6, borderWidth: 0.5, borderColor: slate200 }} wrap={false}>
             <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>{agency.name}</Text>
             <Text style={{ fontSize: 8, color: blue }}>{agency.url}</Text>
-            <Text style={{ fontSize: 8, color: slate600, marginTop: 2 }}>When to use: {(agency as any).when_to_use || agency.when}</Text>
+            <Text style={{ fontSize: 8, color: slate600, marginTop: 2 }}>{ag.when_to_use}: {(agency as any).when_to_use || agency.when}</Text>
           </View>
         ))}
 
-        <DocFooter caseData={caseData} pageLabel="Action Guide — Page 2" />
+        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 2`} t={t} />
       </Page>
 
       {/* ─── PAGE 3: Timeline + Contacts + CTA ─── */}
       <Page size="A4" style={s.page}>
         {/* EXPECTED TIMELINE */}
-        <SectionTitle>EXPECTED TIMELINE</SectionTitle>
+        <SectionTitle>{ag.expected_timeline}</SectionTitle>
         <View style={{ marginBottom: 12 }}>
           {[
-            ['Report submission', 'Same day'],
-            ['Exchange preservation response', '1-7 days'],
-            ['Police acknowledgment', research.policeAgency.responseTime],
-            ['Regulatory review', '2-8 weeks'],
-            ['Investigation phase', '1-3 months'],
-            ['Legal action / recovery', '3-12 months'],
+            [ag.timeline_report, 'Same day'],
+            [ag.timeline_exchange, '1-7 days'],
+            [ag.timeline_police, research.policeAgency.responseTime],
+            [ag.timeline_regulator, '2-8 weeks'],
+            [ag.timeline_investigation, '1-3 months'],
+            [ag.timeline_recovery, '3-12 months'],
           ].map(([stage, time], i) => (
             <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: slate200, paddingVertical: 4 }}>
               <Text style={{ fontSize: 9, color: slate900, width: 220 }}>{stage}</Text>
@@ -653,7 +664,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         </View>
 
         {/* EMERGENCY CONTACTS */}
-        <SectionTitle>EMERGENCY CONTACTS</SectionTitle>
+        <SectionTitle>{ag.emergency_contacts}</SectionTitle>
         <View style={{ marginBottom: 12 }}>
           <Field label={research.policeAgency.shortName || 'Police'} value={research.contacts.emergencyPhone} />
           <Field label="Cybercrime" value={research.contacts.cybercrimeEmail} />
@@ -662,9 +673,9 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
 
         {/* CTA BOX */}
         <View style={{ backgroundColor: '#1e293b', borderRadius: 8, padding: 16, marginTop: 12 }}>
-          <Text style={{ fontSize: 12, fontFamily: 'NotoSans', fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>NEED DEEPER INVESTIGATION?</Text>
+          <Text style={{ fontSize: 12, fontFamily: 'NotoSans', fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>{ag.need_investigation}</Text>
           <Text style={{ fontSize: 9, color: '#cbd5e1', lineHeight: 1.5, marginBottom: 8 }}>
-            This automated pack provides templates based on blockchain analysis. For complex cases requiring multi-hop fund tracing, identification of additional exchange endpoints, links to other victims, court-ready forensic reports, or expert witness testimony:
+            {ag.need_investigation_text}
           </Text>
           <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Email: contact@ledgerhound.vip</Text>
           <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Phone: +1 (833) 559-1334</Text>
@@ -675,11 +686,11 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         <View style={{ marginTop: 16 }}>
           <View style={s.separator} />
           <Text style={{ fontSize: 7, color: slate400, lineHeight: 1.4, marginTop: 4 }}>
-            DISCLAIMER: This guide is for informational purposes only and does not constitute legal advice. LedgerHound (USPROJECT LLC) is not a law firm. Recovery is not guaranteed. Consult qualified legal counsel in your jurisdiction.
+            {ag.disclaimer}
           </Text>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel="Action Guide — Page 3" />
+        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 3`} t={t} />
       </Page>
     </Document>
   );

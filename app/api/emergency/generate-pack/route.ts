@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -43,8 +44,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (err: any) {
-    console.error('[generate-pack]', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  } catch (err: unknown) {
+    logger.error({ err }, '[generate-pack] Failed');
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 });
   }
 }

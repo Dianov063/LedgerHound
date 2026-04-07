@@ -12,6 +12,7 @@ import {
 } from '@/lib/legal-packs/templates';
 import type { CaseData, TemplateType, CountryResearch } from '@/lib/legal-packs/types';
 import { calcRecoveryScore } from '@/lib/scam-db';
+import logger from '@/lib/logger';
 
 const getS3 = () =>
   new S3Client({
@@ -191,7 +192,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
   // Use enrichment from Forensic Report if available, fallback to self-calculated
   const enrichment = input.enrichment || {};
   const finalRecoveryScore = enrichment.recoveryScore ?? recovery.score;
-  const finalRiskScore = enrichment.riskScore ?? recovery.score;
+  const finalRiskScore = enrichment.riskScore ?? 50;
   const identifiedExchanges = enrichment.identifiedExchanges || [];
   const mixerDetected = enrichment.mixerDetected ?? false;
   const hops = enrichment.hops ?? 0;
@@ -255,7 +256,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
       const exchangeData = {
         name: exchange.name,
         address: exchange.address,
-        complianceEmail: exchangeContact?.complianceEmail || `compliance@${exchange.name.toLowerCase().replace(/\s+/g, '')}.com`,
+        complianceEmail: exchangeContact?.complianceEmail || `[Contact ${exchange.name} compliance directly via their website]`,
         lawEnforcementPortal: exchangeContact?.lawEnforcementPortal || '',
       };
       const exchangeCaseData = { ...caseData, exchange: exchange.name, exchangeAddress: exchange.address, exchangeEmail: exchangeData.complianceEmail };
@@ -313,9 +314,9 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
       `,
       text: `LedgerHound Emergency Pack\n\nHi ${victimName || 'there'},\n\nYour legal documents for case ${caseId} (${research.name}) are ready.\n\nDownload your documents (links expire in 24 hours):\n${downloadLinks}\n\nLedgerHound by USPROJECT LLC\ncontact@ledgerhound.vip`,
     });
-    console.log('[generateEmergencyPack] Email sent to', email);
+    logger.info({ email }, '[generateEmergencyPack] Email sent');
   } catch (emailErr: any) {
-    console.error('[generateEmergencyPack] Email send failed:', emailErr.message);
+    logger.error({ err: emailErr }, '[generateEmergencyPack] Email send failed');
   }
 
   return {

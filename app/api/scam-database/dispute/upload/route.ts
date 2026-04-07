@@ -21,7 +21,9 @@ const ALLOWED_TYPES: Record<string, string> = {
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
+const RATE_LIMIT_WINDOW = 3600000;
 const rateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
       }
       entry.count++;
     } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
     const formData = await req.formData();
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
         Key: key,
         Body: buffer,
         ContentType: file.type,
+        ServerSideEncryption: 'aws:kms',
       })
     );
 

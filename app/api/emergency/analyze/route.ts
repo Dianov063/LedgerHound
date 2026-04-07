@@ -207,6 +207,7 @@ export async function POST(req: NextRequest) {
           Key: `emergency-cases/${caseId}.json`,
           Body: JSON.stringify(caseData),
           ContentType: 'application/json',
+          ServerSideEncryption: 'aws:kms',
         }),
       );
       console.log(`[emergency/analyze] Saved case ${caseId} to S3`);

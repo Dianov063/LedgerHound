@@ -90,6 +90,10 @@ export default function Navbar() {
             <div className="relative">
               <button
                 onClick={() => setLangOpen(!langOpen)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setLangOpen(false); }}
+                aria-expanded={langOpen}
+                aria-haspopup="listbox"
+                aria-label="Select language"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-brand-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <Globe size={14} />
@@ -98,13 +102,20 @@ export default function Navbar() {
               </button>
 
               {langOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden z-50 min-w-[160px]">
+                <div role="listbox" aria-label="Available languages" className="absolute right-0 top-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden z-50 min-w-[160px]">
                   {locales.map((l) => (
                     <button
                       key={l}
+                      role="option"
+                      aria-selected={l === locale}
+                      tabIndex={0}
                       onClick={() => {
                         switchLocale(l);
                         setLangOpen(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchLocale(l); setLangOpen(false); }
+                        if (e.key === 'Escape') setLangOpen(false);
                       }}
                       className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-left ${
                         l === locale ? 'text-brand-600 font-medium bg-brand-50' : 'text-slate-700'
@@ -130,6 +141,8 @@ export default function Navbar() {
           <button
             className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50"
             onClick={() => setMobileOpen(!mobileOpen)}
+            aria-expanded={mobileOpen}
+            aria-label="Toggle navigation menu"
           >
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>

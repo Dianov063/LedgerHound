@@ -36,6 +36,7 @@ interface ReportStatus {
 
 function ReportSuccessContent() {
   const t = useTranslations('report');
+  const ts = useTranslations('report_success');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
   const searchParams = useSearchParams();
@@ -118,11 +119,11 @@ function ReportSuccessContent() {
           </div>
 
           <h1 className="font-display font-bold text-3xl lg:text-4xl text-slate-900 mb-4">
-            {isProcessing ? 'Generating Your Report...' : t('success_title')}
+            {isProcessing ? ts('generating_title') : t('success_title')}
           </h1>
           <p className="text-slate-600 text-lg mb-8">
             {isProcessing
-              ? 'Your forensic wallet analysis is being generated. This usually takes 30-60 seconds.'
+              ? ts('generating_desc')
               : t('success_subtitle')}
           </p>
 
@@ -131,7 +132,7 @@ function ReportSuccessContent() {
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium px-5 py-3 rounded-xl mb-6">
               <Mail size={16} />
               {reportStatus.email
-                ? `Report sent to ${reportStatus.email}`
+                ? ts('report_sent_to', { email: reportStatus.email })
                 : t('success_email')}
             </div>
           )}
@@ -140,7 +141,7 @@ function ReportSuccessContent() {
           {isProcessing && (
             <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium px-5 py-3 rounded-xl mb-6">
               <Loader2 size={16} className="animate-spin" />
-              {reportStatus.message || 'Analyzing blockchain data...'}
+              {reportStatus.message || ts('analyzing')}
             </div>
           )}
 
@@ -153,11 +154,11 @@ function ReportSuccessContent() {
                 className="inline-flex items-center gap-2 bg-emerald-600 text-white font-semibold text-sm px-6 py-3 rounded-xl hover:bg-emerald-700 transition-colors shadow-md"
               >
                 <Download size={16} />
-                Download Your Report PDF
+                {ts('download_btn')}
               </a>
               <p className="text-xs text-slate-400 mt-2">
-                {reportStatus.caseId && <span className="font-mono">Case {reportStatus.caseId} · </span>}
-                Link valid for 7 days
+                {reportStatus.caseId && <span className="font-mono">{ts('case_label')} {reportStatus.caseId} · </span>}
+                {ts('link_valid')}
               </p>
             </div>
           )}
@@ -166,7 +167,7 @@ function ReportSuccessContent() {
           {isReady && !reportStatus.downloadUrl && (
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium px-5 py-3 rounded-xl mb-6">
               <Mail size={16} />
-              Your report has been sent to your email with a PDF attachment.
+              {ts('email_fallback')}
             </div>
           )}
 
@@ -182,13 +183,13 @@ function ReportSuccessContent() {
                     href={`${base}/wallet-tracker`}
                     className="flex items-center gap-1.5 text-sm text-brand-600 font-semibold hover:text-brand-700"
                   >
-                    Wallet Tracker <ArrowRight size={12} />
+                    {ts('wallet_tracker')} <ArrowRight size={12} />
                   </Link>
                   <Link
                     href={`${base}/graph-tracer`}
                     className="flex items-center gap-1.5 text-sm text-brand-600 font-semibold hover:text-brand-700"
                   >
-                    Graph Tracer <ArrowRight size={12} />
+                    {ts('graph_tracer')} <ArrowRight size={12} />
                   </Link>
                 </div>
               </div>

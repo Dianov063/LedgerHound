@@ -11,8 +11,13 @@ import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
 import { getAddressIndex } from './scam-db';
 import { buildGraphData, type GraphData } from './generateGraphData';
 import QRCode from 'qrcode';
+import logger from '@/lib/logger';
 
-const ALCHEMY_URL = 'https://eth-mainnet.g.alchemy.com/v2/OAymykkPw_Oi3LINBgrqZ';
+function getAlchemyUrl(): string {
+  const key = process.env.ALCHEMY_API_KEY;
+  if (!key) throw new Error('ALCHEMY_API_KEY not configured');
+  return `https://eth-mainnet.g.alchemy.com/v2/${key}`;
+}
 
 const NETWORK_LABELS: Record<string, string> = {
   eth: 'Ethereum (ETH)', btc: 'Bitcoin (BTC)', sol: 'Solana (SOL)', trx: 'TRON (TRX)',
@@ -234,7 +239,7 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Pro
     else params.toAddress = address;
     if (pageKey) params.pageKey = pageKey;
 
-    const res = await fetch(ALCHEMY_URL, {
+    const res = await fetch(getAlchemyUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] }),
@@ -373,7 +378,7 @@ export async function generateReport(
   const caseId = `LH-${Date.now().toString(36).toUpperCase()}`;
   const date = new Date().toISOString().split('T')[0];
 
-  console.log(`[generateReport] Starting report for ${network}: ${address}`);
+  logger.info({ network, address }, '[generateReport] Starting report');
 
   // Fetch transfers from the correct chain
   const { incoming: rawIncoming, outgoing: rawOutgoing } = await fetchTransfersForNetwork(address, network);
@@ -383,7 +388,7 @@ export async function generateReport(
   const incoming = network === 'eth' ? filterSpam(rawIncoming) : rawIncoming;
   const spamFiltered = (rawIncoming.length - incoming.length) + (rawOutgoing.length - outgoing.length);
 
-  console.log(`[generateReport] Transfers: ${rawIncoming.length} in → ${incoming.length} clean, ${rawOutgoing.length} out → ${outgoing.length} clean (${spamFiltered} spam filtered)`);
+  logger.info({ rawIn: rawIncoming.length, cleanIn: incoming.length, rawOut: rawOutgoing.length, cleanOut: outgoing.length, spamFiltered }, '[generateReport] Transfers fetched');
 
   // Calculate stats — ETH-only totals (different tokens can't be summed)
   let ethReceived = 0;
@@ -432,7 +437,7 @@ export async function generateReport(
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
-  console.log(`[generateReport] ETH received: ${ethReceived.toFixed(4)}, sent: ${ethSent.toFixed(4)}, net: ${(ethReceived - ethSent).toFixed(4)}`);
+  logger.info({ ethReceived: ethReceived.toFixed(4), ethSent: ethSent.toFixed(4), net: (ethReceived - ethSent).toFixed(4) }, '[generateReport] Balance calculated');
 
   timestamps.sort((a, b) => a - b);
   const firstActivity = timestamps.length > 0 ? new Date(timestamps[0]).toISOString().split('T')[0] : 'N/A';
@@ -687,15 +692,13 @@ export async function generateReport(
   let downloadUrl = '';
   let s3Key = '';
   try {
-    console.log(`[generateReport] S3 env check — bucket: ${process.env.AWS_S3_BUCKET || 'NOT SET'}, region: ${process.env.AWS_REGION || 'NOT SET'}, keyId: ${process.env.AWS_ACCESS_KEY_ID ? process.env.AWS_ACCESS_KEY_ID.slice(0, 8) + '...' : 'NOT SET'}`);
-    console.log(`[generateReport] PDF buffer size: ${buf.length} bytes`);
+    logger.info({ pdfBytes: buf.length }, '[generateReport] Uploading to S3');
     s3Key = await uploadReport(buf, caseId);
-    console.log(`[generateReport] S3 upload OK: ${s3Key}`);
+    logger.info({ s3Key }, '[generateReport] S3 upload OK');
     downloadUrl = await getReportDownloadUrl(caseId);
-    console.log(`[generateReport] Presigned URL generated: ${downloadUrl.slice(0, 80)}...`);
-  } catch (err: any) {
-    console.error('[generateReport] S3 upload failed (continuing with email only):', err?.message || err);
-    console.error('[generateReport] S3 error name:', err?.name, 'code:', err?.$metadata?.httpStatusCode);
+    logger.info('[generateReport] Presigned URL generated');
+  } catch (err: unknown) {
+    logger.error({ err }, '[generateReport] S3 upload failed (continuing with email only)');
   }
 
   // Send email with download link
@@ -715,7 +718,7 @@ export async function generateReport(
       amount: options?.amount || 4900,
     });
   } catch (err) {
-    console.error('[generateReport] Failed to log report:', err);
+    logger.error({ err }, '[generateReport] Failed to log report');
   }
 
   return { ...reportData, downloadUrl, s3Key };

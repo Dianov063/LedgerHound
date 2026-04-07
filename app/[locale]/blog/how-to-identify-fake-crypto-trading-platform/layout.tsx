@@ -4,8 +4,8 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   return makeMetadata({
     locale,
     path: '/blog/how-to-identify-fake-crypto-trading-platform',
-    title: "How to Identify a Fake Crypto Trading Platform | LedgerHound",
-    description: "Learn the red flags of fake cryptocurrency trading platforms. Protect yourself from common crypto scam tactics used by fraudulent exchanges.",
+    title: "How to Identify Fake Crypto Trading Platforms | LedgerHound",
+    description: "Learn to spot fraudulent cryptocurrency exchanges and protect your funds.",
     keywords: ["fake crypto exchange","identify scam platform","crypto trading scam signs"],
   });
 }

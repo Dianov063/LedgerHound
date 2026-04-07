@@ -2,13 +2,33 @@ import { NextRequest } from 'next/server';
 import { listAllReports, updateReportStatus, listDisputes, deleteReportAndPlatform, updateDisputeStatus, getDispute } from '@/lib/scam-db';
 import { sendDisputeResolution } from '@/lib/dispute-emails';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const password = searchParams.get('password');
+/* ── Admin auth rate limiting: 5 attempts/min per IP ── */
+const authRateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(authRateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) authRateLimit.delete(k); }); }, 60000);
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+function checkAdmin(req: NextRequest): Response | null {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+  const now = Date.now();
+  const entry = authRateLimit.get(ip);
+  if (entry && entry.reset > now) {
+    if (entry.count >= 5) {
+      return Response.json({ error: 'Too many auth attempts. Try again later.' }, { status: 429 });
+    }
+    entry.count++;
+  } else {
+    authRateLimit.set(ip, { count: 1, reset: now + 60000 });
+  }
+
+  const authHeader = req.headers.get('x-admin-key');
+  if (!authHeader || authHeader !== process.env.ADMIN_PASSWORD) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const denied = checkAdmin(req);
+  if (denied) return denied;
 
   try {
     const [reports, disputes] = await Promise.all([
@@ -24,14 +44,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = checkAdmin(req);
+  if (denied) return denied;
+
   try {
-    const { searchParams } = new URL(req.url);
-    const password = searchParams.get('password');
-
-    if (password !== process.env.ADMIN_PASSWORD) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
     const { action, reportId, status, trustTier, platformSlug, disputeId, resolutionNote, sendEmail } = body;
 

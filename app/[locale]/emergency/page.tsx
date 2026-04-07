@@ -355,12 +355,14 @@ export default function EmergencyPage() {
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
                   {/* Country dropdown */}
                   <div className="mb-5">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label htmlFor="country" className="block text-sm font-medium text-slate-700 mb-2">
                       Where are you located?
                     </label>
                     <select
+                      id="country"
                       value={form.country}
                       onChange={(e) => set({ country: e.target.value })}
+                      aria-required="true"
                       className={inputCls}
                     >
                       <option value="">Select country...</option>
@@ -375,10 +377,11 @@ export default function EmergencyPage() {
                   {/* State/Region — for US, DE, AU */}
                   {COUNTRIES_WITH_STATES.includes(form.country) && (
                     <div className="mb-5">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <label htmlFor="victimState" className="block text-sm font-medium text-slate-700 mb-2">
                         State / Region
                       </label>
                       <input
+                        id="victimState"
                         type="text"
                         value={form.victimState}
                         onChange={(e) => set({ victimState: e.target.value })}
@@ -469,7 +472,7 @@ export default function EmergencyPage() {
 
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">
+                  <label htmlFor="walletAddress" className="block text-sm text-slate-500 mb-2">
                     Wallet Address{' '}
                     {form.detectedNetwork && (
                       <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
@@ -478,6 +481,7 @@ export default function EmergencyPage() {
                     )}
                   </label>
                   <input
+                    id="walletAddress"
                     type="text"
                     value={form.walletAddress}
                     onChange={(e) => set({ walletAddress: e.target.value })}
@@ -487,8 +491,9 @@ export default function EmergencyPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
+                  <label htmlFor="txid" className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
                   <input
+                    id="txid"
                     type="text"
                     value={form.txid}
                     onChange={(e) => set({ txid: e.target.value })}
@@ -498,12 +503,14 @@ export default function EmergencyPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">
+                  <label htmlFor="txDate" className="block text-sm text-slate-500 mb-2">
                     When did this happen? <span className="text-red-400">*</span>
                   </label>
                   <input
+                    id="txDate"
                     type="date"
                     value={form.txDate}
+                    aria-required="true"
                     onChange={(e) => set({ txDate: e.target.value })}
                     className={inputCls}
                   />
@@ -591,8 +598,9 @@ export default function EmergencyPage() {
 
               {/* Description */}
               <div className="mb-5">
-                <label className="block text-sm text-slate-500 mb-2">Describe what happened</label>
+                <label htmlFor="description" className="block text-sm text-slate-500 mb-2">Describe what happened</label>
                 <textarea
+                  id="description"
                   rows={4}
                   value={form.description}
                   onChange={(e) => set({ description: e.target.value })}
@@ -625,12 +633,14 @@ export default function EmergencyPage() {
 
               {/* Email */}
               <div className="mb-5">
-                <label className="block text-sm text-slate-500 mb-2">
+                <label htmlFor="email" className="block text-sm text-slate-500 mb-2">
                   Your email <span className="text-red-400">*</span>
                 </label>
                 <input
+                  id="email"
                   type="email"
                   value={form.email}
+                  aria-required="true"
                   onChange={(e) => set({ email: e.target.value })}
                   placeholder="you@email.com"
                   className={inputCls}
@@ -639,8 +649,9 @@ export default function EmergencyPage() {
 
               {/* Phone */}
               <div className="mb-6">
-                <label className="block text-sm text-slate-500 mb-2">Phone number (optional)</label>
+                <label htmlFor="victimPhone" className="block text-sm text-slate-500 mb-2">Phone number (optional)</label>
                 <input
+                  id="victimPhone"
                   type="tel"
                   value={form.victimPhone}
                   onChange={(e) => set({ victimPhone: e.target.value })}

@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-timeout';
+
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
 
 const RPC_URL = HELIUS_API_KEY
@@ -16,7 +18,8 @@ interface SolTransfer {
   metadata?: { blockTimestamp?: string };
 }
 
-async function rpcCall(method: string, params: any[]): Promise<any> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function rpcCall(method: string, params: unknown[]): Promise<any> {
   const body = JSON.stringify({
     jsonrpc: '2.0',
     id: 1,
@@ -24,7 +27,7 @@ async function rpcCall(method: string, params: any[]): Promise<any> {
     params,
   });
 
-  const res = await fetch(RPC_URL, {
+  const res = await fetchWithTimeout(RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

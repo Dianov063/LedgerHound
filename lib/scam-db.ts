@@ -343,8 +343,15 @@ export async function getReportById(id: string): Promise<ScamReport | null> {
 }
 
 export async function getReportsForPlatform(reportIds: string[]): Promise<ScamReport[]> {
-  const reports = await Promise.all(reportIds.map(id => s3Get(`reports/${id}.json`)));
-  return reports.filter(Boolean) as ScamReport[];
+  const results = await Promise.allSettled(reportIds.map(id => s3Get(`reports/${id}.json`)));
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length > 0) {
+    console.warn(`[scam-db] getReportsForPlatform: ${failed.length}/${results.length} S3 fetches failed`);
+  }
+  return results
+    .filter((r): r is PromiseFulfilledResult<ScamReport | null> => r.status === 'fulfilled')
+    .map(r => r.value)
+    .filter(Boolean) as ScamReport[];
 }
 
 export async function getAddressIndex(address: string): Promise<AddressIndex | null> {

@@ -5,7 +5,9 @@ import type { ScamType } from '@/lib/scam-db';
 const VALID_TYPES: ScamType[] = ['fake_exchange', 'pig_butchering', 'rug_pull', 'phishing', 'ponzi', 'other'];
 
 /* Rate limiting */
+const RATE_LIMIT_WINDOW = 3600000;
 const rateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +20,7 @@ export async function POST(req: NextRequest) {
       }
       entry.count++;
     } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
     const body = await req.json();

@@ -1,7 +1,8 @@
 import Stripe from 'stripe';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+import logger from '@/lib/logger';
 
 const getS3 = () =>
   new S3Client({
@@ -14,6 +15,35 @@ const getS3 = () =>
 
 const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
+const processedEvents = new Set<string>();
+const IDEMPOTENCY_PREFIX = 'webhook-events/';
+
+async function isEventProcessed(eventId: string): Promise<boolean> {
+  if (processedEvents.has(eventId)) return true;
+  try {
+    await getS3().send(new GetObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Key: `${IDEMPOTENCY_PREFIX}${eventId}`,
+    }));
+    processedEvents.add(eventId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function markEventProcessed(eventId: string): Promise<void> {
+  processedEvents.add(eventId);
+  await getS3().send(new PutObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET!,
+    Key: `${IDEMPOTENCY_PREFIX}${eventId}`,
+    Body: JSON.stringify({ processedAt: new Date().toISOString() }),
+    ContentType: 'application/json',
+    ServerSideEncryption: 'aws:kms',
+  }));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadCaseData(caseId: string): Promise<Record<string, any> | null> {
   try {
     const resp = await getS3().send(
@@ -24,52 +54,49 @@ async function loadCaseData(caseId: string): Promise<Record<string, any> | null>
     );
     const body = await resp.Body?.transformToString();
     return body ? JSON.parse(body) : null;
-  } catch (err: any) {
-    console.error('[webhook] Failed to load case data from S3:', err.message);
+  } catch (err: unknown) {
+    logger.error({ err }, '[webhook] Failed to load case data from S3');
     return null;
   }
 }
 
-const getStripe = (): any => {
+const getStripe = () => {
   // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 
-/* GET /api/webhook — health check to verify the route is reachable */
+/* GET /api/webhook — minimal health check */
 export async function GET() {
-  return Response.json({
-    status: 'ok',
-    hasSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
-    hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
-  });
+  return Response.json({ status: 'ok' });
 }
 
 export async function POST(request: Request) {
-  console.log('[webhook] POST received');
+  logger.info('[webhook] POST received');
 
   const rawBody = await request.text();
   const sig = request.headers.get('stripe-signature');
 
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.error('[webhook] STRIPE_WEBHOOK_SECRET is not set — add it to Vercel env vars');
+    logger.error('[webhook] STRIPE_WEBHOOK_SECRET is not set — add it to Vercel env vars');
     return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
   }
 
   if (!sig) {
-    console.error('[webhook] Missing stripe-signature header');
+    logger.error('[webhook] Missing stripe-signature header');
     return Response.json({ error: 'Missing signature' }, { status: 400 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let event: any;
 
   try {
     event = getStripe().webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err: any) {
-    console.error('[webhook] Signature verification failed:', err.message);
+  } catch (err: unknown) {
+    logger.error({ err }, '[webhook] Signature verification failed');
     return Response.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  console.log('[webhook] Event verified:', event.type, event.id);
+  logger.info({ type: event.type, eventId: event.id }, '[webhook] Event verified');
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
@@ -79,10 +106,10 @@ export async function POST(request: Request) {
     const network = session.metadata?.network || 'eth';
     const caseId = session.metadata?.caseId || '';
 
-    console.log('[webhook] Checkout completed — product:', product, 'wallet:', walletAddress, 'email:', email);
+    logger.info({ product, walletAddress, email }, '[webhook] Checkout completed');
 
     if (!email) {
-      console.error('[webhook] Missing email in metadata');
+      logger.error('[webhook] Missing email in metadata');
       return Response.json({ received: true });
     }
 
@@ -111,10 +138,10 @@ export async function POST(request: Request) {
             : NaN;
         const lossAmount = !isNaN(userLossAmount) ? userLossAmount : (session.amount_total || 7900) / 100;
 
-        console.log('[webhook] Generating Emergency Pack — case:', caseId, 'country:', country, 'lossAmount:', lossAmount);
+        logger.info({ caseId, country, lossAmount }, '[webhook] Generating Emergency Pack');
 
         // 1. Generate Forensic Report FIRST to get enrichment data
-        let enrichment: any = {};
+        let enrichment: Record<string, unknown> = {};
         if (walletAddress) {
           try {
             const paymentId = session.payment_intent || session.id || '';
@@ -123,26 +150,27 @@ export async function POST(request: Request) {
               amount: session.amount_total || 7900,
               network: detectedNetwork,
             });
-            console.log('[webhook] Forensic Report generated, caseId:', reportResult.caseId);
+            logger.info({ caseId: reportResult.caseId }, '[webhook] Forensic Report generated');
 
             // Extract enrichment data for legal pack
-            const exchanges = (reportResult.identifiedEntities || []).filter((e: any) => e.type === 'exchange');
+            const entities = reportResult.identifiedEntities || [];
+            const exchanges = entities.filter((e: { type: string }) => e.type === 'exchange');
             enrichment = {
               forensicCaseId: reportResult.caseId,
               riskScore: reportResult.riskScore,
               recoveryScore: reportResult.recoveryScore,
               recoveryLabel: reportResult.recoveryLabel,
-              identifiedExchanges: exchanges.map((e: any) => ({
+              identifiedExchanges: exchanges.map((e: { label: string; address: string }) => ({
                 name: e.label,
                 address: e.address,
               })),
-              mixerDetected: (reportResult.identifiedEntities || []).some((e: any) => e.type === 'mixer'),
+              mixerDetected: entities.some((e: { type: string }) => e.type === 'mixer'),
               ofacWarning: reportResult.ofacWarning,
               hops: reportResult.graphData?.nodes?.length || 0,
               keyFindings: reportResult.keyFindings || [],
             };
           } catch (err) {
-            console.error('[webhook] Forensic Report failed, continuing with legal pack:', err);
+            logger.error({ err }, '[webhook] Forensic Report failed, continuing with legal pack');
           }
         }
 
@@ -168,7 +196,7 @@ export async function POST(request: Request) {
           victimState,
           enrichment,
         });
-        console.log('[webhook] Emergency Pack generated:', packResult.templates?.length, 'templates');
+        logger.info({ templateCount: packResult.templates?.length }, '[webhook] Emergency Pack generated');
 
       } else if (product === 'summary_report') {
         /* ── Summary Report: just the Forensic Report ── */
@@ -179,9 +207,9 @@ export async function POST(request: Request) {
             amount: session.amount_total || 1900,
             network,
           });
-          console.log('[webhook] Summary Report generated, caseId:', result.caseId);
+          logger.info({ caseId: result.caseId }, '[webhook] Summary Report generated');
         } else {
-          console.error('[webhook] Summary Report: missing walletAddress');
+          logger.error('[webhook] Summary Report: missing walletAddress');
         }
 
       } else {
@@ -193,13 +221,13 @@ export async function POST(request: Request) {
             amount: session.amount_total || 4900,
             network,
           });
-          console.log('[webhook] Forensic Report generated, caseId:', result.caseId);
+          logger.info({ caseId: result.caseId }, '[webhook] Forensic Report generated');
         } else {
-          console.error('[webhook] Missing walletAddress for forensic report');
+          logger.error('[webhook] Missing walletAddress for forensic report');
         }
       }
     } catch (err) {
-      console.error('[webhook] Generation failed for product:', product, err);
+      logger.error({ err, product }, '[webhook] Generation failed');
     }
   }
 

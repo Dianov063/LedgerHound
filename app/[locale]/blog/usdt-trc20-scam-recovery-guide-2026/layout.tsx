@@ -5,7 +5,7 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
     locale,
     path: '/blog/usdt-trc20-scam-recovery-guide-2026',
     title: "USDT TRC20 Scam Recovery Guide 2026 | LedgerHound",
-    description: "Complete guide to recovering USDT sent via TRON TRC20 to scammers. Exchange freeze strategies, blockchain tracing, and legal options for victims.",
+    description: "Expert guide to recovering USDT TRC20 funds lost to cryptocurrency scams.",
     keywords: ["USDT TRC20 scam recovery","TRON scam recovery","USDT recovery guide"],
   });
 }

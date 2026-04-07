@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-timeout';
+
 // Chain-specific explorer APIs — each chain uses its own working free API
 // All return Etherscan-compatible format (status/message/result)
 
@@ -122,12 +124,9 @@ export async function fetchEtherscanV2Transfers(
   let nativeData: { status: string; message: string; result: unknown } = { status: '0', message: '', result: [] };
   let tokenData: { status: string; message: string; result: unknown } = { status: '0', message: '', result: [] };
 
-  const fetchWithTimeout = async (url: string, label: string, timeoutMs = 15000) => {
+  const fetchSafe = async (url: string, label: string) => {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
-      clearTimeout(timer);
+      const res = await fetchWithTimeout(url, { redirect: 'follow' }, 15000);
       return await res.json();
     } catch (err) {
       console.error(`[chain-tracker] ${chain.name} ${label} fetch error:`, err);
@@ -136,8 +135,8 @@ export async function fetchEtherscanV2Transfers(
   };
 
   [nativeData, tokenData] = await Promise.all([
-    fetchWithTimeout(nativeUrl, 'native'),
-    fetchWithTimeout(tokenUrl, 'token'),
+    fetchSafe(nativeUrl, 'native'),
+    fetchSafe(tokenUrl, 'token'),
   ]);
 
   console.log(

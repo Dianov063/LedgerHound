@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-timeout';
+
 // Blockstream public API — no API key required
 const BTC_BASE = 'https://blockstream.info/api';
 const BTC_EXPLORER = 'https://blockstream.info/tx';
@@ -39,7 +41,7 @@ export async function fetchBtcTransfers(address: string): Promise<{
     // Fetch address info
     const infoUrl = `${BTC_BASE}/address/${address}`;
     console.log(`[btc-tracker] Fetching address info: ${infoUrl}`);
-    const infoRes = await fetch(infoUrl);
+    const infoRes = await fetchWithTimeout(infoUrl);
     if (!infoRes.ok) {
       console.error(`[btc-tracker] Address info request failed: ${infoRes.status} ${infoRes.statusText}`);
       return empty;
@@ -52,7 +54,7 @@ export async function fetchBtcTransfers(address: string): Promise<{
     // Fetch transactions
     const txUrl = `${BTC_BASE}/address/${address}/txs`;
     console.log(`[btc-tracker] Fetching transactions: ${txUrl}`);
-    const txRes = await fetch(txUrl);
+    const txRes = await fetchWithTimeout(txUrl);
     if (!txRes.ok) {
       console.error(`[btc-tracker] Transaction request failed: ${txRes.status} ${txRes.statusText}`);
       return empty;

@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddressIndex } from '@/lib/scam-db';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 
-const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY || 'OAymykkPw_Oi3LINBgrqZ';
+function getAlchemyKey(): string {
+  const key = process.env.ALCHEMY_API_KEY;
+  if (!key) throw new Error('ALCHEMY_API_KEY not configured');
+  return key;
+}
 
-const ALCHEMY_URLS: Record<string, string> = {
-  eth: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  bnb: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  polygon: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  base: `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  arb: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  op: `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-};
+function getAlchemyUrls(): Record<string, string> {
+  const key = getAlchemyKey();
+  return {
+    eth: `https://eth-mainnet.g.alchemy.com/v2/${key}`,
+    bnb: `https://bnb-mainnet.g.alchemy.com/v2/${key}`,
+    polygon: `https://polygon-mainnet.g.alchemy.com/v2/${key}`,
+    base: `https://base-mainnet.g.alchemy.com/v2/${key}`,
+    arb: `https://arb-mainnet.g.alchemy.com/v2/${key}`,
+    op: `https://opt-mainnet.g.alchemy.com/v2/${key}`,
+  };
+}
 
 const EXPLORER_URLS: Record<string, string> = {
   eth: 'https://etherscan.io/tx/',
@@ -50,16 +58,16 @@ const NATIVE_CURRENCY: Record<string, string> = {
 
 /* ── EVM chains via Alchemy ── */
 async function fetchEVMTx(hash: string, network: string) {
-  const url = ALCHEMY_URLS[network];
+  const url = getAlchemyUrls()[network];
   if (!url) throw new Error(`Unsupported EVM network: ${network}`);
 
   const [txRes, receiptRes] = await Promise.all([
-    fetch(url, {
+    fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'eth_getTransactionByHash', params: [hash] }),
     }),
-    fetch(url, {
+    fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: 2, jsonrpc: '2.0', method: 'eth_getTransactionReceipt', params: [hash] }),
@@ -108,7 +116,7 @@ async function fetchEVMTx(hash: string, network: string) {
   let timestamp = '';
   if (tx.blockNumber) {
     try {
-      const blockRes = await fetch(url, {
+      const blockRes = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: 3, jsonrpc: '2.0', method: 'eth_getBlockByNumber', params: [tx.blockNumber, false] }),
@@ -142,7 +150,7 @@ async function fetchEVMTx(hash: string, network: string) {
 
 /* ── Bitcoin via Blockstream ── */
 async function fetchBTCTx(hash: string) {
-  const res = await fetch(`https://blockstream.info/api/tx/${hash}`);
+  const res = await fetchWithTimeout(`https://blockstream.info/api/tx/${hash}`);
   if (!res.ok) throw new Error('Bitcoin transaction not found');
   const tx = await res.json();
 
@@ -176,7 +184,7 @@ async function fetchTRONTx(hash: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (process.env.TRONGRID_API_KEY) headers['TRON-PRO-API-KEY'] = process.env.TRONGRID_API_KEY;
 
-  const res = await fetch(`https://api.trongrid.io/v1/transactions/${hash}`, { headers });
+  const res = await fetchWithTimeout(`https://api.trongrid.io/v1/transactions/${hash}`, { headers });
   if (!res.ok) throw new Error('TRON transaction not found');
   const data = await res.json();
   const tx = data.data?.[0] || data;
@@ -240,7 +248,7 @@ async function fetchSOLTx(hash: string) {
     ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
     : 'https://api.mainnet-beta.solana.com';
 
-  const res = await fetch(rpcUrl, {
+  const res = await fetchWithTimeout(rpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -349,7 +357,7 @@ export async function POST(req: NextRequest) {
     } else if (net === 'auto') {
       // Auto-detect: try all EVM chains in parallel
       result = await fetchEVMTxAuto(trimmedHash);
-    } else if (ALCHEMY_URLS[net]) {
+    } else if (getAlchemyUrls()[net]) {
       // Try the specific chain first; if not found, try all EVM chains
       try {
         result = await fetchEVMTx(trimmedHash, net);

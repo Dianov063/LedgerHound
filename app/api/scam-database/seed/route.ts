@@ -3,14 +3,35 @@ import { seedDatabase, getPlatformIndex, getStats, deleteReportAndPlatform } fro
 
 export const maxDuration = 60 // seconds — prevent Vercel 10s timeout
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const password = searchParams.get('password')
-  const force = searchParams.get('force') === 'true'
+/* ── Admin auth rate limiting: 5 attempts/min per IP ── */
+const authRateLimit = new Map<string, { count: number; reset: number }>()
+setInterval(() => { const now = Date.now(); Array.from(authRateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) authRateLimit.delete(k) }) }, 60000)
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+function checkAdmin(req: NextRequest): Response | null {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+  const now = Date.now()
+  const entry = authRateLimit.get(ip)
+  if (entry && entry.reset > now) {
+    if (entry.count >= 5) {
+      return Response.json({ error: 'Too many auth attempts. Try again later.' }, { status: 429 })
+    }
+    entry.count++
+  } else {
+    authRateLimit.set(ip, { count: 1, reset: now + 60000 })
+  }
+
+  const authHeader = req.headers.get('x-admin-key')
+  if (!authHeader || authHeader !== process.env.ADMIN_PASSWORD) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  return null
+}
+
+export async function GET(request: NextRequest) {
+  const denied = checkAdmin(request)
+  if (denied) return denied
+
+  const force = request.nextUrl.searchParams.get('force') === 'true'
 
   try {
     console.log('[seed/route] GET seed called, force:', force)
@@ -28,20 +49,16 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[seed/route] Error:', error)
-    return Response.json({ error: error.message, stack: error.stack?.split('\n').slice(0, 5) }, { status: 500 })
+    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const password = searchParams.get('password')
+  const denied = checkAdmin(request)
+  if (denied) return denied
 
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const reportId = searchParams.get('reportId')
-  const platformSlug = searchParams.get('platformSlug')
+  const reportId = request.nextUrl.searchParams.get('reportId')
+  const platformSlug = request.nextUrl.searchParams.get('platformSlug')
 
   if (!reportId || !platformSlug) {
     return Response.json({ error: 'Missing reportId or platformSlug query params' }, { status: 400 })
@@ -53,27 +70,20 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ success: true, ...result })
   } catch (error: any) {
     console.error('[seed/route] DELETE error:', error)
-    return Response.json({ error: error.message }, { status: 500 })
+    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
-  let password: string | null = null
-  let force = false
+  const denied = checkAdmin(request)
+  if (denied) return denied
 
+  let force = false
   try {
     const body = await request.json()
-    password = body.password
     force = body.force === true
   } catch {
-    // If body parsing fails, check query params
-    const { searchParams } = new URL(request.url)
-    password = searchParams.get('password')
-    force = searchParams.get('force') === 'true'
-  }
-
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    force = request.nextUrl.searchParams.get('force') === 'true'
   }
 
   try {
@@ -91,6 +101,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[seed/route] Error:', error)
-    return Response.json({ error: error.message, stack: error.stack?.split('\n').slice(0, 5) }, { status: 500 })
+    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
   }
 }
