@@ -11,6 +11,7 @@ import {
   ActionGuideDoc,
 } from '@/lib/legal-packs/templates';
 import type { CaseData, TemplateType, CountryResearch } from '@/lib/legal-packs/types';
+import { calcRecoveryScore } from '@/lib/scam-db';
 
 const getS3 = () =>
   new S3Client({
@@ -90,6 +91,10 @@ export interface GeneratePackInput {
   walletAddress: string;
   txHashes: string[];
   description: string;
+  txDate?: string;
+  platformName?: string;
+  network?: string;
+  contactMethod?: string;
 }
 
 export interface GeneratePackResult {
@@ -114,6 +119,10 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     walletAddress,
     txHashes,
     description,
+    txDate,
+    platformName,
+    network: inputNetwork,
+    contactMethod,
   } = input;
 
   // Load research for the country
@@ -123,6 +132,46 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     throw new Error(`No legal research available for country: ${code}. Run the research pipeline first.`);
   }
 
+  // Derive display names from network identifier
+  const NETWORK_MAP: Record<string, { cryptoType: string; networkName: string }> = {
+    eth: { cryptoType: 'ETH', networkName: 'Ethereum' },
+    btc: { cryptoType: 'BTC', networkName: 'Bitcoin' },
+    bsc: { cryptoType: 'BNB', networkName: 'BNB Smart Chain' },
+    trx: { cryptoType: 'TRX', networkName: 'Tron' },
+    sol: { cryptoType: 'SOL', networkName: 'Solana' },
+    matic: { cryptoType: 'MATIC', networkName: 'Polygon' },
+    avax: { cryptoType: 'AVAX', networkName: 'Avalanche' },
+    arb: { cryptoType: 'ETH', networkName: 'Arbitrum' },
+    op: { cryptoType: 'ETH', networkName: 'Optimism' },
+    base: { cryptoType: 'ETH', networkName: 'Base' },
+  };
+  const netKey = (inputNetwork || 'eth').toLowerCase();
+  const { cryptoType, networkName } = NETWORK_MAP[netKey] || { cryptoType: 'ETH', networkName: 'Ethereum' };
+
+  // Calculate recovery score (same algorithm used in scam-db)
+  const incidentDate = txDate || new Date().toISOString().split('T')[0];
+  const daysOld = Math.floor((Date.now() - new Date(incidentDate).getTime()) / 86400000);
+  const recovery = calcRecoveryScore({
+    lossDate: incidentDate,
+    blockchainConfirmed: !!(txHashes?.[0]),
+    network: netKey,
+    lossAmount: lossAmount || 0,
+  });
+
+  // Determine risk and urgency levels
+  const riskLevel: 'low' | 'medium' | 'high' | 'critical' =
+    daysOld <= 3 ? 'critical' : daysOld <= 14 ? 'high' : daysOld <= 60 ? 'medium' : 'low';
+  const urgencyLevel =
+    daysOld <= 3 ? 'CRITICAL — Act within 24 hours' :
+    daysOld <= 14 ? 'URGENT — Act this week' :
+    daysOld <= 60 ? 'MODERATE — Act within 30 days' :
+    'REDUCED — Extended timeline';
+  const timeWindow =
+    daysOld <= 7 ? '24-72 hours for exchange freeze' :
+    daysOld <= 30 ? '1-2 weeks for preservation requests' :
+    daysOld <= 90 ? '30-60 days for legal proceedings' :
+    '90+ days — focus on law enforcement';
+
   // Build CaseData
   const caseData: CaseData = {
     caseId,
@@ -130,16 +179,23 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     victimName: victimName || '',
     victimEmail: email,
     country: code,
-    incidentDate: new Date().toISOString().split('T')[0],
+    incidentDate,
     lossAmount: lossAmount || 0,
     lossCurrency: 'USD',
-    cryptoType: 'ETH',
+    cryptoType,
     scammerAddress: walletAddress || '',
     txid: txHashes?.[0] || '',
-    platformName: '',
-    network: 'Ethereum',
+    platformName: platformName || '',
+    network: networkName,
     scamType: scamType || '',
     description: description || '',
+    contactMethod: contactMethod || '',
+    // Recovery analysis fields
+    recoveryScore: recovery.score,
+    riskLevel,
+    urgencyLevel,
+    timeWindow,
+    daysOld,
   };
 
   // Render all 4 template PDFs

@@ -1,6 +1,34 @@
 import Stripe from 'stripe';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+
+const getS3 = () =>
+  new S3Client({
+    region: process.env.AWS_REGION || 'eu-central-1',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+
+const s3Bucket = () => process.env.AWS_S3_BUCKET!;
+
+async function loadCaseData(caseId: string): Promise<Record<string, any> | null> {
+  try {
+    const resp = await getS3().send(
+      new GetObjectCommand({
+        Bucket: s3Bucket(),
+        Key: `emergency-cases/${caseId}.json`,
+      }),
+    );
+    const body = await resp.Body?.transformToString();
+    return body ? JSON.parse(body) : null;
+  } catch (err: any) {
+    console.error('[webhook] Failed to load case data from S3:', err.message);
+    return null;
+  }
+}
 
 const getStripe = (): any => {
   // @ts-expect-error Stripe types mismatch with ESM default import
@@ -61,11 +89,24 @@ export async function POST(request: Request) {
     try {
       if (product === 'emergency_pack') {
         /* ── Emergency Pack: 4 legal PDFs + Forensic Report ── */
-        const country = session.metadata?.country || 'US';
-        const scamType = session.metadata?.scamType || '';
-        const platformName = session.metadata?.platformName || '';
+        const saved = await loadCaseData(caseId);
 
-        console.log('[webhook] Generating Emergency Pack — case:', caseId, 'country:', country);
+        const country = saved?.country || session.metadata?.country || 'US';
+        const scamType = saved?.scamType || session.metadata?.scamType || '';
+        const platformName = saved?.platformName || session.metadata?.platformName || '';
+        const description = saved?.description || '';
+        const txid = saved?.txid || session.metadata?.txid || '';
+        const txDate = saved?.txDate || '';
+        const detectedNetwork = saved?.detectedNetwork || session.metadata?.network || 'eth';
+        const contactMethod = saved?.contactMethod || '';
+        const userLossAmount = saved?.lossAmount
+          ? parseFloat(String(saved.lossAmount))
+          : session.metadata?.lossAmount
+            ? parseFloat(session.metadata.lossAmount)
+            : NaN;
+        const lossAmount = !isNaN(userLossAmount) ? userLossAmount : (session.amount_total || 7900) / 100;
+
+        console.log('[webhook] Generating Emergency Pack — case:', caseId, 'country:', country, 'lossAmount:', lossAmount);
 
         // 1. Generate 4 legal PDFs (police complaint, preservation letter, regulator complaint, action guide)
         const packResult = await generateEmergencyPack({
@@ -73,11 +114,15 @@ export async function POST(request: Request) {
           countryCode: country,
           email,
           victimName: session.customer_details?.name || '',
-          lossAmount: (session.amount_total || 7900) / 100,
+          lossAmount,
           scamType,
           walletAddress: walletAddress || '',
-          txHashes: [],
-          description: '',
+          txHashes: txid ? [txid] : [],
+          description,
+          txDate,
+          platformName,
+          network: detectedNetwork,
+          contactMethod,
         });
         console.log('[webhook] Emergency Pack generated:', packResult.templates?.length, 'templates');
 
@@ -87,7 +132,7 @@ export async function POST(request: Request) {
           const reportResult = await generateReport(walletAddress, email, {
             stripePaymentId: paymentId,
             amount: session.amount_total || 7900,
-            network,
+            network: detectedNetwork,
           });
           console.log('[webhook] Forensic Report also generated, caseId:', reportResult.caseId);
         }

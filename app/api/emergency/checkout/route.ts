@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+const getS3 = () =>
+  new S3Client({
+    region: process.env.AWS_REGION || 'eu-central-1',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+
+const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,6 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     /* ── Parse body ── */
+    const body = await req.json();
     const {
       product,
       caseId,
@@ -57,7 +70,14 @@ export async function POST(req: NextRequest) {
       platformName,
       scamType,
       route,
-    } = await req.json();
+      lossAmount,
+      lossBracket,
+      txid,
+      txDate,
+      detectedNetwork,
+      description,
+      contactMethod,
+    } = body;
 
     /* ── Validate product ── */
     if (!product || !(product in PRODUCTS)) {
@@ -76,6 +96,43 @@ export async function POST(req: NextRequest) {
     }
 
     const productDef = PRODUCTS[product as ProductKey];
+
+    /* ── Save full case data to S3 for webhook retrieval ── */
+    try {
+      const casePayload = {
+        caseId,
+        product,
+        email,
+        country: country || '',
+        walletAddress: walletAddress || '',
+        network: network || '',
+        detectedNetwork: detectedNetwork || network || '',
+        platformName: platformName || '',
+        scamType: scamType || '',
+        route: route || '',
+        lossAmount: lossAmount || '',
+        lossBracket: lossBracket || '',
+        txid: txid || '',
+        txDate: txDate || '',
+        description: description || '',
+        contactMethod: contactMethod || '',
+        savedAt: new Date().toISOString(),
+      };
+
+      await getS3().send(
+        new PutObjectCommand({
+          Bucket: s3Bucket(),
+          Key: `emergency-cases/${caseId}.json`,
+          Body: JSON.stringify(casePayload),
+          ContentType: 'application/json',
+          ServerSideEncryption: 'aws:kms',
+        }),
+      );
+      console.log(`[emergency/checkout] Case data saved to S3 for ${caseId}`);
+    } catch (s3Err: any) {
+      console.error('[emergency/checkout] Failed to save case data to S3:', s3Err.message);
+      // Continue with checkout — data loss is better than blocking payment
+    }
 
     /* ── Create Stripe checkout session ── */
     const session = await getStripe().checkout.sessions.create({
@@ -104,6 +161,8 @@ export async function POST(req: NextRequest) {
         platformName: platformName || '',
         scamType: scamType || '',
         route: route || '',
+        lossAmount: String(lossAmount || ''),
+        txid: txid || '',
       },
       customer_email: email,
       success_url: `${req.nextUrl.origin}/emergency/success?session_id={CHECKOUT_SESSION_ID}&case_id=${encodeURIComponent(caseId)}&product=${encodeURIComponent(product)}`,

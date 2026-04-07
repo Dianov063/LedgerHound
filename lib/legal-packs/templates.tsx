@@ -1,6 +1,24 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { CountryResearch, CaseData } from './types';
+
+/* Register Noto Sans — FULL font files with Latin + Cyrillic + Greek + Vietnamese */
+Font.register({
+  family: 'NotoSans',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@main/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@main/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf',
+      fontWeight: 700,
+    },
+  ],
+});
+
+/* Disable hyphenation for non-Latin scripts */
+Font.registerHyphenationCallback((word: string) => [word]);
 
 const blue = '#2563eb';
 const slate900 = '#0f172a';
@@ -9,20 +27,20 @@ const slate400 = '#94a3b8';
 const red = '#dc2626';
 
 const s = StyleSheet.create({
-  page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 },
+  page: { padding: 50, fontFamily: 'NotoSans', fontSize: 10, color: slate900 },
   header: { marginBottom: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  logo: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 },
-  title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 },
+  logo: { fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 4 },
+  title: { fontSize: 16, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 },
   subtitle: { fontSize: 10, color: slate600 },
   section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 8, backgroundColor: '#f1f5f9', padding: 6, borderRadius: 4 },
+  sectionTitle: { fontSize: 12, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 8, backgroundColor: '#f1f5f9', padding: 6, borderRadius: 4 },
   label: { fontSize: 8, color: slate400, marginBottom: 2 },
   value: { fontSize: 10, color: slate900, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 16, marginBottom: 4 },
   col: { flex: 1 },
   p: { fontSize: 10, color: slate600, lineHeight: 1.6, marginBottom: 8 },
   bullet: { fontSize: 10, color: slate600, lineHeight: 1.5, marginBottom: 3, paddingLeft: 12 },
-  bold: { fontFamily: 'Helvetica-Bold' },
+  bold: { fontFamily: 'NotoSans', fontWeight: 700 },
   footer: { position: 'absolute', bottom: 30, left: 50, right: 50, flexDirection: 'row', justifyContent: 'space-between', fontSize: 7, color: slate400, borderTopWidth: 0.5, borderTopColor: '#e2e8f0', paddingTop: 8 },
   alertBox: { backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' },
   infoBox: { backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#bfdbfe' },
@@ -64,7 +82,7 @@ const form = StyleSheet.create({
   fieldBox: { backgroundColor: '#f8fafc', borderRadius: 4, borderWidth: 0.5, borderColor: '#e2e8f0', padding: 8, marginBottom: 8 },
   fieldRow: { flexDirection: 'row', marginBottom: 4 },
   fieldLabel: { fontSize: 8, color: slate400, width: 120 },
-  fieldValue: { fontSize: 9, color: slate900, flex: 1, fontFamily: 'Helvetica-Bold' },
+  fieldValue: { fontSize: 9, color: slate900, flex: 1, fontFamily: 'NotoSans', fontWeight: 700 },
   monoValue: { fontSize: 8, color: slate900, fontFamily: 'Courier', flex: 1 },
   evidenceBox: { backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#93c5fd' },
   lhFooter: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8, marginTop: 'auto' as any },
@@ -109,7 +127,7 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
             </View>
             <View>
               <View style={{ backgroundColor: blue, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 4 }}>
-                <Text style={{ color: 'white', fontSize: 8, fontFamily: 'Helvetica-Bold' }}>LH-{caseData.caseId}</Text>
+                <Text style={{ color: 'white', fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700 }}>LH-{caseData.caseId}</Text>
               </View>
               <Text style={{ fontSize: 8, color: slate400, textAlign: 'right' as any }}>Date: {caseData.date}</Text>
             </View>
@@ -118,7 +136,7 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
 
         {/* Section 1: Filing Information */}
         <View style={{ backgroundColor: '#f1f5f9', borderRadius: 6, padding: 10, marginBottom: 14 }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 6 }}>FILING INFORMATION</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 6 }}>FILING INFORMATION</Text>
           <FormField label="Filing with" value={`${research.policeAgency.name} (${research.policeAgency.shortName})`} />
           <FormField label="Jurisdiction" value={research.policeAgency.jurisdiction} />
           <FormField label="Online submission" value={research.policeAgency.complaintUrl} />
@@ -145,7 +163,7 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
             <FormField label="Date of Incident" value={caseData.incidentDate} />
             <View style={form.fieldRow}>
               <Text style={form.fieldLabel}>Amount Lost:</Text>
-              <Text style={{ fontSize: 9, color: red, fontFamily: 'Helvetica-Bold', flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
+              <Text style={{ fontSize: 9, color: red, fontFamily: 'NotoSans', fontWeight: 700, flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
             </View>
             <FormField label="Cryptocurrency" value={caseData.cryptoType || 'ETH'} />
             <FormField label="Network" value={caseData.network?.toUpperCase() || 'Ethereum'} />
@@ -170,14 +188,14 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
 
         {/* Section 5: Blockchain Evidence */}
         <View style={form.evidenceBox}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>BLOCKCHAIN EVIDENCE (Verified by LedgerHound)</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 6 }}>BLOCKCHAIN EVIDENCE (Verified by LedgerHound)</Text>
           <View style={form.fieldRow}>
             <Text style={form.fieldLabel}>Recovery Probability:</Text>
-            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: score >= 60 ? '#16a34a' : score >= 35 ? '#d97706' : red, flex: 1 }}>{score}%</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: score >= 60 ? '#16a34a' : score >= 35 ? '#d97706' : red, flex: 1 }}>{score}%</Text>
           </View>
           <View style={form.fieldRow}>
             <Text style={form.fieldLabel}>Risk Assessment:</Text>
-            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, flex: 1 }}>{riskLevel.toUpperCase()}</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>{riskLevel.toUpperCase()}</Text>
           </View>
           <FormField label="Fund Destination" value={caseData.finalDestination || caseData.detectedExchange || 'Under investigation'} />
           {hops > 0 ? (
@@ -292,12 +310,12 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 
         {/* Recipient */}
         <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900 }}>{caseData.exchange || caseData.detectedExchange || '[Exchange Name]'} Compliance Department</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>{caseData.exchange || caseData.detectedExchange || '[Exchange Name]'} Compliance Department</Text>
         </View>
 
         {/* Subject */}
         <View style={{ borderBottomWidth: 1, borderBottomColor: slate900, paddingBottom: 8, marginBottom: 16 }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: slate900 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>
             RE: URGENT REQUEST FOR TRANSACTION REVIEW AND ASSET PRESERVATION
           </Text>
           <Text style={{ fontSize: 9, color: slate600, marginTop: 2 }}>
@@ -319,7 +337,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
             <FormField label="Network" value={caseData.network?.toUpperCase() || 'Ethereum'} />
             <View style={form.fieldRow}>
               <Text style={form.fieldLabel}>USD Value:</Text>
-              <Text style={{ fontSize: 9, color: red, fontFamily: 'Helvetica-Bold', flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
+              <Text style={{ fontSize: 9, color: red, fontFamily: 'NotoSans', fontWeight: 700, flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
             </View>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 2, marginTop: 4 }}>Transaction Hash (TXID):</Text>
             <Text style={{ fontFamily: 'Courier', fontSize: 7, color: slate900, marginBottom: 6 }}>{caseData.txid || '________________________'}</Text>
@@ -342,7 +360,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 
         {/* Blockchain Evidence */}
         <View style={form.evidenceBox}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>BLOCKCHAIN EVIDENCE</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 6 }}>BLOCKCHAIN EVIDENCE</Text>
           <Text style={{ fontSize: 9, color: slate600, marginBottom: 6 }}>
             This transaction has been traced and verified by LedgerHound, a blockchain forensics service. Our analysis indicates:
           </Text>
@@ -366,16 +384,16 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <View style={s.section}>
           <Text style={s.sectionTitle}>ACTIONS REQUESTED</Text>
           <View style={{ paddingLeft: 4 }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>1. IMMEDIATE ASSET FREEZE</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>1. IMMEDIATE ASSET FREEZE</Text>
             <Text style={{ fontSize: 9, color: slate600, marginBottom: 8, paddingLeft: 16 }}>Freeze any assets associated with wallet address {shortAddr(caseData.scammerAddress)} pending investigation.</Text>
 
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>2. ACCOUNT REVIEW</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>2. ACCOUNT REVIEW</Text>
             <Text style={{ fontSize: 9, color: slate600, marginBottom: 8, paddingLeft: 16 }}>Review the account associated with this wallet for suspicious activity.</Text>
 
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>3. EVIDENCE PRESERVATION</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>3. EVIDENCE PRESERVATION</Text>
             <Text style={{ fontSize: 9, color: slate600, marginBottom: 8, paddingLeft: 16 }}>Preserve all records, KYC documents, login history, and transaction records for this account.</Text>
 
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>4. CONFIRMATION</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>4. CONFIRMATION</Text>
             <Text style={{ fontSize: 9, color: slate600, marginBottom: 8, paddingLeft: 16 }}>Please confirm receipt of this request and any actions taken within 48 hours.</Text>
           </View>
         </View>
@@ -402,7 +420,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 
         {/* Legal Notice */}
         <View style={s.alertBox}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>LEGAL NOTICE</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 4 }}>LEGAL NOTICE</Text>
           <Text style={{ fontSize: 8, color: '#991b1b', lineHeight: 1.5 }}>
             Failure to take reasonable steps to preserve potentially fraudulent assets may result in liability. This letter serves as formal notice of suspected criminal activity on your platform.
           </Text>
@@ -460,7 +478,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
           </View>
           <View>
             <View style={{ backgroundColor: blue, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 4 }}>
-              <Text style={{ color: 'white', fontSize: 8, fontFamily: 'Helvetica-Bold' }}>LH-{caseData.caseId}</Text>
+              <Text style={{ color: 'white', fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700 }}>LH-{caseData.caseId}</Text>
             </View>
           </View>
         </View>
@@ -468,7 +486,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
 
       {/* Section 1: Regulatory Body */}
       <View style={s.infoBox}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>REGULATORY BODY</Text>
+        <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 6 }}>REGULATORY BODY</Text>
         <FormField label="Filing with" value={`${research.financialRegulator.name} (${research.financialRegulator.shortName})`} />
         <FormField label="Online" value={research.financialRegulator.tipUrl} />
         <FormField label="Scope" value={research.financialRegulator.scope} />
@@ -503,7 +521,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
         <View style={form.fieldBox}>
           <View style={form.fieldRow}>
             <Text style={form.fieldLabel}>Amount Lost:</Text>
-            <Text style={{ fontSize: 9, color: red, fontFamily: 'Helvetica-Bold', flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
+            <Text style={{ fontSize: 9, color: red, fontFamily: 'NotoSans', fontWeight: 700, flex: 1 }}>{fmtMoney(caseData.lossAmount, caseData.lossCurrency)}</Text>
           </View>
           <FormField label="Cryptocurrency" value={caseData.cryptoType || 'ETH'} />
           <FormField label="Payment Method" value={caseData.paymentMethod || 'Cryptocurrency transfer'} />
@@ -611,23 +629,23 @@ const emerald = '#059669';
 
 const ag = StyleSheet.create({
   caseBadge: { backgroundColor: blue, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' as any },
-  caseBadgeText: { color: 'white', fontSize: 8, fontFamily: 'Helvetica-Bold' },
+  caseBadgeText: { color: 'white', fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700 },
   summaryBox: { backgroundColor: '#eff6ff', borderRadius: 8, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#bfdbfe' },
   summaryRow: { flexDirection: 'row', marginBottom: 6 },
   summaryLabel: { fontSize: 9, color: slate600, width: 110 },
-  summaryValue: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, flex: 1 },
+  summaryValue: { fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 },
   analysisBox: { backgroundColor: '#f0fdf4', borderRadius: 8, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#bbf7d0' },
   scoreCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 3, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  scoreText: { fontSize: 18, fontFamily: 'Helvetica-Bold' },
+  scoreText: { fontSize: 18, fontFamily: 'NotoSans', fontWeight: 700 },
   scoreLabel: { fontSize: 7, color: slate600, marginTop: 1 },
   riskBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' as any },
-  riskText: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: 'white' },
+  riskText: { fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: 'white' },
   warningBox: { borderRadius: 8, padding: 12, marginBottom: 16, borderWidth: 1.5 },
   stepContainer: { marginBottom: 14 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   stepCircle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  stepNum: { color: 'white', fontFamily: 'Helvetica-Bold', fontSize: 13 },
-  stepTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: slate900 },
+  stepNum: { color: 'white', fontFamily: 'NotoSans', fontWeight: 700, fontSize: 13 },
+  stepTitle: { fontSize: 12, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 },
   stepWhy: { backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: '#cbd5e1' },
   stepWhyText: { fontSize: 8, color: slate600, fontStyle: 'italic' },
   checkItem: { flexDirection: 'row', marginBottom: 3, paddingLeft: 36 },
@@ -635,14 +653,14 @@ const ag = StyleSheet.create({
   checkText: { fontSize: 9, color: slate900, flex: 1 },
   stepLink: { fontSize: 8, color: blue, paddingLeft: 36, marginTop: 2 },
   timelineRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e2e8f0', paddingVertical: 6 },
-  timelineStage: { flex: 1, fontSize: 9, color: slate900, fontFamily: 'Helvetica-Bold' },
+  timelineStage: { flex: 1, fontSize: 9, color: slate900, fontFamily: 'NotoSans', fontWeight: 700 },
   timelineTime: { flex: 1, fontSize: 9, color: slate600 },
   timelineHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', paddingVertical: 5, paddingHorizontal: 4, borderRadius: 4, marginBottom: 2 },
   insightBox: { borderRadius: 8, padding: 12, marginBottom: 16, borderWidth: 1 },
   ctaBox: { backgroundColor: '#0f172a', borderRadius: 8, padding: 16, marginBottom: 16 },
-  ctaTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#38bdf8', marginBottom: 6 },
+  ctaTitle: { fontSize: 12, fontFamily: 'NotoSans', fontWeight: 700, color: '#38bdf8', marginBottom: 6 },
   ctaBullet: { fontSize: 9, color: '#e2e8f0', marginBottom: 3, paddingLeft: 8 },
-  ctaContact: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#38bdf8', marginTop: 10 },
+  ctaContact: { fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#38bdf8', marginTop: 10 },
 });
 
 const getRiskColor = (level?: string) => {
@@ -706,7 +724,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View>
               <Text style={s.logo}>LedgerHound</Text>
-              <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 6 }}>
+              <Text style={{ fontSize: 16, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 6 }}>
                 Emergency Recovery Action Guide
               </Text>
             </View>
@@ -718,7 +736,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
 
         {/* Section 1: Case Summary */}
         <View style={ag.summaryBox}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 8 }}>CASE SUMMARY</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 8 }}>CASE SUMMARY</Text>
           <View style={ag.summaryRow}>
             <Text style={ag.summaryLabel}>Case ID:</Text>
             <Text style={ag.summaryValue}>LH-{caseData.caseId}</Text>
@@ -747,7 +765,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
 
         {/* Section 2: Recovery Analysis */}
         <View style={ag.analysisBox}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: emerald, marginBottom: 10 }}>RECOVERY ANALYSIS</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: emerald, marginBottom: 10 }}>RECOVERY ANALYSIS</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {/* Score Circle */}
             <View style={{ ...ag.scoreCircle, borderColor: getScoreColor(score) }}>
@@ -756,7 +774,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
             </View>
             {/* Fund Status */}
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Fund Status:</Text>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 4 }}>Fund Status:</Text>
               <Text style={{ fontSize: 8, color: slate600, marginBottom: 2 }}>
                 {'\u2022'} {detectedExchange ? `Funds traced to ${detectedExchange}` : 'Funds in unknown wallet'}
               </Text>
@@ -783,7 +801,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
                 <Text style={ag.riskText}>{riskLevel.toUpperCase()}</Text>
               </View>
             </View>
-            <Text style={{ fontSize: 8, color: slate900, fontFamily: 'Helvetica-Bold' }}>
+            <Text style={{ fontSize: 8, color: slate900, fontFamily: 'NotoSans', fontWeight: 700 }}>
               {urgencyLevel} — Action required within {timeWindow}
             </Text>
           </View>
@@ -792,7 +810,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         {/* Section 3: Warning Box */}
         {daysOld <= 3 ? (
           <View style={{ ...ag.warningBox, backgroundColor: '#fef2f2', borderColor: '#fca5a5' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 4 }}>
               CRITICAL WINDOW
             </Text>
             <Text style={{ fontSize: 9, color: '#991b1b', lineHeight: 1.5 }}>
@@ -801,7 +819,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </View>
         ) : daysOld > 7 ? (
           <View style={{ ...ag.warningBox, backgroundColor: '#fffbeb', borderColor: '#fcd34d' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 4 }}>
               REDUCED CHANCES
             </Text>
             <Text style={{ fontSize: 9, color: '#92400e', lineHeight: 1.5 }}>
@@ -810,7 +828,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </View>
         ) : (
           <View style={{ ...ag.warningBox, backgroundColor: '#fffbeb', borderColor: '#fcd34d' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 4 }}>
               URGENT — TIME-SENSITIVE
             </Text>
             <Text style={{ fontSize: 9, color: '#92400e', lineHeight: 1.5 }}>
@@ -899,7 +917,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
               <View key={i} style={{ flexDirection: 'row', marginBottom: 6, paddingLeft: 4 }}>
                 <Text style={{ fontSize: 9, color: blue, marginRight: 6 }}>{'\u25B8'}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{agency.name}</Text>
+                  <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>{agency.name}</Text>
                   <Text style={{ fontSize: 8, color: blue }}>{agency.url}</Text>
                   <Text style={{ fontSize: 7, color: slate400 }}>When: {agency.when}</Text>
                 </View>
@@ -942,21 +960,21 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         {/* Section 6: Personalized Insight */}
         {score >= 60 ? (
           <View style={{ ...ag.insightBox, backgroundColor: '#f0fdf4', borderColor: '#86efac' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 4 }}>RECOVERY OUTLOOK: FAVORABLE</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: green, marginBottom: 4 }}>RECOVERY OUTLOOK: FAVORABLE</Text>
             <Text style={{ fontSize: 9, color: '#166534', lineHeight: 1.6 }}>
               Good news: {detectedExchange ? `Funds were detected on ${detectedExchange}, a KYC-compliant exchange.` : 'Funds are traceable on the blockchain.'} This significantly increases recovery chances. KYC exchanges are legally required to cooperate with law enforcement and can freeze accounts quickly. Focus on filing your police report and preservation letter immediately — speed is your greatest advantage.
             </Text>
           </View>
         ) : score >= 35 ? (
           <View style={{ ...ag.insightBox, backgroundColor: '#fffbeb', borderColor: '#fcd34d' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>RECOVERY OUTLOOK: MODERATE</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 4 }}>RECOVERY OUTLOOK: MODERATE</Text>
             <Text style={{ fontSize: 9, color: '#92400e', lineHeight: 1.6 }}>
               Recovery is possible but will require persistence. {mixerDetected ? 'A mixer/tumbler was detected in the transaction chain, which complicates tracing.' : 'The funds have moved through multiple hops.'} Complete all five steps in this guide. Building a comprehensive evidence package will be crucial for any legal action. Consider a professional forensic trace to identify additional leads.
             </Text>
           </View>
         ) : (
           <View style={{ ...ag.insightBox, backgroundColor: '#fef2f2', borderColor: '#fca5a5' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>RECOVERY OUTLOOK: CHALLENGING</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 4 }}>RECOVERY OUTLOOK: CHALLENGING</Text>
             <Text style={{ fontSize: 9, color: '#991b1b', lineHeight: 1.6 }}>
               Recovery will be challenging{mixerDetected ? ' due to mixer/tumbler usage in the transaction chain' : daysOld > 30 ? ` — your transaction was ${daysOld} days ago and funds have likely been moved` : ''}. However, completing all steps still provides value: it creates a legal record, may help identify the perpetrator, and contributes to broader fraud investigations. Consider joining our Victim Recovery Group to combine resources with other affected individuals.
             </Text>
@@ -968,7 +986,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           <Text style={s.sectionTitle}>EMERGENCY CONTACTS</Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 6, padding: 10 }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>Cybercrime</Text>
+              <Text style={{ fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 4 }}>Cybercrime</Text>
               {research.contacts.emergencyPhone ? (
                 <Text style={{ fontSize: 8, color: slate600, marginBottom: 2 }}>Phone: {research.contacts.emergencyPhone}</Text>
               ) : null}
@@ -977,7 +995,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
               ) : null}
             </View>
             <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 6, padding: 10 }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>Consumer Protection</Text>
+              <Text style={{ fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: blue, marginBottom: 4 }}>Consumer Protection</Text>
               <Text style={{ fontSize: 8, color: slate600 }}>{research.contacts.consumerProtection || 'See regulator above'}</Text>
             </View>
           </View>
@@ -995,7 +1013,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           <Text style={ag.ctaBullet}>{'\u2022'} Build court-ready forensic report with visualizations</Text>
           <Text style={ag.ctaBullet}>{'\u2022'} Expert witness testimony available</Text>
           <View style={{ marginTop: 10, borderTopWidth: 0.5, borderTopColor: '#334155', paddingTop: 10 }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 4 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: 'white', marginBottom: 4 }}>
               Request Full Forensic Analysis
             </Text>
             <Text style={ag.ctaContact}>contact@ledgerhound.vip | +1 (833) 559-1334</Text>
