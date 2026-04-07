@@ -261,6 +261,7 @@ export default function GraphTracer() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState('');
   const [data, setData] = useState<GraphData | null>(null);
+  const [activeNetworks, setActiveNetworks] = useState<string[]>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [layout, setLayout] = useState<'breadthfirst' | 'cose'>('breadthfirst');
   const [moreOpen, setMoreOpen] = useState(false);
@@ -479,13 +480,15 @@ export default function GraphTracer() {
     }
   }, [data, layout, initCytoscape]);
 
-  const handleTrace = async () => {
+  const handleTrace = async (overrideNetwork?: NetworkOrAuto) => {
+    const traceNetwork = overrideNetwork || network;
+
     // For auto mode, accept any valid address format
     if (!address) {
       setError(t('error_invalid'));
       return;
     }
-    if (network !== 'auto' && !isValidAddress(network, address)) {
+    if (traceNetwork !== 'auto' && !isValidAddress(traceNetwork as NetworkType, address)) {
       setError(t('error_invalid'));
       return;
     }
@@ -494,8 +497,8 @@ export default function GraphTracer() {
     setError('');
     setData(null);
     setSelectedNode(null);
-    sourceAddressRef.current = network === 'auto' ? address : (shouldPreserveCase(network) ? address : address.toLowerCase());
-    networkRef.current = network;
+    sourceAddressRef.current = traceNetwork === 'auto' ? address : (shouldPreserveCase(traceNetwork as NetworkType) ? address : address.toLowerCase());
+    networkRef.current = traceNetwork;
 
     // Animate loading steps
     setLoadingStep(0);
@@ -506,7 +509,7 @@ export default function GraphTracer() {
       const res = await fetch('/api/trace-graph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, depth, network }),
+        body: JSON.stringify({ address, depth, network: traceNetwork }),
       });
 
       const json = await res.json();
@@ -516,6 +519,13 @@ export default function GraphTracer() {
       if (network === 'auto' && json.detectedNetwork) {
         setNetwork(json.detectedNetwork);
         networkRef.current = json.detectedNetwork;
+      }
+
+      // Store active networks for multichain indicator
+      if (json.activeNetworks?.length > 0) {
+        setActiveNetworks(json.activeNetworks);
+      } else {
+        setActiveNetworks([]);
       }
 
       setLoadingStep(2);
@@ -638,7 +648,7 @@ export default function GraphTracer() {
               </div>
 
               <button
-                onClick={handleTrace}
+                onClick={() => handleTrace()}
                 disabled={loading || !address}
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors text-sm whitespace-nowrap"
               >
@@ -664,6 +674,31 @@ export default function GraphTracer() {
             </div>
           )}
         </div>
+
+        {/* Multichain indicator */}
+        {activeNetworks.length > 1 && data && (
+          <div className="mb-4 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-slate-400 text-sm font-medium">Active on {activeNetworks.length} chains:</span>
+              {activeNetworks.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => {
+                    setNetwork(n as NetworkOrAuto);
+                    handleTrace(n as NetworkOrAuto);
+                  }}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
+                    n === currentNetwork
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer'
+                  }`}
+                >
+                  {NETWORK_DISPLAY_LABELS[n as NetworkOrAuto] || n.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Graph Area */}
         <div className="relative">

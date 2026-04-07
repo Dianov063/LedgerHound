@@ -552,20 +552,31 @@ interface GraphEdge {
 
 // ---- Auto-detect: try EVM chains in parallel, return first with data ----
 
-const AUTO_EVM_ORDER: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op'];
+const AUTO_EVM_ORDER: NetworkType[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
-async function autoDetectEVMNetwork(address: string): Promise<NetworkType> {
+async function detectActiveEVMNetworks(address: string): Promise<{ best: NetworkType; activeOn: NetworkType[] }> {
   const results = await Promise.allSettled(
     AUTO_EVM_ORDER.map(async (net) => {
       const { outgoing, incoming } = await getTransfersForAddress(net, address.toLowerCase());
-      if (outgoing.length === 0 && incoming.length === 0) throw new Error('No data');
-      return net;
+      const txCount = outgoing.length + incoming.length;
+      if (txCount === 0) throw new Error('No data');
+      return { net, txCount };
     })
   );
+
+  const active: { net: NetworkType; txCount: number }[] = [];
   for (const r of results) {
-    if (r.status === 'fulfilled') return r.value;
+    if (r.status === 'fulfilled') active.push(r.value);
   }
-  return 'eth'; // fallback
+
+  if (active.length === 0) return { best: 'eth', activeOn: [] };
+
+  // Pick chain with most transactions as "best"
+  active.sort((a, b) => b.txCount - a.txCount);
+  return {
+    best: active[0].net,
+    activeOn: active.map((a) => a.net),
+  };
 }
 
 // ---- Route handler ----
@@ -575,10 +586,14 @@ export async function POST(req: NextRequest) {
     const { address, depth = 1, network = 'eth' } = await req.json();
 
     let net: NetworkType;
+    let activeNetworks: NetworkType[] = [];
+
     if (network === 'auto') {
       // For 0x addresses, auto-detect EVM chain; for others, detect by format
       if (/^0x[a-fA-F0-9]{40}$/i.test(address)) {
-        net = await autoDetectEVMNetwork(address);
+        const detected = await detectActiveEVMNetworks(address);
+        net = detected.best;
+        activeNetworks = detected.activeOn;
       } else if (/^T[a-zA-Z0-9]{33}$/.test(address)) {
         net = 'trx';
       } else if (/^(1|3)[a-zA-Z0-9]{24,33}$/.test(address) || /^bc1[a-zA-Z0-9]{25,62}$/.test(address)) {
@@ -731,6 +746,7 @@ export async function POST(req: NextRequest) {
       totalEdges: edges.length,
       maxReached: nodes.size >= MAX_NODES,
       detectedNetwork: net,
+      activeNetworks,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Trace failed' }, { status: 500 });
