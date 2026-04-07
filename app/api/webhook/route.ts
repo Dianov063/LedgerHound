@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { generateReport } from '@/lib/generateReport';
+import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
 
 const getStripe = (): any => {
   // @ts-expect-error Stripe types mismatch with ESM default import
@@ -44,27 +45,83 @@ export async function POST(request: Request) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    const product = session.metadata?.product || 'forensic_report';
     const walletAddress = session.metadata?.walletAddress;
     const email = session.metadata?.email;
     const network = session.metadata?.network || 'eth';
+    const caseId = session.metadata?.caseId || '';
 
-    console.log('[webhook] Checkout completed — wallet:', walletAddress, 'email:', email, 'network:', network);
+    console.log('[webhook] Checkout completed — product:', product, 'wallet:', walletAddress, 'email:', email);
 
-    if (walletAddress && email) {
-      try {
-        const paymentId = session.payment_intent || session.id || '';
-        const amount = session.amount_total || 4900;
-        const result = await generateReport(walletAddress, email, {
-          stripePaymentId: paymentId,
-          amount,
-          network,
+    if (!email) {
+      console.error('[webhook] Missing email in metadata');
+      return Response.json({ received: true });
+    }
+
+    try {
+      if (product === 'emergency_pack') {
+        /* ── Emergency Pack: 4 legal PDFs + Forensic Report ── */
+        const country = session.metadata?.country || 'US';
+        const scamType = session.metadata?.scamType || '';
+        const platformName = session.metadata?.platformName || '';
+
+        console.log('[webhook] Generating Emergency Pack — case:', caseId, 'country:', country);
+
+        // 1. Generate 4 legal PDFs (police complaint, preservation letter, regulator complaint, action guide)
+        const packResult = await generateEmergencyPack({
+          caseId,
+          countryCode: country,
+          email,
+          victimName: session.customer_details?.name || '',
+          lossAmount: (session.amount_total || 7900) / 100,
+          scamType,
+          walletAddress: walletAddress || '',
+          txHashes: [],
+          description: '',
         });
-        console.log('[webhook] Report generated successfully, caseId:', result.caseId, 'downloadUrl:', result.downloadUrl ? 'yes' : 'no');
-      } catch (err) {
-        console.error('[webhook] Report generation failed:', err);
+        console.log('[webhook] Emergency Pack generated:', packResult.templates?.length, 'templates');
+
+        // 2. Also generate Forensic Report if wallet address provided
+        if (walletAddress) {
+          const paymentId = session.payment_intent || session.id || '';
+          const reportResult = await generateReport(walletAddress, email, {
+            stripePaymentId: paymentId,
+            amount: session.amount_total || 7900,
+            network,
+          });
+          console.log('[webhook] Forensic Report also generated, caseId:', reportResult.caseId);
+        }
+
+      } else if (product === 'summary_report') {
+        /* ── Summary Report: just the Forensic Report ── */
+        if (walletAddress) {
+          const paymentId = session.payment_intent || session.id || '';
+          const result = await generateReport(walletAddress, email, {
+            stripePaymentId: paymentId,
+            amount: session.amount_total || 1900,
+            network,
+          });
+          console.log('[webhook] Summary Report generated, caseId:', result.caseId);
+        } else {
+          console.error('[webhook] Summary Report: missing walletAddress');
+        }
+
+      } else {
+        /* ── Default: Forensic Report ($49) ── */
+        if (walletAddress) {
+          const paymentId = session.payment_intent || session.id || '';
+          const result = await generateReport(walletAddress, email, {
+            stripePaymentId: paymentId,
+            amount: session.amount_total || 4900,
+            network,
+          });
+          console.log('[webhook] Forensic Report generated, caseId:', result.caseId);
+        } else {
+          console.error('[webhook] Missing walletAddress for forensic report');
+        }
       }
-    } else {
-      console.error('[webhook] Missing metadata — walletAddress or email is empty');
+    } catch (err) {
+      console.error('[webhook] Generation failed for product:', product, err);
     }
   }
 
