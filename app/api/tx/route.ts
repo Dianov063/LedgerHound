@@ -184,11 +184,24 @@ async function fetchTRONTx(hash: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (process.env.TRONGRID_API_KEY) headers['TRON-PRO-API-KEY'] = process.env.TRONGRID_API_KEY;
 
-  const res = await fetchWithTimeout(`https://api.trongrid.io/v1/transactions/${hash}`, { headers });
-  if (!res.ok) throw new Error('TRON transaction not found');
-  const data = await res.json();
-  const tx = data.data?.[0] || data;
-  if (!tx) throw new Error('TRON transaction not found');
+  // Use /wallet/gettransactionbyid (POST) — the /v1/transactions/ endpoint returns 404
+  const [txRes, infoRes] = await Promise.all([
+    fetchWithTimeout('https://api.trongrid.io/wallet/gettransactionbyid', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ value: hash }),
+    }),
+    fetchWithTimeout('https://api.trongrid.io/wallet/gettransactioninfobyid', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ value: hash }),
+    }),
+  ]);
+
+  const tx = await txRes.json();
+  const info = await infoRes.json();
+
+  if (!tx || !tx.txID) throw new Error('TRON transaction not found');
 
   const raw = tx.raw_data?.contract?.[0];
   const param = raw?.parameter?.value || {};
@@ -199,11 +212,10 @@ async function fetchTRONTx(hash: string) {
   let value = 0;
   let token = 'TRX';
 
-  // Convert hex addresses to base58
+  // Convert hex addresses to base58 using tron-tracker's approach
   const hexToBase58 = (hex: string) => {
-    // TronGrid often returns base58 directly
-    if (hex.startsWith('T')) return hex;
-    return hex; // Keep as-is for display
+    if (hex.startsWith('T')) return hex; // Already base58
+    return hex; // Keep hex for display if we can't convert
   };
 
   from = hexToBase58(from);
@@ -214,15 +226,19 @@ async function fetchTRONTx(hash: string) {
     token = 'TRX';
   } else if (type === 'TriggerSmartContract') {
     token = 'TRC20';
-    // Try to parse transfer data
-    const data = param.data || '';
-    if (data.startsWith('a9059cbb')) {
+    const callData = param.data || '';
+    if (callData.startsWith('a9059cbb')) {
       // transfer(address,uint256)
-      to = '41' + data.slice(32, 72);
-      const rawVal = BigInt('0x' + data.slice(72));
+      to = '41' + callData.slice(32, 72);
+      const rawVal = BigInt('0x' + callData.slice(72));
       value = Number(rawVal) / 1e6; // Assume 6 decimals (USDT)
     }
   }
+
+  // Get timestamp and block from transaction info
+  const blockTimestamp = info.blockTimeStamp || tx.raw_data?.timestamp || 0;
+  const blockNumber = info.blockNumber || null;
+  const fee = (info.fee || 0) / 1e6;
 
   return {
     hash,
@@ -233,10 +249,10 @@ async function fetchTRONTx(hash: string) {
     to,
     value,
     token,
-    timestamp: tx.block_timestamp ? new Date(tx.block_timestamp).toISOString() : '',
-    blockNumber: tx.blockNumber || null,
+    timestamp: blockTimestamp ? new Date(blockTimestamp).toISOString() : '',
+    blockNumber,
     gasUsed: 0,
-    gasCost: 0,
+    gasCost: fee,
     gasCurrency: 'TRX',
     explorerUrl: `https://tronscan.org/#/transaction/${hash}`,
   };
