@@ -41,6 +41,17 @@ export interface CountryResearch {
     requiredElements: string[];
   };
 
+  exchangeContacts?: {
+    name: string;
+    complianceEmail: string;
+    lawEnforcementPortal?: string;
+    freezeTimeframe?: string;
+    notes?: string;
+  }[];
+
+  hasSmallClaims?: boolean;
+  smallClaimsThreshold?: string;
+
   localizedTerms: {
     police: string;
     complaint: string;

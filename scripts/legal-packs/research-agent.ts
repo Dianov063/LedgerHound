@@ -58,27 +58,39 @@ Research these topics:
    - Complaint/tip submission URL
    - What types of crypto fraud they handle
 
-3. ADDITIONAL AGENCIES worth contacting
+3. ADDITIONAL AGENCIES worth contacting (include "when_to_use" for each)
    - Consumer protection agencies
    - Cybercrime-specific units
    - Any crypto-specific task forces
+   - State/local police (for official police report)
+   - For each agency: describe WHEN a victim should contact them
 
 4. LEGAL BASIS for crypto fraud prosecution in ${country.name}
    - Relevant criminal code sections
    - Statute of limitations for fraud
    - Civil recovery options available
+   - Whether small claims court is an option (and threshold amount)
 
 5. PRESERVATION LETTER requirements
    - Legal basis for requesting asset freeze at exchanges
    - What exchanges typically require to freeze assets
    - Expected response time from exchanges
 
-6. PRACTICAL CONTACTS
+6. MAJOR EXCHANGE COMPLIANCE CONTACTS
+   - Binance: compliance email and law enforcement portal
+   - Coinbase: compliance email and law enforcement portal
+   - Kraken: compliance email
+   - OKX: compliance email
+   - KuCoin: compliance email
+   - Include freeze timeframe for each (how long they take to respond)
+   - Any special notes for victim-initiated vs law-enforcement requests
+
+7. PRACTICAL CONTACTS
    - Emergency cyber crime hotline (if exists)
    - Email address for cybercrime reports
    - Consumer protection contact info
 
-7. LOCALIZED LEGAL TERMS in ${country.lang !== 'en' ? country.lang + ' language' : 'English'}
+8. LOCALIZED LEGAL TERMS in ${country.lang !== 'en' ? country.lang + ' language' : 'English'}
    - Word for "police"
    - Word for "complaint/report"
    - Word for "fraud"
@@ -107,18 +119,27 @@ Return your findings as a single JSON object matching this exact structure:
     "scope": "what they handle"
   },
   "additionalAgencies": [
-    { "name": "...", "type": "consumer_protection|cybercrime|crypto_taskforce", "url": "https://...", "when": "when to contact" }
+    { "name": "...", "type": "consumer_protection|cybercrime|crypto_taskforce|local_police", "url": "https://...", "when": "when to contact this agency", "when_to_use": "detailed scenario when victim should use this agency" }
   ],
   "legalBasis": {
-    "criminalCode": "relevant sections",
+    "criminalCode": "relevant sections with full citation",
     "civilRemedies": ["remedy1", "remedy2"],
     "statuteOfLimitations": "e.g. 5 years for fraud"
   },
+  "hasSmallClaims": true,
+  "smallClaimsThreshold": "e.g. $10,000 varies by state",
   "preservationLetter": {
-    "legalBasis": "legal citation",
+    "legalBasis": "legal citation for asset freeze requests",
     "typicalResponse": "e.g. 24-48 hours",
     "requiredElements": ["element1", "element2"]
   },
+  "exchangeContacts": [
+    { "name": "Binance", "complianceEmail": "compliance email", "lawEnforcementPortal": "URL if exists", "freezeTimeframe": "typical response time", "notes": "special requirements" },
+    { "name": "Coinbase", "complianceEmail": "...", "lawEnforcementPortal": "...", "freezeTimeframe": "...", "notes": "..." },
+    { "name": "Kraken", "complianceEmail": "...", "freezeTimeframe": "...", "notes": "..." },
+    { "name": "OKX", "complianceEmail": "...", "freezeTimeframe": "...", "notes": "..." },
+    { "name": "KuCoin", "complianceEmail": "...", "freezeTimeframe": "...", "notes": "..." }
+  ],
   "localizedTerms": {
     "police": "local word",
     "complaint": "local word",
