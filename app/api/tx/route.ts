@@ -325,30 +325,33 @@ async function fetchSOLTx(hash: string) {
   };
 }
 
-/* ── Auto-detect EVM chain by trying all in parallel ── */
+/* ── Auto-detect chain by trying all networks in parallel ── */
 const EVM_CHAIN_ORDER = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op'];
 
 async function fetchEVMTxAuto(hash: string): Promise<any> {
-  // Try all EVM chains in parallel
   const results = await Promise.allSettled(
     EVM_CHAIN_ORDER.map((net) => fetchEVMTx(hash, net))
   );
-
-  // Return first successful result
   for (const r of results) {
-    if (r.status === 'fulfilled') {
-      return r.value;
-    }
+    if (r.status === 'fulfilled') return r.value;
   }
-
-  // All failed — throw the first error
-  for (const r of results) {
-    if (r.status === 'rejected') {
-      throw new Error(r.reason?.message || 'Transaction not found on any EVM chain');
-    }
-  }
-
   throw new Error('Transaction not found on any EVM chain');
+}
+
+async function fetchTxAutoDetect(hash: string): Promise<any> {
+  // Try ALL networks in parallel: EVM chains + BTC + TRON + SOL
+  const results = await Promise.allSettled([
+    ...EVM_CHAIN_ORDER.map((net) => fetchEVMTx(hash, net)),
+    fetchTRONTx(hash),
+    fetchSOLTx(hash),
+    fetchBTCTx(hash),
+  ]);
+
+  for (const r of results) {
+    if (r.status === 'fulfilled') return r.value;
+  }
+
+  throw new Error('Transaction not found on any network');
 }
 
 /* ── Route handler ── */
@@ -371,8 +374,8 @@ export async function POST(req: NextRequest) {
     } else if (net === 'sol') {
       result = await fetchSOLTx(trimmedHash);
     } else if (net === 'auto') {
-      // Auto-detect: try all EVM chains in parallel
-      result = await fetchEVMTxAuto(trimmedHash);
+      // Auto-detect: try ALL networks in parallel (EVM + BTC + TRON + SOL)
+      result = await fetchTxAutoDetect(trimmedHash);
     } else if (getAlchemyUrls()[net]) {
       // Try the specific chain first; if not found, try all EVM chains
       try {

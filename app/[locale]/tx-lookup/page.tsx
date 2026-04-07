@@ -41,7 +41,7 @@ const NETWORKS: { id: Network; label: string; short: string }[] = [
 function detectNetworkFromHash(hash: string): Network {
   const h = hash.trim();
   if (/^0x[a-fA-F0-9]{64}$/.test(h)) return 'auto'; // Could be any EVM chain
-  if (/^[a-fA-F0-9]{64}$/.test(h)) return 'btc';
+  if (/^[a-fA-F0-9]{64}$/.test(h)) return 'auto'; // Could be BTC or TRON — both use 64 hex
   if (/^[1-9A-HJ-NP-Za-km-z]{85,90}$/.test(h)) return 'sol';
   return 'auto';
 }
