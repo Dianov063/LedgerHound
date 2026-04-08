@@ -101,6 +101,14 @@ const KNOWN_TOKENS = new Set([
   'TORN', 'OMG', 'SAI', 'REQ', 'MASK', 'DATA', 'LPT',
 ]);
 
+const REAL_ASSET_SYMBOLS = new Set([
+  'ETH', 'WETH', 'BTC', 'WBTC',
+  'USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'FRAX', 'PYUSD',
+  'ARB', 'OP', 'MATIC', 'BNB', 'AVAX', 'SOL', 'MNT',
+  'LINK', 'UNI', 'AAVE', 'CRV', 'MKR', 'SNX', 'COMP',
+  'LDO', 'RPL', 'GRT', 'ENS', 'DYDX', 'STETH', 'RETH', 'CBETH',
+]);
+
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 interface Transfer {
@@ -339,6 +347,55 @@ export interface ScamDbMatch {
   qrDataUri?: string; // Pre-generated QR code data URI for PDF
 }
 
+export interface RiskBreakdown {
+  unknownWalletInteraction: number;
+  mixerInteraction: number;
+  exchangeInteraction: number;
+  multiHopTransfers: number;
+  stablecoinUsage: number;
+  sanctionedAddress: number;
+  scamDbMatch: number;
+}
+
+export interface TimelineEvent {
+  date: string;
+  type: 'ACTIVATION' | 'MAJOR_INFLOW' | 'MAJOR_OUTFLOW' | 'EXCHANGE_INTERACTION' | 'MIXER_INTERACTION' | 'LAST_ACTIVITY';
+  description: string;
+  highlight?: boolean;
+}
+
+export interface ExitPoint {
+  address: string;
+  amount: number;
+  token: string;
+  date: string;
+  entityType: string;
+  entityName: string | null;
+  recoveryDifficulty: string;
+}
+
+export interface ExitPointAnalysis {
+  exitPoints: ExitPoint[];
+  hasKycExit: boolean;
+  hasMixerUsage: boolean;
+  hasCrossChain: boolean;
+  overallRecoveryAssessment: string;
+}
+
+export interface RecoveryScenario {
+  name: string;
+  probability: string;
+  recoveryChance: string;
+  description: string;
+  action: string;
+}
+
+export interface AssetSummary {
+  realAssets: { symbol: string; totalIn: number; totalOut: number }[];
+  spamTokens: { symbol: string; count: number }[];
+  spamCount: number;
+}
+
 export interface ReportData {
   walletAddress: string;
   caseId: string;
@@ -376,6 +433,292 @@ export interface ReportData {
     token: string;
   }[];
   graphData: GraphData | null;
+  riskBreakdown: RiskBreakdown;
+  timeline: TimelineEvent[];
+  exitPointAnalysis: ExitPointAnalysis;
+  recoveryScenarios: RecoveryScenario[];
+  assetSummary: AssetSummary;
+}
+
+function calculateRiskBreakdown(
+  identifiedEntities: { type: string }[],
+  counterpartyCount: number,
+  outgoing: (Transfer | UnifiedTransfer)[],
+  incoming: (Transfer | UnifiedTransfer)[],
+  ofacWarning: boolean,
+  scamDbMatches: ScamDbMatch[],
+): RiskBreakdown {
+  const breakdown: RiskBreakdown = {
+    unknownWalletInteraction: 0,
+    mixerInteraction: 0,
+    exchangeInteraction: 0,
+    multiHopTransfers: 0,
+    stablecoinUsage: 0,
+    sanctionedAddress: 0,
+    scamDbMatch: 0,
+  };
+
+  const knownCount = identifiedEntities.length;
+  if (counterpartyCount > 0 && knownCount / counterpartyCount < 0.2) {
+    breakdown.unknownWalletInteraction = 20;
+  }
+  if (identifiedEntities.some(e => e.type === 'mixer')) breakdown.mixerInteraction = 30;
+  if (identifiedEntities.some(e => e.type === 'exchange')) breakdown.exchangeInteraction = -10;
+
+  // Multi-hop: check for rapid sequential outflows (3+ within same day)
+  const outDates = outgoing
+    .map(tx => tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toDateString() : '')
+    .filter(Boolean);
+  const dateCounts = new Map<string, number>();
+  for (const d of outDates) dateCounts.set(d, (dateCounts.get(d) || 0) + 1);
+  if (Array.from(dateCounts.values()).some(c => c >= 3)) breakdown.multiHopTransfers = 15;
+
+  // Stablecoin movement
+  const allTx = [...outgoing, ...incoming];
+  const hasStable = allTx.some(tx => {
+    const asset = (tx.asset || '').toUpperCase();
+    return ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'FRAX', 'PYUSD'].includes(asset);
+  });
+  if (hasStable) breakdown.stablecoinUsage = 5;
+
+  if (ofacWarning) breakdown.sanctionedAddress = 40;
+  if (scamDbMatches.length > 0) breakdown.scamDbMatch = 25;
+
+  return breakdown;
+}
+
+function classifyAssets(
+  incoming: (Transfer | UnifiedTransfer)[],
+  outgoing: (Transfer | UnifiedTransfer)[],
+): AssetSummary {
+  const realIn = new Map<string, number>();
+  const realOut = new Map<string, number>();
+  const spam = new Map<string, number>();
+
+  const classify = (tx: Transfer | UnifiedTransfer, dir: 'in' | 'out') => {
+    const asset = (tx.asset || '').toUpperCase().trim();
+    if (!asset) return;
+    const val = safeValue(tx);
+    const isReal = REAL_ASSET_SYMBOLS.has(asset);
+    const isSpamTx = isSpamToken(tx);
+
+    if (isReal && !isSpamTx) {
+      if (dir === 'in') realIn.set(asset, (realIn.get(asset) || 0) + val);
+      else realOut.set(asset, (realOut.get(asset) || 0) + val);
+    } else if (asset && !isReal) {
+      spam.set(asset, (spam.get(asset) || 0) + 1);
+    }
+  };
+
+  for (const tx of incoming) classify(tx, 'in');
+  for (const tx of outgoing) classify(tx, 'out');
+
+  // Also include native (external) category
+  for (const tx of incoming) {
+    if (tx.category === 'external') {
+      const asset = (tx.asset || 'ETH').toUpperCase();
+      if (REAL_ASSET_SYMBOLS.has(asset)) {
+        realIn.set(asset, (realIn.get(asset) || 0) + safeValue(tx));
+      }
+    }
+  }
+  for (const tx of outgoing) {
+    if (tx.category === 'external') {
+      const asset = (tx.asset || 'ETH').toUpperCase();
+      if (REAL_ASSET_SYMBOLS.has(asset)) {
+        realOut.set(asset, (realOut.get(asset) || 0) + safeValue(tx));
+      }
+    }
+  }
+
+  const allSymbols = new Set([...Array.from(realIn.keys()), ...Array.from(realOut.keys())]);
+  const realAssets = Array.from(allSymbols)
+    .map(symbol => ({
+      symbol,
+      totalIn: Math.round((realIn.get(symbol) || 0) * 10000) / 10000,
+      totalOut: Math.round((realOut.get(symbol) || 0) * 10000) / 10000,
+    }))
+    .sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut));
+
+  return {
+    realAssets,
+    spamTokens: Array.from(spam.entries())
+      .map(([symbol, count]) => ({ symbol, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    spamCount: spam.size,
+  };
+}
+
+function generateTimeline(
+  incoming: (Transfer | UnifiedTransfer)[],
+  outgoing: (Transfer | UnifiedTransfer)[],
+  identifiedEntities: { address: string; type: string; label: string }[],
+): TimelineEvent[] {
+  const events: TimelineEvent[] = [];
+  const all = [
+    ...incoming.map(tx => ({ ...tx, _dir: 'IN' as const })),
+    ...outgoing.map(tx => ({ ...tx, _dir: 'OUT' as const })),
+  ].filter(tx => tx.metadata?.blockTimestamp);
+
+  all.sort((a, b) =>
+    new Date(a.metadata!.blockTimestamp!).getTime() - new Date(b.metadata!.blockTimestamp!).getTime()
+  );
+
+  if (all.length === 0) return events;
+
+  // First activity
+  events.push({
+    date: all[0].metadata!.blockTimestamp!.split('T')[0],
+    type: 'ACTIVATION',
+    description: 'Wallet first active',
+  });
+
+  // Major real-asset inflows (top 3)
+  const realInflows = all
+    .filter(tx => tx._dir === 'IN' && REAL_ASSET_SYMBOLS.has((tx.asset || '').toUpperCase()))
+    .sort((a, b) => safeValue(b) - safeValue(a))
+    .slice(0, 3);
+
+  for (const tx of realInflows) {
+    const val = safeValue(tx);
+    if (val <= 0) continue;
+    events.push({
+      date: tx.metadata!.blockTimestamp!.split('T')[0],
+      type: 'MAJOR_INFLOW',
+      description: `Received ${fmtEth(val)} ${tx.asset || 'ETH'} from ${(tx.from || '').slice(0, 10)}...`,
+    });
+  }
+
+  // Major real-asset outflows (top 3)
+  const realOutflows = all
+    .filter(tx => tx._dir === 'OUT' && REAL_ASSET_SYMBOLS.has((tx.asset || '').toUpperCase()))
+    .sort((a, b) => safeValue(b) - safeValue(a))
+    .slice(0, 3);
+
+  for (const tx of realOutflows) {
+    const val = safeValue(tx);
+    if (val <= 0) continue;
+    const entityMatch = identifiedEntities.find(e => e.address === (tx.to || '').toLowerCase());
+    events.push({
+      date: tx.metadata!.blockTimestamp!.split('T')[0],
+      type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
+      description: `Sent ${fmtEth(val)} ${tx.asset || 'ETH'} to ${entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'}`,
+      highlight: true,
+    });
+  }
+
+  // Last activity
+  const last = all[all.length - 1];
+  if (all.length > 1) {
+    events.push({
+      date: last.metadata!.blockTimestamp!.split('T')[0],
+      type: 'LAST_ACTIVITY',
+      description: 'Last recorded activity',
+    });
+  }
+
+  // Sort by date, deduplicate dates
+  events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return events;
+}
+
+function getRecoveryDifficulty(entityType: string): string {
+  switch (entityType) {
+    case 'exchange': return 'LOW - Subpoena possible';
+    case 'mixer': return 'HIGH - Funds obfuscated';
+    case 'defi': return 'MEDIUM - On-chain analysis possible';
+    default: return 'UNKNOWN - Further investigation needed';
+  }
+}
+
+function analyzeExitPoints(
+  outgoing: (Transfer | UnifiedTransfer)[],
+  identifiedEntities: { address: string; type: string; label: string }[],
+): ExitPointAnalysis {
+  const realOutflows = outgoing.filter(tx => {
+    const asset = (tx.asset || '').toUpperCase();
+    return REAL_ASSET_SYMBOLS.has(asset) || tx.category === 'external';
+  });
+
+  // Group by destination address, sum values
+  const destMap = new Map<string, { amount: number; token: string; date: string }>();
+  for (const tx of realOutflows) {
+    const to = (tx.to || '').toLowerCase();
+    if (!to || to === NULL_ADDRESS) continue;
+    const existing = destMap.get(to);
+    const val = safeValue(tx);
+    const date = tx.metadata?.blockTimestamp?.split('T')[0] || '';
+    if (!existing || val > existing.amount) {
+      destMap.set(to, { amount: val, token: tx.asset || 'ETH', date });
+    }
+  }
+
+  const exitPoints: ExitPoint[] = Array.from(destMap.entries())
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .slice(0, 8)
+    .map(([address, data]) => {
+      const entity = identifiedEntities.find(e => e.address === address);
+      return {
+        address,
+        amount: Math.round(data.amount * 10000) / 10000,
+        token: data.token,
+        date: data.date,
+        entityType: entity?.type || 'unknown',
+        entityName: entity?.label || null,
+        recoveryDifficulty: getRecoveryDifficulty(entity?.type || ''),
+      };
+    });
+
+  return {
+    exitPoints,
+    hasKycExit: exitPoints.some(e => e.entityType === 'exchange'),
+    hasMixerUsage: exitPoints.some(e => e.entityType === 'mixer'),
+    hasCrossChain: false, // Could be detected with bridge address list
+    overallRecoveryAssessment: exitPoints.some(e => e.entityType === 'exchange')
+      ? 'MEDIUM - Exchange exit detected'
+      : exitPoints.some(e => e.entityType === 'mixer')
+        ? 'LOW - Mixer used'
+        : 'UNKNOWN - Further investigation needed',
+  };
+}
+
+function generateRecoveryScenarios(exitAnalysis: ExitPointAnalysis, recoveryScore: number): RecoveryScenario[] {
+  const scenarios: RecoveryScenario[] = [];
+
+  scenarios.push({
+    name: 'Scenario A: Funds reached KYC exchange',
+    probability: exitAnalysis.hasKycExit ? 'HIGH' : 'LOW',
+    recoveryChance: 'HIGH',
+    description: exitAnalysis.hasKycExit
+      ? 'Exchange detected. Subpoena can reveal account holder identity.'
+      : 'No exchange exit detected yet. Deeper trace may reveal exchange endpoint.',
+    action: exitAnalysis.hasKycExit
+      ? 'File subpoena to exchange compliance department'
+      : 'Commission deep trace to find exchange endpoint',
+  });
+
+  scenarios.push({
+    name: 'Scenario B: Funds in unknown wallets',
+    probability: exitAnalysis.exitPoints.some(e => e.entityType === 'unknown') ? 'HIGH' : 'LOW',
+    recoveryChance: 'MEDIUM',
+    description: 'Funds held in unidentified wallets. May be intermediary or final destination.',
+    action: 'Continue monitoring for movement to exchange',
+  });
+
+  scenarios.push({
+    name: 'Scenario C: Funds mixed or bridged',
+    probability: exitAnalysis.hasMixerUsage ? 'HIGH' : 'LOW',
+    recoveryChance: 'LOW',
+    description: exitAnalysis.hasMixerUsage
+      ? 'Mixer usage detected. Professional demixing analysis required.'
+      : 'No mixer detected. Cross-chain bridge may have been used.',
+    action: exitAnalysis.hasMixerUsage
+      ? 'Engage specialized demixing service'
+      : 'Check destination chains for continued activity',
+  });
+
+  return scenarios;
 }
 
 export async function generateReport(
@@ -553,6 +896,19 @@ export async function generateReport(
     ? Math.floor((Date.now() - timestamps[timestamps.length - 1]) / 86400000)
     : 0;
 
+  // ── Premium analysis sections ──
+  const riskBreakdown = calculateRiskBreakdown(
+    identifiedEntities, counterpartyMap.size, outgoing, incoming, ofacWarning, scamDbMatches,
+  );
+
+  const assetSummary = classifyAssets(incoming, outgoing);
+
+  const timeline = generateTimeline(incoming, outgoing, identifiedEntities);
+
+  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities);
+
+  const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore);
+
   // Key findings
   const keyFindings: string[] = [];
   if (ofacWarning) {
@@ -694,6 +1050,11 @@ export async function generateReport(
       identifiedEntities: identifiedEntities.map(e => ({ address: e.address, label: e.label, type: e.type })),
       nativeCurrency,
     }),
+    riskBreakdown,
+    timeline,
+    exitPointAnalysis,
+    recoveryScenarios,
+    assetSummary,
   };
 
   // Generate PDF
