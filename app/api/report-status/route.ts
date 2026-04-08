@@ -33,12 +33,14 @@ export async function GET(req: NextRequest) {
     const paymentId = session.payment_intent || session.id || '';
     const email = session.metadata?.email || session.customer_email || '';
     const walletAddress = session.metadata?.walletAddress || '';
+    const network = session.metadata?.network || 'eth';
 
     // Search the reports log for this payment
+    // First try exact match by paymentId, then by wallet+email+network
     const reports = await getReports();
     const report = reports.find(
       (r) => r.stripePaymentId === paymentId ||
-             (r.walletAddress === walletAddress && r.email === email),
+             (r.walletAddress === walletAddress && r.email === email && r.network === network),
     );
 
     if (!report) {
