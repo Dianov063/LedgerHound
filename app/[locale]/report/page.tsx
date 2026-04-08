@@ -14,6 +14,8 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  Search,
+  AlertTriangle,
 } from 'lucide-react';
 
 type Network = 'eth' | 'btc' | 'sol' | 'trx' | 'bnb' | 'base' | 'arb' | 'op';
@@ -58,6 +60,14 @@ export default function ReportPage() {
   const [email, setEmail] = useState('');
   const [network, setNetwork] = useState<Network>('eth');
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [walletInfo, setWalletInfo] = useState<{
+    found: boolean;
+    networkLabel: string;
+    balance: number;
+    currency: string;
+    txCount: number;
+  } | null>(null);
   const [error, setError] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showMore, setShowMore] = useState(false);
@@ -68,9 +78,43 @@ export default function ReportPage() {
     if (detected) setNetwork(detected);
   }, [wallet]);
 
+  // Reset validation when wallet or network changes
+  useEffect(() => {
+    setWalletInfo(null);
+    setError('');
+  }, [wallet, network]);
+
   const isValidWallet = wallet.length > 0 && VALIDATORS[network]?.test(wallet);
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const canSubmit = isValidWallet && isValidEmail && !loading;
+  const isWalletVerified = walletInfo?.found === true;
+  const canSubmit = isValidWallet && isValidEmail && isWalletVerified && !loading;
+
+  // Validate wallet on the selected network
+  const handleValidate = async () => {
+    if (!isValidWallet || validating) return;
+    setValidating(true);
+    setError('');
+    setWalletInfo(null);
+
+    try {
+      const res = await fetch('/api/validate-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: wallet, network }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        setValidating(false);
+        return;
+      }
+      setWalletInfo(data);
+    } catch {
+      setError('Failed to validate wallet. Please try again.');
+    } finally {
+      setValidating(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -215,6 +259,60 @@ export default function ReportPage() {
                           : network === 'trx' ? 'Enter a valid TRON address (T...)'
                           : 'Enter a valid EVM address (0x...)'}
                       </p>
+                    )}
+
+                    {/* Validate Wallet Button */}
+                    {isValidWallet && !walletInfo && (
+                      <button
+                        onClick={handleValidate}
+                        disabled={validating}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50"
+                      >
+                        {validating ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                            Checking on {NETWORKS.find(n => n.id === network)?.label}...
+                          </span>
+                        ) : (
+                          <>
+                            <Search size={14} />
+                            Check Wallet on {NETWORKS.find(n => n.id === network)?.label}
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Wallet Found */}
+                    {walletInfo?.found && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          <span className="text-sm font-semibold text-emerald-800">
+                            Wallet found on {walletInfo.networkLabel}
+                          </span>
+                        </div>
+                        <div className="flex gap-4 text-xs text-emerald-700">
+                          <span>Balance: {walletInfo.balance.toLocaleString('en-US', { maximumFractionDigits: 4 })} {walletInfo.currency}</span>
+                          {walletInfo.txCount > 0 && (
+                            <span>Transactions: {walletInfo.txCount >= 1 ? `${walletInfo.txCount}+` : '0'}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Wallet Not Found */}
+                    {walletInfo && !walletInfo.found && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={16} className="text-amber-600" />
+                          <span className="text-sm font-semibold text-amber-800">
+                            No activity found on {walletInfo.networkLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-1">
+                          This wallet has no transactions on {walletInfo.networkLabel}. Try selecting a different network.
+                        </p>
+                      </div>
                     )}
                   </div>
 
