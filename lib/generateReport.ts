@@ -48,7 +48,7 @@ const NATIVE_CURRENCY: Record<string, string> = {
 };
 
 /** EVM chains that use etherscan-v2-tracker */
-const EVM_CHAINS = new Set(['bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
+const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
@@ -246,6 +246,9 @@ export function fmtEth(v: number): string {
   return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
+/** Delay helper */
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 async function fetchAllTransfers(address: string, direction: 'from' | 'to', alchemyUrl?: string): Promise<Transfer[]> {
   const all: Transfer[] = [];
   let pageKey: string | undefined;
@@ -263,18 +266,33 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to', alch
     else params.toAddress = address;
     if (pageKey) params.pageKey = pageKey;
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] }),
-    });
-    const json = await res.json();
+    const body = JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] });
+
+    // Retry with exponential backoff on rate limit errors
+    let json: any;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      json = await res.json();
+      if (json.error?.message?.includes('compute units per second')) {
+        logger.warn({ attempt, direction }, '[fetchAllTransfers] Alchemy rate limit, retrying...');
+        await delay(1000 * (attempt + 1)); // 1s, 2s, 3s
+        continue;
+      }
+      break;
+    }
     if (json.error) throw new Error(json.error.message);
 
     const transfers = json.result?.transfers || [];
     all.push(...transfers);
     pageKey = json.result?.pageKey;
     if (!pageKey) break;
+
+    // Small delay between pages to stay under CU/s limit
+    if (pageKey) await delay(200);
   }
 
   return all;
@@ -334,11 +352,11 @@ async function fetchTransfersForNetwork(
   }
 
   // Default: Ethereum/BNB/Polygon via Alchemy (most detailed)
+  // Sequential to avoid CU/s rate limit on free tier
   const alchemyUrl = getAlchemyUrl(network);
-  const [outgoing, incoming] = await Promise.all([
-    fetchAllTransfers(address, 'from', alchemyUrl),
-    fetchAllTransfers(address, 'to', alchemyUrl),
-  ]);
+  const outgoing = await fetchAllTransfers(address, 'from', alchemyUrl);
+  await delay(300); // breathing room between directional queries
+  const incoming = await fetchAllTransfers(address, 'to', alchemyUrl);
   return { incoming: incoming as unknown as UnifiedTransfer[], outgoing: outgoing as unknown as UnifiedTransfer[] };
 }
 
