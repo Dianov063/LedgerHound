@@ -136,6 +136,19 @@ export default function EmergencyPage() {
   const [analysis, setAnalysis] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [txLooking, setTxLooking] = useState(false);
+  const [txResult, setTxResult] = useState<{
+    found: boolean;
+    network?: string;
+    networkLabel?: string;
+    from?: string;
+    to?: string;
+    value?: number;
+    token?: string;
+    timestamp?: string;
+    status?: string;
+    explorerUrl?: string;
+  } | null>(null);
 
   /* ── helpers ── */
   const set = useCallback(
@@ -245,6 +258,73 @@ export default function EmergencyPage() {
     }
     setCheckoutLoading(false);
   };
+
+  /* ── TX hash lookup: auto-fill date, amount, network, addresses ── */
+  const handleTxLookup = async () => {
+    const hash = form.txid.trim();
+    if (!hash || hash.length < 20) return;
+    setTxLooking(true);
+    setTxResult(null);
+
+    try {
+      const res = await fetch('/api/tx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash, network: 'auto' }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setTxResult({ found: false });
+        setTxLooking(false);
+        return;
+      }
+
+      // Auto-fill fields from tx data
+      const updates: Partial<typeof form> = {};
+
+      if (data.timestamp) {
+        updates.txDate = data.timestamp.split('T')[0]; // YYYY-MM-DD
+      }
+      if (data.network) {
+        updates.detectedNetwork = data.network;
+      }
+      if (data.to) {
+        updates.walletAddress = data.to; // scam wallet = recipient
+      }
+      if (data.from) {
+        updates.victimWallet = data.from; // victim = sender
+      }
+      // Auto-fill loss amount if we have a value and user hasn't entered one
+      if (data.value && data.value > 0 && !form.lossAmount) {
+        updates.lossAmount = String(Math.round(data.value * 100) / 100);
+      }
+
+      set(updates);
+
+      setTxResult({
+        found: true,
+        network: data.network,
+        networkLabel: data.networkLabel,
+        from: data.from,
+        to: data.to,
+        value: data.value,
+        token: data.token,
+        timestamp: data.timestamp,
+        status: data.status,
+        explorerUrl: data.explorerUrl,
+      });
+    } catch {
+      setTxResult({ found: false });
+    }
+
+    setTxLooking(false);
+  };
+
+  // Reset tx result when txid changes
+  useEffect(() => {
+    setTxResult(null);
+  }, [form.txid]);
 
   /* ── join aggregator ── */
   const handleJoinGroup = async () => {
@@ -471,9 +551,109 @@ export default function EmergencyPage() {
               </h2>
 
               <div className="space-y-5">
+                {/* TX Hash with auto-lookup */}
+                <div>
+                  <label htmlFor="txid" className="block text-sm text-slate-500 mb-2">
+                    Transaction Hash (TXID)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="txid"
+                      type="text"
+                      value={form.txid}
+                      onChange={(e) => set({ txid: e.target.value.trim() })}
+                      placeholder="Paste transaction hash to auto-fill details"
+                      className={`${inputCls} font-mono text-sm flex-1`}
+                    />
+                    <button
+                      onClick={handleTxLookup}
+                      disabled={txLooking || !form.txid.trim() || form.txid.trim().length < 20}
+                      className="px-4 py-3 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors whitespace-nowrap"
+                    >
+                      {txLooking ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Search size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* TX Found — auto-filled summary */}
+                {txResult?.found && (
+                  <div className="bg-emerald-950/50 border border-emerald-500/30 rounded-xl px-4 py-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-400" />
+                      <span className="text-sm font-semibold text-emerald-300">
+                        Transaction found on {txResult.networkLabel}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        txResult.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {txResult.status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
+                      {txResult.value !== undefined && txResult.value > 0 && (
+                        <div>
+                          <span className="text-slate-500">Amount:</span>{' '}
+                          <span className="font-mono">{txResult.value.toLocaleString('en-US', { maximumFractionDigits: 4 })} {txResult.token}</span>
+                        </div>
+                      )}
+                      {txResult.timestamp && (
+                        <div>
+                          <span className="text-slate-500">Date:</span>{' '}
+                          {new Date(txResult.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </div>
+                      )}
+                      {txResult.from && (
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-500">From:</span>{' '}
+                          <span className="font-mono">{txResult.from.slice(0, 16)}...{txResult.from.slice(-8)}</span>
+                        </div>
+                      )}
+                      {txResult.to && (
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-500">To:</span>{' '}
+                          <span className="font-mono">{txResult.to.slice(0, 16)}...{txResult.to.slice(-8)}</span>
+                        </div>
+                      )}
+                    </div>
+                    {txResult.explorerUrl && (
+                      <a
+                        href={txResult.explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-brand-400 hover:text-brand-300 underline"
+                      >
+                        View on explorer
+                      </a>
+                    )}
+                    <p className="text-xs text-emerald-400/70 mt-1">
+                      Fields below have been auto-filled from this transaction.
+                    </p>
+                  </div>
+                )}
+
+                {/* TX Not Found */}
+                {txResult && !txResult.found && (
+                  <div className="bg-amber-950/40 border border-amber-500/30 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-300">
+                        Transaction not found
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-400/70 mt-1">
+                      Please fill in the details manually below.
+                    </p>
+                  </div>
+                )}
+
+                {/* Scam wallet address (recipient) */}
                 <div>
                   <label htmlFor="walletAddress" className="block text-sm text-slate-500 mb-2">
-                    Wallet Address{' '}
+                    Scam Wallet Address (recipient) <span className="text-red-400">*</span>
                     {form.detectedNetwork && (
                       <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
                         {form.detectedNetwork.toUpperCase()} detected
@@ -490,18 +670,7 @@ export default function EmergencyPage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="txid" className="block text-sm text-slate-500 mb-2">Transaction Hash</label>
-                  <input
-                    id="txid"
-                    type="text"
-                    value={form.txid}
-                    onChange={(e) => set({ txid: e.target.value })}
-                    placeholder="TXID (optional)"
-                    className={`${inputCls} font-mono text-sm`}
-                  />
-                </div>
-
+                {/* Date */}
                 <div>
                   <label htmlFor="txDate" className="block text-sm text-slate-500 mb-2">
                     When did this happen? <span className="text-red-400">*</span>
@@ -516,6 +685,7 @@ export default function EmergencyPage() {
                   />
                 </div>
 
+                {/* Platform Name */}
                 <div>
                   <label className="block text-sm text-slate-500 mb-2">Platform Name</label>
                   <input
@@ -527,6 +697,7 @@ export default function EmergencyPage() {
                   />
                 </div>
 
+                {/* Platform URL */}
                 <div>
                   <label className="block text-sm text-slate-500 mb-2">Platform URL (optional)</label>
                   <input
@@ -538,8 +709,9 @@ export default function EmergencyPage() {
                   />
                 </div>
 
+                {/* Victim wallet */}
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">Your Wallet Address (optional)</label>
+                  <label className="block text-sm text-slate-500 mb-2">Your Wallet Address (sender)</label>
                   <input
                     type="text"
                     value={form.victimWallet}
