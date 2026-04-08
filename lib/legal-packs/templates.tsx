@@ -45,11 +45,11 @@ const s = StyleSheet.create({
 const DocHeader = ({ title, subtitle, caseData }: { title: string; subtitle: string; caseData: CaseData }) => (
   <View style={{ marginBottom: 16, paddingBottom: 12, borderBottomWidth: 2, borderBottomColor: slate900 }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <View>
+      <View style={{ flex: 1, marginRight: 12 }}>
         <Text style={{ fontSize: 16, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 2 }}>{title}</Text>
         <Text style={{ fontSize: 10, color: slate600 }}>{subtitle}</Text>
       </View>
-      <View style={{ alignItems: 'flex-end' as any }}>
+      <View style={{ alignItems: 'flex-end' as any, flexShrink: 0 }}>
         <Text style={{ fontSize: 9, color: slate600 }}>Case ID: {caseData.caseId}</Text>
         <Text style={{ fontSize: 9, color: slate600 }}>Date: {caseData.date}</Text>
       </View>
@@ -79,7 +79,10 @@ const Field = ({ label, value, mono }: { label: string; value?: string; mono?: b
 );
 
 const Checkbox = ({ label, checked }: { label: string; checked?: boolean }) => (
-  <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 8 }}>{checked ? '\u2611' : '\u2610'} {label}</Text>
+  <View style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 8 }}>
+    <Text style={{ fontSize: 9, color: slate900, width: 16, flexShrink: 0 }}>{checked ? '\u2611' : '\u2610'}</Text>
+    <Text style={{ fontSize: 9, color: slate900, flex: 1 }}>{label}</Text>
+  </View>
 );
 
 const fmtMoney = (amount: number, currency: string = 'USD') =>
@@ -247,7 +250,10 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 
         {/* TO */}
         <View style={{ marginBottom: 12 }}>
-          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>TO: {exchangeName} Compliance Department</Text>
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 28, flexShrink: 0 }}>TO:</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>{exchangeName} Compliance Department</Text>
+          </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 28 }}>{exchangeEmail}</Text>
         </View>
 
@@ -281,29 +287,52 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         {/* BLOCKCHAIN VERIFICATION */}
         <SectionTitle>BLOCKCHAIN VERIFICATION</SectionTitle>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-            This transaction has been verified by LedgerHound blockchain forensics:{'\n'}
-            {'\u2022'} Funds traced from victim wallet to your platform{'\n'}
-            {'\u2022'} Risk Score: {caseData.recoveryScore ?? 0}/100{'\n'}
-            {'\u2022'} Full forensic report: ledgerhound.vip/case/{caseData.caseId}
+          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 4 }}>
+            This transaction has been verified by LedgerHound blockchain forensics:
           </Text>
+          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Funds traced from victim wallet to your platform</Text>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Risk Score: {caseData.recoveryScore ?? 0}/100</Text>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Full forensic report: ledgerhound.vip/case/{caseData.caseId}</Text>
+          </View>
         </View>
 
         {/* REQUESTED ACTIONS */}
         <SectionTitle>REQUESTED ACTIONS</SectionTitle>
         <View style={{ marginBottom: 6 }}>
-          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 2 }}>1. IMMEDIATE ASSET FREEZE</Text>
-          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 16, lineHeight: 1.5 }}>Freeze assets associated with address:{'\n'}{exchangeAddr || caseData.scammerAddress}</Text>
+          <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>1.</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>IMMEDIATE ASSET FREEZE</Text>
+          </View>
+          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 2 }}>Freeze assets associated with address:</Text>
+          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5 }}>{exchangeAddr || caseData.scammerAddress}</Text>
         </View>
         <View style={{ marginBottom: 6 }}>
-          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 2 }}>2. EVIDENCE PRESERVATION</Text>
-          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 16, lineHeight: 1.5 }}>
-            Preserve all records including:{'\n'}{'\u2022'} KYC/identity documents{'\n'}{'\u2022'} Login history and IP logs{'\n'}{'\u2022'} All transaction records{'\n'}{'\u2022'} Communication records
-          </Text>
+          <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>2.</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>EVIDENCE PRESERVATION</Text>
+          </View>
+          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 4 }}>Preserve all records including:</Text>
+          {['KYC/identity documents', 'Login history and IP logs', 'All transaction records', 'Communication records'].map((item, i) => (
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 18 }}>
+              <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+              <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{item}</Text>
+            </View>
+          ))}
         </View>
         <View style={{ marginBottom: 6 }}>
-          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 2 }}>3. CONFIRMATION</Text>
-          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 16 }}>Please confirm receipt and actions taken within 48 hours.</Text>
+          <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>3.</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>CONFIRMATION</Text>
+          </View>
+          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18 }}>Please confirm receipt and actions taken within 48 hours.</Text>
         </View>
 
         {/* LEGAL BASIS */}
@@ -407,11 +436,18 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
         {/* EVIDENCE SUMMARY */}
         <SectionTitle>{t.regulator.evidence_summary}</SectionTitle>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-            {'\u2022'} {t.regulator.blockchain_verified} (Case: {caseData.caseId}){'\n'}
-            {'\u2022'} {t.regulator.transaction_traced}: {exchanges}{'\n'}
-            {'\u2022'} {t.regulator.police_filed} {research.policeAgency.name}
-          </Text>
+          <View style={{ flexDirection: 'row', marginBottom: 3 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{t.regulator.blockchain_verified} (Case: {caseData.caseId})</Text>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: 3 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{t.regulator.transaction_traced}: {exchanges}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: 3 }}>
+            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{t.regulator.police_filed} {research.policeAgency.name}</Text>
+          </View>
         </View>
 
         {/* OTHER VICTIMS */}
@@ -422,10 +458,17 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
 
         {/* REQUESTED ACTION */}
         <SectionTitle>{t.regulator.requested_action}</SectionTitle>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>1. {interp(t.regulator.action_investigate, { platform: caseData.platformName || '[Platform]' })}</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>2. {t.regulator.action_enforcement}</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 3, paddingLeft: 4 }}>3. {interp(t.regulator.action_coordination, { police: research.policeAgency.name })}</Text>
-        <Text style={{ fontSize: 9, color: slate900, marginBottom: 12, paddingLeft: 4 }}>4. {t.regulator.action_warning}</Text>
+        {[
+          interp(t.regulator.action_investigate, { platform: caseData.platformName || '[Platform]' }),
+          t.regulator.action_enforcement,
+          interp(t.regulator.action_coordination, { police: research.policeAgency.name }),
+          t.regulator.action_warning,
+        ].map((text, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: i === 3 ? 12 : 3, paddingLeft: 4 }}>
+            <Text style={{ fontSize: 9, color: slate900, width: 18, flexShrink: 0 }}>{i + 1}.</Text>
+            <Text style={{ fontSize: 9, color: slate900, flex: 1 }}>{text}</Text>
+          </View>
+        ))}
 
         {/* DECLARATION */}
         <SectionTitle>{t.regulator.declaration}</SectionTitle>
@@ -538,20 +581,29 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         {/* Exchange status box */}
         {hasExchanges ? (
           <View style={{ backgroundColor: '#f0fdf4', borderRadius: 4, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#86efac' }}>
-            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: green, marginBottom: 2 }}>{'\u2713'} {ag.exchange_positive}: {identifiedExchanges}</Text>
-            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.exchange_positive_text}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: green, width: 16, flexShrink: 0 }}>{'\u2713'}</Text>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: green, flex: 1 }}>{ag.exchange_positive}: {identifiedExchanges}</Text>
+            </View>
+            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 16 }}>{ag.exchange_positive_text}</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: '#fffbeb', borderRadius: 4, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
-            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 2 }}>{'\u26A0'} {ag.no_exchange_caution}</Text>
-            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.no_exchange_caution_text}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, width: 18, flexShrink: 0 }}>{'\u26A0'}</Text>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, flex: 1 }}>{ag.no_exchange_caution}</Text>
+            </View>
+            <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 18 }}>{ag.no_exchange_caution_text}</Text>
           </View>
         )}
 
         {/* CRITICAL WINDOW */}
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 4, padding: 8, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 2 }}>{'\u23F0'} {ag.critical_window}</Text>
-          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ag.critical_window_text}</Text>
+          <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, width: 18, flexShrink: 0 }}>{'\u23F0'}</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, flex: 1 }}>{ag.critical_window}</Text>
+          </View>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 18 }}>{ag.critical_window_text}</Text>
         </View>
 
         {/* STEP 1 */}
@@ -625,7 +677,10 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </View>
           <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginTop: 4, marginBottom: 4 }}>{ag.civil_remedies_in} {caseData.country}:</Text>
           {research.legalBasis.civilRemedies.map((r, i) => (
-            <Text key={i} style={{ fontSize: 8, color: slate600, marginBottom: 2, paddingLeft: 8 }}>{'\u2022'} {r}</Text>
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 8 }}>
+              <Text style={{ fontSize: 8, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+              <Text style={{ fontSize: 8, color: slate600, flex: 1 }}>{r}</Text>
+            </View>
           ))}
           <Field label={ag.statute_of_limitations} value={research.legalBasis.statuteOfLimitations} />
         </StepBox>
