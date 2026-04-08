@@ -153,14 +153,18 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
   const NETWORK_MAP: Record<string, { cryptoType: string; networkName: string }> = {
     eth: { cryptoType: 'ETH', networkName: 'Ethereum' },
     btc: { cryptoType: 'BTC', networkName: 'Bitcoin' },
-    bsc: { cryptoType: 'BNB', networkName: 'BNB Smart Chain' },
+    bnb: { cryptoType: 'BNB', networkName: 'BNB Smart Chain' },
     trx: { cryptoType: 'TRX', networkName: 'Tron' },
     sol: { cryptoType: 'SOL', networkName: 'Solana' },
-    matic: { cryptoType: 'MATIC', networkName: 'Polygon' },
+    polygon: { cryptoType: 'MATIC', networkName: 'Polygon' },
     avax: { cryptoType: 'AVAX', networkName: 'Avalanche' },
     arb: { cryptoType: 'ETH', networkName: 'Arbitrum' },
     op: { cryptoType: 'ETH', networkName: 'Optimism' },
     base: { cryptoType: 'ETH', networkName: 'Base' },
+    linea: { cryptoType: 'ETH', networkName: 'Linea' },
+    zksync: { cryptoType: 'ETH', networkName: 'zkSync Era' },
+    scroll: { cryptoType: 'ETH', networkName: 'Scroll' },
+    mantle: { cryptoType: 'MNT', networkName: 'Mantle' },
   };
   const netKey = (inputNetwork || 'eth').toLowerCase();
   const { cryptoType, networkName } = NETWORK_MAP[netKey] || { cryptoType: 'ETH', networkName: 'Ethereum' };

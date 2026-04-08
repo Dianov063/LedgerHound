@@ -496,6 +496,7 @@ function calculateRiskBreakdown(
 function classifyAssets(
   incoming: (Transfer | UnifiedTransfer)[],
   outgoing: (Transfer | UnifiedTransfer)[],
+  nativeCurrency: string = 'ETH',
 ): AssetSummary {
   const realIn = new Map<string, number>();
   const realOut = new Map<string, number>();
@@ -522,7 +523,7 @@ function classifyAssets(
   // Also include native (external) category
   for (const tx of incoming) {
     if (tx.category === 'external') {
-      const asset = (tx.asset || 'ETH').toUpperCase();
+      const asset = (tx.asset || nativeCurrency).toUpperCase();
       if (REAL_ASSET_SYMBOLS.has(asset)) {
         realIn.set(asset, (realIn.get(asset) || 0) + safeValue(tx));
       }
@@ -530,7 +531,7 @@ function classifyAssets(
   }
   for (const tx of outgoing) {
     if (tx.category === 'external') {
-      const asset = (tx.asset || 'ETH').toUpperCase();
+      const asset = (tx.asset || nativeCurrency).toUpperCase();
       if (REAL_ASSET_SYMBOLS.has(asset)) {
         realOut.set(asset, (realOut.get(asset) || 0) + safeValue(tx));
       }
@@ -560,6 +561,7 @@ function generateTimeline(
   incoming: (Transfer | UnifiedTransfer)[],
   outgoing: (Transfer | UnifiedTransfer)[],
   identifiedEntities: { address: string; type: string; label: string }[],
+  nativeCurrency: string = 'ETH',
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   const all = [
@@ -592,7 +594,7 @@ function generateTimeline(
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: 'MAJOR_INFLOW',
-      description: `Received ${fmtEth(val)} ${tx.asset || 'ETH'} from ${(tx.from || '').slice(0, 10)}...`,
+      description: `Received ${fmtEth(val)} ${tx.asset || nativeCurrency} from ${(tx.from || '').slice(0, 10)}...`,
     });
   }
 
@@ -609,7 +611,7 @@ function generateTimeline(
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
-      description: `Sent ${fmtEth(val)} ${tx.asset || 'ETH'} to ${entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'}`,
+      description: `Sent ${fmtEth(val)} ${tx.asset || nativeCurrency} to ${entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'}`,
       highlight: true,
     });
   }
@@ -641,6 +643,7 @@ function getRecoveryDifficulty(entityType: string): string {
 function analyzeExitPoints(
   outgoing: (Transfer | UnifiedTransfer)[],
   identifiedEntities: { address: string; type: string; label: string }[],
+  nativeCurrency: string = 'ETH',
 ): ExitPointAnalysis {
   const realOutflows = outgoing.filter(tx => {
     const asset = (tx.asset || '').toUpperCase();
@@ -656,7 +659,7 @@ function analyzeExitPoints(
     const val = safeValue(tx);
     const date = tx.metadata?.blockTimestamp?.split('T')[0] || '';
     if (!existing || val > existing.amount) {
-      destMap.set(to, { amount: val, token: tx.asset || 'ETH', date });
+      destMap.set(to, { amount: val, token: tx.asset || nativeCurrency, date });
     }
   }
 
@@ -907,11 +910,11 @@ export async function generateReport(
     identifiedEntities, counterpartyMap.size, outgoing, incoming, ofacWarning, scamDbMatches,
   );
 
-  const assetSummary = classifyAssets(incoming, outgoing);
+  const assetSummary = classifyAssets(incoming, outgoing, nativeCurrency);
 
-  const timeline = generateTimeline(incoming, outgoing, identifiedEntities);
+  const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency);
 
-  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities);
+  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency);
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore);
 
@@ -1031,7 +1034,8 @@ export async function generateReport(
 
   // Build transaction list: ETH first → major tokens → rest, dedup by token (max 3)
   type TxRow = { date: string; direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string };
-  const MAJOR_TOKENS = new Set(['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC']);
+  const MAJOR_TOKENS = new Set(['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC', 'BNB', 'WBNB', 'MATIC', 'AVAX', 'MNT']);
+  const nativeUpper2 = nativeCurrency.toUpperCase();
 
   const toRow = (tx: Transfer, dir: 'IN' | 'OUT'): TxRow => ({
     date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
@@ -1039,7 +1043,7 @@ export async function generateReport(
     from: dir === 'IN' ? (tx.from || 'N/A') : (tx.from || address),
     to: dir === 'OUT' ? (tx.to || 'N/A') : (tx.to || address),
     value: safeValue(tx),
-    token: tx.asset || 'ETH',
+    token: tx.asset || nativeCurrency,
   });
 
   const rawTxs: TxRow[] = [
@@ -1047,10 +1051,10 @@ export async function generateReport(
     ...outgoing.map((tx) => toRow(tx, 'OUT')),
   ];
 
-  // Sort priority: ETH first, then major tokens, then others — within each group by value desc
+  // Sort priority: native currency first, then major tokens, then others — within each group by value desc
   const sortKey = (tx: TxRow): number => {
     const upper = tx.token.toUpperCase();
-    if (upper === 'ETH') return 0;
+    if (upper === nativeUpper2) return 0;
     if (MAJOR_TOKENS.has(upper)) return 1;
     return 2;
   };
