@@ -14,6 +14,8 @@ import QRCode from 'qrcode';
 import logger from '@/lib/logger';
 import { analyzeScamPatterns } from './patternDetection';
 export type { PatternAnalysis, ScamPattern } from './patternDetection';
+import { traceCrossChain } from './crossChainTracer';
+export type { CrossChainTrace, CrossChainHop, BridgeInteraction, ChainActivity } from './crossChainTracer';
 
 function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
@@ -441,6 +443,7 @@ export interface ReportData {
   recoveryScenarios: RecoveryScenario[];
   assetSummary: AssetSummary;
   patternAnalysis: import('./patternDetection').PatternAnalysis;
+  crossChainTrace: import('./crossChainTracer').CrossChainTrace | null;
 }
 
 function calculateRiskBreakdown(
@@ -939,6 +942,41 @@ export async function generateReport(
 
   logger.info({ patterns: patternAnalysis.patterns.length, risk: patternAnalysis.overallRisk }, '[generateReport] Pattern analysis done');
 
+  // ── Cross-chain tracing ──
+  let crossChainTrace: import('./crossChainTracer').CrossChainTrace | null = null;
+  try {
+    const txInputs = [
+      ...incoming.map((tx) => ({
+        from: tx.from || '',
+        to: tx.to || '',
+        value: safeValue(tx),
+        asset: tx.asset,
+        direction: 'IN' as const,
+        date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+        category: tx.category,
+      })),
+      ...outgoing.map((tx) => ({
+        from: tx.from || '',
+        to: tx.to || '',
+        value: safeValue(tx),
+        asset: tx.asset,
+        direction: 'OUT' as const,
+        date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+        category: tx.category,
+      })),
+    ];
+    crossChainTrace = await traceCrossChain(address, network, txInputs, identifiedEntities);
+    if (crossChainTrace?.detected) {
+      logger.info({
+        bridges: crossChainTrace.bridgeInteractions.length,
+        chains: crossChainTrace.activeChains.length,
+        intent: crossChainTrace.intent.label,
+      }, '[generateReport] Cross-chain trace done');
+    }
+  } catch (err) {
+    logger.error({ err }, '[generateReport] Cross-chain trace failed');
+  }
+
   // Key findings
   const keyFindings: string[] = [];
   if (ofacWarning) {
@@ -958,6 +996,17 @@ export async function generateReport(
   if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${outgoing.filter((t: any) => t.category === 'external').length} native transactions.`);
   if (inactiveDays > 365) keyFindings.push(`Wallet inactive for ${inactiveDays} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`);
   if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
+  // Add cross-chain findings
+  if (crossChainTrace?.detected) {
+    if (crossChainTrace.bridgeInteractions.length > 0) {
+      keyFindings.push(`CROSS-CHAIN: ${crossChainTrace.bridgeInteractions.length} bridge interaction(s) detected. ${crossChainTrace.escapePathSummary}`);
+    } else if (crossChainTrace.activeChains.length > 0) {
+      keyFindings.push(`MULTI-CHAIN: Wallet active on ${crossChainTrace.activeChains.length + 1} chains: ${crossChainTrace.activeChains.map(c => c.chainLabel).join(', ')}.`);
+    }
+    if (crossChainTrace.intent.label === 'LAUNDERING') {
+      keyFindings.push(`CRITICAL: Cross-chain intent analysis indicates likely laundering behavior (${crossChainTrace.intent.confidence}% confidence). ${crossChainTrace.intent.reason}`);
+    }
+  }
   // Add behavioral pattern findings
   for (const p of patternAnalysis.patterns) {
     if (p.severity === 'CRITICAL' || p.severity === 'HIGH') {
@@ -1092,6 +1141,7 @@ export async function generateReport(
     recoveryScenarios,
     assetSummary,
     patternAnalysis,
+    crossChainTrace,
   };
 
   // Generate PDF

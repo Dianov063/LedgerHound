@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path } from '@react-pdf/renderer';
-import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern } from './generateReport';
+import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 
 const blue = '#2563eb';
@@ -13,7 +13,10 @@ const amber = '#d97706';
 const darkRed = '#7f1d1d';
 const purple = '#7c3aed';
 
-const TOTAL_PAGES = 11;
+function getTotalPages(data: ReportData): number {
+  const hasCrossChain = data.crossChainTrace?.detected === true;
+  return hasCrossChain ? 12 : 11;
+}
 
 const s = StyleSheet.create({
   page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 },
@@ -56,7 +59,7 @@ const Header = ({ data }: { data: ReportData }) => (
 const Footer = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <View style={s.footer} fixed>
     <Text>LedgerHound · USPROJECT LLC · Confidential</Text>
-    <Text>Page {pageNum} of {TOTAL_PAGES} · {data.caseId}</Text>
+    <Text>Page {pageNum} of {getTotalPages(data)} · {data.caseId}</Text>
   </View>
 );
 
@@ -649,9 +652,151 @@ const EntitiesExitPage = ({ data }: { data: ReportData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 7: FUND FLOW GRAPH (FIXED)
+   PAGE 7: CROSS-CHAIN TRACE (conditional — only if detected)
    ═══════════════════════════════════════════════════════════════ */
-const FundFlowPage = ({ data }: { data: ReportData }) => {
+const intentColor = (label: string) => {
+  switch (label) {
+    case 'LAUNDERING': return darkRed;
+    case 'OBFUSCATION': return amber;
+    default: return green;
+  }
+};
+
+const CrossChainPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => {
+  const cc = data.crossChainTrace;
+  if (!cc || !cc.detected) return null;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Cross-Chain Trace Summary</Text>
+      <Text style={{ ...s.p, marginBottom: 12 }}>
+        Analysis of cross-chain bridge interactions and multi-chain activity for this wallet address.
+      </Text>
+
+      {/* Escape path summary */}
+      <View style={{ ...s.card, borderLeftWidth: 3, borderLeftColor: intentColor(cc.intent.label), marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Escape Path</Text>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>{cc.escapePathSummary}</Text>
+      </View>
+
+      {/* Active chains */}
+      {cc.activeChains.length > 0 && (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ ...s.h3, marginBottom: 6 }}>Multi-Chain Activity ({cc.activeChains.length + 1} chains)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {/* Origin chain */}
+            <View style={{ backgroundColor: blue, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}>
+              <Text style={{ fontSize: 8, color: 'white', fontFamily: 'Helvetica-Bold' }}>{data.networkLabel} (origin)</Text>
+            </View>
+            {cc.activeChains.map((chain, i) => (
+              <View key={i} style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 8, color: slate900 }}>{chain.chainLabel} ({chain.txCount} tx)</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Bridge interactions table */}
+      {cc.bridgeInteractions.length > 0 && (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ ...s.h3, marginBottom: 6 }}>Bridge Interactions ({cc.bridgeInteractions.length})</Text>
+          <View style={s.table}>
+            <View style={s.tableHeader}>
+              <Text style={{ ...s.th, width: '14%' }}>Date</Text>
+              <Text style={{ ...s.th, width: '8%' }}>Dir</Text>
+              <Text style={{ ...s.th, width: '22%' }}>Bridge</Text>
+              <Text style={{ ...s.th, width: '16%' }}>Amount</Text>
+              <Text style={{ ...s.th, width: '10%' }}>Token</Text>
+              <Text style={{ ...s.th, width: '30%' }}>Possible Dest.</Text>
+            </View>
+            {cc.bridgeInteractions.slice(0, 10).map((bi, i) => (
+              <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{bi.date}</Text>
+                <Text style={{ ...s.td, width: '8%', color: bi.direction === 'OUT' ? red : green, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{bi.direction}</Text>
+                <Text style={{ ...s.td, width: '22%', fontSize: 7 }}>{bi.bridgeName}</Text>
+                <Text style={{ ...s.td, width: '16%', fontSize: 7 }}>{fmtEth(bi.amount)}</Text>
+                <Text style={{ ...s.td, width: '10%', fontSize: 7 }}>{bi.token}</Text>
+                <Text style={{ ...s.td, width: '30%', fontSize: 6 }}>{bi.possibleDestChains.slice(0, 4).join(', ')}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Cross-chain hops visualization */}
+      {cc.hops.length > 0 && (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ ...s.h3, marginBottom: 6 }}>Traced Path ({cc.hops.length} hop{cc.hops.length > 1 ? 's' : ''})</Text>
+          {cc.hops.map((hop, i) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <View style={{ backgroundColor: blue, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 7, color: 'white', fontFamily: 'Helvetica-Bold' }}>{hop.step}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: blue }}>{(hop.fromChain || '').toUpperCase()}</Text>
+                </View>
+                <Text style={{ fontSize: 8, color: red }}>{'\u2192'}</Text>
+                <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: blue }}>{(hop.toChain || '').toUpperCase()}</Text>
+                </View>
+                <Text style={{ fontSize: 7, color: slate600 }}>via {hop.bridge}</Text>
+                <Text style={{ fontSize: 7, color: slate900, fontFamily: 'Helvetica-Bold' }}>{fmtEth(hop.amount)} {hop.token}</Text>
+                <Text style={{ fontSize: 6, color: slate400 }}>({hop.confidence}%)</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Final destination */}
+      {cc.finalDestination && cc.finalDestination.entityName && (
+        <View style={{
+          backgroundColor: cc.finalDestination.entityType === 'exchange' ? '#f0fdf4' : cc.finalDestination.entityType === 'mixer' ? '#fef2f2' : '#f8fafc',
+          borderRadius: 6, padding: 12, marginBottom: 12,
+          borderWidth: 1, borderColor: cc.finalDestination.entityType === 'exchange' ? '#bbf7d0' : cc.finalDestination.entityType === 'mixer' ? '#fecaca' : '#e2e8f0',
+        }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: cc.finalDestination.entityType === 'exchange' ? green : red, marginBottom: 4 }}>
+            Final Destination: {cc.finalDestination.entityName}
+          </Text>
+          <Text style={{ fontSize: 8, color: slate600 }}>
+            Chain: {cc.finalDestination.chain.toUpperCase()} | Type: {cc.finalDestination.entityType.toUpperCase()}
+          </Text>
+          {cc.finalDestination.entityType === 'exchange' && (
+            <Text style={{ fontSize: 8, color: blue, marginTop: 4 }}>
+              Subpoena target: {cc.finalDestination.entityName} compliance can identify account holder.
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Intent analysis */}
+      <View style={{
+        ...s.card,
+        borderLeftWidth: 3,
+        borderLeftColor: intentColor(cc.intent.label),
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900 }}>Intent Analysis</Text>
+          <View style={{ backgroundColor: intentColor(cc.intent.label), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 3 }}>
+            <Text style={{ fontSize: 7, color: 'white', fontFamily: 'Helvetica-Bold' }}>{cc.intent.label}</Text>
+          </View>
+          <Text style={{ fontSize: 8, color: slate600 }}>Confidence: {cc.intent.confidence}%</Text>
+        </View>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{cc.intent.reason}</Text>
+      </View>
+
+      <Footer data={data} pageNum={pageNum} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE 7/8: FUND FLOW GRAPH
+   ═══════════════════════════════════════════════════════════════ */
+const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => {
   const graph = data.graphData;
 
   return (
@@ -777,15 +922,15 @@ const FundFlowPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} pageNum={7} />
+      <Footer data={data} pageNum={pageNum} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 8: TRANSACTION HISTORY (filtered to real assets, top 30)
+   PAGE 8/9: TRANSACTION HISTORY (filtered to real assets, top 30)
    ═══════════════════════════════════════════════════════════════ */
-const TransactionsPage = ({ data }: { data: ReportData }) => (
+const TransactionsPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <Page size="A4" style={s.page} wrap>
     <Header data={data} />
     <Text style={s.h2}>Transaction History (Top {data.transactions.length})</Text>
@@ -817,16 +962,16 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
       </Text>
     )}
 
-    <Footer data={data} pageNum={8} />
+    <Footer data={data} pageNum={pageNum} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 9: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
+   PAGE 9/10: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
    ═══════════════════════════════════════════════════════════════ */
 const probColor = (p: string) => p === 'HIGH' ? red : p === 'LOW' ? green : amber;
 
-const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
+const RecoveryLegalPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => {
   const scenarios = data.recoveryScenarios;
 
   return (
@@ -881,15 +1026,15 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
         <Text key={i} style={s.bullet}>{i + 1}. {r}</Text>
       ))}
 
-      <Footer data={data} pageNum={9} />
+      <Footer data={data} pageNum={pageNum} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 10: SUBPOENA TARGETS + INVESTIGATION NEXT STEPS
+   PAGE 10/11: SUBPOENA TARGETS + INVESTIGATION NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
-const InvestigationPage = ({ data }: { data: ReportData }) => (
+const InvestigationPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <Page size="A4" style={s.page}>
     <Header data={data} />
     <Text style={s.h2}>Investigation Next Steps</Text>
@@ -955,14 +1100,14 @@ const InvestigationPage = ({ data }: { data: ReportData }) => (
       </Text>
     </View>
 
-    <Footer data={data} pageNum={10} />
+    <Footer data={data} pageNum={pageNum} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
    PAGE 11: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
-const DisclaimerPage = ({ data }: { data: ReportData }) => (
+const DisclaimerPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <Page size="A4" style={s.page}>
     <Header data={data} />
     <Text style={s.h2}>Disclaimer & Legal Notice</Text>
@@ -996,25 +1141,31 @@ const DisclaimerPage = ({ data }: { data: ReportData }) => (
       <Text style={{ fontSize: 9, color: slate400 }}>+1 (833) 559-1334</Text>
     </View>
 
-    <Footer data={data} pageNum={11} />
+    <Footer data={data} pageNum={pageNum} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
    DOCUMENT
    ═══════════════════════════════════════════════════════════════ */
-export const ReportDocument = ({ data }: { data: ReportData }) => (
-  <Document>
-    <CoverPage data={data} />
-    <SummaryPage data={data} />
-    <AssetTimelinePage data={data} />
-    <PatternPage data={data} />
-    <AnalyticsPage data={data} />
-    <EntitiesExitPage data={data} />
-    <FundFlowPage data={data} />
-    <TransactionsPage data={data} />
-    <RecoveryLegalPage data={data} />
-    <InvestigationPage data={data} />
-    <DisclaimerPage data={data} />
-  </Document>
-);
+export const ReportDocument = ({ data }: { data: ReportData }) => {
+  const hasCrossChain = data.crossChainTrace?.detected === true;
+  const ccOffset = hasCrossChain ? 1 : 0;
+
+  return (
+    <Document>
+      <CoverPage data={data} />
+      <SummaryPage data={data} />
+      <AssetTimelinePage data={data} />
+      <PatternPage data={data} />
+      <AnalyticsPage data={data} />
+      <EntitiesExitPage data={data} />
+      {hasCrossChain && <CrossChainPage data={data} pageNum={7} />}
+      <FundFlowPage data={data} pageNum={7 + ccOffset} />
+      <TransactionsPage data={data} pageNum={8 + ccOffset} />
+      <RecoveryLegalPage data={data} pageNum={9 + ccOffset} />
+      <InvestigationPage data={data} pageNum={10 + ccOffset} />
+      <DisclaimerPage data={data} pageNum={11 + ccOffset} />
+    </Document>
+  );
+};
