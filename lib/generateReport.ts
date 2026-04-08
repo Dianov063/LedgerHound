@@ -48,7 +48,7 @@ const NATIVE_CURRENCY: Record<string, string> = {
 };
 
 /** EVM chains that use etherscan-v2-tracker */
-const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
+const EVM_CHAINS = new Set(['bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },

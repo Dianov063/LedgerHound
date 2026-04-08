@@ -16,6 +16,22 @@ interface ChainConfig {
 }
 
 export const ETHERSCAN_V2_CHAINS: Record<string, ChainConfig> = {
+  // BNB: Etherscan V2 (chainid=56)
+  bnb: {
+    name: 'BNB Smart Chain',
+    nativeCurrency: 'BNB',
+    explorer: 'https://bscscan.com',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=56`,
+    needsKey: true,
+  },
+  // Polygon: Etherscan V2 (chainid=137)
+  polygon: {
+    name: 'Polygon',
+    nativeCurrency: 'MATIC',
+    explorer: 'https://polygonscan.com',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=137`,
+    needsKey: true,
+  },
   // ARB: Etherscan V2 free plan supports Arbitrum
   arb: {
     name: 'Arbitrum One',
