@@ -96,11 +96,12 @@ const COUNTRY_CURRENCIES: Record<string, string> = {
 
 const COUNTRIES_WITH_STATES = ['US', 'DE', 'AU'];
 
+/** Detect network from address format. For 0x addresses returns 'evm' (ambiguous). */
 function detectNetwork(addr: string): string {
   if (!addr || addr.length < 10) return '';
   if (/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,}$/.test(addr)) return 'btc';
   if (/^T[a-zA-Z0-9]{33}$/.test(addr)) return 'trx';
-  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) return 'eth';
+  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) return 'evm'; // Could be ETH, BNB, Polygon, etc.
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr) && !addr.startsWith('0x')) return 'sol';
   return '';
 }
@@ -156,11 +157,25 @@ export default function EmergencyPage() {
     [],
   );
 
-  /* auto-detect network */
+  /* auto-detect network from address format.
+     Only set if: (a) we have a specific chain (btc/trx/sol), or
+     (b) detectedNetwork is empty (TX lookup hasn't set it yet).
+     Never overwrite a specific chain (bnb/arb/base/etc.) with generic 'evm'. */
   useEffect(() => {
     const net = detectNetwork(form.walletAddress);
-    if (net) set({ detectedNetwork: net });
-  }, [form.walletAddress, set]);
+    if (!net) return;
+    // Non-ambiguous chains always win
+    if (net !== 'evm') {
+      set({ detectedNetwork: net });
+      return;
+    }
+    // 'evm' is ambiguous — only set if nothing better is known
+    const current = form.detectedNetwork;
+    if (!current) {
+      set({ detectedNetwork: 'eth' }); // default EVM = ETH until TX lookup resolves
+    }
+    // If current is already a specific EVM chain (bnb, arb, base, etc.), keep it
+  }, [form.walletAddress, form.detectedNetwork, set]);
 
   /* auto-set currency from country */
   useEffect(() => {
