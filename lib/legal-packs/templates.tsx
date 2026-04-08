@@ -1,20 +1,33 @@
 import React from 'react';
+import path from 'path';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { CountryResearch, CaseData } from './types';
 import { getPdfTranslations, type PdfTranslations } from './pdf-i18n';
 
-/* Register Noto Sans — pinned release for stability (Latin + Cyrillic + Greek) */
+/**
+ * Register Noto Sans — Google Fonts CDN (v42, Latin + Cyrillic + Greek).
+ * Local fallback files also kept in lib/fonts/ for offline builds.
+ *
+ * We try local path first (works in standard Node.js), fall back to CDN.
+ */
+const NOTO_REGULAR_CDN = 'https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99d.ttf';
+const NOTO_BOLD_CDN = 'https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyAaBN9d.ttf';
+
+function resolveFont(filename: string, cdn: string): string {
+  try {
+    const local = path.resolve(process.cwd(), 'lib', 'fonts', filename);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs');
+    if (fs.existsSync(local)) return local;
+  } catch { /* bundled env — use CDN */ }
+  return cdn;
+}
+
 Font.register({
   family: 'NotoSans',
   fonts: [
-    {
-      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@noto-monthly-release-24.9.1/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@noto-monthly-release-24.9.1/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf',
-      fontWeight: 700,
-    },
+    { src: resolveFont('NotoSans-Regular.ttf', NOTO_REGULAR_CDN), fontWeight: 400 },
+    { src: resolveFont('NotoSans-Bold.ttf', NOTO_BOLD_CDN), fontWeight: 700 },
   ],
 });
 
@@ -243,21 +256,21 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
   const exchangeEmail = caseData.exchangeEmail || '[compliance@exchange.com]';
   const exchangeAddr = caseData.exchangeAddress || '';
 
-  /* Preservation Letter uses built-in Helvetica (always English, no CDN font dependency) */
-  const plPage = { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 };
-  const plBold = 'Helvetica-Bold';
+  /* Preservation Letter uses NotoSans (supports Cyrillic research data even though doc is English) */
+  const plPage = { padding: 50, fontFamily: 'NotoSans', fontSize: 10, color: slate900 };
+  const plBold: { fontFamily: string; fontWeight: number } = { fontFamily: 'NotoSans', fontWeight: 700 };
 
-  /* Local overrides for Field/SectionTitle that use Helvetica */
+  /* Local overrides for Field/SectionTitle */
   const PlField = ({ label, value, mono }: { label: string; value?: string; mono?: boolean }) => (
     <View style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 2 }}>
       <Text style={{ fontSize: 9, color: slate400, width: 130 }}>{label}:</Text>
-      <Text style={{ fontSize: 9, color: slate900, flex: 1, fontFamily: mono ? 'Courier' : plBold }}>{value || '[TO BE FILLED]'}</Text>
+      <Text style={{ fontSize: 9, color: slate900, flex: 1, fontFamily: mono ? 'Courier' : 'NotoSans', fontWeight: mono ? 400 : 700 }}>{value || '[TO BE FILLED]'}</Text>
     </View>
   );
 
   const PlSection = ({ children }: { children: string }) => (
     <View>
-      <Text style={{ fontSize: 11, fontFamily: plBold, color: slate900, marginTop: 12, marginBottom: 2 }}>{children}</Text>
+      <Text style={{ fontSize: 11, ...plBold, color: slate900, marginTop: 12, marginBottom: 2 }}>{children}</Text>
       <View style={s.separator} />
     </View>
   );
@@ -276,7 +289,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <View style={{ marginBottom: 16, paddingBottom: 12, borderBottomWidth: 2, borderBottomColor: slate900 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ fontSize: 16, fontFamily: plBold, color: slate900, marginBottom: 2 }}>PRESERVATION LETTER</Text>
+              <Text style={{ fontSize: 16, ...plBold, color: slate900, marginBottom: 2 }}>PRESERVATION LETTER</Text>
               <Text style={{ fontSize: 10, color: slate600 }}>Urgent Request for Asset Freeze</Text>
             </View>
             <View style={{ alignItems: 'flex-end' as any, flexShrink: 0 }}>
@@ -289,13 +302,13 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         {/* TO */}
         <View style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row' }}>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 28, flexShrink: 0 }}>TO:</Text>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>{exchangeName} Compliance Department</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, width: 28, flexShrink: 0 }}>TO:</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, flex: 1 }}>{exchangeName} Compliance Department</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 28 }}>{exchangeEmail}</Text>
         </View>
 
-        <Text style={{ fontSize: 10, fontFamily: plBold, color: red, marginBottom: 12 }}>RE: URGENT - ASSET PRESERVATION REQUEST - Suspected Cryptocurrency Fraud</Text>
+        <Text style={{ fontSize: 10, ...plBold, color: red, marginBottom: 12 }}>RE: URGENT - ASSET PRESERVATION REQUEST - Suspected Cryptocurrency Fraud</Text>
         <View style={s.separator} />
 
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 6 }}>Dear Compliance Team,</Text>
@@ -334,16 +347,16 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <PlSection>REQUESTED ACTIONS</PlSection>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>1.</Text>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>IMMEDIATE ASSET FREEZE</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, width: 18, flexShrink: 0 }}>1.</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, flex: 1 }}>IMMEDIATE ASSET FREEZE</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 2 }}>Freeze assets associated with address:</Text>
           <Text style={{ fontSize: 9, fontFamily: 'Courier', color: slate600, paddingLeft: 18, lineHeight: 1.5 }}>{exchangeAddr || caseData.scammerAddress}</Text>
         </View>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>2.</Text>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>EVIDENCE PRESERVATION</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, width: 18, flexShrink: 0 }}>2.</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, flex: 1 }}>EVIDENCE PRESERVATION</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 4 }}>Preserve all records including:</Text>
           {['KYC/identity documents', 'Login history and IP logs', 'All transaction records', 'Communication records'].map((item, i) => (
@@ -355,8 +368,8 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         </View>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>3.</Text>
-            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>CONFIRMATION</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, width: 18, flexShrink: 0 }}>3.</Text>
+            <Text style={{ fontSize: 10, ...plBold, color: slate900, flex: 1 }}>CONFIRMATION</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18 }}>Please confirm receipt and actions taken within 48 hours.</Text>
         </View>
@@ -375,7 +388,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
 
         {/* LEGAL NOTICE */}
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 4, padding: 8, marginTop: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 8, fontFamily: plBold, color: red, marginBottom: 2 }}>LEGAL NOTICE</Text>
+          <Text style={{ fontSize: 8, ...plBold, color: red, marginBottom: 2 }}>LEGAL NOTICE</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>This letter serves as formal notice of suspected criminal activity. Failure to preserve potentially fraudulent assets may result in liability.</Text>
         </View>
 

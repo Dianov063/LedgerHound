@@ -6,7 +6,7 @@ export async function sendReport(email: string, walletAddress: string, pdfBuffer
   const shortAddr = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
 
   await getResend().emails.send({
-    from: 'LedgerHound Reports <reports@ledgerhound.vip>',
+    from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
     to: email,
     subject: `Your LedgerHound Forensic Report is Ready — ${caseId}`,
     html: `
