@@ -2,7 +2,7 @@
  * Generates graph node/edge data for the PDF fund flow visualization.
  * Pure data — no rendering. Used by reportPdf.tsx to draw SVG.
  *
- * Max 15 nodes, top counterparties by volume, dust filtered.
+ * Max 12 nodes, top counterparties by volume, dust filtered.
  */
 
 export interface GraphNode {
@@ -24,6 +24,9 @@ export interface GraphEdge {
   y2: number;
   direction: 'IN' | 'OUT';
   label: string;
+  /** Midpoint for label placement */
+  labelX: number;
+  labelY: number;
 }
 
 export interface GraphData {
@@ -49,7 +52,7 @@ export function getNodeColor(type: string): string {
 
 function shortAddr(addr: string): string {
   if (!addr || addr.length < 14) return addr || '?';
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 function fmtValue(v: number, currency: string): string {
@@ -73,7 +76,7 @@ export function buildGraphData(params: {
   const addr = walletAddress.toLowerCase();
 
   // Aggregate counterparties by volume
-  const counterparties = new Map<string, { volume: number; direction: 'IN' | 'OUT'; label: string; type: string }>();
+  const counterparties = new Map<string, { volume: number; direction: 'IN' | 'OUT'; label: string; type: string; token: string }>();
   const entityMap = new Map<string, { label: string; type: string }>();
   for (const e of identifiedEntities) {
     entityMap.set(e.address.toLowerCase(), { label: e.label, type: e.type });
@@ -96,22 +99,24 @@ export function buildGraphData(params: {
         direction: tx.direction,
         label: entity?.label || shortAddr(counterparty),
         type: entity?.type || 'unknown',
+        token: tx.token || nativeCurrency,
       });
     }
   }
 
   if (counterparties.size === 0) return null;
 
-  // Top 14 counterparties (+ 1 source = 15 max)
+  // Top 11 counterparties (+ 1 source = 12 max)
   const sorted = Array.from(counterparties.entries())
     .sort((a, b) => b[1].volume - a[1].volume)
-    .slice(0, 14);
+    .slice(0, 11);
 
-  // Layout: radial around center
-  const W = 500;
-  const H = 340;
+  // Layout: radial around center — fits within A4 content area (max ~480pt)
+  const W = 470;
+  const H = 330;
   const cx = W / 2;
   const cy = H / 2;
+  const SOURCE_R = 20;
 
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -119,24 +124,24 @@ export function buildGraphData(params: {
   // Source node at center
   nodes.push({
     id: addr,
-    label: 'Your Wallet',
+    label: shortAddr(walletAddress),
     type: 'source',
     x: cx,
     y: cy,
-    radius: 18,
+    radius: SOURCE_R,
     volume: 0,
   });
 
   // Position counterparties in ellipse
-  const rx = W / 2 - 55; // horizontal radius
-  const ry = H / 2 - 50; // vertical radius
+  const rx = W / 2 - 60; // horizontal radius
+  const ry = H / 2 - 55; // vertical radius
   const count = sorted.length;
 
   sorted.forEach(([cpAddr, data], i) => {
     const angle = (2 * Math.PI * i) / count - Math.PI / 2;
     const x = cx + rx * Math.cos(angle);
     const y = cy + ry * Math.sin(angle);
-    const r = data.type === 'exchange' || data.type === 'mixer' ? 14 : 11;
+    const nodeR = data.type === 'exchange' || data.type === 'mixer' ? 16 : 13;
 
     nodes.push({
       id: cpAddr,
@@ -144,67 +149,51 @@ export function buildGraphData(params: {
       type: data.type as GraphNode['type'],
       x,
       y,
-      radius: r,
+      radius: nodeR,
       volume: data.volume,
     });
 
-    // Edge: shorten line so it doesn't overlap node circles
+    // Calculate unit vector from center to counterparty
     const dx = x - cx;
     const dy = y - cy;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
     const ux = dx / dist;
     const uy = dy / dist;
 
-    const sourceR = 18;
-    const targetR = r;
+    // Determine the value label
+    const valueLabel = fmtValue(data.volume, data.token);
 
     if (data.direction === 'OUT') {
+      // Arrow from center → counterparty
+      const sx = cx + ux * (SOURCE_R + 4);
+      const sy = cy + uy * (SOURCE_R + 4);
+      const ex = x - ux * (nodeR + 8);
+      const ey = y - uy * (nodeR + 8);
       edges.push({
-        fromId: addr,
-        toId: cpAddr,
-        x1: cx + ux * (sourceR + 4),
-        y1: cy + uy * (sourceR + 4),
-        x2: x - ux * (targetR + 8),
-        y2: y - uy * (targetR + 8),
+        fromId: addr, toId: cpAddr,
+        x1: sx, y1: sy, x2: ex, y2: ey,
         direction: 'OUT',
-        label: fmtValue(data.volume, nativeCurrency),
+        label: valueLabel,
+        labelX: (sx + ex) / 2,
+        labelY: (sy + ey) / 2,
       });
     } else {
+      // Arrow from counterparty → center
+      const sx = x - ux * (nodeR + 4);
+      const sy = y - uy * (nodeR + 4);
+      const ex = cx + ux * (SOURCE_R + 8);
+      const ey = cy + uy * (SOURCE_R + 8);
       edges.push({
-        fromId: cpAddr,
-        toId: addr,
-        x1: x + ux * (targetR + 4) * -1 + ux * (targetR + 4),
-        y1: y + uy * (targetR + 4) * -1 + uy * (targetR + 4),
-        x2: cx - ux * (sourceR + 8) + ux * (sourceR + 4),
-        y2: cy - uy * (sourceR + 8) + uy * (sourceR + 4),
+        fromId: cpAddr, toId: addr,
+        x1: sx, y1: sy, x2: ex, y2: ey,
         direction: 'IN',
-        label: fmtValue(data.volume, nativeCurrency),
+        label: valueLabel,
+        labelX: (sx + ex) / 2,
+        labelY: (sy + ey) / 2,
       });
-      // Simplify IN edge coordinates
-      edges[edges.length - 1].x1 = x - ux * (targetR + 4) * -1;
-      edges[edges.length - 1].y1 = y - uy * (targetR + 4) * -1;
-      edges[edges.length - 1].x2 = cx + ux * (sourceR + 8) * -1;
-      edges[edges.length - 1].y2 = cy + uy * (sourceR + 8) * -1;
     }
   });
-
-  // Fix IN edges: from counterparty toward center
-  for (const edge of edges) {
-    if (edge.direction === 'IN') {
-      const cp = nodes.find(n => n.id === edge.fromId && n.id !== addr);
-      if (cp) {
-        const dx = cx - cp.x;
-        const dy = cy - cp.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const ux = dx / dist;
-        const uy = dy / dist;
-        edge.x1 = cp.x + ux * (cp.radius + 4);
-        edge.y1 = cp.y + uy * (cp.radius + 4);
-        edge.x2 = cx - ux * (18 + 8);
-        edge.y2 = cy - uy * (18 + 8);
-      }
-    }
-  }
 
   return { nodes, edges, width: W, height: H };
 }

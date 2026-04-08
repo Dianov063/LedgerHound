@@ -810,10 +810,11 @@ const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) 
       {graph && graph.nodes.length > 1 ? (
         <View>
           {/* SVG Graph */}
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          <View style={{ alignItems: 'center', marginBottom: 14 }}>
             <Svg width={graph.width} height={graph.height} viewBox={`0 0 ${graph.width} ${graph.height}`}>
               {/* Background */}
-              <Rect x={0} y={0} width={graph.width} height={graph.height} rx={8} style={{ fill: '#f8fafc' }} />
+              <Rect x={0} y={0} width={graph.width} height={graph.height} rx={6}
+                style={{ fill: '#f0f4f8', stroke: '#cbd5e1', strokeWidth: 1 }} />
 
               {/* Edges with arrows */}
               {graph.edges.map((edge, i) => {
@@ -824,23 +825,30 @@ const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) 
                 if (dist < 1) return null;
                 const ux = dx / dist;
                 const uy = dy / dist;
-                // Arrow triangle
-                const aSize = 6;
                 const px = -uy;
                 const py = ux;
+                // Arrowhead triangle
+                const aSize = 7;
                 const ax = edge.x2;
                 const ay = edge.y2;
-                const triPath = `M ${ax} ${ay} L ${ax - ux * aSize + px * aSize * 0.4} ${ay - uy * aSize + py * aSize * 0.4} L ${ax - ux * aSize - px * aSize * 0.4} ${ay - uy * aSize - py * aSize * 0.4} Z`;
+                const triPath = `M ${ax} ${ay} L ${ax - ux * aSize + px * aSize * 0.45} ${ay - uy * aSize + py * aSize * 0.45} L ${ax - ux * aSize - px * aSize * 0.45} ${ay - uy * aSize - py * aSize * 0.45} Z`;
 
                 return (
                   <G key={`edge-${i}`}>
                     <Line
                       x1={edge.x1} y1={edge.y1}
-                      x2={edge.x2 - ux * 4} y2={edge.y2 - uy * 4}
-                      style={{ stroke: color, strokeWidth: 1.5, strokeOpacity: 0.7 }}
+                      x2={edge.x2 - ux * 5} y2={edge.y2 - uy * 5}
+                      style={{ stroke: color, strokeWidth: 1.5 }}
                     />
-                    {/* Arrowhead */}
-                    <Path d={triPath} style={{ fill: color, fillOpacity: 0.8 }} />
+                    <Path d={triPath} style={{ fill: color }} />
+                    {/* Edge value label */}
+                    <Text
+                      x={edge.labelX + px * 8}
+                      y={edge.labelY + py * 8}
+                      style={{ fontSize: 5.5, fill: color, fontFamily: 'Helvetica' }}
+                    >
+                      {edge.label}
+                    </Text>
                   </G>
                 );
               })}
@@ -848,14 +856,26 @@ const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) 
               {/* Nodes */}
               {graph.nodes.map((node, i) => {
                 const color = getNodeColor(node.type);
+                const isSource = node.type === 'source';
                 return (
                   <G key={`node-${i}`}>
                     {/* Outer ring */}
-                    <Circle cx={node.x} cy={node.y} r={node.radius + 2} style={{ fill: 'white', stroke: color, strokeWidth: 2 }} />
+                    <Circle cx={node.x} cy={node.y} r={node.radius + 2}
+                      style={{ fill: 'white', stroke: color, strokeWidth: isSource ? 3 : 2 }} />
                     {/* Inner fill */}
-                    <Circle cx={node.x} cy={node.y} r={node.radius} style={{ fill: color, fillOpacity: 0.2 }} />
+                    <Circle cx={node.x} cy={node.y} r={node.radius}
+                      style={{ fill: color, fillOpacity: isSource ? 0.35 : 0.2 }} />
                     {/* Center dot */}
-                    <Circle cx={node.x} cy={node.y} r={4} style={{ fill: color }} />
+                    <Circle cx={node.x} cy={node.y} r={isSource ? 5 : 3.5}
+                      style={{ fill: color }} />
+                    {/* Node label */}
+                    <Text
+                      x={node.x}
+                      y={node.y + node.radius + 12}
+                      style={{ fontSize: isSource ? 6.5 : 6, fill: slate900, fontFamily: isSource ? 'Helvetica-Bold' : 'Helvetica', textAnchor: 'middle' }}
+                    >
+                      {node.label}
+                    </Text>
                   </G>
                 );
               })}
@@ -863,22 +883,22 @@ const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) 
           </View>
 
           {/* Node legend table */}
-          <View style={{ ...s.table, marginBottom: 12 }}>
+          <View style={{ ...s.table, marginBottom: 10 }}>
             <View style={s.tableHeader}>
-              <Text style={{ ...s.th, width: '8%' }}>#</Text>
-              <Text style={{ ...s.th, width: '32%' }}>Label</Text>
-              <Text style={{ ...s.th, width: '20%' }}>Type</Text>
-              <Text style={{ ...s.th, width: '20%' }}>Volume</Text>
+              <Text style={{ ...s.th, width: '6%' }}>#</Text>
+              <Text style={{ ...s.th, width: '30%' }}>Label</Text>
+              <Text style={{ ...s.th, width: '22%' }}>Type</Text>
+              <Text style={{ ...s.th, width: '22%' }}>Volume</Text>
               <Text style={{ ...s.th, width: '20%' }}>Direction</Text>
             </View>
             {graph.nodes.filter(n => n.type !== 'source').map((node, i) => {
               const edge = graph.edges.find(e => e.fromId === node.id || e.toId === node.id);
               return (
                 <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                  <Text style={{ ...s.td, width: '8%' }}>{i + 1}</Text>
-                  <Text style={{ ...s.td, width: '32%', fontFamily: 'Helvetica-Bold' }}>{node.label}</Text>
-                  <Text style={{ ...s.td, width: '20%', color: getNodeColor(node.type) }}>{node.type.toUpperCase()}</Text>
-                  <Text style={{ ...s.td, width: '20%' }}>{edge?.label || '—'}</Text>
+                  <Text style={{ ...s.td, width: '6%' }}>{i + 1}</Text>
+                  <Text style={{ ...s.td, width: '30%', fontFamily: 'Helvetica-Bold' }}>{node.label}</Text>
+                  <Text style={{ ...s.td, width: '22%', color: getNodeColor(node.type) }}>{node.type.toUpperCase()}</Text>
+                  <Text style={{ ...s.td, width: '22%' }}>{edge?.label || '—'}</Text>
                   <Text style={{ ...s.td, width: '20%', color: edge?.direction === 'IN' ? green : red }}>{edge?.direction || '—'}</Text>
                 </View>
               );
