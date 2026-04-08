@@ -13,10 +13,21 @@ import { buildGraphData, type GraphData } from './generateGraphData';
 import QRCode from 'qrcode';
 import logger from '@/lib/logger';
 
-function getAlchemyUrl(): string {
+function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
   if (!key) throw new Error('ALCHEMY_API_KEY not configured');
-  return `https://eth-mainnet.g.alchemy.com/v2/${key}`;
+  return key;
+}
+
+function getAlchemyUrl(network: string = 'eth'): string {
+  const key = getAlchemyKey();
+  const hosts: Record<string, string> = {
+    eth: 'eth-mainnet',
+    bnb: 'bnb-mainnet',
+    polygon: 'polygon-mainnet',
+  };
+  const host = hosts[network] || 'eth-mainnet';
+  return `https://${host}.g.alchemy.com/v2/${key}`;
 }
 
 const NETWORK_LABELS: Record<string, string> = {
@@ -223,9 +234,10 @@ export function fmtEth(v: number): string {
   return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
-async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Promise<Transfer[]> {
+async function fetchAllTransfers(address: string, direction: 'from' | 'to', alchemyUrl?: string): Promise<Transfer[]> {
   const all: Transfer[] = [];
   let pageKey: string | undefined;
+  const url = alchemyUrl || getAlchemyUrl('eth');
 
   for (let i = 0; i < 10; i++) { // max 10 pages
     const params: any = {
@@ -239,7 +251,7 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to'): Pro
     else params.toAddress = address;
     if (pageKey) params.pageKey = pageKey;
 
-    const res = await fetch(getAlchemyUrl(), {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'alchemy_getAssetTransfers', params: [params] }),
@@ -309,10 +321,11 @@ async function fetchTransfersForNetwork(
     };
   }
 
-  // Default: Ethereum via Alchemy (most detailed)
+  // Default: Ethereum/BNB/Polygon via Alchemy (most detailed)
+  const alchemyUrl = getAlchemyUrl(network);
   const [outgoing, incoming] = await Promise.all([
-    fetchAllTransfers(address, 'from'),
-    fetchAllTransfers(address, 'to'),
+    fetchAllTransfers(address, 'from', alchemyUrl),
+    fetchAllTransfers(address, 'to', alchemyUrl),
   ]);
   return { incoming: incoming as unknown as UnifiedTransfer[], outgoing: outgoing as unknown as UnifiedTransfer[] };
 }
