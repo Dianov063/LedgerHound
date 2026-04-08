@@ -12,6 +12,8 @@ import { getAddressIndex } from './scam-db';
 import { buildGraphData, type GraphData } from './generateGraphData';
 import QRCode from 'qrcode';
 import logger from '@/lib/logger';
+import { analyzeScamPatterns } from './patternDetection';
+export type { PatternAnalysis, ScamPattern } from './patternDetection';
 
 function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
@@ -438,6 +440,7 @@ export interface ReportData {
   exitPointAnalysis: ExitPointAnalysis;
   recoveryScenarios: RecoveryScenario[];
   assetSummary: AssetSummary;
+  patternAnalysis: import('./patternDetection').PatternAnalysis;
 }
 
 function calculateRiskBreakdown(
@@ -909,6 +912,33 @@ export async function generateReport(
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore);
 
+  // ── Behavioral pattern analysis ──
+  const patternAnalysis = analyzeScamPatterns(
+    // Build TxInput[] from the combined transactions
+    [
+      ...incoming.map((tx) => ({
+        date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+        direction: 'IN' as const,
+        from: tx.from || '',
+        to: tx.to || '',
+        value: safeValue(tx),
+        token: tx.asset || nativeCurrency,
+      })),
+      ...outgoing.map((tx) => ({
+        date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+        direction: 'OUT' as const,
+        from: tx.from || '',
+        to: tx.to || '',
+        value: safeValue(tx),
+        token: tx.asset || nativeCurrency,
+      })),
+    ],
+    identifiedEntities,
+    assetSummary.spamCount,
+  );
+
+  logger.info({ patterns: patternAnalysis.patterns.length, risk: patternAnalysis.overallRisk }, '[generateReport] Pattern analysis done');
+
   // Key findings
   const keyFindings: string[] = [];
   if (ofacWarning) {
@@ -928,6 +958,12 @@ export async function generateReport(
   if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${outgoing.filter((t: any) => t.category === 'external').length} native transactions.`);
   if (inactiveDays > 365) keyFindings.push(`Wallet inactive for ${inactiveDays} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`);
   if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
+  // Add behavioral pattern findings
+  for (const p of patternAnalysis.patterns) {
+    if (p.severity === 'CRITICAL' || p.severity === 'HIGH') {
+      keyFindings.push(`BEHAVIORAL: ${p.name} detected (${p.confidence}% confidence). ${p.evidence[0]}`);
+    }
+  }
   if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
 
   // Recommendations
@@ -1055,6 +1091,7 @@ export async function generateReport(
     exitPointAnalysis,
     recoveryScenarios,
     assetSummary,
+    patternAnalysis,
   };
 
   // Generate PDF

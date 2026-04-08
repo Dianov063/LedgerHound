@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path } from '@react-pdf/renderer';
-import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary } from './generateReport';
+import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 
 const blue = '#2563eb';
@@ -13,7 +13,7 @@ const amber = '#d97706';
 const darkRed = '#7f1d1d';
 const purple = '#7c3aed';
 
-const TOTAL_PAGES = 10;
+const TOTAL_PAGES = 11;
 
 const s = StyleSheet.create({
   page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 },
@@ -335,7 +335,145 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 4: WALLET ANALYTICS
+   PAGE 4: BEHAVIORAL PATTERN ANALYSIS
+   ═══════════════════════════════════════════════════════════════ */
+const severityColor = (sev: string) => {
+  switch (sev) {
+    case 'CRITICAL': return darkRed;
+    case 'HIGH': return red;
+    case 'MEDIUM': return amber;
+    default: return slate600;
+  }
+};
+
+const overallRiskColor = (risk: string) => {
+  switch (risk) {
+    case 'CONFIRMED_SCAM': return darkRed;
+    case 'LIKELY_SCAM': return red;
+    case 'SUSPICIOUS': return amber;
+    default: return green;
+  }
+};
+
+const overallRiskLabel = (risk: string) => {
+  switch (risk) {
+    case 'CONFIRMED_SCAM': return 'CONFIRMED SCAM';
+    case 'LIKELY_SCAM': return 'LIKELY SCAM';
+    case 'SUSPICIOUS': return 'SUSPICIOUS';
+    default: return 'CLEAN';
+  }
+};
+
+const PatternPage = ({ data }: { data: ReportData }) => {
+  const pa = data.patternAnalysis;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Behavioral Pattern Analysis</Text>
+      <Text style={{ ...s.p, marginBottom: 12 }}>
+        Automated detection of scam-associated behavioral patterns based on transaction timing, flow structure, and counterparty analysis.
+      </Text>
+
+      {/* Overall Assessment */}
+      {pa && (
+        <View style={{
+          backgroundColor: pa.overallRisk === 'CLEAN' ? '#f0fdf4' : pa.overallRisk === 'SUSPICIOUS' ? '#fffbeb' : '#fef2f2',
+          borderRadius: 8,
+          padding: 14,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: pa.overallRisk === 'CLEAN' ? '#bbf7d0' : pa.overallRisk === 'SUSPICIOUS' ? '#fde68a' : '#fecaca',
+          alignItems: 'center',
+        }}>
+          <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>OVERALL BEHAVIORAL ASSESSMENT</Text>
+          <Text style={{
+            ...s.badge,
+            fontSize: 12,
+            backgroundColor: overallRiskColor(pa.overallRisk),
+            color: 'white',
+            paddingHorizontal: 16,
+            paddingVertical: 5,
+          }}>
+            {overallRiskLabel(pa.overallRisk)}
+          </Text>
+          <Text style={{ fontSize: 8, color: slate600, marginTop: 8, textAlign: 'center', maxWidth: 400, lineHeight: 1.4 }}>
+            {pa.interpretation}
+          </Text>
+        </View>
+      )}
+
+      {/* Detected Patterns */}
+      {pa && pa.patterns.length > 0 ? (
+        <View>
+          <Text style={{ ...s.h3, marginBottom: 8 }}>Detected Patterns ({pa.patterns.length})</Text>
+          {pa.patterns.map((pattern, i) => (
+            <View key={i} style={{
+              ...s.card,
+              marginBottom: 8,
+              borderLeftWidth: 3,
+              borderLeftColor: severityColor(pattern.severity),
+            }}>
+              {/* Pattern header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate900 }}>
+                  {pattern.name}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{
+                    backgroundColor: severityColor(pattern.severity),
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 3,
+                  }}>
+                    <Text style={{ fontSize: 7, color: 'white', fontFamily: 'Helvetica-Bold' }}>{pattern.severity}</Text>
+                  </View>
+                  <Text style={{ fontSize: 8, color: slate600 }}>Confidence: {pattern.confidence}%</Text>
+                </View>
+              </View>
+
+              {/* Confidence bar */}
+              <View style={{ height: 4, backgroundColor: '#e2e8f0', borderRadius: 2, marginBottom: 8 }}>
+                <View style={{
+                  height: 4,
+                  width: `${pattern.confidence}%`,
+                  backgroundColor: severityColor(pattern.severity),
+                  borderRadius: 2,
+                }} />
+              </View>
+
+              {/* Evidence */}
+              {pattern.evidence.map((ev, j) => (
+                <Text key={j} style={{ fontSize: 8, color: slate600, paddingLeft: 8, marginBottom: 2, lineHeight: 1.4 }}>
+                  {'\u2022'} {ev}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={{ ...s.card, alignItems: 'center', paddingVertical: 20 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 6 }}>No Suspicious Patterns Detected</Text>
+          <Text style={{ fontSize: 9, color: slate600, textAlign: 'center', maxWidth: 350, lineHeight: 1.4 }}>
+            Automated behavioral analysis did not detect scam-associated patterns. This does not guarantee legitimacy — manual review may still be warranted for comprehensive assessment.
+          </Text>
+        </View>
+      )}
+
+      {/* Methodology note */}
+      <View style={{ marginTop: 'auto', paddingTop: 12 }}>
+        <Text style={{ fontSize: 7, color: slate400, lineHeight: 1.4 }}>
+          Methodology: Patterns are detected by analyzing transaction timing, flow direction, counterparty diversity, asset types, and known entity interactions. Confidence scores reflect the strength of evidence. This is automated analysis — professional forensic review may identify additional patterns.
+        </Text>
+      </View>
+
+      <Footer data={data} pageNum={4} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE 5: WALLET ANALYTICS (was 4)
    ═══════════════════════════════════════════════════════════════ */
 const AnalyticsPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
@@ -401,12 +539,12 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
       ))}
     </View>
 
-    <Footer data={data} pageNum={4} />
+    <Footer data={data} pageNum={5} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 5: ENTITY IDENTIFICATION + EXIT POINT ANALYSIS
+   PAGE 6: ENTITY IDENTIFICATION + EXIT POINT ANALYSIS
    ═══════════════════════════════════════════════════════════════ */
 const recoveryDiffColor = (d: string) => {
   if (d.startsWith('LOW')) return green;
@@ -505,13 +643,13 @@ const EntitiesExitPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} pageNum={5} />
+      <Footer data={data} pageNum={6} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 6: FUND FLOW GRAPH (FIXED)
+   PAGE 7: FUND FLOW GRAPH (FIXED)
    ═══════════════════════════════════════════════════════════════ */
 const FundFlowPage = ({ data }: { data: ReportData }) => {
   const graph = data.graphData;
@@ -639,13 +777,13 @@ const FundFlowPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} pageNum={6} />
+      <Footer data={data} pageNum={7} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 7: TRANSACTION HISTORY (filtered to real assets, top 30)
+   PAGE 8: TRANSACTION HISTORY (filtered to real assets, top 30)
    ═══════════════════════════════════════════════════════════════ */
 const TransactionsPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page} wrap>
@@ -679,12 +817,12 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
       </Text>
     )}
 
-    <Footer data={data} pageNum={7} />
+    <Footer data={data} pageNum={8} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 8: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
+   PAGE 9: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
    ═══════════════════════════════════════════════════════════════ */
 const probColor = (p: string) => p === 'HIGH' ? red : p === 'LOW' ? green : amber;
 
@@ -743,13 +881,13 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
         <Text key={i} style={s.bullet}>{i + 1}. {r}</Text>
       ))}
 
-      <Footer data={data} pageNum={8} />
+      <Footer data={data} pageNum={9} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 9: SUBPOENA TARGETS + INVESTIGATION NEXT STEPS
+   PAGE 10: SUBPOENA TARGETS + INVESTIGATION NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
 const InvestigationPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
@@ -817,12 +955,12 @@ const InvestigationPage = ({ data }: { data: ReportData }) => (
       </Text>
     </View>
 
-    <Footer data={data} pageNum={9} />
+    <Footer data={data} pageNum={10} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 10: DISCLAIMER
+   PAGE 11: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
 const DisclaimerPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
@@ -858,7 +996,7 @@ const DisclaimerPage = ({ data }: { data: ReportData }) => (
       <Text style={{ fontSize: 9, color: slate400 }}>+1 (833) 559-1334</Text>
     </View>
 
-    <Footer data={data} pageNum={10} />
+    <Footer data={data} pageNum={11} />
   </Page>
 );
 
@@ -870,6 +1008,7 @@ export const ReportDocument = ({ data }: { data: ReportData }) => (
     <CoverPage data={data} />
     <SummaryPage data={data} />
     <AssetTimelinePage data={data} />
+    <PatternPage data={data} />
     <AnalyticsPage data={data} />
     <EntitiesExitPage data={data} />
     <FundFlowPage data={data} />
