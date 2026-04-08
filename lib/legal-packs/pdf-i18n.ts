@@ -117,6 +117,17 @@ export interface PdfTranslations {
     need_investigation: string;
     need_investigation_text: string;
     disclaimer: string;
+    /* layout labels */
+    step_prefix: string;
+    why_matters: string;
+    where_label: string;
+    url_label: string;
+    /* timeline time values */
+    time_same_day: string;
+    time_1_7_days: string;
+    time_2_8_weeks: string;
+    time_1_3_months: string;
+    time_3_12_months: string;
   };
   police: {
     title: string;
@@ -299,6 +310,15 @@ const en: PdfTranslations = {
     need_investigation: 'NEED DEEPER INVESTIGATION?',
     need_investigation_text: 'This automated pack provides templates based on blockchain analysis. For complex cases requiring multi-hop fund tracing, identification of additional exchange endpoints, links to other victims, court-ready forensic reports, or expert witness testimony:',
     disclaimer: 'DISCLAIMER: This guide is for informational purposes only and does not constitute legal advice. LedgerHound (USPROJECT LLC) is not a law firm. Recovery is not guaranteed. Consult qualified legal counsel in your jurisdiction.',
+    step_prefix: 'STEP',
+    why_matters: 'WHY THIS MATTERS:',
+    where_label: 'WHERE',
+    url_label: 'URL',
+    time_same_day: 'Same day',
+    time_1_7_days: '1-7 days',
+    time_2_8_weeks: '2-8 weeks',
+    time_1_3_months: '1-3 months',
+    time_3_12_months: '3-12 months',
   },
   police: {
     title: 'POLICE COMPLAINT', subtitle: 'Cryptocurrency Fraud Report',
@@ -428,6 +448,15 @@ const ru: PdfTranslations = {
     need_investigation: 'НУЖНО УГЛУБЛЁННОЕ РАССЛЕДОВАНИЕ?',
     need_investigation_text: 'Этот автоматический пакет предоставляет шаблоны на основе блокчейн-анализа. Для сложных дел, требующих многоступенчатого отслеживания средств, идентификации дополнительных бирж, связей с другими жертвами, судебных экспертных заключений:',
     disclaimer: 'ОТКАЗ ОТ ОТВЕТСТВЕННОСТИ: Данное руководство носит информационный характер и не является юридической консультацией. LedgerHound (USPROJECT LLC) — не юридическая фирма. Возврат средств не гарантирован. Проконсультируйтесь с квалифицированным юристом.',
+    step_prefix: 'ШАГ',
+    why_matters: 'ПОЧЕМУ ЭТО ВАЖНО:',
+    where_label: 'КУДА',
+    url_label: 'URL',
+    time_same_day: 'В тот же день',
+    time_1_7_days: '1-7 дней',
+    time_2_8_weeks: '2-8 недель',
+    time_1_3_months: '1-3 месяца',
+    time_3_12_months: '3-12 месяцев',
   },
   police: {
     title: 'ЗАЯВЛЕНИЕ В ПОЛИЦИЮ', subtitle: 'Отчёт о криптовалютном мошенничестве',
@@ -557,6 +586,15 @@ const de: PdfTranslations = {
     need_investigation: 'TIEFERE ERMITTLUNG NÖTIG?',
     need_investigation_text: 'Dieses automatisierte Paket bietet Vorlagen auf Basis der Blockchain-Analyse. Für komplexe Fälle mit mehrstufiger Mittelverfolgung, gerichtsfesten Gutachten oder Sachverständigenaussagen:',
     disclaimer: 'HAFTUNGSAUSSCHLUSS: Dieser Leitfaden dient nur zu Informationszwecken und stellt keine Rechtsberatung dar. LedgerHound (USPROJECT LLC) ist keine Anwaltskanzlei. Eine Rückgewinnung ist nicht garantiert.',
+    step_prefix: 'SCHRITT',
+    why_matters: 'WARUM DAS WICHTIG IST:',
+    where_label: 'WO',
+    url_label: 'URL',
+    time_same_day: 'Am selben Tag',
+    time_1_7_days: '1-7 Tage',
+    time_2_8_weeks: '2-8 Wochen',
+    time_1_3_months: '1-3 Monate',
+    time_3_12_months: '3-12 Monate',
   },
   police: {
     title: 'STRAFANZEIGE', subtitle: 'Bericht über Kryptowährungsbetrug',
@@ -684,6 +722,15 @@ const es: PdfTranslations = {
     need_investigation: '¿NECESITA INVESTIGACIÓN MÁS PROFUNDA?',
     need_investigation_text: 'Este paquete automatizado proporciona plantillas basadas en análisis blockchain. Para casos complejos que requieran rastreo multi-salto, informes forenses judiciales o testimonio pericial:',
     disclaimer: 'AVISO LEGAL: Esta guía es solo informativa y no constituye asesoramiento legal. LedgerHound (USPROJECT LLC) no es un despacho de abogados. La recuperación no está garantizada.',
+    step_prefix: 'PASO',
+    why_matters: 'POR QUÉ ESTO IMPORTA:',
+    where_label: 'DÓNDE',
+    url_label: 'URL',
+    time_same_day: 'El mismo día',
+    time_1_7_days: '1-7 días',
+    time_2_8_weeks: '2-8 semanas',
+    time_1_3_months: '1-3 meses',
+    time_3_12_months: '3-12 meses',
   },
   police: {
     title: 'DENUNCIA POLICIAL', subtitle: 'Informe de Fraude con Criptomonedas',
@@ -811,6 +858,15 @@ const fr: PdfTranslations = {
     need_investigation: 'BESOIN D\'UNE ENQUÊTE APPROFONDIE ?',
     need_investigation_text: 'Ce pack automatisé fournit des modèles basés sur l\'analyse blockchain. Pour les cas complexes nécessitant un traçage multi-sauts, des rapports forensiques ou un témoignage d\'expert :',
     disclaimer: 'AVERTISSEMENT : Ce guide est fourni à titre informatif uniquement et ne constitue pas un conseil juridique. LedgerHound (USPROJECT LLC) n\'est pas un cabinet d\'avocats. La récupération n\'est pas garantie.',
+    step_prefix: 'ÉTAPE',
+    why_matters: 'POURQUOI C\'EST IMPORTANT :',
+    where_label: 'OÙ',
+    url_label: 'URL',
+    time_same_day: 'Le jour même',
+    time_1_7_days: '1-7 jours',
+    time_2_8_weeks: '2-8 semaines',
+    time_1_3_months: '1-3 mois',
+    time_3_12_months: '3-12 mois',
   },
   police: {
     title: 'PLAINTE', subtitle: 'Rapport de Fraude aux Cryptomonnaies',

@@ -3,16 +3,16 @@ import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/rendere
 import type { CountryResearch, CaseData } from './types';
 import { getPdfTranslations, type PdfTranslations } from './pdf-i18n';
 
-/* Register Noto Sans — FULL font files with Latin + Cyrillic + Greek + Vietnamese */
+/* Register Noto Sans — pinned release for stability (Latin + Cyrillic + Greek) */
 Font.register({
   family: 'NotoSans',
   fonts: [
     {
-      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@main/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf',
+      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@noto-monthly-release-24.9.1/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf',
       fontWeight: 400,
     },
     {
-      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@main/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf',
+      src: 'https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@noto-monthly-release-24.9.1/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf',
       fontWeight: 700,
     },
   ],
@@ -57,10 +57,10 @@ const DocHeader = ({ title, subtitle, caseData }: { title: string; subtitle: str
   </View>
 );
 
-const DocFooter = ({ caseData, pageLabel, t }: { caseData: CaseData; pageLabel: string; t?: PdfTranslations }) => (
+const DocFooter = ({ caseData, docTitle, t }: { caseData: CaseData; docTitle: string; t?: PdfTranslations }) => (
   <View style={s.footer} fixed>
     <Text>{(t?.common.prepared_with || 'Prepared with LedgerHound')} · ledgerhound.vip · {caseData.caseId}</Text>
-    <Text>{pageLabel}</Text>
+    <Text render={({ pageNumber, totalPages }) => `${docTitle} — ${t?.common.page || 'Page'} ${pageNumber} / ${totalPages}`} />
   </View>
 );
 
@@ -180,7 +180,7 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
           <Field label={t.police.full_report} value={`ledgerhound.vip/case/${caseData.caseId}`} />
         </View>
 
-        <DocFooter caseData={caseData} pageLabel={`${t.police.title} — ${t.common.page} 1`} t={t} />
+        <DocFooter caseData={caseData} docTitle={t.police.title} t={t} />
       </Page>
 
       {/* PAGE 2 */}
@@ -228,7 +228,7 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
           </View>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel={`${t.police.title} — ${t.common.page} 2`} t={t} />
+        <DocFooter caseData={caseData} docTitle={t.police.title} t={t} />
       </Page>
     </Document>
   );
@@ -243,33 +243,70 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
   const exchangeEmail = caseData.exchangeEmail || '[compliance@exchange.com]';
   const exchangeAddr = caseData.exchangeAddress || '';
 
+  /* Preservation Letter uses built-in Helvetica (always English, no CDN font dependency) */
+  const plPage = { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: slate900 };
+  const plBold = 'Helvetica-Bold';
+
+  /* Local overrides for Field/SectionTitle that use Helvetica */
+  const PlField = ({ label, value, mono }: { label: string; value?: string; mono?: boolean }) => (
+    <View style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 2 }}>
+      <Text style={{ fontSize: 9, color: slate400, width: 130 }}>{label}:</Text>
+      <Text style={{ fontSize: 9, color: slate900, flex: 1, fontFamily: mono ? 'Courier' : plBold }}>{value || '[TO BE FILLED]'}</Text>
+    </View>
+  );
+
+  const PlSection = ({ children }: { children: string }) => (
+    <View>
+      <Text style={{ fontSize: 11, fontFamily: plBold, color: slate900, marginTop: 12, marginBottom: 2 }}>{children}</Text>
+      <View style={s.separator} />
+    </View>
+  );
+
+  const PlBullet = ({ children }: { children: React.ReactNode }) => (
+    <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
+      <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>-</Text>
+      <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{children}</Text>
+    </View>
+  );
+
   return (
     <Document>
-      <Page size="A4" style={s.page}>
-        <DocHeader title="PRESERVATION LETTER" subtitle="Urgent Request for Asset Freeze" caseData={caseData} />
+      <Page size="A4" style={plPage}>
+        {/* Header */}
+        <View style={{ marginBottom: 16, paddingBottom: 12, borderBottomWidth: 2, borderBottomColor: slate900 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ fontSize: 16, fontFamily: plBold, color: slate900, marginBottom: 2 }}>PRESERVATION LETTER</Text>
+              <Text style={{ fontSize: 10, color: slate600 }}>Urgent Request for Asset Freeze</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' as any, flexShrink: 0 }}>
+              <Text style={{ fontSize: 9, color: slate600 }}>Case ID: {caseData.caseId}</Text>
+              <Text style={{ fontSize: 9, color: slate600 }}>Date: {caseData.date}</Text>
+            </View>
+          </View>
+        </View>
 
         {/* TO */}
         <View style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 28, flexShrink: 0 }}>TO:</Text>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>{exchangeName} Compliance Department</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 28, flexShrink: 0 }}>TO:</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>{exchangeName} Compliance Department</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 28 }}>{exchangeEmail}</Text>
         </View>
 
-        <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 12 }}>RE: URGENT — ASSET PRESERVATION REQUEST — Suspected Cryptocurrency Fraud</Text>
+        <Text style={{ fontSize: 10, fontFamily: plBold, color: red, marginBottom: 12 }}>RE: URGENT - ASSET PRESERVATION REQUEST - Suspected Cryptocurrency Fraud</Text>
         <View style={s.separator} />
 
-        <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 12 }}>
-          Dear Compliance Team,{'\n\n'}I am a victim of cryptocurrency fraud. I am requesting IMMEDIATE preservation and review of assets associated with the following transaction on your platform.
-        </Text>
+        <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 6 }}>Dear Compliance Team,</Text>
+        <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.6, marginBottom: 12 }}>I am a victim of cryptocurrency fraud. I am requesting IMMEDIATE preservation and review of assets associated with the following transaction on your platform.</Text>
 
         {/* TRANSACTION DETAILS */}
-        <SectionTitle>TRANSACTION DETAILS</SectionTitle>
-        <Field label="Amount" value={`${fmtMoney(caseData.lossAmount, caseData.lossCurrency)}`} />
-        <Field label="Network" value={caseData.network} />
-        <Field label="Transaction Hash" value={caseData.txid} mono />
-        <Field label="Date/Time" value={caseData.txDateTime || caseData.incidentDate} />
+        <PlSection>TRANSACTION DETAILS</PlSection>
+        <PlField label="Amount" value={fmtMoney(caseData.lossAmount, caseData.lossCurrency)} />
+        <PlField label="Network" value={caseData.network} />
+        <PlField label="Transaction Hash" value={caseData.txid} mono />
+        <PlField label="Date/Time" value={caseData.txDateTime || caseData.incidentDate} />
         {exchangeAddr ? (
           <View style={{ marginTop: 6 }}>
             <Text style={{ fontSize: 8, color: slate400, marginBottom: 2 }}>Receiving Address on Your Platform:</Text>
@@ -278,78 +315,67 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         ) : null}
 
         {/* FRAUD SUMMARY */}
-        <SectionTitle>FRAUD SUMMARY</SectionTitle>
-        <Field label="Type" value={fraudTypeLocalized(caseData.scamType)} />
-        <Field label="Platform Used" value={caseData.platformName || '[Under investigation]'} />
-        <Field label="Police Report" value={`Filed with ${research.policeAgency.name}`} />
-        <Field label="Reference" value={caseData.policeReportNumber || '[Pending]'} />
+        <PlSection>FRAUD SUMMARY</PlSection>
+        <PlField label="Type" value={fraudTypeLocalized(caseData.scamType)} />
+        <PlField label="Platform Used" value={caseData.platformName || '[Under investigation]'} />
+        <PlField label="Police Report" value={`Filed with ${research.policeAgency.name}`} />
+        <PlField label="Reference" value={caseData.policeReportNumber || '[Pending]'} />
 
         {/* BLOCKCHAIN VERIFICATION */}
-        <SectionTitle>BLOCKCHAIN VERIFICATION</SectionTitle>
+        <PlSection>BLOCKCHAIN VERIFICATION</PlSection>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 4 }}>
-            This transaction has been verified by LedgerHound blockchain forensics:
-          </Text>
-          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
-            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
-            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Funds traced from victim wallet to your platform</Text>
-          </View>
-          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
-            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
-            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Risk Score: {caseData.recoveryScore ?? 0}/100</Text>
-          </View>
-          <View style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 4 }}>
-            <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
-            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>Full forensic report: ledgerhound.vip/case/{caseData.caseId}</Text>
-          </View>
+          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 4 }}>This transaction has been verified by LedgerHound blockchain forensics:</Text>
+          <PlBullet>Funds traced from victim wallet to your platform</PlBullet>
+          <PlBullet>Risk Score: {caseData.recoveryScore ?? 0}/100</PlBullet>
+          <PlBullet>Full forensic report: ledgerhound.vip/case/{caseData.caseId}</PlBullet>
         </View>
 
         {/* REQUESTED ACTIONS */}
-        <SectionTitle>REQUESTED ACTIONS</SectionTitle>
+        <PlSection>REQUESTED ACTIONS</PlSection>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>1.</Text>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>IMMEDIATE ASSET FREEZE</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>1.</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>IMMEDIATE ASSET FREEZE</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 2 }}>Freeze assets associated with address:</Text>
-          <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5 }}>{exchangeAddr || caseData.scammerAddress}</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'Courier', color: slate600, paddingLeft: 18, lineHeight: 1.5 }}>{exchangeAddr || caseData.scammerAddress}</Text>
         </View>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>2.</Text>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>EVIDENCE PRESERVATION</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>2.</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>EVIDENCE PRESERVATION</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18, lineHeight: 1.5, marginBottom: 4 }}>Preserve all records including:</Text>
           {['KYC/identity documents', 'Login history and IP logs', 'All transaction records', 'Communication records'].map((item, i) => (
             <View key={i} style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 18 }}>
-              <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
+              <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>-</Text>
               <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{item}</Text>
             </View>
           ))}
         </View>
         <View style={{ marginBottom: 6 }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, width: 18, flexShrink: 0 }}>3.</Text>
-            <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, flex: 1 }}>CONFIRMATION</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, width: 18, flexShrink: 0 }}>3.</Text>
+            <Text style={{ fontSize: 10, fontFamily: plBold, color: slate900, flex: 1 }}>CONFIRMATION</Text>
           </View>
           <Text style={{ fontSize: 9, color: slate600, paddingLeft: 18 }}>Please confirm receipt and actions taken within 48 hours.</Text>
         </View>
 
         {/* LEGAL BASIS */}
-        <SectionTitle>LEGAL BASIS</SectionTitle>
+        <PlSection>LEGAL BASIS</PlSection>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>{research.preservationLetter.legalBasis}</Text>
         <Text style={{ fontSize: 9, color: slate600, marginBottom: 12 }}>A formal police report has been filed with {research.policeAgency.name}.</Text>
 
         {/* CONTACT */}
-        <SectionTitle>CONTACT</SectionTitle>
-        <Field label="Name" value={caseData.victimName} />
-        <Field label="Email" value={caseData.victimEmail} />
-        <Field label="Phone" value={caseData.victimPhone || '[Available upon request]'} />
-        <Field label="Case Ref" value={caseData.caseId} />
+        <PlSection>CONTACT</PlSection>
+        <PlField label="Name" value={caseData.victimName} />
+        <PlField label="Email" value={caseData.victimEmail} />
+        <PlField label="Phone" value={caseData.victimPhone || '[Available upon request]'} />
+        <PlField label="Case Ref" value={caseData.caseId} />
 
         {/* LEGAL NOTICE */}
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 4, padding: 8, marginTop: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: red, marginBottom: 2 }}>LEGAL NOTICE</Text>
+          <Text style={{ fontSize: 8, fontFamily: plBold, color: red, marginBottom: 2 }}>LEGAL NOTICE</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>This letter serves as formal notice of suspected criminal activity. Failure to preserve potentially fraudulent assets may result in liability.</Text>
         </View>
 
@@ -361,7 +387,10 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
           <Text style={{ fontSize: 9, color: slate600 }}>{caseData.date}</Text>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel={`Preservation Letter${caseData.exchange ? ` — ${caseData.exchange}` : ''}`} />
+        <View style={s.footer} fixed>
+          <Text>Prepared with LedgerHound · ledgerhound.vip · {caseData.caseId}</Text>
+          <Text>Preservation Letter{caseData.exchange ? ` - ${caseData.exchange}` : ''}</Text>
+        </View>
       </Page>
     </Document>
   );
@@ -428,7 +457,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
           {caseData.description || t.common.to_be_filled}
         </Text>
 
-        <DocFooter caseData={caseData} pageLabel={`${t.regulator.title} — ${t.common.page} 1`} t={t} />
+        <DocFooter caseData={caseData} docTitle={t.regulator.title} t={t} />
       </Page>
 
       {/* PAGE 2 */}
@@ -486,7 +515,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
           </View>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel={`${t.regulator.title} — ${t.common.page} 2`} t={t} />
+        <DocFooter caseData={caseData} docTitle={t.regulator.title} t={t} />
       </Page>
     </Document>
   );
@@ -520,15 +549,15 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
     }
   };
 
-  /* Step box component */
+  /* Step box component — uses localized prefix */
   const StepBox = ({ num, title, timing, why, children }: { num: number; title: string; timing: string; why: string; children: React.ReactNode }) => (
     <View style={{ marginBottom: 14 }} wrap={false}>
       <View style={{ backgroundColor: '#f1f5f9', borderRadius: 4, padding: 8, marginBottom: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>STEP {num}: {title}</Text>
+        <Text style={{ fontSize: 11, fontFamily: 'NotoSans', fontWeight: 700, color: slate900 }}>{ag.step_prefix} {num}: {title}</Text>
         <Text style={{ fontSize: 9, color: slate600 }}>{timing}</Text>
       </View>
       <View style={{ backgroundColor: '#fffbeb', borderRadius: 3, padding: 6, marginBottom: 6, borderWidth: 0.5, borderColor: '#fde68a' }}>
-        <Text style={{ fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 1 }}>WHY THIS MATTERS:</Text>
+        <Text style={{ fontSize: 8, fontFamily: 'NotoSans', fontWeight: 700, color: amber, marginBottom: 1 }}>{ag.why_matters}</Text>
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{why}</Text>
       </View>
       {children}
@@ -610,8 +639,8 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         <Text style={{ fontSize: 13, fontFamily: 'NotoSans', fontWeight: 700, color: slate900, marginBottom: 8, textAlign: 'center' as any }}>{ag.action_plan}</Text>
 
         <StepBox num={1} title={ag.step1_title} timing={ag.step1_when} why={ag.step1_why}>
-          <Field label="WHERE" value={research.policeAgency.name} />
-          <Field label="URL" value={research.policeAgency.url} />
+          <Field label={ag.where_label} value={research.policeAgency.name} />
+          <Field label={ag.url_label} value={research.policeAgency.url} />
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 8, marginTop: 4 }}>
             {ag.step1_instructions}
           </Text>
@@ -641,15 +670,15 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </Text>
         </StepBox>
 
-        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 1`} t={t} />
+        <DocFooter caseData={caseData} docTitle={ag.title} t={t} />
       </Page>
 
       {/* ─── PAGE 2: Steps 3-5 + Additional Agencies ─── */}
       <Page size="A4" style={s.page}>
         {/* STEP 3 */}
         <StepBox num={3} title={ag.step3_title} timing={ag.step3_when} why={ag.step3_why}>
-          <Field label="WHERE" value={research.financialRegulator.name} />
-          <Field label="URL" value={research.financialRegulator.url} />
+          <Field label={ag.where_label} value={research.financialRegulator.name} />
+          <Field label={ag.url_label} value={research.financialRegulator.url} />
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 8, marginTop: 4 }}>
             {ag.step3_instructions}
           </Text>
@@ -695,7 +724,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </View>
         ))}
 
-        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 2`} t={t} />
+        <DocFooter caseData={caseData} docTitle={ag.title} t={t} />
       </Page>
 
       {/* ─── PAGE 3: Timeline + Contacts + CTA ─── */}
@@ -704,12 +733,12 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         <SectionTitle>{ag.expected_timeline}</SectionTitle>
         <View style={{ marginBottom: 12 }}>
           {[
-            [ag.timeline_report, 'Same day'],
-            [ag.timeline_exchange, '1-7 days'],
+            [ag.timeline_report, ag.time_same_day],
+            [ag.timeline_exchange, ag.time_1_7_days],
             [ag.timeline_police, research.policeAgency.responseTime],
-            [ag.timeline_regulator, '2-8 weeks'],
-            [ag.timeline_investigation, '1-3 months'],
-            [ag.timeline_recovery, '3-12 months'],
+            [ag.timeline_regulator, ag.time_2_8_weeks],
+            [ag.timeline_investigation, ag.time_1_3_months],
+            [ag.timeline_recovery, ag.time_3_12_months],
           ].map(([stage, time], i) => (
             <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: slate200, paddingVertical: 4 }}>
               <Text style={{ fontSize: 9, color: slate900, width: 220 }}>{stage}</Text>
@@ -745,7 +774,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </Text>
         </View>
 
-        <DocFooter caseData={caseData} pageLabel={`${ag.title} — ${t.common.page} 3`} t={t} />
+        <DocFooter caseData={caseData} docTitle={ag.title} t={t} />
       </Page>
     </Document>
   );
