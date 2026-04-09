@@ -71,12 +71,69 @@ function validate(f: FormState): Record<string, string> {
   return e;
 }
 
+/* ─── Field component defined OUTSIDE the main component ───
+   This prevents React from unmounting/remounting inputs on every render,
+   which was causing the "one character at a time" bug. */
+function FormField({
+  label,
+  value,
+  error,
+  onChange,
+  type = 'text',
+  placeholder,
+  required = true,
+  half = false,
+  textarea = false,
+  hint,
+}: {
+  label: string;
+  value: string;
+  error?: string;
+  onChange: (val: string) => void;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  half?: boolean;
+  textarea?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div className={half ? 'sm:col-span-1' : 'sm:col-span-2'}>
+      <label className="block text-sm font-medium text-slate-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {textarea ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={4}
+          className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y ${
+            error ? 'border-red-300 bg-red-50' : 'border-slate-300'
+          }`}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+            error ? 'border-red-300 bg-red-50' : 'border-slate-300'
+          }`}
+        />
+      )}
+      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
 export default function ExchangeLetterForm() {
   const t = useTranslations('exchange_letter');
   const [form, setForm] = useState<FormState>(INITIAL);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [generated, setGenerated] = useState(false);
 
   // Load draft from localStorage
@@ -95,7 +152,7 @@ export default function ExchangeLetterForm() {
     }));
   }, []);
 
-  // Auto-save to localStorage
+  // Auto-save to localStorage (debounced via dependency)
   useEffect(() => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(form));
@@ -145,7 +202,6 @@ export default function ExchangeLetterForm() {
     const errs = validate(form);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    setShowPreview(true);
     setGenerated(true);
   };
 
@@ -177,60 +233,9 @@ export default function ExchangeLetterForm() {
     const newCaseId = generateCaseId();
     setForm({ ...INITIAL, caseId: newCaseId });
     setErrors({});
-    setShowPreview(false);
     setGenerated(false);
     localStorage.removeItem(LS_KEY);
   };
-
-  // Field helper
-  const Field = ({
-    label,
-    name,
-    type = 'text',
-    placeholder,
-    required = true,
-    half = false,
-    textarea = false,
-    hint,
-  }: {
-    label: string;
-    name: keyof FormState;
-    type?: string;
-    placeholder?: string;
-    required?: boolean;
-    half?: boolean;
-    textarea?: boolean;
-    hint?: string;
-  }) => (
-    <div className={half ? 'sm:col-span-1' : 'sm:col-span-2'}>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      {textarea ? (
-        <textarea
-          value={form[name]}
-          onChange={(e) => set(name, e.target.value)}
-          placeholder={placeholder}
-          rows={4}
-          className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y ${
-            errors[name] ? 'border-red-300 bg-red-50' : 'border-slate-300'
-          }`}
-        />
-      ) : (
-        <input
-          type={type}
-          value={form[name]}
-          onChange={(e) => set(name, e.target.value)}
-          placeholder={placeholder}
-          className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
-            errors[name] ? 'border-red-300 bg-red-50' : 'border-slate-300'
-          }`}
-        />
-      )}
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
-      {errors[name] && <p className="text-xs text-red-500 mt-1">{errors[name]}</p>}
-    </div>
-  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -294,6 +299,7 @@ export default function ExchangeLetterForm() {
                 return (
                   <button
                     key={lt}
+                    type="button"
                     onClick={() => set('letterType', lt)}
                     className={`text-left p-3 rounded-lg border-2 transition-all ${
                       selected
@@ -313,11 +319,11 @@ export default function ExchangeLetterForm() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 mb-4">{t('your_details')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={t('name')} name="senderName" placeholder="John Doe" half />
-              <Field label={t('email')} name="senderEmail" type="email" placeholder="your@email.com" half />
-              <Field label={t('phone')} name="senderPhone" placeholder="+1 (555) 123-4567" required={false} half />
-              <Field label={t('incident_date')} name="incidentDate" type="date" half />
-              <Field label={t('amount_lost')} name="amountLost" placeholder="5000" half hint={t('amount_hint')} />
+              <FormField label={t('name')} value={form.senderName} error={errors.senderName} onChange={(v) => set('senderName', v)} placeholder="John Doe" half />
+              <FormField label={t('email')} value={form.senderEmail} error={errors.senderEmail} onChange={(v) => set('senderEmail', v)} type="email" placeholder="your@email.com" half />
+              <FormField label={t('phone')} value={form.senderPhone} error={errors.senderPhone} onChange={(v) => set('senderPhone', v)} placeholder="+1 (555) 123-4567" required={false} half />
+              <FormField label={t('incident_date')} value={form.incidentDate} error={errors.incidentDate} onChange={(v) => set('incidentDate', v)} type="date" half />
+              <FormField label={t('amount_lost')} value={form.amountLost} error={errors.amountLost} onChange={(v) => set('amountLost', v)} placeholder="5000" half hint={t('amount_hint')} />
               <div className="sm:col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t('network')}</label>
                 <select
@@ -330,17 +336,21 @@ export default function ExchangeLetterForm() {
                   ))}
                 </select>
               </div>
-              <Field label={t('wallet_address')} name="walletAddress" placeholder="0x..." />
-              <Field
+              <FormField label={t('wallet_address')} value={form.walletAddress} error={errors.walletAddress} onChange={(v) => set('walletAddress', v)} placeholder="0x..." />
+              <FormField
                 label={t('tx_hashes')}
-                name="transactionHashes"
+                value={form.transactionHashes}
+                error={errors.transactionHashes}
+                onChange={(v) => set('transactionHashes', v)}
                 textarea
                 placeholder={t('tx_hashes_placeholder')}
                 hint={t('tx_hashes_hint')}
               />
-              <Field
+              <FormField
                 label={t('description')}
-                name="description"
+                value={form.description}
+                error={errors.description}
+                onChange={(v) => set('description', v)}
                 textarea
                 placeholder={t('description_placeholder')}
               />
@@ -352,12 +362,14 @@ export default function ExchangeLetterForm() {
               </p>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={handleReset}
                   className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
                 >
                   {t('reset')}
                 </button>
                 <button
+                  type="button"
                   onClick={handleGenerate}
                   className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
                 >
@@ -394,6 +406,7 @@ export default function ExchangeLetterForm() {
             <div className="px-6 py-4 border-t border-slate-100 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={handleCopy}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                 >
@@ -401,6 +414,7 @@ export default function ExchangeLetterForm() {
                   {copied ? t('copied') : t('copy')}
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownloadTxt}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                 >
@@ -409,6 +423,7 @@ export default function ExchangeLetterForm() {
                 </button>
               </div>
               <button
+                type="button"
                 onClick={handleMailto}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
               >
