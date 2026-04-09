@@ -270,6 +270,7 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to', alch
     const params: any = {
       fromBlock: '0x0',
       toBlock: 'latest',
+      order: 'desc', // newest first — critical for wallets with >1000 txs
       category: ['external', 'erc20'],
       withMetadata: true,
       maxCount: '0x64', // 100 per page

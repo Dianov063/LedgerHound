@@ -95,6 +95,7 @@ async function fetchAlchemyForAddress(address: string, alchemyUrl: string, netwo
   const baseParams = {
     fromBlock: '0x0',
     toBlock: 'latest',
+    order: 'desc' as const, // newest first — critical for wallets with >1000 txs
     category: supportsInternal
       ? ['external', 'internal', 'erc20', 'erc721', 'erc1155']
       : ['external', 'erc20', 'erc721', 'erc1155'],
