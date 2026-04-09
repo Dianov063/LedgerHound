@@ -503,6 +503,10 @@ export interface ReportData {
   narrative: NarrativeData;
   evidenceStrength: EvidenceStrength;
   topInflows: { from: string; value: number; token: string; date: string }[];
+  /** Compliance emails for ALL identified exchanges (not just primary) */
+  exchangeComplianceEmails: { name: string; email: string }[];
+  /** Legal Weight — which purposes this report is suitable for */
+  legalWeight: { label: string; suitable: boolean }[];
 }
 
 export interface NarrativeData {
@@ -963,12 +967,7 @@ export async function generateReport(
   }
 
   riskScore = Math.max(0, Math.min(100, riskScore));
-
-  let riskLabel: string;
-  if (riskScore >= 85) riskLabel = 'CRITICAL RISK';
-  else if (riskScore >= 70) riskLabel = 'HIGH RISK';
-  else if (riskScore >= 40) riskLabel = 'MODERATE RISK';
-  else riskLabel = 'LOW RISK';
+  // riskLabel assigned after patternAnalysis (behavioral boost may adjust score)
 
   // ── Recovery score ──
   let recoveryScore = 30; // baseline
@@ -1029,6 +1028,20 @@ export async function generateReport(
   );
 
   logger.info({ patterns: patternAnalysis.patterns.length, risk: patternAnalysis.overallRisk }, '[generateReport] Pattern analysis done');
+
+  // Fix: if behavioral analysis says CONFIRMED_SCAM, ensure risk score >= 75
+  // Prevents contradiction of "LOW RISK" label alongside "CONFIRMED SCAM" behavioral assessment
+  if (patternAnalysis.overallRisk === 'CONFIRMED_SCAM' && riskScore < 75) {
+    riskScore = 75;
+  } else if (patternAnalysis.overallRisk === 'LIKELY_SCAM' && riskScore < 55) {
+    riskScore = 55;
+  }
+
+  let riskLabel: string;
+  if (riskScore >= 85) riskLabel = 'CRITICAL';
+  else if (riskScore >= 70) riskLabel = 'HIGH';
+  else if (riskScore >= 40) riskLabel = 'MODERATE';
+  else riskLabel = 'LOW';
 
   // ── Cross-chain tracing ──
   let crossChainTrace: import('./crossChainTracer').CrossChainTrace | null = null;
@@ -1316,6 +1329,27 @@ export async function generateReport(
       date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
     }));
 
+  // ── Exchange Compliance Emails for ALL identified exchanges ──
+  const exchangeComplianceEmails = identifiedEntities
+    .filter(e => e.type === 'exchange')
+    .map(e => ({
+      name: e.label,
+      email: EXCHANGE_COMPLIANCE_EMAILS[e.label]
+        || `compliance@${e.label.toLowerCase().replace(/[^a-z]/g, '')}.com`,
+    }))
+    // Deduplicate by name
+    .filter((e, i, arr) => arr.findIndex(x => x.name === e.name) === i);
+
+  // ── Legal Weight Assessment ──
+  const legalWeight = [
+    { label: 'Law enforcement submission (FBI IC3, local police)', suitable: true },
+    { label: `Exchange compliance review${hasExchange ? ` (${kycExchangesSorted.map(e => e.label).slice(0, 3).join(', ')})` : ''}`, suitable: true },
+    { label: 'Civil litigation support', suitable: true },
+    { label: 'Insurance claim documentation', suitable: true },
+    { label: 'Regulatory complaint filing', suitable: true },
+    { label: 'Court evidence (certified upgrade available)', suitable: false },
+  ];
+
   const reportData: ReportData = {
     walletAddress: address,
     caseId,
@@ -1359,6 +1393,8 @@ export async function generateReport(
     narrative,
     evidenceStrength,
     topInflows,
+    exchangeComplianceEmails,
+    legalWeight,
     patternAnalysis,
     crossChainTrace,
   };

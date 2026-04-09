@@ -150,7 +150,7 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
       {/* Risk + Recovery scores side by side */}
       <View style={{ ...s.row, marginBottom: 14, gap: 12 }}>
         <View style={{ flex: 1, alignItems: 'center', padding: 14, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-          <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RISK ASSESSMENT</Text>
+          <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RISK SCORE</Text>
           <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: riskColor(data.riskScore), alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
             <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: riskColor(data.riskScore) }}>{data.riskScore}</Text>
           </View>
@@ -233,6 +233,7 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
   const n = data.narrative;
   const ev = data.evidenceStrength;
   const evColor = ev.score >= 70 ? green : ev.score >= 40 ? amber : red;
+  const isDangerous = n.walletType === 'transit' || n.walletType === 'aggregation';
 
   return (
     <Page size="A4" style={s.page}>
@@ -240,116 +241,121 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
       <Text style={s.h2}>Investigation Summary</Text>
 
       {/* Wallet Type Badge */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 }}>
-        <View style={{ backgroundColor: n.walletType === 'transit' || n.walletType === 'aggregation' ? '#fef2f2' : n.walletType === 'exchange_deposit' ? '#fffbeb' : '#f0fdf4', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: n.walletType === 'transit' || n.walletType === 'aggregation' ? '#fecaca' : n.walletType === 'exchange_deposit' ? '#fde68a' : '#bbf7d0' }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: n.walletType === 'transit' || n.walletType === 'aggregation' ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
+        <View style={{ backgroundColor: isDangerous ? '#fef2f2' : n.walletType === 'exchange_deposit' ? '#fffbeb' : '#f0fdf4', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: isDangerous ? '#fecaca' : n.walletType === 'exchange_deposit' ? '#fde68a' : '#bbf7d0' }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: isDangerous ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
         </View>
       </View>
 
       {/* Key Stats Row */}
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-        <View style={{ flex: 1, backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
-          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>UNIQUE SENDERS</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+        <View style={{ flex: 1, backgroundColor: '#eff6ff', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' }}>
+          <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>UNIQUE SENDERS</Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: '#f0fdf4', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: green }}>{fmtEth(data.ethReceived)}</Text>
-          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{data.nativeCurrency} IN</Text>
+        <View style={{ flex: 1, backgroundColor: '#f0fdf4', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' }}>
+          <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: green }}>{fmtEth(data.ethReceived)}</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{data.nativeCurrency} IN</Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: red }}>{fmtEth(data.ethSent)}</Text>
-          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{data.nativeCurrency} OUT</Text>
+        <View style={{ flex: 1, backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
+          <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: red }}>{fmtEth(data.ethSent)}</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{data.nativeCurrency} OUT</Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: n.forwardingPercent >= 70 ? '#fef2f2' : '#f8fafc', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: n.forwardingPercent >= 70 ? '#fecaca' : '#e2e8f0' }}>
-          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: n.forwardingPercent >= 70 ? red : slate900 }}>{n.forwardingPercent}%</Text>
-          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>FORWARDED {'<'}24H</Text>
+        <View style={{ flex: 1, backgroundColor: n.forwardingPercent >= 70 ? '#fef2f2' : '#f8fafc', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: n.forwardingPercent >= 70 ? '#fecaca' : '#e2e8f0' }}>
+          <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: n.forwardingPercent >= 70 ? red : slate900 }}>{n.forwardingPercent}%</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>FORWARDED {'<'}24H</Text>
         </View>
       </View>
 
       {/* Narrative Text */}
-      <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
-        <Text style={{ ...s.p, fontSize: 10, lineHeight: 1.6, marginBottom: 6 }}>{n.summary}</Text>
-        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.walletType === 'transit' || n.walletType === 'aggregation' ? red : blue, lineHeight: 1.5 }}>{n.conclusion}</Text>
+      <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ ...s.p, fontSize: 9, lineHeight: 1.5, marginBottom: 4 }}>{n.summary}</Text>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: isDangerous ? red : blue, lineHeight: 1.4 }}>{n.conclusion}</Text>
       </View>
 
-      {/* Victim Flow Diagram */}
-      {n.uniqueSenders >= 2 && (
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ ...s.h3, marginBottom: 8 }}>Fund Flow Overview</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
-            {/* Senders */}
-            <View style={{ alignItems: 'center', backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, width: 120, borderWidth: 1, borderColor: '#bfdbfe' }}>
-              <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: blue }}>Senders</Text>
-              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethReceived)} {data.nativeCurrency}</Text>
+      {/* Simplified Fund Flow Diagram — 3 boxes, 1 line */}
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ ...s.h3, marginBottom: 6 }}>Fund Flow</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <View style={{ alignItems: 'center', backgroundColor: '#eff6ff', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: '#bfdbfe' }}>
+            <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders} Victims</Text>
+            <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethReceived)} {data.nativeCurrency}</Text>
+          </View>
+          <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
+          <View style={{ alignItems: 'center', backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, flex: 1, borderWidth: 2, borderColor: red }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>SCAM WALLET</Text>
+            <Text style={{ fontFamily: 'Courier', fontSize: 6, color: slate600, marginTop: 1 }}>{shortAddr(data.walletAddress)}</Text>
+          </View>
+          <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
+          <View style={{ alignItems: 'center', backgroundColor: n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.primaryExitExchange ? green : amber }}>{n.primaryExitExchange || `${n.uniqueReceivers} Receivers`}</Text>
+            <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethSent)} {data.nativeCurrency}</Text>
+            {n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>KYC Exchange</Text>}
+          </View>
+        </View>
+      </View>
+
+      {/* Victim Guidance Block */}
+      <View style={{ backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#bfdbfe' }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>If You Sent Funds to This Wallet:</Text>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 3 }}>
+          Your transaction likely followed this path: YOU {'\u2192'} This Wallet ({n.walletTypeLabel}) {n.primaryExitExchange ? `\u2192 ${n.primaryExitExchange} (Cash-out)` : ''}
+        </Text>
+        <Text style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>To locate your specific transaction:</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>1. Find your TXID in the Transaction History section of this report</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>2. Note the date, amount, and transaction hash</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>3. Include this information in your police report and exchange complaint</Text>
+      </View>
+
+      <View style={s.divider} />
+
+      {/* Evidence Strength + Legal Weight — side by side */}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {/* Evidence Strength */}
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...s.h3, marginBottom: 4 }}>Evidence Strength</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <View style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: evColor, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: evColor }}>{ev.score}%</Text>
             </View>
-            {/* Arrow */}
-            <Text style={{ fontSize: 14, color: slate400 }}>{'\u2192'}</Text>
-            {/* This wallet */}
-            <View style={{ alignItems: 'center', backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, width: 120, borderWidth: 2, borderColor: red }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>THIS WALLET</Text>
-              <Text style={{ fontFamily: 'Courier', fontSize: 6, color: slate600, marginTop: 2 }}>{shortAddr(data.walletAddress)}</Text>
-              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>Transit Point</Text>
-            </View>
-            {/* Arrow */}
-            <Text style={{ fontSize: 14, color: slate400 }}>{'\u2192'}</Text>
-            {/* Exit */}
-            <View style={{ alignItems: 'center', backgroundColor: n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 10, width: 120, borderWidth: 1, borderColor: n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
-              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.primaryExitExchange ? green : amber }}>{n.primaryExitExchange || `${n.uniqueReceivers} Receivers`}</Text>
-              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethSent)} {data.nativeCurrency}</Text>
-              {n.primaryExitExchange && <Text style={{ fontSize: 7, color: green, marginTop: 2 }}>KYC Exchange</Text>}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: evColor, marginBottom: 4 }}>{ev.label}</Text>
+              <View style={{ height: 6, backgroundColor: '#e2e8f0', borderRadius: 3 }}>
+                <View style={{ height: 6, width: `${ev.score}%`, backgroundColor: evColor, borderRadius: 3 }} />
+              </View>
             </View>
           </View>
-
-          {/* Top Inflow Examples */}
-          {data.topInflows.length > 0 && (
-            <View style={{ ...s.card, padding: 8 }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Largest Incoming Transactions</Text>
-              <View style={s.tableHeader}>
-                <Text style={{ ...s.th, width: '30%' }}>From</Text>
-                <Text style={{ ...s.th, width: '25%' }}>Amount</Text>
-                <Text style={{ ...s.th, width: '15%' }}>Token</Text>
-                <Text style={{ ...s.th, width: '30%' }}>Date</Text>
+          <View style={{ ...s.card, padding: 6 }}>
+            {ev.factors.map((f, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 2, alignItems: 'center' }}>
+                <Text style={{ fontSize: 8, width: 12, color: f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
+                <Text style={{ fontSize: 7, color: f.met ? slate900 : slate400, flex: 1 }}>{f.label}</Text>
               </View>
-              {data.topInflows.map((inf, i) => (
-                <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                  <Text style={{ ...s.td, ...s.mono, width: '30%' }}>{shortAddr(inf.from)}</Text>
-                  <Text style={{ ...s.td, width: '25%', color: green }}>{fmtEth(inf.value)}</Text>
-                  <Text style={{ ...s.td, width: '15%' }}>{truncToken(inf.token)}</Text>
-                  <Text style={{ ...s.td, width: '30%' }}>{inf.date}</Text>
-                </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Legal Weight */}
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...s.h3, marginBottom: 4 }}>Report Suitability</Text>
+          <View style={{ ...s.card, padding: 6 }}>
+            {data.legalWeight.map((lw, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
+                <Text style={{ fontSize: 8, width: 12, color: lw.suitable ? green : amber }}>{lw.suitable ? '\u2714' : '\u25CB'}</Text>
+                <Text style={{ fontSize: 7, color: lw.suitable ? slate900 : slate400, flex: 1 }}>{lw.label}</Text>
+              </View>
+            ))}
+          </View>
+          {/* Exchange compliance contacts */}
+          {data.exchangeComplianceEmails.length > 0 && (
+            <View style={{ ...s.card, padding: 6, marginTop: 4 }}>
+              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>Exchange Compliance Contacts</Text>
+              {data.exchangeComplianceEmails.slice(0, 4).map((ec, i) => (
+                <Text key={i} style={{ fontSize: 7, color: blue, marginBottom: 1 }}>{ec.name}: {ec.email}</Text>
               ))}
             </View>
           )}
         </View>
-      )}
-
-      <View style={s.sectionDivider} />
-
-      {/* Evidence Strength Score */}
-      <Text style={s.h3}>Evidence Strength</Text>
-      <View style={{ flexDirection: 'row', gap: 14, marginBottom: 10 }}>
-        {/* Score circle */}
-        <View style={{ width: 70, height: 70, borderRadius: 35, borderWidth: 3, borderColor: evColor, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: evColor }}>{ev.score}%</Text>
-        </View>
-        {/* Progress bar + label */}
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: evColor, marginBottom: 6 }}>Evidence Level: {ev.label}</Text>
-          <View style={{ height: 8, backgroundColor: '#e2e8f0', borderRadius: 4 }}>
-            <View style={{ height: 8, width: `${ev.score}%`, backgroundColor: evColor, borderRadius: 4 }} />
-          </View>
-        </View>
-      </View>
-
-      {/* Evidence checklist */}
-      <View style={{ ...s.card, padding: 8 }}>
-        {ev.factors.map((f, i) => (
-          <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, width: 14, color: f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
-            <Text style={{ fontSize: 8, color: f.met ? slate900 : slate400, flex: 1 }}>{f.label}</Text>
-          </View>
-        ))}
       </View>
 
       <Footer data={data} pageNum={3} />
@@ -1211,18 +1217,21 @@ const ActionableStepsPage = ({ data, pageNum }: { data: ReportData; pageNum: num
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
           <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>STEP 1: Contact Exchange Compliance (URGENT — within 24h)</Text>
-          {exchanges.slice(0, 3).map((e, i) => (
-            <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{e.label}</Text>
-                <Text style={{ fontSize: 8, color: slate600 }}>{e.interactions} interaction(s)</Text>
+          {exchanges.slice(0, 3).map((e, i) => {
+            const emailEntry = data.exchangeComplianceEmails.find(ec => ec.name === e.label);
+            return (
+              <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{e.label}</Text>
+                  <Text style={{ fontSize: 8, color: slate600 }}>{e.interactions} interaction(s)</Text>
+                </View>
+                <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>{e.address}</Text>
+                {emailEntry ? (
+                  <Text style={{ fontSize: 8, color: blue }}>{emailEntry.email}</Text>
+                ) : null}
               </View>
-              <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>{e.address}</Text>
-              {i === 0 && n.primaryExitExchangeEmail ? (
-                <Text style={{ fontSize: 8, color: blue }}>{n.primaryExitExchangeEmail}</Text>
-              ) : null}
-            </View>
-          ))}
+            );
+          })}
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
             Send a preservation request to the compliance department referencing your police report number and this case ID ({data.caseId}). Request immediate account freeze and subscriber information disclosure.
           </Text>
