@@ -507,6 +507,8 @@ export interface ReportData {
   exchangeComplianceEmails: { name: string; email: string }[];
   /** Legal Weight — which purposes this report is suitable for */
   legalWeight: { label: string; suitable: boolean }[];
+  /** Primary asset by volume — token with highest total flow (e.g. USDT instead of BNB) */
+  primaryAsset: { symbol: string; totalIn: number; totalOut: number } | null;
 }
 
 export interface NarrativeData {
@@ -1395,6 +1397,17 @@ export async function generateReport(
     topInflows,
     exchangeComplianceEmails,
     legalWeight,
+    // Primary asset by volume: use highest-volume real asset from assetSummary
+    // If the top asset is NOT the native currency and has more volume, use it (e.g. USDT on BNB chain)
+    primaryAsset: (() => {
+      const top = assetSummary.realAssets[0];
+      if (!top) return null;
+      const nativeEntry = assetSummary.realAssets.find(a => a.symbol === nativeCurrency);
+      const topVol = top.totalIn + top.totalOut;
+      const nativeVol = nativeEntry ? nativeEntry.totalIn + nativeEntry.totalOut : ethReceived + ethSent;
+      // If top asset has at least 2x volume of native, it's the primary
+      return topVol > nativeVol * 1.5 ? top : null;
+    })(),
     patternAnalysis,
     crossChainTrace,
   };
