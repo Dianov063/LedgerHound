@@ -98,6 +98,21 @@ export async function POST(request: Request) {
 
   logger.info({ type: event.type, eventId: event.id }, '[webhook] Event verified');
 
+  // ── Idempotency: prevent duplicate processing from Stripe retries ──
+  // Stripe retries webhooks if we don't respond within ~20s.
+  // Report generation takes 30-60s, so retries are inevitable.
+  // Mark the event as processed BEFORE doing any work.
+  if (await isEventProcessed(event.id)) {
+    logger.info({ eventId: event.id }, '[webhook] Event already processed — skipping (Stripe retry)');
+    return Response.json({ received: true });
+  }
+  try {
+    await markEventProcessed(event.id);
+  } catch (err) {
+    // If marking fails, log but continue — better to risk one duplicate than to block
+    logger.error({ err, eventId: event.id }, '[webhook] Failed to mark event as processed');
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const product = session.metadata?.product || 'forensic_report';
