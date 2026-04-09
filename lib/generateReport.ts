@@ -189,6 +189,14 @@ function safeValue(tx: Transfer | UnifiedTransfer): number {
   return 0;
 }
 
+/** Sanitize asset symbol — strip non-printable/non-ASCII chars */
+function sanitizeAsset(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  // Keep only printable ASCII (space through tilde)
+  const clean = raw.replace(/[^\x20-\x7E]/g, '').trim();
+  return clean || null;
+}
+
 /** Check if a token is likely spam/airdrop */
 function isSpamToken(tx: Transfer | UnifiedTransfer): boolean {
   const asset = (tx.asset || '').trim();
@@ -196,10 +204,13 @@ function isSpamToken(tx: Transfer | UnifiedTransfer): boolean {
   // No asset name or control characters → spam
   if (!asset || asset.charCodeAt(0) < 32) return true;
 
+  // Non-ASCII characters (¿, °, Ñ, ¹, Ž, etc.) → almost always spam on EVM chains
+  if (/[^\x20-\x7E]/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+
   const lower = asset.toLowerCase();
 
   // URL patterns, very long names, suspicious chars, @-handles, spaces in name
-  if (/[/:.<>@]/.test(asset) || asset.length > 15) return true;
+  if (/[/:.<>@~+]/.test(asset) || asset.length > 15) return true;
   if (/\s/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
   if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
 
@@ -287,6 +298,24 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to', alch
     if (json.error) throw new Error(json.error.message);
 
     const transfers = json.result?.transfers || [];
+    // Sanitize asset names (Alchemy can return non-ASCII in token symbols)
+    for (const t of transfers) {
+      t.asset = sanitizeAsset(t.asset);
+    }
+    // Log first transfer structure on first page for debugging
+    if (i === 0 && transfers.length > 0) {
+      const t = transfers[0];
+      logger.info({
+        direction,
+        keys: Object.keys(t),
+        hasMetadata: !!t.metadata,
+        metadataKeys: t.metadata ? Object.keys(t.metadata) : [],
+        blockTimestamp: t.metadata?.blockTimestamp || 'MISSING',
+        asset: t.asset,
+        value: t.value,
+        category: t.category,
+      }, '[fetchAllTransfers] Sample transfer structure');
+    }
     all.push(...transfers);
     pageKey = json.result?.pageKey;
     if (!pageKey) break;
@@ -766,12 +795,20 @@ export async function generateReport(
   // Fetch transfers from the correct chain
   const { incoming: rawIncoming, outgoing: rawOutgoing } = await fetchTransfersForNetwork(address, network);
 
-  // Only apply spam filter for ETH (other chains have cleaner data)
-  const outgoing = network === 'eth' ? filterSpam(rawOutgoing) : rawOutgoing;
-  const incoming = network === 'eth' ? filterSpam(rawIncoming) : rawIncoming;
+  // Apply spam filter on all EVM chains (BNB is especially spam-heavy)
+  const outgoing = filterSpam(rawOutgoing);
+  const incoming = filterSpam(rawIncoming);
   const spamFiltered = (rawIncoming.length - incoming.length) + (rawOutgoing.length - outgoing.length);
 
-  logger.info({ rawIn: rawIncoming.length, cleanIn: incoming.length, rawOut: rawOutgoing.length, cleanOut: outgoing.length, spamFiltered }, '[generateReport] Transfers fetched');
+  // Debug: log first transfer to verify metadata structure
+  const sampleTx = rawIncoming[0] || rawOutgoing[0];
+  logger.info({
+    rawIn: rawIncoming.length, cleanIn: incoming.length,
+    rawOut: rawOutgoing.length, cleanOut: outgoing.length, spamFiltered,
+    sampleHasMetadata: !!sampleTx?.metadata,
+    sampleBlockTimestamp: sampleTx?.metadata?.blockTimestamp || 'MISSING',
+    sampleAsset: sampleTx?.asset || 'NONE',
+  }, '[generateReport] Transfers fetched');
 
   // Calculate stats — ETH-only totals (different tokens can't be summed)
   let ethReceived = 0;
