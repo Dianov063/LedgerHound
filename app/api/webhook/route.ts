@@ -1,7 +1,7 @@
 export const maxDuration = 120; // waitUntil background work: report generation takes 30-60s
 
 import Stripe from 'stripe';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { waitUntil } from '@vercel/functions';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
@@ -19,6 +19,7 @@ const getS3 = () =>
 const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
 const IDEMPOTENCY_PREFIX = 'webhook-events/';
+const PAYMENT_LOCK_PREFIX = 'webhook-payment-locks/';
 
 /**
  * Atomic idempotency: try to claim the event using S3 conditional write.
@@ -39,8 +40,6 @@ async function claimEvent(eventId: string): Promise<boolean> {
     logger.info({ eventId }, '[webhook] Event claimed for processing');
     return true;
   } catch (err: unknown) {
-    // S3 returns 412 PreconditionFailed if object exists (another instance already claimed it)
-    // or ConditionalCheckFailed
     const statusCode = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
     const errName = (err as { name?: string }).name;
     if (statusCode === 412 || errName === 'PreconditionFailed' || errName === 'ConditionalCheckFailed') {
@@ -50,6 +49,80 @@ async function claimEvent(eventId: string): Promise<boolean> {
     // Unexpected S3 error — log but allow processing (better one duplicate than zero)
     logger.error({ err, eventId }, '[webhook] S3 claimEvent failed unexpectedly — proceeding anyway');
     return true;
+  }
+}
+
+/**
+ * SECOND level of deduplication: by payment_intent ID.
+ * Even if Stripe sends DIFFERENT event IDs for the same payment
+ * (e.g., retries from before idempotency was deployed), this prevents duplicates.
+ * Uses HeadObject for fast existence check, then atomic PutObject.
+ */
+async function claimPayment(paymentId: string): Promise<boolean> {
+  if (!paymentId) return true; // If no payment ID, skip this check
+  const key = `${PAYMENT_LOCK_PREFIX}${paymentId}`;
+
+  // Fast check if payment was already processed
+  try {
+    await getS3().send(new HeadObjectCommand({
+      Bucket: s3Bucket(),
+      Key: key,
+    }));
+    // Object exists = payment already processed
+    logger.info({ paymentId }, '[webhook] Payment already processed — skipping');
+    return false;
+  } catch {
+    // Object doesn't exist — try to claim it
+  }
+
+  // Atomic claim
+  try {
+    await getS3().send(new PutObjectCommand({
+      Bucket: s3Bucket(),
+      Key: key,
+      Body: JSON.stringify({ claimedAt: new Date().toISOString() }),
+      ContentType: 'application/json',
+      ServerSideEncryption: 'aws:kms',
+      IfNoneMatch: '*',
+    }));
+    logger.info({ paymentId }, '[webhook] Payment claimed for processing');
+    return true;
+  } catch (err: unknown) {
+    const statusCode = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    const errName = (err as { name?: string }).name;
+    if (statusCode === 412 || errName === 'PreconditionFailed' || errName === 'ConditionalCheckFailed') {
+      logger.info({ paymentId }, '[webhook] Payment already claimed — skipping (race)');
+      return false;
+    }
+    logger.error({ err, paymentId }, '[webhook] S3 claimPayment failed — proceeding anyway');
+    return true;
+  }
+}
+
+/**
+ * Log every incoming webhook event to S3 for debugging.
+ * Non-blocking — fire and forget.
+ */
+async function logWebhookEvent(event: { id: string; type: string; data?: { object?: Record<string, unknown> } }): Promise<void> {
+  try {
+    const ts = new Date().toISOString();
+    const session = event.data?.object as Record<string, unknown> | undefined;
+    await getS3().send(new PutObjectCommand({
+      Bucket: s3Bucket(),
+      Key: `webhook-debug/${ts.slice(0, 10)}/${event.id}-${Date.now()}.json`,
+      Body: JSON.stringify({
+        receivedAt: ts,
+        eventId: event.id,
+        eventType: event.type,
+        paymentIntent: session?.payment_intent || null,
+        sessionId: session?.id || null,
+        metadata: session?.metadata || null,
+        amountTotal: session?.amount_total || null,
+      }, null, 2),
+      ContentType: 'application/json',
+    }));
+  } catch {
+    // Non-critical — don't fail the webhook
   }
 }
 
@@ -85,9 +158,11 @@ export async function GET() {
  *
  * Architecture:
  * 1. Verify Stripe signature
- * 2. Claim event atomically via S3 conditional write (prevents race conditions)
- * 3. Return 200 IMMEDIATELY to Stripe (prevents retries)
- * 4. Process report generation in background via waitUntil()
+ * 2. Log event for debugging (non-blocking)
+ * 3. Claim event atomically via S3 conditional write (prevents race conditions)
+ * 4. Claim payment atomically (prevents duplicates from old retries with different event IDs)
+ * 5. Return 200 IMMEDIATELY to Stripe (prevents retries)
+ * 6. Process report generation in background via waitUntil()
  */
 export async function POST(request: Request) {
   logger.info('[webhook] POST received');
@@ -117,19 +192,30 @@ export async function POST(request: Request) {
 
   logger.info({ type: event.type, eventId: event.id }, '[webhook] Event verified');
 
-  // ── Atomic idempotency: claim the event or skip ──
+  // ── Debug: log every event to S3 ──
+  waitUntil(logWebhookEvent(event));
+
+  // ── LAYER 1: Atomic event-level idempotency ──
   // Uses S3 conditional write (IfNoneMatch: '*') — only the first writer wins.
-  // No race condition: even if two requests arrive simultaneously,
-  // only one PutObject succeeds; the other gets 412.
   const claimed = await claimEvent(event.id);
   if (!claimed) {
     return Response.json({ received: true });
   }
 
-  // ── Return 200 immediately, process in background ──
-  // Stripe won't retry because it gets a fast 200 response.
-  // waitUntil() keeps the serverless function alive for background work.
+  // ── LAYER 2: Payment-level deduplication ──
+  // Even if Stripe sends a NEW event ID for the same payment (rare, but possible
+  // with old retries from before idempotency was deployed), this blocks it.
   if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const paymentId = session.payment_intent || session.id || '';
+
+    const paymentClaimed = await claimPayment(paymentId);
+    if (!paymentClaimed) {
+      logger.warn({ eventId: event.id, paymentId }, '[webhook] Event passed event-level check but BLOCKED by payment-level check');
+      return Response.json({ received: true });
+    }
+
+    // ── Return 200 immediately, process in background ──
     waitUntil(processCheckout(event));
   }
 
