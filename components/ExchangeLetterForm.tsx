@@ -6,7 +6,6 @@ import { EXCHANGES, NETWORKS, type ExchangeInfo } from '@/lib/exchangeDatabase';
 import {
   generateLetter,
   generateCaseId,
-  getLetterSubject,
   LETTER_TYPE_INFO,
   type LetterType,
   type LetterData,
@@ -14,7 +13,6 @@ import {
 import {
   Copy,
   Download,
-  Mail,
   FileText,
   CheckCircle,
   AlertTriangle,
@@ -134,6 +132,7 @@ export default function ExchangeLetterForm() {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [generated, setGenerated] = useState(false);
 
   // Load draft from localStorage
@@ -184,7 +183,6 @@ export default function ExchangeLetterForm() {
   );
 
   const letterText = useMemo(() => generateLetter(letterData), [letterData]);
-  const emailSubject = useMemo(() => getLetterSubject(letterData), [letterData]);
 
   const set = useCallback(
     (key: keyof FormState, val: string) => {
@@ -211,22 +209,24 @@ export default function ExchangeLetterForm() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadTxt = () => {
-    const blob = new Blob([letterText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${form.caseId}-${form.letterType}-${exchange.name.replace(/[^a-zA-Z0-9]/g, '')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownloadPdf = () => {
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>${form.caseId} - ${exchange.name}</title>
+<style>
+  body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; padding: 40px 60px; color: #1a1a1a; white-space: pre-wrap; }
+  @media print { body { padding: 20px 40px; } }
+  @page { margin: 20mm 15mm; }
+</style></head><body>${letterText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 300);
   };
 
-  const handleMailto = () => {
-    const to = exchange.complianceEmail;
-    const cc = exchange.legalEmail || '';
-    const subject = encodeURIComponent(emailSubject);
-    const body = encodeURIComponent(letterText);
-    window.open(`mailto:${to}${cc ? `?cc=${cc}` : ''}${cc ? '&' : '?'}subject=${subject}&body=${body}`);
+  const handleCopyEmail = async () => {
+    const emails = [exchange.complianceEmail, exchange.legalEmail].filter(Boolean).join(', ');
+    await navigator.clipboard.writeText(emails);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
   };
 
   const handleReset = () => {
@@ -407,30 +407,40 @@ export default function ExchangeLetterForm() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
+                  onClick={handleDownloadPdf}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                >
+                  <Download size={16} />
+                  {t('download_pdf')}
+                </button>
+                <button
+                  type="button"
                   onClick={handleCopy}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   {copied ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
                   {copied ? t('copied') : t('copy')}
                 </button>
+              </div>
+
+              {/* Exchange email — copyable text, not mailto */}
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-400 mb-0.5">{t('send_to')}</p>
+                  <p className="text-sm font-medium text-slate-900 truncate">{exchange.complianceEmail}</p>
+                  {exchange.legalEmail && (
+                    <p className="text-xs text-slate-500 truncate">{exchange.legalEmail}</p>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={handleDownloadTxt}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                  onClick={handleCopyEmail}
+                  className="shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
                 >
-                  <Download size={16} />
-                  {t('download_txt')}
+                  {copiedEmail ? <CheckCircle size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  {copiedEmail ? t('copied') : t('copy_email')}
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={handleMailto}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
-              >
-                <Mail size={16} />
-                {t('open_email')} ({exchange.complianceEmail})
-              </button>
-              <p className="text-xs text-slate-400 text-center">{t('email_note')}</p>
             </div>
           </div>
 
