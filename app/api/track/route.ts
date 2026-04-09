@@ -4,6 +4,7 @@ import { fetchBtcTransfers } from '@/lib/bitcoin-tracker';
 import { fetchSolTransfers } from '@/lib/solana-tracker';
 import { fetchTronTransfers } from '@/lib/tron-tracker';
 import { fetchEtherscanV2Transfers } from '@/lib/etherscan-v2-tracker';
+import { backfillBlockTimestamps } from '@/lib/backfill-timestamps';
 
 type Network = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 
@@ -60,18 +61,30 @@ const ADDRESS_PATTERNS: Record<Network, RegExp> = {
 
 const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle'];
 
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
-  const res = await fetchWithTimeout(alchemyUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: 1,
-      jsonrpc: '2.0',
-      method: 'alchemy_getAssetTransfers',
-      params: [params],
-    }),
-  });
-  const json = await res.json();
+  // Retry with backoff on rate limit
+  let json: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetchWithTimeout(alchemyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'alchemy_getAssetTransfers',
+        params: [params],
+      }),
+    }, 30000);
+    json = await res.json();
+    if (json.error?.message?.includes('compute units per second')) {
+      console.warn(`[track] Alchemy rate limit, attempt ${attempt + 1}/3`);
+      await delay(1000 * (attempt + 1));
+      continue;
+    }
+    break;
+  }
   if (json.error) throw new Error(json.error.message);
   return json.result?.transfers || [];
 }
@@ -89,15 +102,20 @@ async function fetchAlchemyForAddress(address: string, alchemyUrl: string, netwo
     maxCount: '0x3e8',
   };
 
-  const [incoming, outgoing] = await Promise.all([
-    fetchAlchemyTransfers(alchemyUrl, { ...baseParams, toAddress: address }),
-    fetchAlchemyTransfers(alchemyUrl, { ...baseParams, fromAddress: address }),
-  ]);
+  // Sequential to avoid Alchemy CU/s rate limit (especially BNB)
+  const incoming = await fetchAlchemyTransfers(alchemyUrl, { ...baseParams, toAddress: address });
+  await delay(300);
+  const outgoing = await fetchAlchemyTransfers(alchemyUrl, { ...baseParams, fromAddress: address });
 
-  const inTagged = incoming.map((tx: any) => ({ ...tx, direction: 'IN', trackedAddress: address }));
-  const outTagged = outgoing.map((tx: any) => ({ ...tx, direction: 'OUT', trackedAddress: address }));
+  const all = [
+    ...incoming.map((tx: any) => ({ ...tx, direction: 'IN', trackedAddress: address })),
+    ...outgoing.map((tx: any) => ({ ...tx, direction: 'OUT', trackedAddress: address })),
+  ];
 
-  return [...inTagged, ...outTagged];
+  // Backfill timestamps if Alchemy didn't return metadata (e.g., BNB chain)
+  await backfillBlockTimestamps(all, network, alchemyUrl);
+
+  return all;
 }
 
 async function fetchTransfersForNetwork(

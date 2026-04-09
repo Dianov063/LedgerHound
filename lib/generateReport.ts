@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
+import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
@@ -260,92 +261,6 @@ export function fmtEth(v: number): string {
 /** Delay helper */
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Public RPC endpoints for block timestamp lookups (free, no key needed) */
-const PUBLIC_RPC: Record<string, string> = {
-  eth: 'https://eth.llamarpc.com',
-  bnb: 'https://bsc-dataseed.binance.org/',
-  polygon: 'https://polygon-rpc.com/',
-};
-
-/**
- * Backfill timestamps for transfers that lack metadata.blockTimestamp.
- * Uses blockNum → eth_getBlockByNumber RPC to fetch block timestamps.
- * Batches unique blocks to minimize RPC calls.
- */
-async function backfillBlockTimestamps(
-  transfers: Transfer[],
-  network: string,
-  alchemyUrl: string,
-): Promise<void> {
-  // Check if timestamps are already present
-  if (transfers.length === 0) return;
-  const hasTimestamps = transfers.some(t => t.metadata?.blockTimestamp);
-  if (hasTimestamps) return; // Already have timestamps, nothing to do
-
-  // Collect unique block numbers
-  const blockNums = new Set<string>();
-  for (const t of transfers) {
-    const bn = (t as any).blockNum;
-    if (bn) blockNums.add(bn);
-  }
-  if (blockNums.size === 0) return;
-
-  logger.info({ network, uniqueBlocks: blockNums.size, totalTransfers: transfers.length },
-    '[backfillBlockTimestamps] Fetching block timestamps via RPC');
-
-  // Use public RPC for non-ETH (avoid Alchemy CU usage), Alchemy for ETH
-  const rpcUrl = PUBLIC_RPC[network] || alchemyUrl;
-
-  // Fetch timestamps in batches of 20 (JSON-RPC batch)
-  const blockArr = Array.from(blockNums);
-  const blockTimestampMap = new Map<string, string>(); // blockNum hex → ISO timestamp
-
-  for (let i = 0; i < blockArr.length; i += 20) {
-    const batch = blockArr.slice(i, i + 20);
-    const batchBody = batch.map((bn, idx) => ({
-      id: idx + 1,
-      jsonrpc: '2.0',
-      method: 'eth_getBlockByNumber',
-      params: [bn, false], // false = don't include transactions
-    }));
-
-    try {
-      const res = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batchBody),
-      });
-      const results = await res.json();
-      const arr = Array.isArray(results) ? results : [results];
-      for (let j = 0; j < arr.length; j++) {
-        const block = arr[j]?.result;
-        if (block?.timestamp) {
-          const ts = parseInt(block.timestamp, 16);
-          const iso = new Date(ts * 1000).toISOString();
-          blockTimestampMap.set(batch[j], iso);
-        }
-      }
-    } catch (err) {
-      logger.warn({ err, batch: i }, '[backfillBlockTimestamps] RPC batch failed, skipping');
-    }
-
-    // Small delay between batches
-    if (i + 20 < blockArr.length) await delay(200);
-  }
-
-  logger.info({ resolved: blockTimestampMap.size, total: blockNums.size },
-    '[backfillBlockTimestamps] Block timestamps resolved');
-
-  // Attach timestamps to transfers
-  for (const t of transfers) {
-    const bn = (t as any).blockNum;
-    if (bn && blockTimestampMap.has(bn)) {
-      if (!t.metadata) t.metadata = {};
-      t.metadata.blockTimestamp = blockTimestampMap.get(bn)!;
-    }
-  }
-}
-
 async function fetchAllTransfers(address: string, direction: 'from' | 'to', alchemyUrl?: string): Promise<Transfer[]> {
   const all: Transfer[] = [];
   let pageKey: string | undefined;
@@ -476,6 +391,7 @@ async function fetchTransfersForNetwork(
   // Backfill timestamps if Alchemy didn't return metadata (e.g., BNB chain)
   const allTransfers = [...outgoing, ...incoming];
   await backfillBlockTimestamps(allTransfers, network, alchemyUrl);
+  // allTransfers shares references with outgoing/incoming — mutations propagate
 
   return { incoming: incoming as unknown as UnifiedTransfer[], outgoing: outgoing as unknown as UnifiedTransfer[] };
 }
