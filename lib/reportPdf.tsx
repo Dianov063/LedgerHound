@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path } from '@react-pdf/renderer';
-import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop } from './generateReport';
+import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 
 const blue = '#2563eb';
@@ -15,7 +15,7 @@ const purple = '#7c3aed';
 
 function getTotalPages(data: ReportData): number {
   const hasCrossChain = data.crossChainTrace?.detected === true;
-  return hasCrossChain ? 12 : 11;
+  return hasCrossChain ? 14 : 13;
 }
 
 const s = StyleSheet.create({
@@ -227,7 +227,138 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 3: ASSET SUMMARY + ACTIVITY TIMELINE
+   PAGE 3: INVESTIGATION NARRATIVE + EVIDENCE STRENGTH + VICTIM FLOW
+   ═══════════════════════════════════════════════════════════════ */
+const NarrativePage = ({ data }: { data: ReportData }) => {
+  const n = data.narrative;
+  const ev = data.evidenceStrength;
+  const evColor = ev.score >= 70 ? green : ev.score >= 40 ? amber : red;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Investigation Summary</Text>
+
+      {/* Wallet Type Badge */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+        <View style={{ backgroundColor: n.walletType === 'transit' || n.walletType === 'aggregation' ? '#fef2f2' : n.walletType === 'exchange_deposit' ? '#fffbeb' : '#f0fdf4', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: n.walletType === 'transit' || n.walletType === 'aggregation' ? '#fecaca' : n.walletType === 'exchange_deposit' ? '#fde68a' : '#bbf7d0' }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: n.walletType === 'transit' || n.walletType === 'aggregation' ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
+        </View>
+      </View>
+
+      {/* Key Stats Row */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+        <View style={{ flex: 1, backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
+          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>UNIQUE SENDERS</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#f0fdf4', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: green }}>{fmtEth(data.ethReceived)}</Text>
+          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{data.nativeCurrency} IN</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: red }}>{fmtEth(data.ethSent)}</Text>
+          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{data.nativeCurrency} OUT</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: n.forwardingPercent >= 70 ? '#fef2f2' : '#f8fafc', borderRadius: 6, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: n.forwardingPercent >= 70 ? '#fecaca' : '#e2e8f0' }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: n.forwardingPercent >= 70 ? red : slate900 }}>{n.forwardingPercent}%</Text>
+          <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>FORWARDED {'<'}24H</Text>
+        </View>
+      </View>
+
+      {/* Narrative Text */}
+      <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ ...s.p, fontSize: 10, lineHeight: 1.6, marginBottom: 6 }}>{n.summary}</Text>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.walletType === 'transit' || n.walletType === 'aggregation' ? red : blue, lineHeight: 1.5 }}>{n.conclusion}</Text>
+      </View>
+
+      {/* Victim Flow Diagram */}
+      {n.uniqueSenders >= 2 && (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ ...s.h3, marginBottom: 8 }}>Fund Flow Overview</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
+            {/* Senders */}
+            <View style={{ alignItems: 'center', backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, width: 120, borderWidth: 1, borderColor: '#bfdbfe' }}>
+              <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: blue }}>Senders</Text>
+              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethReceived)} {data.nativeCurrency}</Text>
+            </View>
+            {/* Arrow */}
+            <Text style={{ fontSize: 14, color: slate400 }}>{'\u2192'}</Text>
+            {/* This wallet */}
+            <View style={{ alignItems: 'center', backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, width: 120, borderWidth: 2, borderColor: red }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>THIS WALLET</Text>
+              <Text style={{ fontFamily: 'Courier', fontSize: 6, color: slate600, marginTop: 2 }}>{shortAddr(data.walletAddress)}</Text>
+              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>Transit Point</Text>
+            </View>
+            {/* Arrow */}
+            <Text style={{ fontSize: 14, color: slate400 }}>{'\u2192'}</Text>
+            {/* Exit */}
+            <View style={{ alignItems: 'center', backgroundColor: n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 10, width: 120, borderWidth: 1, borderColor: n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.primaryExitExchange ? green : amber }}>{n.primaryExitExchange || `${n.uniqueReceivers} Receivers`}</Text>
+              <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{fmtEth(data.ethSent)} {data.nativeCurrency}</Text>
+              {n.primaryExitExchange && <Text style={{ fontSize: 7, color: green, marginTop: 2 }}>KYC Exchange</Text>}
+            </View>
+          </View>
+
+          {/* Top Inflow Examples */}
+          {data.topInflows.length > 0 && (
+            <View style={{ ...s.card, padding: 8 }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Largest Incoming Transactions</Text>
+              <View style={s.tableHeader}>
+                <Text style={{ ...s.th, width: '30%' }}>From</Text>
+                <Text style={{ ...s.th, width: '25%' }}>Amount</Text>
+                <Text style={{ ...s.th, width: '15%' }}>Token</Text>
+                <Text style={{ ...s.th, width: '30%' }}>Date</Text>
+              </View>
+              {data.topInflows.map((inf, i) => (
+                <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                  <Text style={{ ...s.td, ...s.mono, width: '30%' }}>{shortAddr(inf.from)}</Text>
+                  <Text style={{ ...s.td, width: '25%', color: green }}>{fmtEth(inf.value)}</Text>
+                  <Text style={{ ...s.td, width: '15%' }}>{truncToken(inf.token)}</Text>
+                  <Text style={{ ...s.td, width: '30%' }}>{inf.date}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      <View style={s.sectionDivider} />
+
+      {/* Evidence Strength Score */}
+      <Text style={s.h3}>Evidence Strength</Text>
+      <View style={{ flexDirection: 'row', gap: 14, marginBottom: 10 }}>
+        {/* Score circle */}
+        <View style={{ width: 70, height: 70, borderRadius: 35, borderWidth: 3, borderColor: evColor, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: evColor }}>{ev.score}%</Text>
+        </View>
+        {/* Progress bar + label */}
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: evColor, marginBottom: 6 }}>Evidence Level: {ev.label}</Text>
+          <View style={{ height: 8, backgroundColor: '#e2e8f0', borderRadius: 4 }}>
+            <View style={{ height: 8, width: `${ev.score}%`, backgroundColor: evColor, borderRadius: 4 }} />
+          </View>
+        </View>
+      </View>
+
+      {/* Evidence checklist */}
+      <View style={{ ...s.card, padding: 8 }}>
+        {ev.factors.map((f, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
+            <Text style={{ fontSize: 9, width: 14, color: f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
+            <Text style={{ fontSize: 8, color: f.met ? slate900 : slate400, flex: 1 }}>{f.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Footer data={data} pageNum={3} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE 4: ASSET SUMMARY + ACTIVITY TIMELINE
    ═══════════════════════════════════════════════════════════════ */
 const AssetTimelinePage = ({ data }: { data: ReportData }) => {
   const assets = data.assetSummary;
@@ -332,13 +463,13 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} pageNum={3} />
+      <Footer data={data} pageNum={4} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 4: BEHAVIORAL PATTERN ANALYSIS
+   PAGE 5: BEHAVIORAL PATTERN ANALYSIS
    ═══════════════════════════════════════════════════════════════ */
 const severityColor = (sev: string) => {
   switch (sev) {
@@ -470,13 +601,13 @@ const PatternPage = ({ data }: { data: ReportData }) => {
         </Text>
       </View>
 
-      <Footer data={data} pageNum={4} />
+      <Footer data={data} pageNum={5} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 5: WALLET ANALYTICS (was 4)
+   PAGE 6: WALLET ANALYTICS
    ═══════════════════════════════════════════════════════════════ */
 const AnalyticsPage = ({ data }: { data: ReportData }) => (
   <Page size="A4" style={s.page}>
@@ -542,12 +673,12 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => (
       ))}
     </View>
 
-    <Footer data={data} pageNum={5} />
+    <Footer data={data} pageNum={6} />
   </Page>
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 6: ENTITY IDENTIFICATION + EXIT POINT ANALYSIS
+   PAGE 7: ENTITY IDENTIFICATION + EXIT POINT ANALYSIS
    ═══════════════════════════════════════════════════════════════ */
 const recoveryDiffColor = (d: string) => {
   if (d.startsWith('LOW')) return green;
@@ -646,13 +777,13 @@ const EntitiesExitPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} pageNum={6} />
+      <Footer data={data} pageNum={7} />
     </Page>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 7: CROSS-CHAIN TRACE (conditional — only if detected)
+   PAGE 8: CROSS-CHAIN TRACE (conditional — only if detected)
    ═══════════════════════════════════════════════════════════════ */
 const intentColor = (label: string) => {
   switch (label) {
@@ -794,7 +925,7 @@ const CrossChainPage = ({ data, pageNum }: { data: ReportData; pageNum: number }
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 7/8: FUND FLOW GRAPH
+   PAGE 8/9: FUND FLOW GRAPH
    ═══════════════════════════════════════════════════════════════ */
 const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => {
   const graph = data.graphData;
@@ -948,7 +1079,7 @@ const FundFlowPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) 
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 8/9: TRANSACTION HISTORY (filtered to real assets, top 30)
+   PAGE 9/10: TRANSACTION HISTORY (filtered to real assets, top 30)
    ═══════════════════════════════════════════════════════════════ */
 const TransactionsPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <Page size="A4" style={s.page} wrap>
@@ -987,7 +1118,7 @@ const TransactionsPage = ({ data, pageNum }: { data: ReportData; pageNum: number
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 9/10: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
+   PAGE 10/11: RECOVERY SCENARIOS + LEGAL RECOMMENDATIONS
    ═══════════════════════════════════════════════════════════════ */
 const probColor = (p: string) => p === 'HIGH' ? red : p === 'LOW' ? green : amber;
 
@@ -1052,80 +1183,121 @@ const RecoveryLegalPage = ({ data, pageNum }: { data: ReportData; pageNum: numbe
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 10/11: SUBPOENA TARGETS + INVESTIGATION NEXT STEPS
+   PAGE 11/12: ACTIONABLE NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
-const InvestigationPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
-  <Page size="A4" style={s.page}>
-    <Header data={data} />
-    <Text style={s.h2}>Investigation Next Steps</Text>
+const ActionableStepsPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => {
+  const n = data.narrative;
+  const exchanges = data.identifiedEntities.filter(e => e.type === 'exchange');
+  const hasExchanges = exchanges.length > 0;
 
-    {/* Subpoena targets */}
-    {data.identifiedEntities.some(e => e.type === 'exchange') && (
-      <View style={{ ...s.card, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: green }}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>Subpoena Targets Identified</Text>
-        {data.identifiedEntities.filter(e => e.type === 'exchange').map((e, i) => (
-          <Text key={i} style={{ fontSize: 10, color: slate900, marginBottom: 2 }}>
-            {'\u2022'} {e.label} ({shortAddr(e.address)}) — {e.interactions} interaction(s)
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Actionable Recovery Steps</Text>
+
+      {/* Priority banner */}
+      <View style={{ backgroundColor: hasExchanges ? '#f0fdf4' : '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: hasExchanges ? '#bbf7d0' : '#fecaca' }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: hasExchanges ? green : red, marginBottom: 4 }}>
+          {hasExchanges ? 'RECOVERY PATH IDENTIFIED' : 'RECOVERY REQUIRES INVESTIGATION'}
+        </Text>
+        <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
+          {hasExchanges
+            ? `Funds were traced to KYC-regulated exchange(s). The account holder identity is obtainable through legal process. Time-sensitive action is required to prevent fund withdrawal.`
+            : `No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.`}
+        </Text>
+      </View>
+
+      {/* Step 1: Exchange Compliance Contact */}
+      {hasExchanges && (
+        <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>STEP 1: Contact Exchange Compliance (URGENT — within 24h)</Text>
+          {exchanges.slice(0, 3).map((e, i) => (
+            <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{e.label}</Text>
+                <Text style={{ fontSize: 8, color: slate600 }}>{e.interactions} interaction(s)</Text>
+              </View>
+              <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>{e.address}</Text>
+              {i === 0 && n.primaryExitExchangeEmail ? (
+                <Text style={{ fontSize: 8, color: blue }}>{n.primaryExitExchangeEmail}</Text>
+              ) : null}
+            </View>
+          ))}
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
+            Send a preservation request to the compliance department referencing your police report number and this case ID ({data.caseId}). Request immediate account freeze and subscriber information disclosure.
           </Text>
-        ))}
-        <Text style={{ fontSize: 9, color: slate600, marginTop: 8, lineHeight: 1.4 }}>
-          An attorney can file a subpoena compelling the exchange to produce account holder identification, including name, address, government ID, and banking information.
+        </View>
+      )}
+
+      {/* Step 2: Law Enforcement */}
+      <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: amber }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 6 }}>
+          {hasExchanges ? 'STEP 2' : 'STEP 1'}: File Law Enforcement Reports
+        </Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} FBI IC3 complaint — ic3.gov (reference this report)</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Local police report — needed for exchange compliance requests</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} FTC report — reportfraud.ftc.gov</Text>
+        {data.narrative.walletType === 'transit' && (
+          <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request SAR filing — transit wallet pattern indicates organized fraud</Text>
+        )}
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
+          Include Case ID {data.caseId}, wallet address, and attach this forensic report as evidence.
         </Text>
       </View>
-    )}
 
-    {/* Recovery action plan */}
-    {data.recoveryScore >= 60 && (
-      <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0' }}>
-        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 4 }}>HIGH RECOVERY PROBABILITY — ACTION PLAN</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>1. File police report immediately (within 72 hours)</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>2. Request Preservation Letter through attorney to freeze exchange accounts</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 2 }}>3. Submit SAR reference to exchange compliance department</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>4. Consider civil asset recovery proceedings</Text>
+      {/* Step 3: Legal Action */}
+      <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: purple }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: purple, marginBottom: 6 }}>
+          {hasExchanges ? 'STEP 3' : 'STEP 2'}: Legal Proceedings
+        </Text>
+        {hasExchanges ? (
+          <>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Retain attorney for emergency subpoena to {exchanges[0].label}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request account holder identity: name, address, government ID, bank info</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} File civil asset recovery proceedings once identity obtained</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Send Preservation Letter to freeze suspect accounts</Text>
+          </>
+        ) : (
+          <>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Consult attorney experienced in cryptocurrency fraud recovery</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Explore advanced blockchain tracing and cross-chain analysis</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Consider international cooperation if funds crossed jurisdictions</Text>
+          </>
+        )}
       </View>
-    )}
-    {data.recoveryScore < 35 && (
-      <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>LOW RECOVERY PROBABILITY</Text>
-        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>
-          Funds passed through mixing services or were distributed across wallets. Recovery requires extensive resources and specialized analysis.
+
+      {/* Step 4: Evidence Preservation */}
+      <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: slate400 }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate600, marginBottom: 6 }}>
+          {hasExchanges ? 'STEP 4' : 'STEP 3'}: Preserve Evidence
+        </Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Save all communications with the scammer (screenshots, emails, messages)</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Keep this forensic report as court-admissible evidence</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Document the timeline of events in writing</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>{'\u2022'} Do not communicate with the scammer further</Text>
+      </View>
+
+      {/* CTA */}
+      <View style={{ ...s.card, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>Need Help Executing These Steps?</Text>
+        <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
+          LedgerHound offers certified forensic investigations with expert testimony, full chain-of-custody documentation, and direct coordination with law enforcement and exchanges.
+        </Text>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginTop: 8 }}>
+          contact@ledgerhound.vip {'\u00B7'} +1 (833) 559-1334
+        </Text>
+        <Text style={{ fontSize: 9, color: slate600, marginTop: 3 }}>
+          www.ledgerhound.vip/free-evaluation
         </Text>
       </View>
-    )}
 
-    <View style={s.sectionDivider} />
-
-    {/* General next steps */}
-    <Text style={s.h3}>Standard Procedures</Text>
-    <Text style={s.bullet}>1. File an FBI IC3 complaint at ic3.gov if not already done.</Text>
-    <Text style={s.bullet}>2. Preserve all evidence: screenshots, communications, transaction records.</Text>
-    <Text style={s.bullet}>3. Consult with an attorney experienced in cryptocurrency fraud cases.</Text>
-    <Text style={s.bullet}>4. Consider filing a SAR (Suspicious Activity Report) if applicable.</Text>
-    {data.identifiedEntities.some(e => e.type === 'exchange') && (
-      <Text style={s.bullet}>5. Engage attorney to file emergency subpoena to identified exchange(s).</Text>
-    )}
-
-    <View style={s.sectionDivider} />
-
-    <View style={{ ...s.card, backgroundColor: '#eff6ff' }}>
-      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>Need a Certified Forensic Investigation?</Text>
-      <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-        This automated report provides preliminary analysis. For court-ready forensic investigations with certified methodology, expert testimony, and full chain-of-custody documentation, contact our forensic team.
-      </Text>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginTop: 10 }}>
-        contact@ledgerhound.vip · +1 (833) 559-1334
-      </Text>
-      <Text style={{ fontSize: 9, color: slate600, marginTop: 4 }}>
-        www.ledgerhound.vip/free-evaluation
-      </Text>
-    </View>
-
-    <Footer data={data} pageNum={pageNum} />
-  </Page>
-);
+      <Footer data={data} pageNum={pageNum} />
+    </Page>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE 11: DISCLAIMER
+   PAGE 12/13: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
 const DisclaimerPage = ({ data, pageNum }: { data: ReportData; pageNum: number }) => (
   <Page size="A4" style={s.page}>
@@ -1176,16 +1348,17 @@ export const ReportDocument = ({ data }: { data: ReportData }) => {
     <Document>
       <CoverPage data={data} />
       <SummaryPage data={data} />
+      <NarrativePage data={data} />
       <AssetTimelinePage data={data} />
       <PatternPage data={data} />
       <AnalyticsPage data={data} />
       <EntitiesExitPage data={data} />
-      {hasCrossChain && <CrossChainPage data={data} pageNum={7} />}
-      <FundFlowPage data={data} pageNum={7 + ccOffset} />
-      <TransactionsPage data={data} pageNum={8 + ccOffset} />
-      <RecoveryLegalPage data={data} pageNum={9 + ccOffset} />
-      <InvestigationPage data={data} pageNum={10 + ccOffset} />
-      <DisclaimerPage data={data} pageNum={11 + ccOffset} />
+      {hasCrossChain && <CrossChainPage data={data} pageNum={8} />}
+      <FundFlowPage data={data} pageNum={8 + ccOffset} />
+      <TransactionsPage data={data} pageNum={9 + ccOffset} />
+      <RecoveryLegalPage data={data} pageNum={10 + ccOffset} />
+      <ActionableStepsPage data={data} pageNum={11 + ccOffset} />
+      <DisclaimerPage data={data} pageNum={12 + ccOffset} />
     </Document>
   );
 };

@@ -499,6 +499,28 @@ export interface ReportData {
   assetSummary: AssetSummary;
   patternAnalysis: import('./patternDetection').PatternAnalysis;
   crossChainTrace: import('./crossChainTracer').CrossChainTrace | null;
+  // Narrative & Evidence
+  narrative: NarrativeData;
+  evidenceStrength: EvidenceStrength;
+  topInflows: { from: string; value: number; token: string; date: string }[];
+}
+
+export interface NarrativeData {
+  walletType: 'transit' | 'aggregation' | 'personal' | 'exchange_deposit' | 'unknown';
+  walletTypeLabel: string;
+  uniqueSenders: number;
+  uniqueReceivers: number;
+  forwardingPercent: number;     // % of funds forwarded within 24h
+  primaryExitExchange: string;   // e.g. "Binance"
+  primaryExitExchangeEmail: string;
+  summary: string;               // Auto-generated narrative paragraph
+  conclusion: string;            // One-line conclusion
+}
+
+export interface EvidenceStrength {
+  score: number;                // 0–100
+  label: string;                // STRONG / MODERATE / WEAK
+  factors: { label: string; met: boolean }[];
 }
 
 function calculateRiskBreakdown(
@@ -1167,6 +1189,133 @@ export async function generateReport(
 
   const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
+  // ── Narrative computation ──
+  const uniqueSenders = new Set(incoming.map(tx => (tx.from || '').toLowerCase()).filter(Boolean)).size;
+  const uniqueReceivers = new Set(outgoing.map(tx => (tx.to || '').toLowerCase()).filter(Boolean)).size;
+
+  // Forwarding % — check how much of incoming value was sent out within 24h
+  let forwardedWithin24h = 0;
+  let totalInValue = 0;
+  for (const inTx of incoming) {
+    const inVal = safeValue(inTx);
+    if (inVal <= 0) continue;
+    totalInValue += inVal;
+    const inTime = inTx.metadata?.blockTimestamp ? new Date(inTx.metadata.blockTimestamp).getTime() : 0;
+    if (!inTime) continue;
+    // Check if there's an outgoing tx within 24h of this incoming
+    for (const outTx of outgoing) {
+      const outTime = outTx.metadata?.blockTimestamp ? new Date(outTx.metadata.blockTimestamp).getTime() : 0;
+      if (outTime > inTime && outTime - inTime < 86400000) {
+        forwardedWithin24h += inVal;
+        break;
+      }
+    }
+  }
+  const forwardingPercent = totalInValue > 0 ? Math.round((forwardedWithin24h / totalInValue) * 100) : 0;
+
+  // Primary exit exchange
+  const kycExchangesSorted = identifiedEntities
+    .filter(e => e.type === 'exchange')
+    .sort((a, b) => b.interactions - a.interactions);
+  const primaryExitExchange = kycExchangesSorted[0]?.label || '';
+  const EXCHANGE_COMPLIANCE_EMAILS: Record<string, string> = {
+    'Binance': 'compliance@binance.com',
+    'Coinbase': 'compliance@coinbase.com',
+    'Kraken': 'compliance@kraken.com',
+    'OKX': 'compliance@okx.com',
+    'Bybit': 'compliance@bybit.com',
+    'KuCoin': 'support@kucoin.com',
+    'Huobi': 'compliance@huobi.com',
+    'Gate.io': 'compliance@gate.io',
+    'Bitfinex': 'compliance@bitfinex.com',
+    'Gemini': 'compliance@gemini.com',
+  };
+  const primaryExitExchangeEmail = EXCHANGE_COMPLIANCE_EMAILS[primaryExitExchange]
+    || (primaryExitExchange ? `compliance@${primaryExitExchange.toLowerCase().replace(/[^a-z]/g, '')}.com` : '');
+
+  // Wallet type classification
+  const inOutRatio = incoming.length > 0 ? outgoing.length / incoming.length : 0;
+  const isTransit = forwardingPercent >= 70 && uniqueSenders >= 3;
+  const isAggregation = uniqueSenders >= 10 && uniqueReceivers <= 5;
+  const isExchangeDeposit = uniqueReceivers === 1 && kycExchangesSorted.length > 0;
+  const walletType: NarrativeData['walletType'] = isTransit ? 'transit'
+    : isAggregation ? 'aggregation'
+    : isExchangeDeposit ? 'exchange_deposit'
+    : (incoming.length + outgoing.length < 20) ? 'personal'
+    : 'unknown';
+  const walletTypeLabels: Record<string, string> = {
+    transit: 'Transit/Forwarding Wallet',
+    aggregation: 'Scam Aggregation Point',
+    exchange_deposit: 'Exchange Deposit Funnel',
+    personal: 'Personal/Low-Activity Wallet',
+    unknown: 'Unclassified Wallet',
+  };
+
+  // Auto-generate narrative
+  const totalInDisplay = `${fmtEth(ethReceived)} ${nativeCurrency}`;
+  const totalOutDisplay = `${fmtEth(ethSent)} ${nativeCurrency}`;
+  let narrativeSummary = '';
+  let narrativeConclusion = '';
+  if (walletType === 'transit' || walletType === 'aggregation') {
+    narrativeSummary = `This wallet functions as a ${walletTypeLabels[walletType].toLowerCase()}. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
+    if (primaryExitExchange) {
+      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity is obtainable via legal subpoena.`;
+    }
+    narrativeConclusion = `Conclusion: This is a ${walletType === 'transit' ? 'transit wallet used in organized fraud' : 'scam aggregation point collecting victim funds'}, not a legitimate user account.`;
+  } else if (walletType === 'exchange_deposit') {
+    narrativeSummary = `This wallet appears to funnel funds to ${primaryExitExchange}. It received from ${uniqueSenders} senders and consolidated to a single exchange destination. Total flow: ${totalInDisplay} in, ${totalOutDisplay} out.`;
+    narrativeConclusion = `Conclusion: Exchange deposit funnel — identity likely recoverable via ${primaryExitExchange} KYC records.`;
+  } else {
+    narrativeSummary = `This wallet shows ${incoming.length + outgoing.length} total transactions across ${uniqueSenders} unique senders and ${uniqueReceivers} unique receivers. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
+    if (primaryExitExchange) narrativeSummary += ` Funds were routed through ${primaryExitExchange}.`;
+    narrativeConclusion = hasMixer
+      ? 'Conclusion: Mixer usage detected — funds were deliberately obfuscated.'
+      : primaryExitExchange
+        ? `Conclusion: Funds traceable to ${primaryExitExchange} — recovery possible via legal channels.`
+        : 'Conclusion: Further investigation recommended to determine fund destination.';
+  }
+
+  const narrative: NarrativeData = {
+    walletType,
+    walletTypeLabel: walletTypeLabels[walletType],
+    uniqueSenders,
+    uniqueReceivers,
+    forwardingPercent,
+    primaryExitExchange,
+    primaryExitExchangeEmail,
+    summary: narrativeSummary,
+    conclusion: narrativeConclusion,
+  };
+
+  // ── Evidence Strength Score ──
+  const criticalPatterns = patternAnalysis.patterns.filter(p => p.severity === 'CRITICAL' || p.severity === 'HIGH').length;
+  const evidenceFactors: EvidenceStrength['factors'] = [
+    { label: `${incoming.length + outgoing.length} transactions analyzed`, met: incoming.length + outgoing.length > 10 },
+    { label: `${uniqueSenders} unique sender addresses identified`, met: uniqueSenders >= 3 },
+    { label: `${forwardingPercent}% rapid forwarding pattern`, met: forwardingPercent >= 50 },
+    { label: 'KYC exchange exit confirmed', met: kycExchangesSorted.length > 0 },
+    { label: `${criticalPatterns} critical behavioral pattern(s) detected`, met: criticalPatterns > 0 },
+    { label: 'Scam database match found', met: scamDbMatches.length > 0 },
+    { label: 'Timestamps verified on-chain', met: timestamps.length > 0 },
+    { label: 'Cross-chain activity traced', met: crossChainTrace?.detected === true },
+  ];
+  const evidenceMetCount = evidenceFactors.filter(f => f.met).length;
+  const evidenceScore = Math.min(100, Math.round((evidenceMetCount / evidenceFactors.length) * 100));
+  const evidenceLabel = evidenceScore >= 70 ? 'STRONG' : evidenceScore >= 40 ? 'MODERATE' : 'WEAK';
+  const evidenceStrength: EvidenceStrength = { score: evidenceScore, label: evidenceLabel, factors: evidenceFactors };
+
+  // ── Top Inflows (for Victim Flow section) ──
+  const topInflows = incoming
+    .filter(tx => safeValue(tx) > 0)
+    .sort((a, b) => safeValue(b) - safeValue(a))
+    .slice(0, 5)
+    .map(tx => ({
+      from: tx.from || '',
+      value: safeValue(tx),
+      token: tx.asset || nativeCurrency,
+      date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+    }));
+
   const reportData: ReportData = {
     walletAddress: address,
     caseId,
@@ -1207,6 +1356,9 @@ export async function generateReport(
     exitPointAnalysis,
     recoveryScenarios,
     assetSummary,
+    narrative,
+    evidenceStrength,
+    topInflows,
     patternAnalysis,
     crossChainTrace,
   };
