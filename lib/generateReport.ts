@@ -49,7 +49,7 @@ const NATIVE_CURRENCY: Record<string, string> = {
 };
 
 /** EVM chains that use etherscan-v2-tracker */
-const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle']);
+const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle', 'bnb', 'polygon']);
 
 const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
   '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
@@ -382,7 +382,7 @@ async function fetchTransfersForNetwork(
     };
   }
 
-  // Default: Ethereum/BNB/Polygon via Alchemy (most detailed)
+  // Default: Ethereum via Alchemy (most detailed)
   // Sequential to avoid CU/s rate limit on free tier
   const alchemyUrl = getAlchemyUrl(network);
   const outgoing = await fetchAllTransfers(address, 'from', alchemyUrl);

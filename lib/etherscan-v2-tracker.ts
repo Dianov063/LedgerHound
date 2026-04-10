@@ -80,6 +80,22 @@ export const ETHERSCAN_V2_CHAINS: Record<string, ChainConfig> = {
     apiBase: () => `https://api.routescan.io/v2/network/mainnet/evm/5000/etherscan/api`,
     needsKey: false,
   },
+  // BNB Chain: Etherscan V2 unified API (chainid=56, same API key)
+  bnb: {
+    name: 'BNB Smart Chain',
+    nativeCurrency: 'BNB',
+    explorer: 'https://bscscan.com',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=56`,
+    needsKey: true,
+  },
+  // Polygon: Etherscan V2 unified API (chainid=137, same API key)
+  polygon: {
+    name: 'Polygon',
+    nativeCurrency: 'MATIC',
+    explorer: 'https://polygonscan.com',
+    apiBase: (key) => `https://api.etherscan.io/v2/api?chainid=137`,
+    needsKey: true,
+  },
 };
 
 interface EvmTransfer {
