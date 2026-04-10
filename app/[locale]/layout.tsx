@@ -49,6 +49,9 @@ export async function generateMetadata({
     title: titles[locale] || titles.en,
     description: descriptions[locale] || descriptions.en,
     metadataBase: new URL('https://www.ledgerhound.vip'),
+    verification: {
+      other: { 'yandex-verification': ['8f4e048179bfde8c'] },
+    },
     // NOTE: Do NOT set alternates.canonical here — it would incorrectly
     // canonicalize ALL child pages to the root URL. Each page must set
     // its own canonical via generateMetadata() or layout.tsx.
