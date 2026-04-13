@@ -31,6 +31,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/blog/crypto-divorce-hidden-assets',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
         source: '/:locale/blog/crypto-divorce-hidden-assets',
         destination: '/:locale/blog',
         permanent: true,
