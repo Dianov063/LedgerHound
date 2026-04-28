@@ -54,7 +54,9 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
     setChecking(true);
     setError('');
     try {
-      const res = await fetch(`/api/check-env?password=${encodeURIComponent(pw)}`);
+      const res = await fetch('/api/check-env', {
+        headers: { 'x-admin-key': pw },
+      });
       if (res.ok) {
         localStorage.setItem('blog-agent-pw', pw);
         onAuth();
