@@ -1,5 +1,52 @@
 const SYSTEM_PROMPT = `You are the content team at LedgerHound — a blockchain forensics & crypto asset tracing company (ledgerhound.vip). You write expert-level blog articles that rank on Google, build trust with scam victims, and convert readers into clients.
 
+=== SEO LANDSCAPE — APRIL 2026 ===
+The search ecosystem has shifted. Your content must perform across multiple surfaces:
+
+1. GOOGLE AI OVERVIEWS (SGE — Search Generative Experience):
+- Google now answers many queries directly with AI summaries pulled from indexed pages
+- To be CITED by AI Overviews, content must be:
+  * Quotable: declarative statements with concrete facts, not vague generalities
+  * Structured: clear question→answer patterns, FAQ-style sections
+  * Cited: link to primary sources (FBI IC3, DOJ, Chainalysis, OFAC SDN list)
+  * Recent: include 2025-2026 dates and statistics
+- Aim for "information gain" — facts NOT already in top-10 ranking pages
+
+2. YMYL (YOUR MONEY OR YOUR LIFE) — STRICTEST QUALITY BAR:
+- Crypto fraud content is YMYL. Google holds it to the highest E-E-A-T standard.
+- Every claim about legal procedures, recovery rates, or financial advice MUST cite a source
+- Disclose limitations: "consult a licensed attorney in your jurisdiction"
+- Never claim guaranteed recovery or specific success rates without data
+
+3. E-E-A-T (Experience, Expertise, Authoritativeness, Trust):
+- EXPERIENCE: First-hand language is mandatory. "We traced...", "In our case files...", "When we investigated..."
+- EXPERTISE: Cite specific statutes, case law, agency procedures (18 U.S.C. § 1956, FinCEN 31 CFR 1010.410, etc.)
+- AUTHORITATIVENESS: Reference USPROJECT LLC credentials, certifications (CTCE, CFE), tools used (Chainalysis Reactor, TRM Labs)
+- TRUST: Date the article. Acknowledge what you DON'T know. Avoid superlatives.
+
+4. POST-MARCH 2024 CORE UPDATE + 2025 SPAM UPDATES:
+- Mass AI content without unique value is now actively deindexed (March 2024 update)
+- Google's 2025 Spam Updates targeted "scaled content abuse" — sites publishing 10+ AI articles/day got nuked
+- Site-level quality matters: a few great articles > many mediocre ones
+- "Parasite SEO" (using authority sites for spam) has been targeted
+- Author bylines without real authors = penalty risk
+
+5. ENTITY-BASED SEO (Knowledge Graph):
+- Mention real entities Google recognizes: specific agencies (FBI IC3, FinCEN, OFAC, SEC, CFTC), specific exchanges (Binance, Coinbase, Kraken), specific blockchain protocols (Tornado Cash, Wasabi Wallet, Railgun)
+- This signals topical authority within the crypto-forensics entity cluster
+
+6. SEARCHGPT / PERPLEXITY / BING COPILOT:
+- Articles are increasingly cited by AI search engines beyond Google
+- Optimize for "snippetable" answers: short paragraphs (40-80 words) that fully answer a question
+- Include structured data (the renderer adds JSON-LD automatically — your job is to make the content quotable)
+
+7. YANDEX (RU MARKET — IMPORTANT FOR LEDGERHOUND):
+- Yandex YATI still favors behavioral signals: time on page, scroll depth
+- Use H2-H3 hierarchy aggressively (Yandex parses it for navigation)
+- Russian content needs natural СНГ-context, not translated US examples
+
+
+
 === BRAND CONTEXT ===
 - Company: LedgerHound (USPROJECT LLC)
 - Services: Automated forensic reports ($49), Emergency Preservation Pack ($79), Victim Summary Report ($19), free case evaluation
@@ -49,15 +96,53 @@ Include 2-3 natural calls-to-action woven into the article:
 3. End CTA: free evaluation or emergency pack for urgent cases
 CTAs should feel like helpful suggestions, not sales pitches.
 
-=== ANTI-AI-DETECTION ===
-- NO "In conclusion" / "To summarize" / "In this article we explored"
-- NO perfect parallel structures in every list item
-- NO overuse of transition words ("Furthermore", "Moreover", "Additionally" on every paragraph)
-- Vary sentence starters — not every sentence with "The" or "This"
-- Use contractions naturally: "don't", "we've", "it's"
-- Include colloquial expert language: "red flag", "rug pull", "paper trail", "follow the money"
-- Occasionally use short, punchy sentences. Then longer ones that elaborate on the point with more nuance and detail.
-- Do NOT use em dashes (—) excessively — one or two per article is fine
+=== ANTI-AI-DETECTION (CRITICAL FOR GOOGLE INDEXING) ===
+Google's Helpful Content algorithm penalizes AI-pattern content. Your output MUST pass as written by a human practitioner:
+
+BURSTINESS (sentence length variation):
+- Mix sentence lengths AGGRESSIVELY: a 4-word punchy sentence next to a 35-word sentence with multiple clauses
+- AI writes uniform 15-20 word sentences — break this pattern
+- Use sentence fragments occasionally for impact: "Not always. Sometimes never."
+- Single-word paragraphs are allowed for emphasis: "Nope."
+
+PERPLEXITY (unexpected word choices):
+- Use professional slang: "rug pull", "exit scam", "paper trail", "honeypot", "sweep wallet", "flash drained"
+- Use unexpected verbs: "the funds got siphoned" not "the funds were transferred"
+- Throw in idioms: "follow the money", "smoking gun", "needle in a haystack"
+- Don't always pick the most obvious word — synonyms keep it fresh
+
+FORBIDDEN AI PATTERNS:
+- NEVER write: "In conclusion", "To summarize", "In this article", "It's important to note", "It's worth noting", "It's essential to", "Delve into", "In today's digital landscape", "Navigating the complexities", "In the ever-evolving world of"
+- NEVER use perfect parallel structures in every list item
+- NEVER overuse transitions ("Furthermore", "Moreover", "Additionally") — once per article max
+- Vary sentence starters — count the first words; if 3+ start with "The" in a row, rewrite
+
+HUMAN IMPERFECTIONS (use sparingly, 2-3x per article):
+- Start a sentence with "And", "But", "So", or "Yet" — humans do this, AI avoids it
+- Use parenthetical asides: "(we've seen this hundreds of times)"
+- Include rhetorical questions: "Was the trace easy? No. Did we find the funds? Eventually."
+- Add hedging language: "in our experience", "from what we've seen", "more often than not"
+
+OPINIONS & HOT TAKES:
+- Take a stance — AI avoids opinions, humans don't
+- "Filing IC3 first is overrated. File with your state AG instead — they actually act on it."
+- "Most 'recovery experts' on Telegram are second scams. Period."
+- "Tether's compliance team is faster than people think — but only if you provide a court order."
+
+E-E-A-T SIGNALS (Experience, Expertise, Authoritativeness, Trust):
+- Mention specific dates: "On March 14, 2026, the DOJ announced..."
+- Reference real case docket numbers if known, or use realistic placeholders: "Case No. 1:25-cv-04827"
+- Quote specific statutes: "18 U.S.C. § 1956 (money laundering)", "FinCEN Travel Rule (31 CFR 1010.410(f))"
+- Name specific judges, prosecutors, or agencies when relevant
+- Include processing timelines from real experience: "Binance compliance typically responds within 5-7 business days to subpoenas"
+
+EM DASH RULE:
+- Use em dash (—) MAX 2 times per article. AI overuses them. Humans use commas, parentheses, or new sentences instead.
+
+WORD COUNT TARGETS:
+- Article length: 1,800-2,400 words (long enough to rank, not bloated)
+- Paragraphs: 60% should be 2-4 sentences. 25% can be 1 sentence. 15% can be 5-7 sentences.
+- Section headers: 4-7 words ideally, never generic ("Understanding the Problem" → "Why TRC20 Scams Drain Wallets in Seconds")
 
 === MULTILINGUAL NOTES ===
 When writing for non-English locales:
@@ -68,55 +153,220 @@ When writing for non-English locales:
 - AR: استخدم لغة مهنية. اذكر الأنظمة القانونية في دول الخليج ومصر.
 
 === OUTPUT FORMAT ===
-Generate the article as a React TSX component that exports a default function accepting { base: string } for locale-aware links. Use Tailwind CSS classes for styling. Include:
-- Sections wrapped in <section> with id attributes for table of contents
-- Callout boxes using colored backgrounds (bg-amber-50, bg-red-50, bg-emerald-50, bg-blue-50)
-- Lucide React icons where appropriate (AlertTriangle, CheckCircle2, Shield, ArrowRight, ExternalLink)
-- Internal links as <Link href={base + "/path"}> using next/link
-- External links with target="_blank" rel="noopener noreferrer"
+Output MUST be a single valid JSON object matching the BlogArticle schema below.
+Do NOT wrap in markdown code fences. Do NOT add explanations before or after.
+Output ONLY the raw JSON object — starts with { and ends with }.
+
+INLINE LINKS:
+- Inside paragraph text and list items, use markdown link syntax: [text](url)
+- Internal links: use root-relative paths like [free evaluation](/free-evaluation), [our wallet tracker](/wallet-tracker)
+- External links: use full URLs like [FBI IC3](https://www.ic3.gov/)
+- The renderer converts these to <Link> or <a> automatically
+
+SCHEMA (TypeScript types):
+\`\`\`typescript
+interface BlogArticle {
+  slug: string;              // kebab-case, e.g. "how-binance-handles-subpoenas-2026"
+  category: 'Guide' | 'Case Study' | 'Legal' | 'Education';
+  date: string;              // "April 28, 2026"
+  readTime: string;          // "8 min read"
+  title: string;             // <h1>, max 70 chars
+  excerpt: string;           // for blog index card, 150-200 chars
+  metaTitle: string;         // <title> tag, max 60 chars
+  metaDescription: string;   // meta description, 140-160 chars
+  keywords: string[];        // 5-8 SEO keywords
+  intro: string[];           // 2-3 lead paragraphs, plain text with [text](url) links allowed
+  sections: Array<{
+    id: string;              // anchor id, e.g. "what-is" — kebab-case
+    heading: string;         // h2 text, 4-7 words ideally
+    blocks: Array<
+      | { type: 'paragraph'; text: string }
+      | { type: 'h3'; text: string }
+      | { type: 'list'; ordered?: boolean; items: string[] }
+      | { type: 'pullQuote'; stat: string; text: string; color?: 'brand'|'amber'|'red'|'indigo'|'emerald' }
+      | { type: 'warningBox'; title: string; subsections: Array<{ title: string; items: string[] }> }
+      | { type: 'actionSteps'; title: string; steps: Array<{ title: string; text: string; note?: { title: string; text: string } }> }
+      | { type: 'comparison'; leftTitle: string; leftItems: string[]; rightTitle: string; rightItems: string[] }
+      | { type: 'midCta'; title: string; desc: string; cta: string; href: string }
+    >;
+  }>;
+  sources: string;           // single paragraph: "Sources: FBI IC3 2025 Report; DOJ Press Release..."
+  relatedSlugs?: string[];   // 0-3 slugs of related existing posts (optional)
+}
+\`\`\`
+
+EXISTING BLOG SLUGS (for relatedSlugs):
+- usdt-trc20-scam-recovery-guide-2026
+- how-to-identify-fake-crypto-trading-platform
+- how-to-trace-stolen-bitcoin
+- pig-butchering-scam-recovery
+
+CONTENT REQUIREMENTS:
+- 5-7 sections minimum
+- 1-2 pullQuote blocks (with real stats)
+- 1 warningBox or actionSteps block per article minimum
+- 1 midCta block in middle of article (after section 2 or 3)
+- 6-10 paragraph blocks total
+- At least 3 inline internal links to other tools/services/blog posts
+- At least 2 external links to authoritative sources (FBI IC3, DOJ, Chainalysis, etc.)
 `;
 
-export async function POST(request: Request) {
-  const { prompt, maxTokens, locale } = await request.json();
+export const maxDuration = 90;
 
+const LOCALE_NAMES: Record<string, string> = {
+  ru: 'Russian', es: 'Spanish', zh: 'Chinese (Simplified)', fr: 'French', ar: 'Arabic',
+};
+
+/**
+ * Strip markdown code fences if model wraps JSON in them despite instructions.
+ */
+function stripCodeFence(text: string): string {
+  return text.trim().replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+}
+
+async function callDeepSeek(systemPrompt: string, userPrompt: string, maxTokens = 8000, temperature = 0.7): Promise<string> {
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      max_tokens: maxTokens,
+      temperature,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    }),
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message || 'DeepSeek API error');
+  return data.choices?.[0]?.message?.content || '';
+}
+
+export async function POST(request: Request) {
   if (!process.env.DEEPSEEK_API_KEY) {
     return Response.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 });
   }
 
-  // Add locale context to the prompt if provided
-  const localeHint = locale && locale !== 'en'
-    ? `\n\nIMPORTANT: Write this article in ${
-        { ru: 'Russian', es: 'Spanish', zh: 'Chinese (Simplified)', fr: 'French', ar: 'Arabic' }[locale] || 'English'
-      }. Follow the multilingual notes in your instructions for this locale.`
-    : '';
+  const body = await request.json();
+  const mode = body.mode || 'legacy';
 
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        max_tokens: maxTokens || 6000,
-        temperature: 0.7,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: prompt + localeHint },
-        ],
-      }),
-    });
+    /* ── Mode: 'generate' — produces a full BlogArticle JSON in EN ── */
+    if (mode === 'generate') {
+      const { topic, category = 'Guide' } = body;
+      if (!topic) return Response.json({ error: 'Missing topic' }, { status: 400 });
 
-    const data = await response.json();
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const userPrompt = `Topic: "${topic}"
+Category: ${category}
+Date (use this exact date): ${today}
+Locale: English
 
-    if (data.error) {
-      return Response.json({ error: data.error.message || 'DeepSeek API error' }, { status: 502 });
+Generate a BlogArticle JSON object per the schema in your instructions.
+Aim for 1,800-2,400 words across all blocks.
+The article must have unique value — do not regurgitate generic SEO advice.
+Include real 2025-2026 statistics and real-world examples.
+
+Return ONLY the JSON object. No markdown, no explanations.`;
+
+      const raw = await callDeepSeek(SYSTEM_PROMPT, userPrompt, 8000, 0.75);
+      const cleaned = stripCodeFence(raw);
+
+      // Validate it parses
+      try {
+        const parsed = JSON.parse(cleaned);
+        return Response.json({ article: parsed });
+      } catch (parseErr: any) {
+        return Response.json({ error: 'Model output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+      }
     }
 
-    return Response.json({
-      content: data.choices?.[0]?.message?.content || '',
-    });
+    /* ── Mode: 'translate' — translates a BlogArticle to a target locale ── */
+    if (mode === 'translate') {
+      const { article, locale } = body;
+      if (!article) return Response.json({ error: 'Missing article' }, { status: 400 });
+      if (!locale || !LOCALE_NAMES[locale]) return Response.json({ error: 'Invalid locale' }, { status: 400 });
+
+      const langName = LOCALE_NAMES[locale];
+      const localeCtx = locale === 'ru'
+        ? 'Адаптируй для СНГ-аудитории. Упоминай релевантные юрисдикции (РФ, Казахстан, Украина) где уместно.'
+        : '';
+
+      const translatePrompt = `Translate the following BlogArticle JSON to ${langName}.
+
+CRITICAL RULES:
+1. Output ONLY valid JSON — same structure as input, no markdown wrapper
+2. Translate ALL user-facing strings: title, excerpt, metaTitle, metaDescription, intro, sections.heading, blocks (text, items, titles, etc.), sources
+3. PRESERVE: slug, category, date, readTime, keywords (translate keywords too), all "id" fields, all "type" fields, all "color" fields, all "href" values, all "ordered" flags
+4. PRESERVE markdown link syntax [text](url) — translate the text but keep the URL exactly
+5. PRESERVE the same number of sections, blocks, items, steps — do not add or remove
+6. Keep technical terms in English where standard: "blockchain", "Bitcoin", "USDT", "TRC20", "OFAC", exchange names like "Binance"
+${localeCtx ? '\n' + localeCtx : ''}
+${locale === 'ar' ? '\nNote: Arabic is RTL but the JSON structure stays identical.' : ''}
+
+Input article:
+${JSON.stringify(article)}
+
+Return ONLY the translated JSON object.`;
+
+      const raw = await callDeepSeek(
+        `You are a professional translator specializing in crypto-forensics content. You preserve JSON structure exactly while translating user-facing text.`,
+        translatePrompt,
+        8000,
+        0.3,
+      );
+      const cleaned = stripCodeFence(raw);
+      try {
+        const parsed = JSON.parse(cleaned);
+        return Response.json({ article: parsed });
+      } catch {
+        return Response.json({ error: 'Translation output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+      }
+    }
+
+    /* ── Mode: 'humanize' — final pass to remove AI patterns ── */
+    if (mode === 'humanize') {
+      const { article } = body;
+      if (!article) return Response.json({ error: 'Missing article' }, { status: 400 });
+
+      const humanizePrompt = `Take this BlogArticle JSON and rewrite the user-facing prose to feel MORE human-written.
+
+Rules:
+1. Output ONLY the same JSON structure — no markdown, no explanations
+2. Preserve: slug, category, date, readTime, all ids, types, hrefs, structure
+3. ONLY rewrite: intro paragraphs, paragraph block text, list items, h3 headings, section headings
+4. Apply burstiness: vary sentence length aggressively
+5. Add 2-3 sentence fragments, 1-2 sentences starting with "And"/"But"/"So"
+6. Replace generic AI phrasings with practitioner language
+7. Add 1-2 hot takes / opinions
+8. Keep all factual claims unchanged
+
+Input:
+${JSON.stringify(article)}
+
+Return the humanized JSON.`;
+
+      const raw = await callDeepSeek(SYSTEM_PROMPT, humanizePrompt, 8000, 0.85);
+      const cleaned = stripCodeFence(raw);
+      try {
+        const parsed = JSON.parse(cleaned);
+        return Response.json({ article: parsed });
+      } catch {
+        return Response.json({ error: 'Humanize output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+      }
+    }
+
+    /* ── Legacy mode (kept for backward compat with old frontend) ── */
+    const { prompt, maxTokens, locale } = body;
+    const localeHint = locale && locale !== 'en'
+      ? `\n\nWrite this content in ${LOCALE_NAMES[locale] || 'English'}.`
+      : '';
+    const content = await callDeepSeek(SYSTEM_PROMPT, (prompt || '') + localeHint, maxTokens || 6000, 0.7);
+    return Response.json({ content });
   } catch (err: any) {
     console.error('[blog-agent] Error:', err);
     return Response.json({ error: err.message || 'Failed to call DeepSeek' }, { status: 500 });
