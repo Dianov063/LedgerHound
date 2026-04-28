@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Lock, Zap, Loader2, FileText, Globe, CheckCircle2, AlertCircle, Rocket, RefreshCw, Sparkles } from 'lucide-react';
+import { Lock, Zap, Loader2, FileText, Globe, CheckCircle2, AlertCircle, Rocket, RefreshCw, Sparkles, Search, ExternalLink, Calendar } from 'lucide-react';
 
 /* ── Quick topic presets ── */
 const QUICK_TOPICS = [
@@ -24,7 +24,15 @@ const LANGS = [
 ] as const;
 
 type Article = any;
-type Step = 'idle' | 'generating' | 'humanizing' | 'translating' | 'ready' | 'publishing' | 'published' | 'error';
+type Step = 'idle' | 'researching' | 'generating' | 'humanizing' | 'translating' | 'ready' | 'publishing' | 'published' | 'error';
+
+interface TavilyResult {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+  publishedDate?: string;
+}
 
 /* ─── Password Gate ─── */
 function PasswordGate({ onAuth }: { onAuth: (pw: string) => void }) {
@@ -90,6 +98,12 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
 
+  // Research state
+  const [researchQuery, setResearchQuery] = useState('');
+  const [researchResults, setResearchResults] = useState<TavilyResult[]>([]);
+  const [selectedSources, setSelectedSources] = useState<TavilyResult[]>([]);
+  const [showResearch, setShowResearch] = useState(false);
+
   // Article state
   const [enArticle, setEnArticle] = useState<Article | null>(null);
   const [translations, setTranslations] = useState<Record<string, Article>>({});
@@ -122,6 +136,33 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
     return data;
   }
 
+  /* ── Research: find real trending topics with sources ── */
+  async function doResearch() {
+    setStep('researching');
+    setError('');
+    setResearchResults([]);
+    setSelectedSources([]);
+    try {
+      const data = await api({ mode: 'research', query: researchQuery || undefined });
+      setResearchResults(data.results || []);
+      if (!researchQuery) setResearchQuery(data.query); // show what we searched for
+      setStep('idle');
+      setShowResearch(true);
+    } catch (e: any) {
+      setError(e.message || 'Research failed');
+      setStep('error');
+    }
+  }
+
+  function toggleSource(source: TavilyResult) {
+    if (selectedSources.find((s) => s.url === source.url)) {
+      setSelectedSources(selectedSources.filter((s) => s.url !== source.url));
+    } else {
+      if (selectedSources.length >= 6) return; // cap at 6 sources
+      setSelectedSources([...selectedSources, source]);
+    }
+  }
+
   /* ── Generate article + translations ── */
   async function generateAll() {
     if (!topic.trim()) return;
@@ -134,10 +175,17 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
     setActiveTab('en');
 
     try {
-      // Step 1: Generate EN article
-      setProgressLabel('Generating English article...');
+      // Step 1: Generate EN article (with sources if research was done)
+      setProgressLabel(selectedSources.length > 0
+        ? `Generating from ${selectedSources.length} real sources...`
+        : 'Generating English article...');
       setProgress(15);
-      const gen = await api({ mode: 'generate', topic, category });
+      const gen = await api({
+        mode: 'generate',
+        topic,
+        category,
+        sources: selectedSources.length > 0 ? selectedSources : undefined,
+      });
       let en = gen.article;
 
       // Step 2: Humanize EN
@@ -274,8 +322,112 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Research */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Search size={14} className="text-slate-500" />
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Step 1: Research real trending topics</span>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Find real news from the last 30 days across EN/RU/ES. Articles will be based on these sources — no invented facts.
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              placeholder="e.g. crypto exchange subpoena 2026 (or leave empty for curated trending)"
+              className="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-slate-400"
+              onKeyDown={(e) => e.key === 'Enter' && !isWorking && doResearch()}
+            />
+            <button
+              type="button"
+              onClick={doResearch}
+              disabled={isWorking}
+              className="px-5 py-2.5 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 disabled:opacity-40 flex items-center gap-2"
+            >
+              {step === 'researching' ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              {step === 'researching' ? 'Searching...' : 'Research'}
+            </button>
+          </div>
+
+          {/* Research results */}
+          {showResearch && researchResults.length > 0 && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-slate-500">
+                  Found {researchResults.length} sources · Selected: <span className="font-bold text-slate-900">{selectedSources.length}/6</span>
+                </p>
+                {selectedSources.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSources([])}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {researchResults.map((r) => {
+                  const selected = !!selectedSources.find((s) => s.url === r.url);
+                  const disabled = !selected && selectedSources.length >= 6;
+                  return (
+                    <button
+                      type="button"
+                      key={r.url}
+                      onClick={() => toggleSource(r)}
+                      disabled={disabled}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        selected
+                          ? 'border-emerald-500 bg-emerald-50'
+                          : disabled
+                            ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                            : 'border-slate-200 hover:border-slate-400 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={`flex-shrink-0 w-4 h-4 rounded border ${selected ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300'} flex items-center justify-center mt-0.5`}>
+                          {selected && <CheckCircle2 size={10} className="text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 mb-1">{r.title}</p>
+                          <p className="text-xs text-slate-500 mb-1.5 line-clamp-2">{r.content}</p>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                            <span className="flex items-center gap-1 truncate max-w-xs">
+                              <ExternalLink size={9} />
+                              {(() => { try { return new URL(r.url).hostname; } catch { return r.url; } })()}
+                            </span>
+                            {r.publishedDate && (
+                              <span className="flex items-center gap-1">
+                                <Calendar size={9} />
+                                {new Date(r.publishedDate).toLocaleDateString()}
+                              </span>
+                            )}
+                            {r.score && <span>score {r.score.toFixed(2)}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Topic input */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-slate-500" />
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Step 2: Define topic & generate</span>
+            {selectedSources.length > 0 && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                {selectedSources.length} sources selected
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-500 mb-1.5">Topic</label>

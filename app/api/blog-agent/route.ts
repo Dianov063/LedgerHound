@@ -211,6 +211,8 @@ CONTENT REQUIREMENTS:
 - At least 2 external links to authoritative sources (FBI IC3, DOJ, Chainalysis, etc.)
 `;
 
+import { researchTopics, CURATED_SEEDS, type TavilyResult } from '@/lib/research/tavily';
+
 export const maxDuration = 90;
 
 const LOCALE_NAMES: Record<string, string> = {
@@ -255,21 +257,57 @@ export async function POST(request: Request) {
   const mode = body.mode || 'legacy';
 
   try {
+    /* ── Mode: 'research' — find real trending topics with sources ── */
+    if (mode === 'research') {
+      const { query } = body;
+      if (!process.env.TAVILY_API_KEY) {
+        return Response.json({ error: 'TAVILY_API_KEY not configured. Add it to Vercel env vars (free tier at tavily.com).' }, { status: 500 });
+      }
+
+      // Use provided query or pick a random curated seed
+      let seedQuery: string = query;
+      if (!seedQuery) {
+        seedQuery = CURATED_SEEDS[Math.floor(Math.random() * CURATED_SEEDS.length)];
+      }
+
+      try {
+        const results = await researchTopics(seedQuery, { perLanguage: 4, days: 30 });
+        if (results.length === 0) {
+          return Response.json({ error: 'No results found. Try a different query.' }, { status: 404 });
+        }
+        return Response.json({ query: seedQuery, results });
+      } catch (err: any) {
+        return Response.json({ error: err.message || 'Research failed' }, { status: 502 });
+      }
+    }
+
     /* ── Mode: 'generate' — produces a full BlogArticle JSON in EN ── */
     if (mode === 'generate') {
-      const { topic, category = 'Guide' } = body;
+      const { topic, category = 'Guide', sources } = body;
       if (!topic) return Response.json({ error: 'Missing topic' }, { status: 400 });
 
       const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // If sources are provided (from research mode), include them in the prompt
+      const sourcesBlock = Array.isArray(sources) && sources.length > 0
+        ? `\n\nREAL SOURCES (you MUST base the article on these, cite them with [text](url) inline links):
+${(sources as TavilyResult[]).map((s, i) => `[${i + 1}] ${s.title}
+URL: ${s.url}
+Snippet: ${s.content.slice(0, 400)}
+${s.publishedDate ? `Published: ${s.publishedDate}` : ''}`).join('\n\n')}
+
+CRITICAL: At least 3 paragraphs in the article must reference these sources by linking to them via [anchor text](url). Do NOT invent statistics — use only numbers from these sources. The "sources" field at the end of the article must list ALL of these URLs.`
+        : '';
+
       const userPrompt = `Topic: "${topic}"
 Category: ${category}
 Date (use this exact date): ${today}
-Locale: English
+Locale: English${sourcesBlock}
 
 Generate a BlogArticle JSON object per the schema in your instructions.
 Aim for 1,800-2,400 words across all blocks.
 The article must have unique value — do not regurgitate generic SEO advice.
-Include real 2025-2026 statistics and real-world examples.
+${sourcesBlock ? 'Base ALL factual claims on the provided sources.' : 'Include real 2025-2026 statistics and real-world examples.'}
 
 Return ONLY the JSON object. No markdown, no explanations.`;
 
