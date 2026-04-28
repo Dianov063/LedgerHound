@@ -271,13 +271,23 @@ export async function POST(request: Request) {
       }
 
       try {
-        const results = await researchTopics(seedQuery, { perLanguage: 4, days: 30 });
+        const results = await researchTopics(seedQuery, { perLanguage: 5 });
         if (results.length === 0) {
-          return Response.json({ error: 'No results found. Try a different query.' }, { status: 404 });
+          return Response.json({
+            error: `No results found for "${seedQuery}". Try a broader query like "cryptocurrency news" or "crypto scam recovery". Tavily may also be having issues with very recent or niche queries.`,
+          }, { status: 404 });
         }
         return Response.json({ query: seedQuery, results });
       } catch (err: any) {
-        return Response.json({ error: err.message || 'Research failed' }, { status: 502 });
+        const msg = err.message || 'Research failed';
+        // Surface Tavily-specific errors clearly
+        if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+          return Response.json({ error: 'Tavily API key is invalid. Check TAVILY_API_KEY env var on Vercel.' }, { status: 401 });
+        }
+        if (msg.includes('429')) {
+          return Response.json({ error: 'Tavily rate limit hit (free tier = 1000/mo). Wait or upgrade.' }, { status: 429 });
+        }
+        return Response.json({ error: msg }, { status: 502 });
       }
     }
 
