@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Lock, Zap, Loader2, FileText, Globe, CheckCircle2, AlertCircle, Rocket, RefreshCw, Sparkles, Search, ExternalLink, Calendar } from 'lucide-react';
+import { Lock, Zap, Loader2, FileText, Globe, CheckCircle2, AlertCircle, Rocket, RefreshCw, Sparkles, Search, ExternalLink, Calendar, Lightbulb } from 'lucide-react';
 
 /* ── Quick topic presets ── */
 const QUICK_TOPICS = [
@@ -104,6 +104,10 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
   const [selectedSources, setSelectedSources] = useState<TavilyResult[]>([]);
   const [showResearch, setShowResearch] = useState(false);
 
+  // Topic suggestions state
+  const [suggestions, setSuggestions] = useState<{ title: string; category: string; rationale: string }[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+
   // Article state
   const [enArticle, setEnArticle] = useState<Article | null>(null);
   const [translations, setTranslations] = useState<Record<string, Article>>({});
@@ -160,6 +164,29 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
     } else {
       if (selectedSources.length >= 6) return; // cap at 6 sources
       setSelectedSources([...selectedSources, source]);
+    }
+    // Reset suggestions when sources change
+    setSuggestions([]);
+  }
+
+  /* ── Suggest article topics from selected sources ── */
+  async function suggestTopics() {
+    if (selectedSources.length === 0) return;
+    setSuggesting(true);
+    setError('');
+    try {
+      const data = await api({ mode: 'suggest-topics', sources: selectedSources });
+      setSuggestions(data.suggestions || []);
+    } catch (e: any) {
+      setError(e.message || 'Suggestion failed');
+    }
+    setSuggesting(false);
+  }
+
+  function applyTopic(s: { title: string; category: string }) {
+    setTopic(s.title);
+    if (CATEGORIES.includes(s.category as any)) {
+      setCategory(s.category as typeof CATEGORIES[number]);
     }
   }
 
@@ -416,6 +443,59 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
             </div>
           )}
         </div>
+
+        {/* Topic suggestions (only visible when sources are selected) */}
+        {selectedSources.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Lightbulb size={14} className="text-amber-700" />
+                <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+                  {suggestions.length > 0 ? 'Pick a topic angle' : 'Need a topic? AI can suggest one'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={suggestTopics}
+                disabled={suggesting || selectedSources.length === 0}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                {suggesting ? 'Thinking...' : suggestions.length > 0 ? 'Regenerate' : 'Suggest topics'}
+              </button>
+            </div>
+            {suggestions.length === 0 && !suggesting && (
+              <p className="text-xs text-amber-700">
+                Click "Suggest topics" — AI will read your {selectedSources.length} selected sources and propose 5 article angles.
+              </p>
+            )}
+            {suggestions.length > 0 && (
+              <div className="space-y-2">
+                {suggestions.map((s, i) => {
+                  const active = topic === s.title;
+                  return (
+                    <button
+                      type="button"
+                      key={i}
+                      onClick={() => applyTopic(s)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        active ? 'border-amber-600 bg-white ring-2 ring-amber-300' : 'border-amber-200 bg-white hover:border-amber-400'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="text-sm font-semibold text-slate-900">{s.title}</p>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex-shrink-0">
+                          {s.category}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">{s.rationale}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Topic input */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">

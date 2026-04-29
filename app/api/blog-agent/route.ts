@@ -291,6 +291,50 @@ export async function POST(request: Request) {
       }
     }
 
+    /* ── Mode: 'suggest-topics' — propose 3-5 article angles from selected sources ── */
+    if (mode === 'suggest-topics') {
+      const { sources } = body;
+      if (!Array.isArray(sources) || sources.length === 0) {
+        return Response.json({ error: 'Missing sources array' }, { status: 400 });
+      }
+
+      const sourcesContext = (sources as TavilyResult[])
+        .map((s, i) => `[${i + 1}] ${s.title}\n${s.content.slice(0, 300)}`)
+        .join('\n\n');
+
+      const prompt = `You are a content strategist for LedgerHound (crypto-forensics company).
+
+Given these REAL news sources, propose exactly 5 distinct article angles that LedgerHound could write a blog post about. Each angle should:
+- Be specific and SEO-friendly (target a real search query)
+- Have a clear narrative angle (not just a topic — a story or argument)
+- Be 8-12 words long
+- Reference the actual events/entities from the sources
+- Be different from each other (different sub-topics, different perspectives)
+
+SOURCES:
+${sourcesContext}
+
+Return ONLY a JSON array of 5 objects with this exact shape — no markdown, no preamble:
+[
+  { "title": "...", "category": "Guide" | "Case Study" | "Legal" | "Education", "rationale": "Why this angle works for LedgerHound's audience (1 sentence)" }
+]`;
+
+      const raw = await callDeepSeek(
+        'You are a senior content strategist. Output only valid JSON arrays.',
+        prompt,
+        2000,
+        0.7,
+      );
+      const cleaned = stripCodeFence(raw);
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (!Array.isArray(parsed)) throw new Error('Expected array');
+        return Response.json({ suggestions: parsed });
+      } catch {
+        return Response.json({ error: 'Topic suggestions not valid JSON', raw: cleaned.slice(0, 300) }, { status: 502 });
+      }
+    }
+
     /* ── Mode: 'generate' — produces a full BlogArticle JSON in EN ── */
     if (mode === 'generate') {
       const { topic, category = 'Guide', sources } = body;
