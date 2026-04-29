@@ -226,22 +226,76 @@ function stripCodeFence(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
 }
 
-async function callDeepSeek(systemPrompt: string, userPrompt: string, maxTokens = 8000, temperature = 0.7): Promise<string> {
+/**
+ * Robustly parse JSON from LLM output. Handles:
+ * - Markdown code fences (```json ... ```)
+ * - Preamble text before the JSON ("Here is the JSON: ...")
+ * - Trailing text after the JSON ("...That's the result.")
+ * - Extracts the outermost JSON object/array by finding matching braces.
+ *
+ * @param text Raw LLM output
+ * @param expect 'object' or 'array'
+ */
+function extractJson(text: string, expect: 'object' | 'array' = 'object'): unknown {
+  let cleaned = stripCodeFence(text);
+
+  // Try direct parse first (cheapest path)
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Fall through to extraction
+  }
+
+  const open = expect === 'array' ? '[' : '{';
+  const close = expect === 'array' ? ']' : '}';
+
+  const start = cleaned.indexOf(open);
+  if (start === -1) throw new Error(`No ${open} found in output`);
+
+  // Walk forward tracking depth, respecting strings/escapes
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) {
+        const candidate = cleaned.slice(start, i + 1);
+        return JSON.parse(candidate);
+      }
+    }
+  }
+  throw new Error(`Unmatched ${open} in output`);
+}
+
+async function callDeepSeek(systemPrompt: string, userPrompt: string, maxTokens = 8000, temperature = 0.7, jsonMode = false): Promise<string> {
+  const body: any = {
+    model: 'deepseek-chat',
+    max_tokens: maxTokens,
+    temperature,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  // DeepSeek supports OpenAI-compatible json_object response format
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      max_tokens: maxTokens,
-      temperature,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
   const data = await response.json();
   if (data.error) throw new Error(data.error.message || 'DeepSeek API error');
@@ -314,24 +368,31 @@ Given these REAL news sources, propose exactly 5 distinct article angles that Le
 SOURCES:
 ${sourcesContext}
 
-Return ONLY a JSON array of 5 objects with this exact shape — no markdown, no preamble:
-[
-  { "title": "...", "category": "Guide" | "Case Study" | "Legal" | "Education", "rationale": "Why this angle works for LedgerHound's audience (1 sentence)" }
-]`;
+Return ONLY a JSON object with this exact shape — no markdown, no preamble:
+{
+  "suggestions": [
+    { "title": "...", "category": "Guide", "rationale": "Why this angle works for LedgerHound's audience (1 sentence)" }
+  ]
+}
+
+Category MUST be one of: "Guide", "Case Study", "Legal", "Education"
+The suggestions array MUST contain exactly 5 items.`;
 
       const raw = await callDeepSeek(
-        'You are a senior content strategist. Output only valid JSON arrays.',
+        'You are a senior content strategist. You always return valid JSON objects.',
         prompt,
         2000,
         0.7,
+        true, // jsonMode
       );
-      const cleaned = stripCodeFence(raw);
       try {
-        const parsed = JSON.parse(cleaned);
-        if (!Array.isArray(parsed)) throw new Error('Expected array');
-        return Response.json({ suggestions: parsed });
-      } catch {
-        return Response.json({ error: 'Topic suggestions not valid JSON', raw: cleaned.slice(0, 300) }, { status: 502 });
+        const parsed = extractJson(raw, 'object') as { suggestions?: unknown[] };
+        const suggestions = parsed.suggestions;
+        if (!Array.isArray(suggestions)) throw new Error('Missing or invalid "suggestions" array in response');
+        return Response.json({ suggestions });
+      } catch (parseErr: any) {
+        console.error('[blog-agent] Suggest topics parse failed:', parseErr.message, '\nRaw:', raw.slice(0, 500));
+        return Response.json({ error: 'Topic suggestions not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
       }
     }
 
@@ -365,15 +426,13 @@ ${sourcesBlock ? 'Base ALL factual claims on the provided sources.' : 'Include r
 
 Return ONLY the JSON object. No markdown, no explanations.`;
 
-      const raw = await callDeepSeek(SYSTEM_PROMPT, userPrompt, 8000, 0.75);
-      const cleaned = stripCodeFence(raw);
-
-      // Validate it parses
+      const raw = await callDeepSeek(SYSTEM_PROMPT, userPrompt, 8000, 0.75, true);
       try {
-        const parsed = JSON.parse(cleaned);
+        const parsed = extractJson(raw, 'object');
         return Response.json({ article: parsed });
       } catch (parseErr: any) {
-        return Response.json({ error: 'Model output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+        console.error('[blog-agent] Generate parse failed:', parseErr.message, '\nRaw:', raw.slice(0, 500));
+        return Response.json({ error: 'Model output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
       }
     }
 
@@ -410,13 +469,14 @@ Return ONLY the translated JSON object.`;
         translatePrompt,
         8000,
         0.3,
+        true,
       );
-      const cleaned = stripCodeFence(raw);
       try {
-        const parsed = JSON.parse(cleaned);
+        const parsed = extractJson(raw, 'object');
         return Response.json({ article: parsed });
-      } catch {
-        return Response.json({ error: 'Translation output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+      } catch (parseErr: any) {
+        console.error('[blog-agent] Translate parse failed:', parseErr.message);
+        return Response.json({ error: 'Translation output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
       }
     }
 
@@ -442,13 +502,13 @@ ${JSON.stringify(article)}
 
 Return the humanized JSON.`;
 
-      const raw = await callDeepSeek(SYSTEM_PROMPT, humanizePrompt, 8000, 0.85);
-      const cleaned = stripCodeFence(raw);
+      const raw = await callDeepSeek(SYSTEM_PROMPT, humanizePrompt, 8000, 0.85, true);
       try {
-        const parsed = JSON.parse(cleaned);
+        const parsed = extractJson(raw, 'object');
         return Response.json({ article: parsed });
-      } catch {
-        return Response.json({ error: 'Humanize output was not valid JSON', raw: cleaned.slice(0, 500) }, { status: 502 });
+      } catch (parseErr: any) {
+        console.error('[blog-agent] Humanize parse failed:', parseErr.message);
+        return Response.json({ error: 'Humanize output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
       }
     }
 
