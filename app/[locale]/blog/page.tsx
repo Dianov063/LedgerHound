@@ -8,6 +8,15 @@ import { makeMetadata } from '@/lib/metadata';
 
 const blogPosts = [
   {
+    slug: 'ai-fueling-crypto-fraud-irs-investigators-2026',
+    category: 'Education',
+    title: 'How AI Is Fueling a Surge in Crypto Fraud: What IRS Investigators Reveal',
+    excerpt: 'AI-powered scams are driving a record $7.2 billion in crypto investment losses. IRS investigators share how deepfakes and automation are changing fraud—and what you can do to protect your assets.',
+    date: 'April 30, 2026',
+    readTime: '10 min read',
+    featured: true,
+  },
+  {
     slug: 'usdt-trc20-scam-recovery-guide-2026',
     category: 'Guide',
     title: 'USDT TRC20 Scam Recovery Guide 2026: A Forensic Roadmap',
