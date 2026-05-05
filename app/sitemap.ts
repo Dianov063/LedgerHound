@@ -31,6 +31,7 @@ const pages = [
 ];
 
 const blogPosts = [
+  '/blog/northeast-cartel-casinos-crypto-forensics-2026',
   '/blog/ai-fueling-crypto-fraud-irs-investigators-2026',
   '/blog/usdt-trc20-scam-recovery-guide-2026',
   '/blog/how-to-identify-fake-crypto-trading-platform',

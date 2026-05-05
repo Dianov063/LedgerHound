@@ -8,6 +8,15 @@ import { makeMetadata } from '@/lib/metadata';
 
 const blogPosts = [
   {
+    slug: 'northeast-cartel-casinos-crypto-forensics-2026',
+    category: 'Education',
+    title: 'Why the Northeast Cartel Uses Casinos: A Crypto-Forensics Perspective',
+    excerpt: 'The U.S. Treasury sanctioned two Mexican casinos for laundering cash for the Northeast Cartel (CDN). We analyze how casinos serve as crypto-to-fiat gateways, the role of OFAC sanctions, and what this means for blockchain tracing.',
+    date: 'May 5, 2026',
+    readTime: '9 min read',
+    featured: true,
+  },
+  {
     slug: 'ai-fueling-crypto-fraud-irs-investigators-2026',
     category: 'Education',
     title: 'How AI Is Fueling a Surge in Crypto Fraud: What IRS Investigators Reveal',
