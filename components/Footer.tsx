@@ -24,6 +24,8 @@ export default function Footer() {
     { href: `${base}/about`, label: t('about') },
     { href: `${base}/blog`, label: t('blog') },
     { href: `${base}/cases`, label: t('cases') },
+    { href: `${base}/investigators`, label: 'Investigators' },
+    { href: `${base}/join-network`, label: 'Join Network' },
     { href: `${base}/contact`, label: t('contact') },
   ];
 

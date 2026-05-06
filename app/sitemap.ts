@@ -16,6 +16,9 @@ const pages = [
   { path: '/about', priority: 0.7, changeFreq: 'monthly' },
   { path: '/blog', priority: 0.8, changeFreq: 'daily' },
   { path: '/contact', priority: 0.7, changeFreq: 'monthly' },
+  { path: '/investigators', priority: 0.8, changeFreq: 'weekly' },
+  { path: '/join-network', priority: 0.7, changeFreq: 'monthly' },
+  { path: '/legal/investigator-agreement', priority: 0.4, changeFreq: 'yearly' },
   { path: '/free-evaluation', priority: 1.0, changeFreq: 'weekly' },
   { path: '/wallet-tracker', priority: 0.9, changeFreq: 'weekly' },
   { path: '/graph-tracer', priority: 0.9, changeFreq: 'weekly' },
@@ -110,6 +113,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
       });
     }
+  }
+
+  // Investigator profile pages (dynamic from S3 + seed)
+  try {
+    const { listApproved } = await import('@/lib/investigators/storage');
+    const investigators = await listApproved();
+    for (const inv of investigators) {
+      const path = `/investigators/${inv.id}`;
+      for (const locale of locales) {
+        const localePath = locale === 'en' ? '' : `/${locale}`;
+        urls.push({
+          url: `${baseUrl}${localePath}${path}`,
+          lastModified: inv.updatedAt ? new Date(inv.updatedAt) : new Date(),
+          changeFrequency: 'weekly',
+          priority: 0.6,
+          alternates: {
+            languages: Object.fromEntries(
+              locales.map((l) => [l, `${baseUrl}${l === 'en' ? '' : `/${l}`}${path}`]),
+            ),
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[sitemap] Failed to load investigators:', err);
   }
 
   // Scam database platform pages (dynamic from S3 + seed fallback)
