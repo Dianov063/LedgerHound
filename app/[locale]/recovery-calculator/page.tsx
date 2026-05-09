@@ -6,14 +6,12 @@ import { ArrowRight, Shield, Calculator } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/recovery-calculator',
-    title: 'Crypto Recovery Chances Calculator | LedgerHound',
-    description: 'Find out your chances of recovering stolen cryptocurrency. Free assessment based on case details \u2014 used by fraud victims and attorneys.',
-    keywords: ['crypto recovery calculator', 'stolen cryptocurrency recovery chances', 'bitcoin recovery assessment', 'crypto fraud recovery', 'blockchain tracing chances', 'crypto scam recovery odds'],
-  });
+    metadataKey: 'tools.recoveryCalculator',
+});
 }
 
 export default function RecoveryCalculatorPage() {

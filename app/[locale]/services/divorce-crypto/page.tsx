@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/services/divorce-crypto',
-    title: "Cryptocurrency in Divorce & Estates | Hidden Crypto Forensics | LedgerHound",
-    description: "Expert blockchain forensics for divorce and estate proceedings. We uncover hidden cryptocurrency wallets, trace transfers, and provide court-admissible reports.",
-    keywords: ["crypto divorce","hidden cryptocurrency","divorce crypto forensics","estate crypto investigation"],
-  });
+    metadataKey: 'services.divorceCrypto',
+});
 }
 
 export default function DivorceCryptoPage() {

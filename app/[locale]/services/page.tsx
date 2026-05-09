@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/services',
-    title: "Blockchain Investigation Services | LedgerHound",
-    description: "Comprehensive blockchain forensics services: crypto tracing, fraud investigation, divorce crypto analysis, litigation support, and romance scam recovery.",
-    keywords: ["blockchain investigation services","crypto forensics services"],
-  });
+    metadataKey: 'services.index',
+});
 }
 
 export default function ServicesPage() {

@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/services/romance-scams',
-    title: "Romance Scam & Pig Butchering Recovery | LedgerHound",
-    description: "Specialized recovery assistance for romance scam and pig butchering victims. We trace cryptocurrency sent to scammers and identify exchange deposit points.",
-    keywords: ["romance scam recovery","pig butchering scam","crypto romance scam","pig butchering recovery"],
-  });
+    metadataKey: 'services.romanceScams',
+});
 }
 
 export default function RomanceScamsPage() {

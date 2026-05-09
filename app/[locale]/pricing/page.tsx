@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/pricing',
-    title: "Pricing | Crypto Tracing & Blockchain Investigation | LedgerHound",
-    description: "Transparent pricing for cryptocurrency tracing, blockchain forensics, and court-ready investigation reports. Free initial case evaluation.",
-    keywords: ["crypto tracing pricing","blockchain investigation cost","crypto forensics pricing"],
-  });
+    metadataKey: 'pricing',
+});
 }
 
 export default function PricingPage() {

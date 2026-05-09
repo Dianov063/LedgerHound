@@ -13,14 +13,12 @@ const categoryColors: Record<string, string> = {
 };
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/blog',
-    title: "Blog | Crypto Forensics & Blockchain Security | LedgerHound",
-    description: "Expert insights on cryptocurrency scams, blockchain forensics, crypto recovery, and blockchain security from LedgerHound investigators.",
-    keywords: ["crypto forensics blog","blockchain security blog","crypto scam news"],
-  });
+    metadataKey: 'blog.index',
+});
 }
 
 export default function BlogPage() {

@@ -9,7 +9,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const inv = await getApproved(id);
   if (!inv || !inv.isApproved || !inv.isActive) {
-    return makeMetadata({
+    return await makeMetadata({
       locale,
       path: `/investigators/${id}`,
       title: 'Investigator Profile | LedgerHound Network',
@@ -22,7 +22,7 @@ export async function generateMetadata({
   const title = `${inv.name} — ${inv.city}, ${inv.country} | LedgerHound`;
   const description = `${inv.name} is a ${certs} certified blockchain forensics investigator based in ${inv.city}, ${inv.country}. Specializes in ${inv.specializations.slice(0, 3).join(', ')}.`;
 
-  return makeMetadata({
+  return await makeMetadata({
     locale,
     path: `/investigators/${id}`,
     title: title.slice(0, 70),

@@ -6,14 +6,12 @@ import { ArrowRight, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/graph-tracer',
-    title: 'Free Multi-Chain Transaction Graph \u2014 14 Blockchains | LedgerHound',
-    description: 'Visualize fund flows across 14 blockchains with our free transaction graph tool. Supports BTC, ETH, SOL, TRON, and 10 EVM chains. Multi-hop tracing, known entity detection, and export capabilities.',
-    keywords: ['multi-chain transaction graph', 'crypto fund flow visualization', 'blockchain tracing tool', 'trace crypto funds', 'bitcoin transaction graph', 'ethereum flow chart', 'crypto forensics tool', 'transaction flow analysis'],
-  });
+    metadataKey: 'tools.graphTracer',
+});
 }
 
 export default function GraphTracerPage() {

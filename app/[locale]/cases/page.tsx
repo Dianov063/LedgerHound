@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/cases',
-    title: "Case Studies | Crypto Recovery Success Stories | LedgerHound",
-    description: "Real blockchain forensics case studies: cryptocurrency tracing, scam recovery, and fund identification results for our clients.",
-    keywords: ["crypto recovery case studies","blockchain forensics results"],
-  });
+    metadataKey: 'cases',
+});
 }
 
 export default function CasesPage() {

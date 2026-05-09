@@ -3,13 +3,12 @@ import Footer from '@/components/Footer';
 import { useTranslations } from 'next-intl';
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/privacy',
-    title: 'Privacy Policy | LedgerHound',
-    description: 'LedgerHound privacy policy. How USPROJECT LLC collects, uses, and protects your information. GDPR and CCPA compliant.',
-  });
+    metadataKey: 'privacy',
+});
 }
 
 export default function PrivacyPolicyPage() {

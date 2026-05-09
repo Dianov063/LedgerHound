@@ -3,13 +3,12 @@ import Footer from '@/components/Footer';
 import { useTranslations } from 'next-intl';
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/terms',
-    title: 'Terms of Service | LedgerHound',
-    description: 'LedgerHound terms of service. Legal terms governing the use of USPROJECT LLC blockchain forensics services.',
-  });
+    metadataKey: 'terms',
+});
 }
 
 export default function TermsPage() {

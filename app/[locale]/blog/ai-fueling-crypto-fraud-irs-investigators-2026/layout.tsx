@@ -17,8 +17,8 @@ const descriptions: Record<string, string> = {
   ar: 'الذكاء الاصطناعي يغذي طفرة هائلة في احتيال العملات الرقمية. محققو مصلحة الضرائب يبلغون عن خسائر 7.2 مليار دولار في 2025. تعلم كيف يعمل التزييف العميق والأتمتة - وكيفية تتبع الأموال المسروقة.',
 };
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/blog/ai-fueling-crypto-fraud-irs-investigators-2026',
     title: titles[locale] || titles.en,

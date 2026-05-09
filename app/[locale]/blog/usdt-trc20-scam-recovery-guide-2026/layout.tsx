@@ -1,7 +1,7 @@
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/blog/usdt-trc20-scam-recovery-guide-2026',
     title: "USDT TRC20 Scam Recovery Guide 2026 | LedgerHound",

@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/services/corporate-fraud',
-    title: "Corporate Crypto Fraud Investigation | LedgerHound",
-    description: "Enterprise-grade blockchain forensics for corporate fraud, embezzlement, insider threats, and cryptocurrency theft investigation.",
-    keywords: ["corporate crypto fraud","blockchain investigation corporate","crypto embezzlement"],
-  });
+    metadataKey: 'services.corporateFraud',
+});
 }
 
 export default function CorporateFraudPage() {

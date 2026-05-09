@@ -7,14 +7,12 @@ import { makeMetadata } from '@/lib/metadata';
 
 
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/services/crypto-tracing',
-    title: "Cryptocurrency Tracing Service | Trace Stolen Crypto | LedgerHound",
-    description: "Professional cryptocurrency tracing across Bitcoin, Ethereum, TRON, and 10+ blockchains. We trace stolen funds to exchange deposit addresses for legal recovery.",
-    keywords: ["crypto tracing","trace stolen crypto","cryptocurrency investigation","bitcoin tracing"],
-  });
+    metadataKey: 'services.cryptoTracing',
+});
 }
 
 export default function CryptoTracingPage() {

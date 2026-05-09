@@ -3,13 +3,12 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { makeMetadata } from '@/lib/metadata';
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
-  return makeMetadata({
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return await makeMetadata({
     locale,
     path: '/disclaimer',
-    title: 'Legal Disclaimer | LedgerHound',
-    description: 'Legal disclaimer for LedgerHound blockchain forensics services by USPROJECT LLC. Not a law firm. No guarantee of recovery.',
-  });
+    metadataKey: 'disclaimer',
+});
 }
 
 export default function DisclaimerPage() {
