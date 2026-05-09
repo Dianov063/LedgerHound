@@ -89,6 +89,21 @@ export async function POST(request: Request) {
   logger.info({ slug }, '[blog-publish] Starting publish');
 
   try {
+    // ── Final guardrail: validate every translation before committing.
+    // Even if the agent already cleaned them, re-running validation here
+    // means publish CANNOT ship a dead internal link. If the article still
+    // contains 5+ broken links per locale, abort — something's wrong upstream.
+    const { validateAndCleanArticle } = await import('@/lib/blog/validate-article');
+    const totalWarnings: string[] = [];
+    for (const loc of LOCALES) {
+      const { cleaned, warnings } = validateAndCleanArticle(translations[loc]);
+      translations[loc] = cleaned as any;
+      if (warnings.length > 0) {
+        totalWarnings.push(`[${loc}] ${warnings.length} link(s) stripped`);
+        logger.warn({ slug, loc, warnings }, '[blog-publish] Stripped invalid links pre-commit');
+      }
+    }
+
     // 1. Render content/{locale}.tsx for each locale
     const contentFiles = LOCALES.map((loc) => ({
       path: `app/[locale]/blog/${slug}/content/${loc}.tsx`,

@@ -1,4 +1,21 @@
-const SYSTEM_PROMPT = `You are the content team at LedgerHound — a blockchain forensics & crypto asset tracing company (ledgerhound.vip). You write expert-level blog articles that rank on Google, build trust with scam victims, and convert readers into clients.
+import { getValidPathsForPrompt, getValidBlogSlugs } from '@/lib/blog/valid-internal-paths';
+import { validateAndCleanArticle } from '@/lib/blog/validate-article';
+
+/**
+ * Build the system prompt. Whitelist sections are computed at request time
+ * from BLOG_POSTS (single source of truth) so newly published posts become
+ * linkable immediately — and removed posts disappear from the agent's awareness.
+ */
+function buildSystemPrompt(): string {
+  const validPathsList = getValidPathsForPrompt();
+  const validSlugsList = getValidBlogSlugs().map((s) => `  - ${s}`).join('\n');
+
+  return SYSTEM_PROMPT_TEMPLATE
+    .replace('{{VALID_INTERNAL_PATHS}}', validPathsList)
+    .replace('{{VALID_BLOG_SLUGS}}', validSlugsList);
+}
+
+const SYSTEM_PROMPT_TEMPLATE = `You are the content team at LedgerHound — a blockchain forensics & crypto asset tracing company (ledgerhound.vip). You write expert-level blog articles that rank on Google, build trust with scam victims, and convert readers into clients.
 
 === SEO LANDSCAPE — APRIL 2026 ===
 The search ecosystem has shifted. Your content must perform across multiple surfaces:
@@ -195,11 +212,24 @@ interface BlogArticle {
 }
 \`\`\`
 
-EXISTING BLOG SLUGS (for relatedSlugs):
-- usdt-trc20-scam-recovery-guide-2026
-- how-to-identify-fake-crypto-trading-platform
-- how-to-trace-stolen-bitcoin
-- pig-butchering-scam-recovery
+=== HARD RULE: INTERNAL LINKS — STRICT WHITELIST ===
+You may ONLY link to paths in the lists below. Any other internal path
+(e.g. /blog/some-made-up-slug, /tools/wallet-finder) WILL BE REMOVED
+by automated validation, and the article will be rejected if too many
+links are stripped.
+
+DO NOT INVENT. If you cannot find a relevant link in the whitelist,
+write the sentence WITHOUT a link rather than guess.
+
+VALID INTERNAL PATHS (use these in [text](path) markdown links):
+{{VALID_INTERNAL_PATHS}}
+
+VALID BLOG SLUGS (use ONLY these in the relatedSlugs field):
+{{VALID_BLOG_SLUGS}}
+
+If a topic suggests linking to a related article that doesn't exist
+in the slug list above — link instead to /blog (the index) or to a
+relevant tool/service from the path list, or simply omit the link.
 
 CONTENT REQUIREMENTS:
 - 5-7 sections minimum
@@ -426,10 +456,15 @@ ${sourcesBlock ? 'Base ALL factual claims on the provided sources.' : 'Include r
 
 Return ONLY the JSON object. No markdown, no explanations.`;
 
-      const raw = await callDeepSeek(SYSTEM_PROMPT, userPrompt, 8000, 0.75, true);
+      const raw = await callDeepSeek(buildSystemPrompt(), userPrompt, 8000, 0.75, true);
       try {
         const parsed = extractJson(raw, 'object');
-        return Response.json({ article: parsed });
+        // Last-line-of-defense: strip any links to paths the LLM hallucinated.
+        const { cleaned, warnings } = validateAndCleanArticle(parsed);
+        if (warnings.length > 0) {
+          console.warn('[blog-agent] Generate: stripped invalid links:', warnings);
+        }
+        return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {
         console.error('[blog-agent] Generate parse failed:', parseErr.message, '\nRaw:', raw.slice(0, 500));
         return Response.json({ error: 'Model output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
@@ -473,7 +508,13 @@ Return ONLY the translated JSON object.`;
       );
       try {
         const parsed = extractJson(raw, 'object');
-        return Response.json({ article: parsed });
+        // Translate is supposed to preserve link URLs, but models occasionally
+        // mangle or invent paths during translation. Re-validate to be safe.
+        const { cleaned, warnings } = validateAndCleanArticle(parsed);
+        if (warnings.length > 0) {
+          console.warn('[blog-agent] Translate: stripped invalid links:', warnings);
+        }
+        return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {
         console.error('[blog-agent] Translate parse failed:', parseErr.message);
         return Response.json({ error: 'Translation output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
@@ -502,10 +543,15 @@ ${JSON.stringify(article)}
 
 Return the humanized JSON.`;
 
-      const raw = await callDeepSeek(SYSTEM_PROMPT, humanizePrompt, 8000, 0.85, true);
+      const raw = await callDeepSeek(buildSystemPrompt(), humanizePrompt, 8000, 0.85, true);
       try {
         const parsed = extractJson(raw, 'object');
-        return Response.json({ article: parsed });
+        // Re-validate after humanize — the model can introduce new links during rewrite.
+        const { cleaned, warnings } = validateAndCleanArticle(parsed);
+        if (warnings.length > 0) {
+          console.warn('[blog-agent] Humanize: stripped invalid links:', warnings);
+        }
+        return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {
         console.error('[blog-agent] Humanize parse failed:', parseErr.message);
         return Response.json({ error: 'Humanize output was not valid JSON', detail: parseErr.message, raw: raw.slice(0, 500) }, { status: 502 });
@@ -517,7 +563,7 @@ Return the humanized JSON.`;
     const localeHint = locale && locale !== 'en'
       ? `\n\nWrite this content in ${LOCALE_NAMES[locale] || 'English'}.`
       : '';
-    const content = await callDeepSeek(SYSTEM_PROMPT, (prompt || '') + localeHint, maxTokens || 6000, 0.7);
+    const content = await callDeepSeek(buildSystemPrompt(), (prompt || '') + localeHint, maxTokens || 6000, 0.7);
     return Response.json({ content });
   } catch (err: any) {
     console.error('[blog-agent] Error:', err);
