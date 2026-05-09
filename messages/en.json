@@ -264,7 +264,12 @@
     "title": "Insights & Guides",
     "subtitle": "Expert analysis on crypto fraud, blockchain forensics, and asset recovery.",
     "read_more": "Read Article",
-    "view_all": "View All Articles"
+    "view_all": "View All Articles",
+    "category_guide": "Guide",
+    "category_case_study": "Case Study",
+    "category_legal": "Legal",
+    "category_education": "Education",
+    "min_read": "{count} min read"
   },
   "calculator": {
     "badge": "Free Tool",

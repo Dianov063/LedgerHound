@@ -290,7 +290,7 @@ function BlogAgentUI({ adminPw }: { adminPw: string }) {
           </div>
           <div>
             <span className="text-slate-400">Read: </span>
-            <span className="text-slate-700">{article.readTime}</span>
+            <span className="text-slate-700">{article.readMinutes} min</span>
           </div>
         </div>
         <div>

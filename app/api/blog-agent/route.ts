@@ -186,8 +186,8 @@ SCHEMA (TypeScript types):
 interface BlogArticle {
   slug: string;              // kebab-case, e.g. "how-binance-handles-subpoenas-2026"
   category: 'Guide' | 'Case Study' | 'Legal' | 'Education';
-  date: string;              // "April 28, 2026"
-  readTime: string;          // "8 min read"
+  date: string;              // ISO YYYY-MM-DD, e.g. "2026-04-28" — localized at render time
+  readMinutes: number;       // integer minutes, e.g. 8 (localized at render via t('blog.min_read', {count}))
   title: string;             // <h1>, max 70 chars
   excerpt: string;           // for blog index card, 150-200 chars
   metaTitle: string;         // <title> tag, max 60 chars
@@ -432,7 +432,7 @@ The suggestions array MUST contain exactly 5 items.`;
       const { topic, category = 'Guide', sources } = body;
       if (!topic) return Response.json({ error: 'Missing topic' }, { status: 400 });
 
-      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const today = new Date().toISOString().slice(0, 10);  // ISO YYYY-MM-DD — localized at render
 
       // If sources are provided (from research mode), include them in the prompt
       const sourcesBlock = Array.isArray(sources) && sources.length > 0
@@ -495,7 +495,7 @@ Return ONLY the JSON object. No markdown, no explanations.`;
 CRITICAL RULES:
 1. Output ONLY valid JSON — same structure as input, no markdown wrapper
 2. Translate ALL user-facing strings: title, excerpt, metaTitle, metaDescription, intro, sections.heading, blocks (text, items, titles, etc.), sources
-3. PRESERVE: slug, category, date, readTime, keywords (translate keywords too), all "id" fields, all "type" fields, all "color" fields, all "href" values, all "ordered" flags
+3. PRESERVE: slug, category, date, readMinutes, keywords (translate keywords too), all "id" fields, all "type" fields, all "color" fields, all "href" values, all "ordered" flags
 4. PRESERVE markdown link syntax [text](url) — translate the text but keep the URL exactly
 5. PRESERVE the same number of sections, blocks, items, steps — do not add or remove
 6. Keep technical terms in English where standard: "blockchain", "Bitcoin", "USDT", "TRC20", "OFAC", exchange names like "Binance"
@@ -545,7 +545,7 @@ Return ONLY the translated JSON object.`;
 
 Rules:
 1. Output ONLY the same JSON structure — no markdown, no explanations
-2. Preserve: slug, category, date, readTime, all ids, types, hrefs, structure
+2. Preserve: slug, category, date, readMinutes, all ids, types, hrefs, structure
 3. ONLY rewrite: intro paragraphs, paragraph block text, list items, h3 headings, section headings
 4. Apply burstiness: vary sentence length aggressively
 5. Add 2-3 sentence fragments, 1-2 sentences starting with "And"/"But"/"So"

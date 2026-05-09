@@ -264,7 +264,12 @@
     "title": "Analyses et Guides",
     "subtitle": "Analyse experte sur la fraude crypto, la forensique blockchain et la récupération d'actifs.",
     "read_more": "Lire l'Article",
-    "view_all": "Voir Tous les Articles"
+    "view_all": "Voir Tous les Articles",
+    "category_guide": "Guide",
+    "category_case_study": "Étude de cas",
+    "category_legal": "Juridique",
+    "category_education": "Éducation",
+    "min_read": "{count} min de lecture"
   },
   "calculator": {
     "badge": "Outil Gratuit",

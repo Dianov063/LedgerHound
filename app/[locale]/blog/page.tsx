@@ -5,11 +5,15 @@ import Footer from '@/components/Footer';
 import { Clock } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
 import { BLOG_POSTS } from '@/lib/blog/posts';
+import { formatBlogDate, categoryKey } from '@/lib/blog/format-blog-meta';
 
 const blogPosts = BLOG_POSTS;
 
 const categoryColors: Record<string, string> = {
   Guide: 'bg-blue-50 text-blue-700 border-blue-100',
+  'Case Study': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  Legal: 'bg-violet-50 text-violet-700 border-violet-100',
+  Education: 'bg-amber-50 text-amber-700 border-amber-100',
 };
 
 
@@ -48,17 +52,17 @@ export default function BlogPage() {
             {blogPosts.map((post) => (
               <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="card group hover:border-brand-200 transition-colors">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${categoryColors[post.category]}`}>
-                    {post.category}
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${categoryColors[post.category] || categoryColors.Guide}`}>
+                    {t(`category_${categoryKey(post.category)}`)}
                   </span>
-                  <span className="text-xs text-slate-400">{post.date}</span>
+                  <span className="text-xs text-slate-400">{formatBlogDate(post.date, locale)}</span>
                 </div>
                 <h3 className="font-display font-bold text-lg text-slate-900 mb-2 leading-snug group-hover:text-brand-600 transition-colors">
                   {post.title}
                 </h3>
                 <p className="text-sm text-slate-500 leading-relaxed mb-4 line-clamp-3">{post.excerpt}</p>
                 <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="flex items-center gap-1"><Clock size={11} /> {post.readTime}</span>
+                  <span className="flex items-center gap-1"><Clock size={11} /> {t('min_read', { count: post.readMinutes })}</span>
                   <span className="text-brand-600 font-semibold">{t('read_more')} →</span>
                 </div>
               </Link>

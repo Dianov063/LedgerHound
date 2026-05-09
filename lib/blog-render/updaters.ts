@@ -25,7 +25,7 @@ export function updateBlogIndex(source: string, article: BlogArticle): string {
     title: '${escapeStr(article.title)}',
     excerpt: '${escapeStr(article.excerpt)}',
     date: '${escapeStr(article.date)}',
-    readTime: '${escapeStr(article.readTime)}',
+    readMinutes: ${Number(article.readMinutes) || 8},
     featured: true,
   },`;
 

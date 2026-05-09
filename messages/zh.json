@@ -264,7 +264,12 @@
     "title": "洞察与指南",
     "subtitle": "关于加密欺诈、区块链取证和资产恢复的专家分析。",
     "read_more": "阅读文章",
-    "view_all": "查看所有文章"
+    "view_all": "查看所有文章",
+    "category_guide": "指南",
+    "category_case_study": "案例研究",
+    "category_legal": "法律",
+    "category_education": "教育",
+    "min_read": "{count} 分钟阅读"
   },
   "calculator": {
     "badge": "免费工具",

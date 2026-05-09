@@ -11,8 +11,8 @@ export interface BlogArticle {
   // Identifiers
   slug: string;                  // URL slug (kebab-case, no leading slash)
   category: BlogCategory;
-  date: string;                  // "April 5, 2026"
-  readTime: string;              // "8 min read"
+  date: string;                  // ISO YYYY-MM-DD, e.g. "2026-04-05" — localized at render time
+  readMinutes: number;           // integer minutes, e.g. 8 — localized at render time
 
   // SEO metadata
   title: string;                 // <h1>

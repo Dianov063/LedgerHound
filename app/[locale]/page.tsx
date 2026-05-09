@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
 import { getAllBlogPosts } from '@/lib/blog/posts';
+import { formatBlogDate, categoryKey } from '@/lib/blog/format-blog-meta';
 
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
@@ -470,16 +471,16 @@ export default function HomePage() {
               <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="card group hover:border-brand-200">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-100">
-                    {post.category}
+                    {t(`blog.category_${categoryKey(post.category)}`)}
                   </span>
-                  <span className="text-xs text-slate-400">{post.date}</span>
+                  <span className="text-xs text-slate-400">{formatBlogDate(post.date, locale)}</span>
                 </div>
                 <h3 className="font-display font-bold text-slate-900 mb-2 group-hover:text-brand-600 transition-colors leading-snug">
                   {post.title}
                 </h3>
                 <p className="text-sm text-slate-500 leading-relaxed mb-4">{post.excerpt}</p>
                 <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>{post.readTime}</span>
+                  <span>{t('blog.min_read', { count: post.readMinutes })}</span>
                   <span className="text-brand-600 font-semibold group-hover:underline">{t('blog.read_more')}</span>
                 </div>
               </Link>

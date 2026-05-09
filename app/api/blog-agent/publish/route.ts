@@ -31,7 +31,7 @@ function validateArticle(a: BlogArticle, locale: string): string | null {
   if (!a.sources) return `${locale}: missing sources`;
   if (!a.category) return `${locale}: missing category`;
   if (!a.date) return `${locale}: missing date`;
-  if (!a.readTime) return `${locale}: missing readTime`;
+  if (typeof a.readMinutes !== 'number' || a.readMinutes <= 0) return `${locale}: missing or invalid readMinutes`;
   return null;
 }
 

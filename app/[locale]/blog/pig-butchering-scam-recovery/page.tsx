@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import {
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { blogUI, type BlogLocale } from '@/lib/blog-translations';
 import { getRelatedPosts } from '@/lib/blog/get-related-posts';
+import { categoryKey } from '@/lib/blog/format-blog-meta';
 import ContentEn from './content/en';
 import ContentRu from './content/ru';
 import ContentEs from './content/es';
@@ -62,6 +63,7 @@ export default function PigButcheringArticle() {
   const Content = contentByLocale[locale] || ContentEn;
   const [copied, setCopied] = useState(false);
   const relatedPosts = getRelatedPosts(CURRENT_SLUG, locale, 3);
+  const tBlog = useTranslations('blog');
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
   const shareTitle = 'Pig Butchering Scams in 2026: What They Are, How They Work, and What To Do';
@@ -220,14 +222,14 @@ export default function PigButcheringArticle() {
           <div className="grid md:grid-cols-3 gap-5">
             {relatedPosts.map((post) => (
               <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-brand-200 transition-colors group">
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${categoryColors[post.category]}`}>
-                  {post.category}
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${categoryColors[post.category] || categoryColors.Guide}`}>
+                  {tBlog(`category_${categoryKey(post.category)}`)}
                 </span>
                 <h3 className="font-display font-bold text-slate-900 mt-3 mb-2 group-hover:text-brand-600 transition-colors">
                   {post.title}
                 </h3>
                 <span className="text-xs text-slate-400 flex items-center gap-1">
-                  <Clock size={11} /> {post.readTime}
+                  <Clock size={11} /> {tBlog('min_read', { count: post.readMinutes })}
                 </span>
               </Link>
             ))}

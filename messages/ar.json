@@ -264,7 +264,12 @@
     "title": "رؤى وأدلة",
     "subtitle": "تحليل خبير حول احتيال العملات المشفرة والطب الشرعي للبلوكشين واسترداد الأصول.",
     "read_more": "اقرأ المقال",
-    "view_all": "عرض جميع المقالات"
+    "view_all": "عرض جميع المقالات",
+    "category_guide": "دليل",
+    "category_case_study": "دراسة حالة",
+    "category_legal": "قانوني",
+    "category_education": "تعليم",
+    "min_read": "{count} دقيقة قراءة"
   },
   "calculator": {
     "badge": "أداة مجانية",

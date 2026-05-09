@@ -48,20 +48,19 @@ export function renderPageFile(
     })
     .join('\n');
 
-  // Locale-specific titles/categories/readtimes for header rendering
+  // Locale-specific titles for header rendering. readMinutes is a single number
+  // (locale-independent) translated at render time via t('blog.min_read', {count}).
   const titleMap = (['en', 'ru', 'es', 'zh', 'fr', 'ar'] as const)
     .map((loc) => `  ${loc}: '${escapeStr(translations[loc].title)}'`)
     .join(',\n');
 
-  const readTimeMap = (['en', 'ru', 'es', 'zh', 'fr', 'ar'] as const)
-    .map((loc) => `  ${loc}: '${escapeStr(translations[loc].readTime)}'`)
-    .join(',\n');
+  const readMinutes = Number(en.readMinutes) || 8;
 
   return `'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { ArrowRight, Clock, Calendar, User, Tag, ChevronRight, Share2, Link2, Check, Shield } from 'lucide-react';
@@ -87,9 +86,7 @@ const titleByLocale: Record<BlogLocale, string> = {
 ${titleMap},
 };
 
-const readTimeByLocale: Record<BlogLocale, string> = {
-${readTimeMap},
-};
+const READ_MINUTES = ${readMinutes};
 
 const tocItems = [
 ${tocItems},
@@ -112,7 +109,8 @@ export default function ${componentName}() {
   const ui = blogUI[locale] || blogUI.en;
   const Content = contentByLocale[locale] || ContentEn;
   const title = titleByLocale[locale] || titleByLocale.en;
-  const readTime = readTimeByLocale[locale] || readTimeByLocale.en;
+  const tBlog = useTranslations('blog');
+  const readTime = tBlog('min_read', { count: READ_MINUTES });
 
   const [copied, setCopied] = useState(false);
 

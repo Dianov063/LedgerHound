@@ -5,8 +5,8 @@ export interface RelatedPost {
   title: string;
   excerpt: string;
   category: BlogPostMeta['category'];
-  readTime: string;
-  date: string;
+  readMinutes: number;   // localized at render via t('blog.min_read', {count})
+  date: string;          // ISO YYYY-MM-DD, localized at render via Intl.DateTimeFormat
 }
 
 /**
@@ -40,7 +40,7 @@ export function getRelatedPosts(
     title: p.title,
     excerpt: p.excerpt,
     category: p.category,
-    readTime: p.readTime,
+    readMinutes: p.readMinutes,
     date: p.date,
   }));
 }
