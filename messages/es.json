@@ -912,5 +912,135 @@
     "feat_email_desc": "Correo pre-llenado con destinatario correcto",
     "feat_fast": "Generación Instantánea",
     "feat_fast_desc": "Carta profesional en menos de 2 minutos"
+  },
+  "metadata": {
+    "home": {
+      "title": "LedgerHound — Rastreo de Criptoactivos y Análisis Forense Blockchain",
+      "description": "Rastree cripto robado en 14 blockchains. Informes forenses listos para la corte para víctimas de fraude, abogados y empresas. Evaluación gratuita."
+    },
+    "about": {
+      "title": "Acerca de LedgerHound | Expertos en Análisis Forense Blockchain",
+      "description": "Conozca al equipo certificado que rastrea cripto robado en Bitcoin, Ethereum, TRON y 10+ redes. Credenciales CTCE, CFE, CAMS, soporte multilingüe."
+    },
+    "pricing": {
+      "title": "Precios | Rastreo de Cripto e Informes Forenses | LedgerHound",
+      "description": "Precios transparentes para rastreo de cripto e informes forenses listos para la corte. Informes automatizados desde $49. Evaluación gratuita sin compromiso."
+    },
+    "services": {
+      "index": {
+        "title": "Servicios | Análisis Forense Blockchain y Recuperación de Cripto | LedgerHound",
+        "description": "Rastreo de cripto, recuperación de estafas románticas y de matanza de cerdos, descubrimiento de activos en divorcios, fraude corporativo, testigo experto — de investigadores certificados."
+      },
+      "cryptoTracing": {
+        "title": "Servicios de Rastreo de Cripto | Recuperación de Criptomonedas Robadas | LedgerHound",
+        "description": "Rastree cripto robado en Bitcoin, Ethereum, TRON, BNB y 10+ cadenas. Identifique exchanges, mezcladores, rutas de lavado. Informes admisibles en corte."
+      },
+      "romanceScams": {
+        "title": "Recuperación de Estafas Románticas y Matanza de Cerdos | LedgerHound",
+        "description": "¿Perdió dinero en una relación falsa en línea? Rastreamos fondos de matanza de cerdos y estafas románticas, identificamos exchanges y preparamos evidencia para la policía."
+      },
+      "divorceCrypto": {
+        "title": "Cripto Oculto en Divorcios | Análisis Forense para Abogados | LedgerHound",
+        "description": "Descubrimos billeteras de criptomonedas ocultas en casos de divorcio y herencia. Informes admisibles en corte que vinculan a cónyuges con direcciones y saldos específicos."
+      },
+      "litigation": {
+        "title": "Apoyo en Litigios y Testigo Experto | LedgerHound Forensics",
+        "description": "Informes forenses listos para la corte, testimonio de testigo experto y preservación de evidencia para litigios de fraude cripto. Confiado por abogados de EE. UU."
+      },
+      "corporateFraud": {
+        "title": "Investigación de Fraude Corporativo con Cripto | LedgerHound",
+        "description": "Malversación interna, drenaje de tesorería, fraude de proveedores: rastreamos cripto robado de empresas y producimos evidencia para acciones civiles y penales."
+      }
+    },
+    "cases": {
+      "title": "Resultados de Casos | Ejemplos de Recuperación de Cripto | LedgerHound",
+      "description": "Ejemplos reales anonimizados de investigaciones de fraude cripto: matanza de cerdos, exchanges falsos, estafas románticas. Vea cómo el rastreo forense lleva a la recuperación."
+    },
+    "contact": {
+      "title": "Contacte a LedgerHound | Análisis Forense y Recuperación de Cripto",
+      "description": "Póngase en contacto con LedgerHound para rastreo de cripto, recuperación de fraudes o servicios de testigo experto. Respuesta en 24 horas, soporte multilingüe."
+    },
+    "blog": {
+      "index": {
+        "title": "Blog | Análisis Forense de Cripto y Seguridad Blockchain | LedgerHound",
+        "description": "Perspectivas de expertos sobre estafas de criptomonedas, análisis forense blockchain y recuperación de cripto de los investigadores de LedgerHound. Guías prácticas para víctimas."
+      }
+    },
+    "tools": {
+      "walletTracker": {
+        "title": "Rastreador de Billeteras Cripto Gratuito | Consulta Multi-Cadena | LedgerHound",
+        "description": "Rastree cualquier billetera de criptomonedas en Bitcoin, Ethereum, TRON, BNB, Solana y más. Herramienta gratuita de historial de transacciones y saldo."
+      },
+      "graphTracer": {
+        "title": "Rastreador de Gráficos de Transacciones Cripto | Visualización Gratuita | LedgerHound",
+        "description": "Visualice flujos de fondos de criptomonedas como un gráfico interactivo. Rastree cripto robado a través de múltiples billeteras y cadenas. Herramienta forense gratuita."
+      },
+      "recoveryCalculator": {
+        "title": "Calculadora de Recuperación de Cripto | Estime sus Posibilidades | LedgerHound",
+        "description": "Estime la probabilidad de recuperar criptomonedas robadas. Calculadora gratuita basada en tiempo transcurrido, exposición en exchanges y factores del caso."
+      },
+      "scamChecker": {
+        "title": "Verificador de Estafas Cripto | Consulta Gratuita de Billeteras y Plataformas | LedgerHound",
+        "description": "Verifique si una billetera, plataforma o exchange ha sido reportado como estafa. Consulta instantánea gratuita contra la base de datos comunitaria de LedgerHound."
+      },
+      "txLookup": {
+        "title": "Consulta de Transacciones | Decodificador de Hash Multi-Cadena | LedgerHound",
+        "description": "Consulte cualquier transacción de criptomonedas por hash en 14 blockchains. Vea remitente, destinatario, valor y riesgo de contraparte en segundos."
+      },
+      "exchangeLetter": {
+        "title": "Generador de Cartas de Preservación para Exchanges | Gratis para Víctimas | LedgerHound",
+        "description": "Genere cartas de preservación profesionales y solicitudes de congelación para 24+ exchanges de cripto. Herramienta gratuita para víctimas de fraude y abogados."
+      }
+    },
+    "scamDatabase": {
+      "index": {
+        "title": "Base de Datos de Estafas Cripto | Reportes Comunitarios | LedgerHound",
+        "description": "Busque reportes verificados de exchanges de cripto falsos, plataformas de estafa y billeteras fraudulentas. Ayude a otros reportando su propio caso."
+      },
+      "report": {
+        "title": "Reporte una Estafa Cripto | Ayude a Otras Víctimas | LedgerHound",
+        "description": "Reporte un exchange de cripto falso, plataforma de estafa o billetera fraudulenta. Su reporte ayuda a proteger a otros y fortalece los casos de recuperación."
+      }
+    },
+    "report": {
+      "title": "Informe Forense $49 | Análisis Automatizado de Billeteras | LedgerHound",
+      "description": "Informe forense PDF profesional con puntuación de riesgo, análisis de transacciones e identificación de exchanges. Generado en minutos por $49."
+    },
+    "freeEvaluation": {
+      "title": "Evaluación Gratuita de Recuperación de Cripto | LedgerHound Forensics",
+      "description": "Evaluación gratuita en 24 horas de su caso de fraude cripto. Nuestro equipo revisa billetera, transacciones y perspectivas de recuperación — sin compromiso."
+    },
+    "emergency": {
+      "title": "Paquete de Recuperación de Cripto de Emergencia | LedgerHound",
+      "description": "¿Acaba de perder cripto? Genere un reporte policial, cartas de preservación para exchanges y evidencia forense en un solo paquete urgente."
+    },
+    "investigators": {
+      "index": {
+        "title": "Investigadores Certificados de Fraude Cripto | Red LedgerHound",
+        "description": "Red de expertos en análisis forense blockchain certificados CTCE, CFE y CAMS. Cobertura multilingüe en docenas de jurisdicciones."
+      }
+    },
+    "joinNetwork": {
+      "title": "Únase a Nuestra Red de Investigadores | LedgerHound",
+      "description": "¿Es un investigador certificado de fraude cripto? Postule a la red LedgerHound para recibir leads calificados, acceso a herramientas y referencias transparentes."
+    },
+    "legal": {
+      "investigatorAgreement": {
+        "title": "Acuerdo de la Red de Investigadores | LedgerHound",
+        "description": "Términos de la Red de Investigadores LedgerHound: estructura de tarifas de referencia, NDA, código de conducta y marco de responsabilidad."
+      }
+    },
+    "privacy": {
+      "title": "Política de Privacidad | LedgerHound",
+      "description": "Cómo LedgerHound recopila, usa y protege sus datos. Cumplimiento con GDPR y CCPA. Lea nuestro compromiso completo de privacidad."
+    },
+    "terms": {
+      "title": "Términos de Servicio | LedgerHound",
+      "description": "Términos y condiciones para usar los servicios y herramientas de LedgerHound. Lea cuidadosamente antes de realizar un pedido."
+    },
+    "disclaimer": {
+      "title": "Aviso Legal | LedgerHound",
+      "description": "Avisos legales importantes sobre los servicios de LedgerHound, limitaciones de recuperación y relaciones de contratista independiente."
+    }
   }
 }

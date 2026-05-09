@@ -912,5 +912,135 @@
     "feat_email_desc": "Email pré-rempli avec le bon destinataire",
     "feat_fast": "Génération Instantanée",
     "feat_fast_desc": "Lettre professionnelle en moins de 2 minutes"
+  },
+  "metadata": {
+    "home": {
+      "title": "LedgerHound — Traçage d'actifs crypto & Criminalistique blockchain",
+      "description": "Tracez les cryptos volées sur 14 blockchains. Rapports médico-légaux prêts pour le tribunal pour victimes de fraude, avocats et entreprises. Évaluation gratuite."
+    },
+    "about": {
+      "title": "À propos de LedgerHound | Experts en criminalistique blockchain",
+      "description": "Rencontrez l'équipe certifiée qui trace les cryptos volées sur Bitcoin, Ethereum, TRON et 10+ réseaux. Certifications CTCE, CFE, CAMS, support multilingue."
+    },
+    "pricing": {
+      "title": "Tarifs | Traçage crypto & Rapports médico-légaux | LedgerHound",
+      "description": "Tarifs transparents pour le traçage crypto et les rapports médico-légaux prêts pour le tribunal. Rapports automatisés à partir de 49 $. Évaluation gratuite, sans engagement."
+    },
+    "services": {
+      "index": {
+        "title": "Services | Criminalistique blockchain & Récupération crypto | LedgerHound",
+        "description": "Traçage crypto, récupération après arnaque sentimentale et « pig butchering », découverte d'actifs lors d'un divorce, fraude d'entreprise, témoin expert — par des enquêteurs certifiés."
+      },
+      "cryptoTracing": {
+        "title": "Services de traçage crypto | Récupération de cryptomonnaies volées | LedgerHound",
+        "description": "Tracez les cryptos volées sur Bitcoin, Ethereum, TRON, BNB et 10+ chaînes. Identifiez les exchanges, mixers, chemins de blanchiment. Rapports recevables en justice."
+      },
+      "romanceScams": {
+        "title": "Récupération après arnaque sentimentale et pig butchering | LedgerHound",
+        "description": "Vous avez perdu de l'argent dans une fausse relation en ligne ? Nous traçons les fonds des arnaques sentimentales et pig butchering, identifions les exchanges et préparons les preuves pour la police."
+      },
+      "divorceCrypto": {
+        "title": "Crypto cachée lors d'un divorce | Criminalistique pour avocats | LedgerHound",
+        "description": "Nous découvrons les portefeuilles de cryptomonnaies cachés dans les affaires de divorce et de succession. Rapports recevables en justice liant les conjoints à des adresses et soldes spécifiques."
+      },
+      "litigation": {
+        "title": "Soutien aux litiges & Témoin expert | LedgerHound Forensics",
+        "description": "Rapports médico-légaux prêts pour le tribunal, témoignages d'experts et préservation des preuves pour les litiges liés à la fraude crypto. Approuvé par les avocats américains."
+      },
+      "corporateFraud": {
+        "title": "Enquête sur la fraude crypto en entreprise | LedgerHound",
+        "description": "Détournement interne, fuite de trésorerie, fraude fournisseur — nous traçons les cryptos volées de l'entreprise et produisons des preuves pour des actions civiles et pénales."
+      }
+    },
+    "cases": {
+      "title": "Résultats de cas | Exemples de récupération crypto | LedgerHound",
+      "description": "Exemples réels anonymisés d'enquêtes sur la fraude crypto : pig butchering, faux exchanges, arnaques sentimentales. Voyez comment le traçage médico-légal mène à la récupération."
+    },
+    "contact": {
+      "title": "Contactez LedgerHound | Criminalistique & Récupération crypto",
+      "description": "Contactez LedgerHound pour le traçage crypto, la récupération après fraude ou les services de témoin expert. Réponse sous 24h, support multilingue."
+    },
+    "blog": {
+      "index": {
+        "title": "Blog | Criminalistique crypto & Sécurité blockchain | LedgerHound",
+        "description": "Avis d'experts sur les arnaques aux cryptomonnaies, la criminalistique blockchain et la récupération crypto par les enquêteurs de LedgerHound. Guides pratiques pour les victimes."
+      }
+    },
+    "tools": {
+      "walletTracker": {
+        "title": "Traceur de portefeuille crypto gratuit | Recherche multi-chaînes | LedgerHound",
+        "description": "Suivez n'importe quel portefeuille de cryptomonnaie sur Bitcoin, Ethereum, TRON, BNB, Solana et plus. Outil gratuit d'historique des transactions et de solde."
+      },
+      "graphTracer": {
+        "title": "Traceur de graphe de transactions crypto | Visualisation gratuite | LedgerHound",
+        "description": "Visualisez les flux de fonds de cryptomonnaies sous forme de graphe interactif. Tracez les cryptos volées à travers plusieurs portefeuilles et chaînes. Outil médico-légal gratuit."
+      },
+      "recoveryCalculator": {
+        "title": "Calculateur de récupération crypto | Estimez vos chances | LedgerHound",
+        "description": "Estimez la probabilité de récupérer des cryptomonnaies volées. Calculateur gratuit basé sur le temps écoulé, l'exposition aux exchanges et les facteurs du dossier."
+      },
+      "scamChecker": {
+        "title": "Vérificateur d'arnaque crypto | Recherche gratuite de portefeuille et plateforme | LedgerHound",
+        "description": "Vérifiez si un portefeuille, une plateforme ou un exchange a été signalé comme arnaque. Recherche instantanée gratuite dans la base de données communautaire LedgerHound."
+      },
+      "txLookup": {
+        "title": "Recherche de transaction | Décodeur de hachage multi-chaînes | LedgerHound",
+        "description": "Recherchez n'importe quelle transaction de cryptomonnaie par hachage sur 14 blockchains. Voyez l'expéditeur, le destinataire, la valeur et le risque de contrepartie en quelques secondes."
+      },
+      "exchangeLetter": {
+        "title": "Générateur de lettre de préservation d'exchange | Gratuit pour les victimes | LedgerHound",
+        "description": "Générez des lettres de préservation professionnelles et des demandes de gel pour 24+ exchanges crypto. Outil gratuit pour les victimes de fraude et les avocats."
+      }
+    },
+    "scamDatabase": {
+      "index": {
+        "title": "Base de données d'arnaques crypto | Signalements communautaires | LedgerHound",
+        "description": "Recherchez des signalements vérifiés de faux exchanges crypto, plateformes frauduleuses et portefeuilles d'arnaque. Aidez les autres en signalant votre propre cas."
+      },
+      "report": {
+        "title": "Signaler une arnaque crypto | Aidez les autres victimes | LedgerHound",
+        "description": "Signalez un faux exchange crypto, une plateforme frauduleuse ou un portefeuille d'arnaque. Votre signalement aide à protéger les autres et renforce les dossiers de récupération."
+      }
+    },
+    "report": {
+      "title": "Rapport médico-légal 49 $ | Analyse automatisée de portefeuille | LedgerHound",
+      "description": "Rapport PDF médico-légal professionnel avec score de risque, analyse des transactions et identification des exchanges. Généré en quelques minutes pour 49 $."
+    },
+    "freeEvaluation": {
+      "title": "Évaluation gratuite de récupération crypto | LedgerHound Forensics",
+      "description": "Évaluation gratuite de votre dossier de fraude crypto sous 24h. Notre équipe examine le portefeuille, les transactions et les perspectives de récupération — sans engagement."
+    },
+    "emergency": {
+      "title": "Pack de récupération crypto d'urgence | LedgerHound",
+      "description": "Vous venez de perdre des cryptos ? Générez un rapport de police, des lettres de préservation d'exchange et des preuves médico-légales en un seul pack urgent."
+    },
+    "investigators": {
+      "index": {
+        "title": "Enquêteurs certifiés en fraude crypto | Réseau LedgerHound",
+        "description": "Réseau d'experts en criminalistique blockchain certifiés CTCE, CFE et CAMS. Couverture multilingue dans des dizaines de juridictions."
+      }
+    },
+    "joinNetwork": {
+      "title": "Rejoignez notre réseau d'enquêteurs | LedgerHound",
+      "description": "Vous êtes un enquêteur certifié en fraude crypto ? Postulez au réseau LedgerHound pour des leads qualifiés, un accès aux outils et des références transparentes."
+    },
+    "legal": {
+      "investigatorAgreement": {
+        "title": "Accord du réseau d'enquêteurs | LedgerHound",
+        "description": "Conditions du réseau d'enquêteurs LedgerHound — structure des frais de référence, NDA, code de conduite et cadre de responsabilité."
+      }
+    },
+    "privacy": {
+      "title": "Politique de confidentialité | LedgerHound",
+      "description": "Comment LedgerHound collecte, utilise et protège vos données. Conforme au RGPD et au CCPA. Lisez notre engagement complet en matière de confidentialité."
+    },
+    "terms": {
+      "title": "Conditions d'utilisation | LedgerHound",
+      "description": "Conditions générales d'utilisation des services et outils LedgerHound. Lisez attentivement avant de passer une commande."
+    },
+    "disclaimer": {
+      "title": "Avertissement | LedgerHound",
+      "description": "Avertissements juridiques importants concernant les services LedgerHound, les limites de récupération et les relations de sous-traitance indépendante."
+    }
   }
 }

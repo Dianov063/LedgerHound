@@ -912,5 +912,135 @@
     "feat_email_desc": "预填正确收件人的邮件",
     "feat_fast": "即时生成",
     "feat_fast_desc": "2分钟内获得专业信函"
+  },
+  "metadata": {
+    "home": {
+      "title": "LedgerHound — 加密资产追踪与区块链取证",
+      "description": "跨14条区块链追踪被盗加密货币。为欺诈受害者、律师和企业提供法庭认可的取证报告。免费案件评估。"
+    },
+    "about": {
+      "title": "关于 LedgerHound | 区块链取证专家",
+      "description": "认识我们的认证团队，在比特币、以太坊、TRON 等10多个网络上追踪被盗加密货币。持有 CTCE、CFE、CAMS 认证，提供多语言支持。"
+    },
+    "pricing": {
+      "title": "定价 | 加密货币追踪与取证报告 | LedgerHound",
+      "description": "透明的加密货币追踪和法庭认可取证报告定价。自动报告起价 $49。免费案件评估，无义务。"
+    },
+    "services": {
+      "index": {
+        "title": "服务 | 区块链取证与加密货币追回 | LedgerHound",
+        "description": "加密货币追踪、浪漫骗局和杀猪盘追回、离婚资产发现、企业欺诈、专家证人——由认证调查员提供。"
+      },
+      "cryptoTracing": {
+        "title": "加密货币追踪服务 | 被盗加密货币追回 | LedgerHound",
+        "description": "跨比特币、以太坊、TRON、BNB 等10多条链追踪被盗加密货币。识别交易所、混币器、洗钱路径。法庭可采纳报告。"
+      },
+      "romanceScams": {
+        "title": "浪漫骗局与杀猪盘追回 | LedgerHound",
+        "description": "因虚假网恋损失资金？我们追踪杀猪盘和浪漫骗局资金，识别交易所，并为警方准备证据。"
+      },
+      "divorceCrypto": {
+        "title": "离婚中的隐藏加密货币 | 律师取证 | LedgerHound",
+        "description": "我们在离婚和遗产案件中揭露隐藏的加密货币钱包。法庭可采纳报告，将配偶与特定地址和余额关联。"
+      },
+      "litigation": {
+        "title": "诉讼支持与专家证人 | LedgerHound 取证",
+        "description": "为加密货币欺诈诉讼提供法庭认可的取证报告、专家证人证词和证据保全。受美国律师信赖。"
+      },
+      "corporateFraud": {
+        "title": "企业加密货币欺诈调查 | LedgerHound",
+        "description": "内部贪污、资金流失、供应商欺诈——我们追踪被盗的公司加密货币，并为民事和刑事诉讼提供证据。"
+      }
+    },
+    "cases": {
+      "title": "案例结果 | 加密货币追回示例 | LedgerHound",
+      "description": "真实的匿名加密货币欺诈调查案例：杀猪盘、虚假交易所、浪漫骗局。了解取证追踪如何促成追回。"
+    },
+    "contact": {
+      "title": "联系 LedgerHound | 加密货币取证与追回",
+      "description": "联系 LedgerHound 获取加密货币追踪、欺诈追回或专家证人服务。24小时响应，多语言支持。"
+    },
+    "blog": {
+      "index": {
+        "title": "博客 | 加密货币取证与区块链安全 | LedgerHound",
+        "description": "来自 LedgerHound 调查员的加密货币骗局、区块链取证和追回专家见解。为受害者提供实用指南。"
+      }
+    },
+    "tools": {
+      "walletTracker": {
+        "title": "免费加密货币钱包追踪器 | 多链查询 | LedgerHound",
+        "description": "跨比特币、以太坊、TRON、BNB、Solana 等追踪任何加密货币钱包。免费交易历史和余额工具。"
+      },
+      "graphTracer": {
+        "title": "加密货币交易图追踪器 | 免费可视化 | LedgerHound",
+        "description": "以交互式图表可视化加密货币资金流动。通过多个钱包和链追踪被盗加密货币。免费取证工具。"
+      },
+      "recoveryCalculator": {
+        "title": "加密货币追回计算器 | 评估您的机会 | LedgerHound",
+        "description": "评估追回被盗加密货币的可能性。基于时间流逝、交易所暴露和案件因素的免费计算器。"
+      },
+      "scamChecker": {
+        "title": "加密货币骗局检查器 | 免费钱包与平台查询 | LedgerHound",
+        "description": "检查钱包、平台或交易所是否被报告为骗局。针对 LedgerHound 社区数据库的免费即时查询。"
+      },
+      "txLookup": {
+        "title": "交易查询 | 多链哈希解码器 | LedgerHound",
+        "description": "跨14条区块链通过哈希查询任何加密货币交易。秒级查看发送方、接收方、价值和对手方风险。"
+      },
+      "exchangeLetter": {
+        "title": "交易所保全函生成器 | 受害者免费 | LedgerHound",
+        "description": "为24+加密货币交易所生成专业的保全函和冻结请求。受害者和律师的免费工具。"
+      }
+    },
+    "scamDatabase": {
+      "index": {
+        "title": "加密货币骗局数据库 | 社区报告 | LedgerHound",
+        "description": "搜索经过验证的虚假加密货币交易所、骗局平台和欺诈钱包报告。通过报告自己的案例帮助他人。"
+      },
+      "report": {
+        "title": "举报加密货币骗局 | 帮助其他受害者 | LedgerHound",
+        "description": "举报虚假加密货币交易所、骗局平台或欺诈钱包。您的报告有助于保护他人并加强追回案件。"
+      }
+    },
+    "report": {
+      "title": "取证报告 $49 | 自动钱包分析 | LedgerHound",
+      "description": "专业取证 PDF 报告，包含风险评分、交易分析和交易所识别。几分钟内生成，仅需 $49。"
+    },
+    "freeEvaluation": {
+      "title": "免费加密货币追回评估 | LedgerHound 取证",
+      "description": "24小时内免费评估您的加密货币欺诈案件。我们的团队审查钱包、交易和追回前景——无义务。"
+    },
+    "emergency": {
+      "title": "紧急加密货币追回包 | LedgerHound",
+      "description": "刚损失加密货币？在一个紧急包中生成警方报告、交易所保全函和取证证据。"
+    },
+    "investigators": {
+      "index": {
+        "title": "认证加密货币欺诈调查员 | LedgerHound 网络",
+        "description": "由 CTCE、CFE 和 CAMS 认证的区块链取证专家组成的网络。覆盖多个司法管辖区的多语言支持。"
+      }
+    },
+    "joinNetwork": {
+      "title": "加入我们的调查员网络 | LedgerHound",
+      "description": "您是认证的加密货币欺诈调查员吗？申请加入 LedgerHound 网络，获取合格线索、工具访问和透明推荐。"
+    },
+    "legal": {
+      "investigatorAgreement": {
+        "title": "调查员网络协议 | LedgerHound",
+        "description": "LedgerHound 调查员网络条款——推荐费结构、保密协议、行为准则和责任框架。"
+      }
+    },
+    "privacy": {
+      "title": "隐私政策 | LedgerHound",
+      "description": "LedgerHound 如何收集、使用和保护您的数据。符合 GDPR 和 CCPA。阅读我们的完整隐私承诺。"
+    },
+    "terms": {
+      "title": "服务条款 | LedgerHound",
+      "description": "使用 LedgerHound 服务和工具的条款和条件。下单前请仔细阅读。"
+    },
+    "disclaimer": {
+      "title": "免责声明 | LedgerHound",
+      "description": "关于 LedgerHound 服务、追回限制和独立承包商关系的重要法律免责声明。"
+    }
   }
 }
