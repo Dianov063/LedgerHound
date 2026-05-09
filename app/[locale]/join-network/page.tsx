@@ -237,7 +237,7 @@ export default function JoinNetworkPage() {
       <Navbar />
 
       {/* Hero */}
-      <section className="pt-28 pb-12 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white">
+      <section className="pt-32 pb-12 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold mb-5">
             <Users size={12} />

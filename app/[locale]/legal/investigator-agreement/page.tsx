@@ -10,7 +10,7 @@ export default function InvestigatorAgreementPage() {
   return (
     <>
       <Navbar />
-      <article className="pt-28 pb-16 bg-white">
+      <article className="pt-32 pb-16 bg-white">
         <div className="max-w-3xl mx-auto px-4">
           <h1 className="font-display font-bold text-3xl text-slate-900 mb-3">Investigator Network Agreement</h1>
           <p className="text-xs text-slate-400 mb-8">Effective: April 28, 2026 · Last updated: April 28, 2026</p>

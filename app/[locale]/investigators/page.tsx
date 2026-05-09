@@ -110,7 +110,7 @@ export default function InvestigatorsPage() {
       <Navbar />
 
       {/* Hero */}
-      <section className="pt-28 pb-12 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white">
+      <section className="pt-32 pb-12 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold mb-5">

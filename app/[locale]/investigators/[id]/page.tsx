@@ -134,7 +134,7 @@ export default function InvestigatorProfilePage() {
       <Navbar />
 
       {/* Hero */}
-      <section className="pt-28 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+      <section className="pt-32 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-4">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-6">

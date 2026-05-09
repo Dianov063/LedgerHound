@@ -137,7 +137,7 @@ function ScamCheckerInner() {
       <Navbar />
 
       {/* Hero */}
-      <div className="pt-28 pb-8 md:pt-32 md:pb-12">
+      <div className="pt-32 pb-8 md:pt-32 md:pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 text-brand-700 rounded-full text-sm font-medium mb-6">
             <ShieldCheck size={14} />

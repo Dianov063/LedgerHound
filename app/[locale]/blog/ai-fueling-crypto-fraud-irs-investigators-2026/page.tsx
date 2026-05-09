@@ -98,7 +98,7 @@ export default function AiFuelingCryptoFraudIrsInvestigators2026Article() {
   return (
     <>
       <Navbar />
-      <article className="pt-28 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+      <article className="pt-32 pb-12 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
         <div className="max-w-4xl mx-auto px-4">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-6">

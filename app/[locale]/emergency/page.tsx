@@ -385,7 +385,7 @@ export default function EmergencyPage() {
     <div className="min-h-screen">
       <Navbar />
 
-      <div className="pt-28 pb-20">
+      <div className="pt-32 pb-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* progress bar — hidden on step 1 landing */}
           {step > 1 && (

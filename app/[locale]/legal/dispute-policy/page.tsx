@@ -12,7 +12,7 @@ export default function DisputePolicyPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-4 pt-28 pb-20">
+      <div className="max-w-4xl mx-auto px-4 pt-32 pb-20">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-600/20 rounded-2xl mb-4">

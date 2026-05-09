@@ -162,7 +162,7 @@ export default function DisputePage() {
     return (
       <div className="min-h-screen bg-slate-950">
         <Navbar />
-        <div className="max-w-2xl mx-auto px-4 pt-28 pb-20">
+        <div className="max-w-2xl mx-auto px-4 pt-32 pb-20">
           <div className="bg-emerald-950/30 border border-emerald-800 rounded-2xl p-10 text-center">
             <CheckCircle2 size={48} className="text-emerald-400 mx-auto mb-4" />
             <h1 className="font-display font-bold text-2xl text-white mb-3">Dispute Submitted</h1>
@@ -196,7 +196,7 @@ export default function DisputePage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 pt-28 pb-20">
+      <div className="max-w-3xl mx-auto px-4 pt-32 pb-20">
         {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-600/20 rounded-2xl mb-4">
