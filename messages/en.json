@@ -1188,5 +1188,20 @@
       "button_evaluation": "Free Evaluation",
       "button_attorney": "Attorney Inquiry"
     }
+  },
+  "hero_workflow": {
+    "label": "Live Case Workflow",
+    "step1_title": "Wallet Address Submitted",
+    "step1_desc": "Client provides tx hash & timeline",
+    "step2_title": "Blockchain Analysis Started",
+    "step2_desc": "Mapping fund flow across 10+ chains",
+    "step3_title": "Exchange Identified",
+    "step3_desc": "KYC-compliant VASP located",
+    "step4_title": "Court-Ready Report",
+    "step4_desc": "Evidence package for attorney / law enforcement",
+    "result_title": "Funds Located · Exchange Identified",
+    "result_desc": "Attorney filed freezing injunction within 72 hours",
+    "badge_certified": "CTCE Certified",
+    "badge_speed": "48–72h Report"
   }
 }

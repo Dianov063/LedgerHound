@@ -102,14 +102,14 @@ export default function HomePage() {
             <div className="relative">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-xl p-6">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">
-                  Live Case Workflow
+                  {t('hero_workflow.label')}
                 </p>
                 <div className="space-y-0 divide-y divide-slate-50">
                   {[
-                    { n: '01', title: 'Wallet Address Submitted', sub: 'Client provides tx hash & timeline' },
-                    { n: '02', title: 'Blockchain Analysis Started', sub: 'Mapping fund flow across 10+ chains' },
-                    { n: '03', title: 'Exchange Identified', sub: 'KYC-compliant VASP located' },
-                    { n: '04', title: 'Court-Ready Report', sub: 'Evidence package for attorney / law enforcement' },
+                    { n: '01', title: t('hero_workflow.step1_title'), sub: t('hero_workflow.step1_desc') },
+                    { n: '02', title: t('hero_workflow.step2_title'), sub: t('hero_workflow.step2_desc') },
+                    { n: '03', title: t('hero_workflow.step3_title'), sub: t('hero_workflow.step3_desc') },
+                    { n: '04', title: t('hero_workflow.step4_title'), sub: t('hero_workflow.step4_desc') },
                   ].map((step) => (
                     <div key={step.n} className="flex items-start gap-4 py-4">
                       <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
@@ -127,8 +127,8 @@ export default function HomePage() {
                     <CheckCircle2 size={18} className="text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-emerald-800">Funds Located · Exchange Identified</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Attorney filed freezing injunction within 72 hours</p>
+                    <p className="text-sm font-semibold text-emerald-800">{t('hero_workflow.result_title')}</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">{t('hero_workflow.result_desc')}</p>
                   </div>
                 </div>
               </div>
@@ -136,10 +136,10 @@ export default function HomePage() {
               {/* Floating badges */}
               <div className="absolute -top-4 -right-4 bg-white border border-slate-100 shadow-lg rounded-xl px-3 py-2 flex items-center gap-2">
                 <Star size={13} className="text-amber-500 fill-amber-500" />
-                <span className="text-xs font-semibold text-slate-700">CTCE Certified</span>
+                <span className="text-xs font-semibold text-slate-700">{t('hero_workflow.badge_certified')}</span>
               </div>
               <div className="absolute -bottom-4 -left-4 bg-brand-600 text-white shadow-lg rounded-xl px-3 py-2">
-                <p className="text-xs font-semibold">48–72h Report</p>
+                <p className="text-xs font-semibold">{t('hero_workflow.badge_speed')}</p>
               </div>
             </div>
           </div>

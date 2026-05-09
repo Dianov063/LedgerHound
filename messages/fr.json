@@ -1188,5 +1188,20 @@
       "button_evaluation": "Évaluation gratuite",
       "button_attorney": "Demande d'avocat"
     }
+  },
+  "hero_workflow": {
+    "label": "Flux de travail en direct",
+    "step1_title": "Adresse de portefeuille soumise",
+    "step1_desc": "Le client fournit le tx hash et le calendrier",
+    "step2_title": "Analyse blockchain démarrée",
+    "step2_desc": "Cartographie des flux de fonds sur 10+ chaînes",
+    "step3_title": "Échange identifié",
+    "step3_desc": "VASP conforme KYC localisé",
+    "step4_title": "Rapport prêt pour le tribunal",
+    "step4_desc": "Dossier de preuves pour avocat / forces de l'ordre",
+    "result_title": "Fonds localisés · Échange identifié",
+    "result_desc": "L'avocat a déposé une injonction de gel dans les 72 heures",
+    "badge_certified": "Certifié CTCE",
+    "badge_speed": "Rapport en 48–72h"
   }
 }

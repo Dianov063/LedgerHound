@@ -1188,5 +1188,20 @@
       "button_evaluation": "Evaluación Gratuita",
       "button_attorney": "Consulta para Abogados"
     }
+  },
+  "hero_workflow": {
+    "label": "Flujo de Trabajo de Caso en Vivo",
+    "step1_title": "Dirección de Billetera Enviada",
+    "step1_desc": "El cliente proporciona el hash de la transacción y la línea de tiempo",
+    "step2_title": "Análisis de Blockchain Iniciado",
+    "step2_desc": "Mapeo del flujo de fondos en más de 10 cadenas",
+    "step3_title": "Exchange Identificado",
+    "step3_desc": "VASP compatible con KYC localizado",
+    "step4_title": "Informe Listo para la Corte",
+    "step4_desc": "Paquete de evidencia para abogado / autoridades",
+    "result_title": "Fondos Localizados · Exchange Identificado",
+    "result_desc": "El abogado presentó una orden de congelación en 72 horas",
+    "badge_certified": "Certificado CTCE",
+    "badge_speed": "Informe en 48–72h"
   }
 }

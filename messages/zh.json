@@ -1188,5 +1188,20 @@
       "button_evaluation": "免费评估",
       "button_attorney": "律师咨询"
     }
+  },
+  "hero_workflow": {
+    "label": "实时案件工作流",
+    "step1_title": "钱包地址已提交",
+    "step1_desc": "客户提供交易哈希和时间线",
+    "step2_title": "区块链分析已启动",
+    "step2_desc": "跨10+条链追踪资金流向",
+    "step3_title": "交易所已识别",
+    "step3_desc": "已定位符合KYC的VASP",
+    "step4_title": "法庭就绪报告",
+    "step4_desc": "为律师/执法部门准备的证据包",
+    "result_title": "资金已定位 · 交易所已识别",
+    "result_desc": "律师在72小时内提交冻结令",
+    "badge_certified": "CTCE认证",
+    "badge_speed": "48–72小时报告"
   }
 }
