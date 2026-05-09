@@ -1042,5 +1042,151 @@
       "title": "Aviso Legal | LedgerHound",
       "description": "Avisos legales importantes sobre los servicios de LedgerHound, limitaciones de recuperación y relaciones de contratista independiente."
     }
+  },
+  "about_page": {
+    "hero": {
+      "tag": "Acerca de LedgerHound",
+      "title_line1": "Investigadores Certificados.",
+      "title_line2": "Resultados Reales.",
+      "subtitle": "LedgerHound es una firma de análisis forense de blockchain que brinda capacidades de investigación certificadas a víctimas de fraude, abogados y empresas que necesitan rastrear, documentar y actuar sobre criptomonedas malversadas."
+    },
+    "mission": {
+      "tag": "Nuestra Misión",
+      "title": "Por Qué Creamos LedgerHound",
+      "p1": "El fraude con criptomonedas cuesta a las víctimas miles de millones de dólares cada año. Sin embargo, la mayoría de las personas que pierden fondos no tienen a dónde recurrir: las fuerzas del orden están desbordadas, las empresas existentes son caras y opacas, y las víctimas a menudo no saben por dónde empezar.",
+      "p2": "Creamos LedgerHound para cambiar eso. Creemos que toda víctima merece respuestas honestas: ¿Se pueden rastrear mis fondos? ¿Qué evidencia podemos construir? ¿Cuánto costará? ¿Cuáles son los resultados realistas?",
+      "p3": "Nuestro equipo combina experiencia en análisis forense de blockchain con un compromiso con la transparencia: publicamos nuestros precios, ofrecemos evaluaciones gratuitas y atendemos a clientes en seis idiomas, incluido el ruso, el idioma nativo de un gran segmento de víctimas de fraude cripto en EE. UU."
+    },
+    "stats": {
+      "delivery_value": "48h",
+      "delivery_label": "Entrega promedio de informes",
+      "chains_value": "10+",
+      "chains_label": "Blockchains cubiertas",
+      "languages_value": "6",
+      "languages_label": "Idiomas atendidos",
+      "court_value": "100%",
+      "court_label": "Informes listos para tribunales"
+    },
+    "values": {
+      "tag": "Nuestros Valores",
+      "title": "Cómo Trabajamos",
+      "integrity_title": "Integridad Primero",
+      "integrity_desc": "Brindamos evaluaciones honestas. Si no podemos ayudar, lo decimos de inmediato, antes de que gaste un dólar.",
+      "certified_title": "Excelencia Certificada",
+      "certified_desc": "Cada investigación está liderada por profesionales certificados CTCE y CFE que utilizan herramientas estándar de la industria.",
+      "client_title": "Centrado en el Cliente",
+      "client_desc": "Explicamos todo en lenguaje sencillo. Sin jerga, sin misterio: solo comunicación clara durante todo el proceso.",
+      "multilingual_title": "Equipo Multilingüe",
+      "multilingual_desc": "Atendemos a clientes en inglés, ruso, español, chino, francés y árabe, sin necesidad de traductores."
+    },
+    "credentials": {
+      "tag": "Credenciales",
+      "title": "Certificaciones que Poseemos",
+      "issued_by": "Emitido por",
+      "ctce_full": "Examinador Certificado en Rastreo de Criptomonedas",
+      "cfe_full": "Examinador de Fraude Certificado",
+      "cci_full": "Investigador de Criptomonedas Certificado"
+    },
+    "tech": {
+      "tag": "Tecnología",
+      "title": "Herramientas que Usamos",
+      "note_label": "Nota:",
+      "note_text": "Usamos herramientas profesionales estándar de la industria. Nuestros informes se generan utilizando datos de inteligencia de blockchain admisibles en tribunales, no herramientas gratuitas para consumidores."
+    },
+    "corporate": {
+      "tag": "Entidad Legal",
+      "title": "Información Corporativa",
+      "company_label": "Empresa",
+      "ein_label": "EIN",
+      "state_label": "Estado de Constitución",
+      "dos_label": "ID DOS",
+      "website_label": "Sitio web",
+      "contact_label": "Contacto",
+      "description": "LedgerHound es una marca registrada que opera bajo USPROJECT LLC, una compañía de responsabilidad limitada de Nueva York. Todas las investigaciones forenses son realizadas por profesionales certificados que operan bajo la ley estadounidense aplicable y los estándares profesionales.",
+      "not_law_firm": "No es un bufete de abogados. No proporcionamos asesoramiento legal. Solo servicios de investigación forense."
+    },
+    "cta": {
+      "title": "¿Listo para trabajar con nosotros?",
+      "subtitle": "Comience con una evaluación de caso gratuita y confidencial. Respondemos dentro de las 24 horas.",
+      "button": "Obtener Evaluación Gratuita"
+    }
+  },
+  "pricing_page": {
+    "best_for": {
+      "basic": "Ideal para: Una sola estafa, una blockchain",
+      "full": "Ideal para: Estafas románticas, divorcios, litigios",
+      "expert": "Ideal para: Abogados y procedimientos legales"
+    },
+    "not_sure": {
+      "title": "¿No está seguro de qué paquete necesita?",
+      "body": "Comience con nuestra evaluación gratuita. Evaluaremos su caso y recomendaremos el servicio adecuado, sin presión.",
+      "link": "Obtener evaluación gratuita →"
+    },
+    "all_plans": {
+      "title": "Todos los Planes Incluyen",
+      "confidential_title": "Investigación Confidencial",
+      "confidential_desc": "Los detalles de su caso son estrictamente confidenciales.",
+      "certified_title": "Investigadores Certificados",
+      "certified_desc": "Profesionales certificados CTCE y CFE en cada caso.",
+      "fast_title": "Entrega Rápida",
+      "fast_desc": "48–72 horas para la mayoría de las investigaciones.",
+      "attorney_title": "Colaboración con Abogados",
+      "attorney_desc": "Trabajamos directamente con su equipo legal."
+    },
+    "faq": {
+      "title": "Preguntas sobre Precios",
+      "q1": "¿Cobran por adelantado?",
+      "a1": "La evaluación inicial del caso es completamente gratuita. Si decide proceder con una investigación, requerimos el 50% por adelantado y el 50% al entregar el informe.",
+      "q2": "¿Qué pasa si mi caso es más complejo de lo esperado?",
+      "a2": "Evaluamos la complejidad durante la evaluación gratuita y cotizamos en consecuencia. Si surge una complejidad imprevista durante la investigación, discutimos los cambios de alcance de manera transparente antes de continuar.",
+      "q3": "¿Ofrecen acuerdos de contingencia?",
+      "a3": "Para ciertos casos que involucran activos recuperables significativos, discutimos acuerdos de contingencia o tarifas por éxito. Contáctenos para hablar sobre su situación específica.",
+      "q4": "¿Cuál es su política de reembolso?",
+      "a4": "Si determinamos que los fondos no son rastreables durante la investigación, proporcionamos un reembolso parcial del trabajo no completado. Somos transparentes al respecto desde el principio.",
+      "q5": "¿Cómo aceptan el pago?",
+      "a5": "Aceptamos transferencias bancarias, tarjetas de crédito y criptomonedas. Para casos sensibles, podemos discutir arreglos alternativos.",
+      "q6": "¿Ofrecen descuentos para abogados o bufetes?",
+      "a6": "Sí, ofrecemos precios por volumen para bufetes de abogados y abogados que refieran múltiples casos. Contáctenos para discutir un acuerdo de asociación."
+    }
+  },
+  "services_divorce_page": {
+    "breadcrumb": {
+      "home": "Inicio",
+      "services": "Servicios",
+      "current": "Divorcio y Cripto"
+    },
+    "hero": {
+      "badge": "Derecho de Familia · Sucesiones y Herencias",
+      "title_line1": "Criptomonedas en",
+      "title_line2": "Divorcios y Herencias",
+      "subtitle": "Los activos cripto ocultos son cada vez más comunes en procedimientos de divorcio y disputas sucesorias. Nuestro análisis forense de blockchain descubre lo que su cónyuge o beneficiario afirma que no existe.",
+      "cta": "Iniciar Evaluación Gratuita"
+    },
+    "scenarios": {
+      "tag": "Cómo Ayudamos",
+      "title": "Análisis Forense de Cripto para Derecho de Familia",
+      "hidden_title": "Descubrimiento de Billeteras Ocultas",
+      "hidden_desc": "Su cónyuge afirma que no tiene cripto, o que se perdió. Analizamos la blockchain para encontrar billeteras vinculadas a sus direcciones conocidas.",
+      "valuation_title": "Valoración de Activos",
+      "valuation_desc": "Identificamos todas las tenencias de criptomonedas, incluyendo recompensas de staking, posiciones DeFi y NFT, y documentamos su valor para el tribunal.",
+      "transfer_title": "Rastreo de Transferencias",
+      "transfer_desc": "¿Su cónyuge movió fondos antes o durante el proceso? Rastreamos las transferencias y establecemos cuándo y dónde se movieron los activos.",
+      "historical_title": "Documentación Histórica",
+      "historical_desc": "Recopilamos un registro cronológico completo de toda la actividad de criptomonedas, esencial para establecer el patrimonio conyugal."
+    },
+    "deliverables": {
+      "title": "Lo Que Entregamos a los Abogados",
+      "item1": "Informe forense admisible en tribunales con documentación de metodología",
+      "item2": "Lista completa de direcciones de criptomonedas identificadas y saldos",
+      "item3": "Historial de transacciones con marcas de tiempo y valores en USD al momento de la transferencia",
+      "item4": "Disponibilidad como testigo experto para declaraciones y juicio",
+      "item5": "Colaboración continua con su equipo legal durante todo el proceso"
+    },
+    "cta": {
+      "title": "¿Trabajando en un caso de divorcio o herencia?",
+      "subtitle": "Consultas de abogados bienvenidas. Respondemos dentro de las 24 horas y ofrecemos precios por volumen para bufetes.",
+      "button_evaluation": "Evaluación Gratuita",
+      "button_attorney": "Consulta para Abogados"
+    }
   }
 }

@@ -1042,5 +1042,151 @@
       "title": "Avertissement | LedgerHound",
       "description": "Avertissements juridiques importants concernant les services LedgerHound, les limites de récupération et les relations de sous-traitance indépendante."
     }
+  },
+  "about_page": {
+    "hero": {
+      "tag": "À propos de LedgerHound",
+      "title_line1": "Enquêteurs certifiés.",
+      "title_line2": "Résultats concrets.",
+      "subtitle": "LedgerHound est un cabinet de criminalistique blockchain qui propose des capacités d'enquête certifiées aux victimes de fraude, aux avocats et aux entreprises qui doivent tracer, documenter et agir sur les cryptomonnaies détournées."
+    },
+    "mission": {
+      "tag": "Notre mission",
+      "title": "Pourquoi nous avons créé LedgerHound",
+      "p1": "La fraude aux cryptomonnaies coûte chaque année des milliards de dollars aux victimes. Pourtant, la plupart des personnes qui perdent des fonds ne savent pas vers qui se tourner — les forces de l'ordre sont débordées, les cabinets existants sont chers et opaques, et les victimes ne savent souvent pas par où commencer.",
+      "p2": "Nous avons créé LedgerHound pour changer cela. Nous croyons que chaque victime mérite des réponses honnêtes : mes fonds peuvent-ils être tracés ? Quelles preuves pouvons-nous constituer ? Combien cela coûtera-t-il ? Quels sont les résultats réalistes ?",
+      "p3": "Notre équipe combine une expertise en criminalistique blockchain avec un engagement en faveur de la transparence — publication de nos prix, évaluations gratuites, et service aux clients en six langues, dont le russe, la langue maternelle d'une grande partie des victimes de fraude crypto aux États-Unis."
+    },
+    "stats": {
+      "delivery_value": "48h",
+      "delivery_label": "Délai moyen de livraison du rapport",
+      "chains_value": "10+",
+      "chains_label": "Blockchains couvertes",
+      "languages_value": "6",
+      "languages_label": "Langues disponibles",
+      "court_value": "100%",
+      "court_label": "Rapports recevables en justice"
+    },
+    "values": {
+      "tag": "Nos valeurs",
+      "title": "Notre façon de travailler",
+      "integrity_title": "L'intégrité avant tout",
+      "integrity_desc": "Nous fournissons des évaluations honnêtes. Si nous ne pouvons pas vous aider, nous le disons d'emblée, avant que vous ne dépensiez un centime.",
+      "certified_title": "Excellence certifiée",
+      "certified_desc": "Chaque enquête est dirigée par des professionnels certifiés CTCE et CFE utilisant des outils standard de l'industrie.",
+      "client_title": "Centré sur le client",
+      "client_desc": "Nous expliquons tout en langage clair. Pas de jargon, pas de mystère — juste une communication claire tout au long du processus.",
+      "multilingual_title": "Équipe multilingue",
+      "multilingual_desc": "Nous servons nos clients en anglais, russe, espagnol, chinois, français et arabe — pas besoin de traducteurs."
+    },
+    "credentials": {
+      "tag": "Certifications",
+      "title": "Nos certifications",
+      "issued_by": "Délivré par",
+      "ctce_full": "Cryptocurrency Tracing Certified Examiner",
+      "cfe_full": "Certified Fraud Examiner",
+      "cci_full": "Certified Cryptocurrency Investigator"
+    },
+    "tech": {
+      "tag": "Technologie",
+      "title": "Outils que nous utilisons",
+      "note_label": "Remarque :",
+      "note_text": "Nous utilisons des outils professionnels standard de l'industrie. Nos rapports sont générés à partir de données d'intelligence blockchain recevables en justice — pas d'outils grand public gratuits."
+    },
+    "corporate": {
+      "tag": "Entité juridique",
+      "title": "Informations corporatives",
+      "company_label": "Société",
+      "ein_label": "EIN",
+      "state_label": "État de constitution",
+      "dos_label": "DOS ID",
+      "website_label": "Site web",
+      "contact_label": "Contact",
+      "description": "LedgerHound est une marque déposée opérant sous USPROJECT LLC, une société à responsabilité limitée de New York. Toutes les enquêtes criminalistiques sont menées par des professionnels certifiés agissant conformément au droit américain et aux normes professionnelles applicables.",
+      "not_law_firm": "Ce n'est pas un cabinet d'avocats. Nous ne fournissons pas de conseils juridiques. Services d'enquête criminalistique uniquement."
+    },
+    "cta": {
+      "title": "Prêt à travailler avec nous ?",
+      "subtitle": "Commencez par une évaluation gratuite et confidentielle de votre dossier. Nous répondons sous 24 heures.",
+      "button": "Obtenir une évaluation gratuite"
+    }
+  },
+  "pricing_page": {
+    "best_for": {
+      "basic": "Idéal pour : Arnaque unique, une blockchain",
+      "full": "Idéal pour : Arnaques sentimentales, divorce, litige",
+      "expert": "Idéal pour : Avocats et procédures judiciaires"
+    },
+    "not_sure": {
+      "title": "Vous ne savez pas quel forfait vous convient ?",
+      "body": "Commencez par notre évaluation gratuite. Nous évaluerons votre dossier et vous recommanderons le service adapté — sans pression.",
+      "link": "Obtenir une évaluation gratuite →"
+    },
+    "all_plans": {
+      "title": "Tous les forfaits incluent",
+      "confidential_title": "Enquête confidentielle",
+      "confidential_desc": "Les détails de votre dossier sont strictement confidentiels.",
+      "certified_title": "Enquêteurs certifiés",
+      "certified_desc": "Des professionnels certifiés CTCE et CFE sur chaque dossier.",
+      "fast_title": "Délais rapides",
+      "fast_desc": "48 à 72 heures pour la plupart des enquêtes.",
+      "attorney_title": "Collaboration avec les avocats",
+      "attorney_desc": "Nous travaillons directement avec votre équipe juridique."
+    },
+    "faq": {
+      "title": "Questions sur les tarifs",
+      "q1": "Facturez-vous un acompte ?",
+      "a1": "L'évaluation initiale du dossier est entièrement gratuite. Si vous décidez de poursuivre avec une enquête, nous demandons 50 % d'acompte et 50 % à la livraison du rapport.",
+      "q2": "Que se passe-t-il si mon dossier est plus complexe que prévu ?",
+      "a2": "Nous évaluons la complexité lors de l'évaluation gratuite et établissons un devis en conséquence. Si une complexité imprévue survient en cours d'enquête, nous discutons des changements de périmètre de manière transparente avant de procéder.",
+      "q3": "Proposez-vous des arrangements de type « succès » ?",
+      "a3": "Pour certains dossiers impliquant des actifs récupérables importants, nous discutons d'arrangements de type « succès » ou honoraires conditionnels. Contactez-nous pour discuter de votre situation spécifique.",
+      "q4": "Quelle est votre politique de remboursement ?",
+      "a4": "Si nous déterminons que les fonds ne sont pas traçables au cours de l'enquête, nous remboursons partiellement le travail non encore effectué. Nous sommes transparents à ce sujet dès le départ.",
+      "q5": "Comment acceptez-vous les paiements ?",
+      "a5": "Nous acceptons les virements bancaires, les cartes de crédit et les cryptomonnaies. Pour les dossiers sensibles, nous pouvons discuter d'arrangements alternatifs.",
+      "q6": "Offrez-vous des réductions pour les avocats ou les cabinets d'avocats ?",
+      "a6": "Oui, nous proposons des tarifs dégressifs pour les cabinets d'avocats qui nous réfèrent plusieurs dossiers. Contactez-nous pour discuter d'un partenariat."
+    }
+  },
+  "services_divorce_page": {
+    "breadcrumb": {
+      "home": "Accueil",
+      "services": "Services",
+      "current": "Divorce et crypto"
+    },
+    "hero": {
+      "badge": "Droit de la famille · Successions et héritages",
+      "title_line1": "Les cryptomonnaies dans",
+      "title_line2": "le divorce et les successions",
+      "subtitle": "Les actifs crypto cachés sont de plus en plus fréquents dans les procédures de divorce et les litiges successoraux. Notre criminalistique blockchain révèle ce que votre conjoint ou bénéficiaire prétend ne pas exister.",
+      "cta": "Commencez l'évaluation gratuite"
+    },
+    "scenarios": {
+      "tag": "Comment nous aidons",
+      "title": "Analyse crypto criminalistique pour le droit de la famille",
+      "hidden_title": "Découverte de portefeuilles cachés",
+      "hidden_desc": "Votre conjoint prétend ne pas avoir de crypto, ou qu'elle a été perdue. Nous analysons la blockchain pour trouver des portefeuilles liés à ses adresses connues.",
+      "valuation_title": "Évaluation des actifs",
+      "valuation_desc": "Nous identifions toutes les détentions de cryptomonnaies — y compris les récompenses de staking, les positions DeFi et les NFT — et documentons leur valeur pour le tribunal.",
+      "transfer_title": "Traçage des transferts",
+      "transfer_desc": "Votre conjoint a-t-il déplacé des fonds avant ou pendant la procédure ? Nous traçons les transferts et établissons quand et où les actifs ont été déplacés.",
+      "historical_title": "Documentation historique",
+      "historical_desc": "Nous compilons un enregistrement chronologique complet de toute l'activité crypto — essentiel pour établir le patrimoine conjugal."
+    },
+    "deliverables": {
+      "title": "Ce que nous livrons aux avocats",
+      "item1": "Rapport criminalistique recevable en justice avec documentation de la méthodologie",
+      "item2": "Liste complète des adresses cryptographiques identifiées et des soldes",
+      "item3": "Historique des transactions avec horodatage et valeur en USD au moment du transfert",
+      "item4": "Disponibilité en tant que témoin expert pour les dépositions et le procès",
+      "item5": "Collaboration continue avec votre équipe juridique tout au long de la procédure"
+    },
+    "cta": {
+      "title": "Vous travaillez sur un dossier de divorce ou de succession ?",
+      "subtitle": "Les demandes des avocats sont les bienvenues. Nous répondons sous 24 heures et proposons des tarifs dégressifs pour les cabinets d'avocats.",
+      "button_evaluation": "Évaluation gratuite",
+      "button_attorney": "Demande d'avocat"
+    }
   }
 }
