@@ -9,6 +9,20 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // ─── /en/* → /* ───
+      // localePrefix: 'as-needed' means English uses the root URL (no /en prefix).
+      // /en and /en/* are not real routes — collapse them to root to prevent
+      // duplicate-content signals and the "Page with redirect" GSC warning.
+      {
+        source: '/en',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/en/:path*',
+        destination: '/:path*',
+        permanent: true,
+      },
       // ─── Legacy redirects for non-existent blog posts (GSC 404s) ───
       // TODO(2026-06-09): Remove these after Google has had 30+ days to recrawl.
       // Cross-links to these slugs were removed from internal pages on 2026-05-09;

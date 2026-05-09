@@ -66,6 +66,19 @@ async function getDynamicPlatforms(): Promise<{ slug: string; lastReported?: str
   return seedPlatformSlugs.map(slug => ({ slug }));
 }
 
+/**
+ * Build the alternates.languages map for a given path, including x-default.
+ * Google requires x-default to indicate the fallback locale (here: English root).
+ */
+function buildLanguages(pathname: string): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const l of locales) {
+    map[l] = `${baseUrl}${l === 'en' ? '' : `/${l}`}${pathname}`;
+  }
+  map['x-default'] = `${baseUrl}${pathname}`;
+  return map;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const urls: MetadataRoute.Sitemap = [];
 
@@ -78,14 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(),
         changeFrequency: page.changeFreq as any,
         priority: page.priority,
-        alternates: {
-          languages: Object.fromEntries(
-            locales.map((l) => [
-              l,
-              `${baseUrl}${l === 'en' ? '' : `/${l}`}${page.path}`,
-            ])
-          ),
-        },
+        alternates: { languages: buildLanguages(page.path) },
       });
     }
   }
@@ -99,14 +105,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(),
         changeFrequency: 'monthly',
         priority: 0.8,
-        alternates: {
-          languages: Object.fromEntries(
-            locales.map((l) => [
-              l,
-              `${baseUrl}${l === 'en' ? '' : `/${l}`}${post}`,
-            ])
-          ),
-        },
+        alternates: { languages: buildLanguages(post) },
       });
     }
   }
@@ -116,19 +115,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { listApproved } = await import('@/lib/investigators/storage');
     const investigators = await listApproved();
     for (const inv of investigators) {
-      const path = `/investigators/${inv.id}`;
+      const profilePath = `/investigators/${inv.id}`;
       for (const locale of locales) {
         const localePath = locale === 'en' ? '' : `/${locale}`;
         urls.push({
-          url: `${baseUrl}${localePath}${path}`,
+          url: `${baseUrl}${localePath}${profilePath}`,
           lastModified: inv.updatedAt ? new Date(inv.updatedAt) : new Date(),
           changeFrequency: 'weekly',
           priority: 0.6,
-          alternates: {
-            languages: Object.fromEntries(
-              locales.map((l) => [l, `${baseUrl}${l === 'en' ? '' : `/${l}`}${path}`]),
-            ),
-          },
+          alternates: { languages: buildLanguages(profilePath) },
         });
       }
     }
@@ -139,22 +134,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Scam database platform pages (dynamic from S3 + seed fallback)
   const dynamicPlatforms = await getDynamicPlatforms();
   for (const { slug, lastReported } of dynamicPlatforms) {
-    const path = `/scam-database/platform/${slug}`;
+    const platformPath = `/scam-database/platform/${slug}`;
     for (const locale of locales) {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
-        url: `${baseUrl}${localePath}${path}`,
+        url: `${baseUrl}${localePath}${platformPath}`,
         lastModified: lastReported ? new Date(lastReported) : new Date(),
         changeFrequency: 'weekly',
         priority: 0.8,
-        alternates: {
-          languages: Object.fromEntries(
-            locales.map((l) => [
-              l,
-              `${baseUrl}${l === 'en' ? '' : `/${l}`}${path}`,
-            ])
-          ),
-        },
+        alternates: { languages: buildLanguages(platformPath) },
       });
     }
   }
