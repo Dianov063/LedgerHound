@@ -103,6 +103,40 @@ export interface ValidationStats {
 /**
  * Compute stats over the last N days. Range is inclusive of today.
  * Reads all keys under blog-validation-logs/YYYY-MM-DD/ for each day in range.
+ *
+ * SCALING NOTE — read this if /api/blog-agent/validation-stats becomes slow.
+ *
+ * Current implementation: O(events) per request. Each event is one S3 object.
+ * Per article: generate + humanize + 5 translates = up to 7 events. With
+ * publish overlap → ~10 events per published post. At 1 post/week that's
+ * ~520 events/year — trivial.
+ *
+ * THE WALL: when total events in the queried window exceed roughly 1000-2000,
+ * this endpoint slows past 2s and starts hitting Vercel's API timeout.
+ * Triggers that get us there:
+ *   - Spike: DeepSeek regression that strips 5+ links per call for a week
+ *   - Migration: a tools/ or services/ page was renamed/removed and every
+ *     cross-link to the old path now strips
+ *   - Blog Agent volume scales to 5+ posts/week
+ *
+ * THE FIX (when you see > 500 events in a single day's listing):
+ *   1. Add a daily aggregation cron at scripts/aggregate-validation-logs.ts
+ *      that runs once per day:
+ *        - List blog-validation-logs/YYYY-MM-DD/ for yesterday
+ *        - Compute the same shape as ValidationStats but for that one day
+ *        - Write blog-validation-logs/daily-summary/YYYY-MM-DD.json
+ *        - Optionally delete the per-event files (or move to /archive/)
+ *   2. Update getValidationStats() below to read daily-summary/* first
+ *      and only fall back to per-event files for "today" (which the cron
+ *      hasn't aggregated yet).
+ *   3. Result: 30-day query reads 30 files instead of thousands.
+ *
+ * Don't preemptively migrate to DynamoDB or D1 — daily-summary in S3 is
+ * sufficient up to ~10k events/day. We'd revisit storage choice only at
+ * that scale, which is well past LedgerHound's foreseeable need.
+ *
+ * To detect approaching the wall, this function logs a warn line if it
+ * processes more than 500 raw events in one call. That's the canary.
  */
 export async function getValidationStats(days = 30): Promise<ValidationStats> {
   const stats: ValidationStats = {
@@ -197,6 +231,20 @@ export async function getValidationStats(days = 30): Promise<ValidationStats> {
   stats.byDay = Array.from(dayCounts.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, c]) => ({ date, events: c.events, stripped: c.stripped }));
+
+  // ── Scaling canary ──
+  // If we're regularly processing >500 raw events per query, the per-event
+  // S3 fetch loop above will start hitting Vercel's API timeout. This warn
+  // is the signal to implement daily-summary aggregation (see comment block
+  // above this function for the migration plan).
+  if (stats.totalEvents > 500) {
+    logger.warn({
+      event: 'validation-stats-scaling-canary',
+      totalEvents: stats.totalEvents,
+      rangeDays: days,
+      message: 'getValidationStats processed >500 events in one call. Consider implementing daily-summary aggregation.',
+    }, `[blog-validator] validation-stats slow-path: ${stats.totalEvents} events in ${days}-day range`);
+  }
 
   return stats;
 }
