@@ -4,64 +4,9 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Clock } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
+import { BLOG_POSTS } from '@/lib/blog/posts';
 
-
-const blogPosts = [
-  {
-    slug: 'northeast-cartel-casinos-crypto-forensics-2026',
-    category: 'Education',
-    title: 'Why the Northeast Cartel Uses Casinos: A Crypto-Forensics Perspective',
-    excerpt: 'The U.S. Treasury sanctioned two Mexican casinos for laundering cash for the Northeast Cartel (CDN). We analyze how casinos serve as crypto-to-fiat gateways, the role of OFAC sanctions, and what this means for blockchain tracing.',
-    date: 'May 5, 2026',
-    readTime: '9 min read',
-    featured: true,
-  },
-  {
-    slug: 'ai-fueling-crypto-fraud-irs-investigators-2026',
-    category: 'Education',
-    title: 'How AI Is Fueling a Surge in Crypto Fraud: What IRS Investigators Reveal',
-    excerpt: 'AI-powered scams are driving a record $7.2 billion in crypto investment losses. IRS investigators share how deepfakes and automation are changing fraud—and what you can do to protect your assets.',
-    date: 'April 30, 2026',
-    readTime: '10 min read',
-    featured: true,
-  },
-  {
-    slug: 'usdt-trc20-scam-recovery-guide-2026',
-    category: 'Guide',
-    title: 'USDT TRC20 Scam Recovery Guide 2026: A Forensic Roadmap',
-    excerpt: '34% increase in TRC20 fraud cases in 2025. A step-by-step forensic guide for victims — from the critical first 72 hours to legal recovery pathways and exchange freezes.',
-    date: 'April 5, 2026',
-    readTime: '12 min read',
-    featured: true,
-  },
-  {
-    slug: 'how-to-identify-fake-crypto-trading-platform',
-    category: 'Guide',
-    title: 'How to Identify a Fake Crypto Trading Platform in 2026',
-    excerpt: 'Fake exchanges have become the most effective tool for organized fraud networks. $17 billion lost in 2025. Learn the 10 warning signs and what to do if you\'ve already sent money.',
-    date: 'April 5, 2026',
-    readTime: '8 min read',
-    featured: true,
-  },
-  {
-    slug: 'how-to-trace-stolen-bitcoin',
-    category: 'Guide',
-    title: 'How to Trace Stolen Bitcoin and Cryptocurrency: A Step-by-Step Guide',
-    excerpt: 'Despite the common perception that crypto is untraceable, the opposite is true. Learn exactly how investigators trace stolen funds step by step — from transaction mapping to exchange subpoenas.',
-    date: 'March 28, 2026',
-    readTime: '10 min read',
-    featured: true,
-  },
-  {
-    slug: 'pig-butchering-scam-recovery',
-    category: 'Guide',
-    title: 'Pig Butchering Scams in 2026: What They Are, How They Work, and What To Do',
-    excerpt: 'The most financially devastating form of crypto fraud. $9.3 billion in reported losses in 2024 alone. Learn the full playbook, warning signs, and what to do if you\'re a victim.',
-    date: 'March 15, 2026',
-    readTime: '9 min read',
-    featured: true,
-  },
-];
+const blogPosts = BLOG_POSTS;
 
 const categoryColors: Record<string, string> = {
   Guide: 'bg-blue-50 text-blue-700 border-blue-100',

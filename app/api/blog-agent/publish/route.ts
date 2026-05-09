@@ -11,7 +11,7 @@
 import logger from '@/lib/logger';
 import { renderContentFile, contentComponentName } from '@/lib/blog-render/renderer';
 import { renderPageFile, renderLayoutFile } from '@/lib/blog-render/templates';
-import { updateBlogIndex, updateSitemap } from '@/lib/blog-render/updaters';
+import { updateBlogIndex } from '@/lib/blog-render/updaters';
 import { commitFiles, getFileContent } from '@/lib/github/commit';
 import type { BlogArticle, BlogArticleTranslations, BlogLocale } from '@/lib/blog-render/schema';
 
@@ -106,29 +106,19 @@ export async function POST(request: Request) {
       content: renderLayoutFile(translations),
     };
 
-    // 3. Fetch existing blog index + sitemap, then patch them
-    const [blogIndexSrc, sitemapSrc] = await Promise.all([
-      getFileContent('app/[locale]/blog/page.tsx'),
-      getFileContent('app/sitemap.ts'),
-    ]);
-
-    if (!blogIndexSrc) {
-      return Response.json({ error: 'Could not fetch app/[locale]/blog/page.tsx from repo' }, { status: 500 });
+    // 3. Fetch single source of truth (lib/blog/posts.ts) and patch it
+    const postsSrc = await getFileContent('lib/blog/posts.ts');
+    if (!postsSrc) {
+      return Response.json({ error: 'Could not fetch lib/blog/posts.ts from repo' }, { status: 500 });
     }
-    if (!sitemapSrc) {
-      return Response.json({ error: 'Could not fetch app/sitemap.ts from repo' }, { status: 500 });
-    }
-
-    const newBlogIndex = updateBlogIndex(blogIndexSrc, translations.en);
-    const newSitemap = updateSitemap(sitemapSrc, translations.en);
+    const newPosts = updateBlogIndex(postsSrc, translations.en);
 
     // 4. Commit all files atomically
     const allFiles = [
       ...contentFiles,
       pageFile,
       layoutFile,
-      { path: 'app/[locale]/blog/page.tsx', content: newBlogIndex },
-      { path: 'app/sitemap.ts', content: newSitemap },
+      { path: 'lib/blog/posts.ts', content: newPosts },
     ];
 
     const result = await commitFiles({

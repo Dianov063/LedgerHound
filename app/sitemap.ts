@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { locales } from '@/i18n';
+import { BLOG_POSTS } from '@/lib/blog/posts';
 
 const baseUrl = 'https://www.ledgerhound.vip';
 
@@ -33,14 +34,9 @@ const pages = [
   { path: '/disclaimer', priority: 0.3, changeFreq: 'yearly' },
 ];
 
-const blogPosts = [
-  '/blog/northeast-cartel-casinos-crypto-forensics-2026',
-  '/blog/ai-fueling-crypto-fraud-irs-investigators-2026',
-  '/blog/usdt-trc20-scam-recovery-guide-2026',
-  '/blog/how-to-identify-fake-crypto-trading-platform',
-  '/blog/how-to-trace-stolen-bitcoin',
-  '/blog/pig-butchering-scam-recovery',
-];
+// Blog posts are read from single source of truth in lib/blog/posts.ts
+// to keep sitemap, blog index, and related-posts in sync.
+const blogPosts = BLOG_POSTS.map((p) => `/blog/${p.slug}`);
 
 /* Seed platform slugs — always included even if S3 is unavailable at build time */
 const seedPlatformSlugs = [

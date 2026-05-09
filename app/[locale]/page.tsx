@@ -8,6 +8,7 @@ import {
   Clock, FileText, Phone, Lock, BarChart3, Download,
 } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
+import { getAllBlogPosts } from '@/lib/blog/posts';
 
 
 export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
@@ -44,32 +45,8 @@ export default function HomePage() {
     { key: 'case3', colorClass: 'bg-violet-50 border-violet-100', amountClass: 'text-violet-700' },
   ];
 
-  const blogPosts = [
-    {
-      slug: 'how-to-trace-stolen-bitcoin',
-      category: 'Guide',
-      title: 'How to Trace Stolen Bitcoin: A Step-by-Step Overview',
-      excerpt: 'Every Bitcoin transaction leaves a permanent record on the blockchain. Learn how investigators use this data to follow stolen funds.',
-      date: 'March 2026',
-      readTime: '8 min read',
-    },
-    {
-      slug: 'pig-butchering-scam-recovery',
-      category: 'Case Study',
-      title: 'Pig Butchering Scams: Can Victims Recover Their Funds?',
-      excerpt: 'Pig butchering scams cost victims billions annually. We break down how these schemes work and what forensic investigation can achieve.',
-      date: 'February 2026',
-      readTime: '6 min read',
-    },
-    {
-      slug: 'crypto-divorce-hidden-assets',
-      category: 'Legal',
-      title: 'Hidden Crypto in Divorce: What Attorneys Need to Know',
-      excerpt: 'Spouses hiding cryptocurrency is increasingly common. This guide explains how forensic blockchain analysis uncovers undisclosed assets.',
-      date: 'January 2026',
-      readTime: '7 min read',
-    },
-  ];
+  // 3 latest posts from the single source of truth — no dead links
+  const blogPosts = getAllBlogPosts(locale).slice(0, 3);
 
   return (
     <div className="min-h-screen">

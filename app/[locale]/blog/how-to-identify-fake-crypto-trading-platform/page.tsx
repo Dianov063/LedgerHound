@@ -18,6 +18,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { blogUI, type BlogLocale } from '@/lib/blog-translations';
+import { getRelatedPosts } from '@/lib/blog/get-related-posts';
 import ContentEn from './content/en';
 import ContentRu from './content/ru';
 import ContentEs from './content/es';
@@ -44,26 +45,7 @@ const tocItems = [
   { id: 'getting-help', label: 'Getting Help' },
 ];
 
-const relatedPosts = [
-  {
-    slug: 'pig-butchering-scam-recovery',
-    title: 'Pig Butchering Scams in 2026: What They Are, How They Work, and What To Do',
-    category: 'Guide',
-    readTime: '9 min read',
-  },
-  {
-    slug: 'how-to-trace-stolen-bitcoin',
-    title: 'How to Trace Stolen Bitcoin: A Step-by-Step Overview',
-    category: 'Guide',
-    readTime: '10 min read',
-  },
-  {
-    slug: 'how-crypto-scammers-launder-money',
-    title: 'How Crypto Scammers Launder Money: Mixers, Chains, and Exchanges',
-    category: 'Education',
-    readTime: '10 min read',
-  },
-];
+const CURRENT_SLUG = 'how-to-identify-fake-crypto-trading-platform';
 
 const categoryColors: Record<string, string> = {
   Guide: 'bg-blue-50 text-blue-700 border-blue-100',
@@ -78,6 +60,7 @@ export default function FakeTradingPlatformArticle() {
   const ui = blogUI[locale] || blogUI.en;
   const Content = contentByLocale[locale] || ContentEn;
   const [copied, setCopied] = useState(false);
+  const relatedPosts = getRelatedPosts(CURRENT_SLUG, locale, 3);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
   const shareTitle = 'How to Identify a Fake Crypto Trading Platform in 2026';

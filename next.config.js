@@ -9,7 +9,10 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // 301 redirects for non-existent blog posts (GSC 404s)
+      // ─── Legacy redirects for non-existent blog posts (GSC 404s) ───
+      // TODO(2026-06-09): Remove these after Google has had 30+ days to recrawl.
+      // Cross-links to these slugs were removed from internal pages on 2026-05-09;
+      // these redirects only catch old external bookmarks / Google cache hits.
       {
         source: '/blog/how-crypto-scammers-launder-money',
         destination: '/blog',
