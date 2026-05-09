@@ -17,16 +17,17 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 
 export default function PricingPage() {
   const t = useTranslations('pricing');
+  const tp = useTranslations('pricing_page');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 
   const faqs = [
-    { q: 'Do you charge upfront?', a: 'The initial case evaluation is completely free. If you decide to proceed with an investigation, we require 50% upfront and 50% upon delivery of the report.' },
-    { q: 'What if my case is more complex than expected?', a: 'We assess complexity during the free evaluation and quote accordingly. If unforeseen complexity arises mid-investigation, we discuss scope changes transparently before proceeding.' },
-    { q: 'Do you offer contingency arrangements?', a: 'For select cases involving significant recoverable assets, we discuss contingency or success-fee arrangements. Contact us to discuss your specific situation.' },
-    { q: 'What is your refund policy?', a: 'If we determine funds are not traceable during the investigation, we provide a partial refund of work not yet completed. We are transparent about this from the start.' },
-    { q: 'How do you accept payment?', a: 'We accept bank transfers, credit cards, and cryptocurrency. For sensitive cases, we can discuss alternative arrangements.' },
-    { q: 'Do you offer discounts for attorneys or law firms?', a: 'Yes, we offer volume pricing for law firms and attorneys who refer multiple cases. Contact us to discuss a partnership arrangement.' },
+    { q: tp('faq.q1'), a: tp('faq.a1') },
+    { q: tp('faq.q2'), a: tp('faq.a2') },
+    { q: tp('faq.q3'), a: tp('faq.a3') },
+    { q: tp('faq.q4'), a: tp('faq.a4') },
+    { q: tp('faq.q5'), a: tp('faq.a5') },
+    { q: tp('faq.q6'), a: tp('faq.a6') },
   ];
 
   return (
@@ -66,7 +67,7 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Link href={`${base}/free-evaluation`} className="btn-outline text-sm">{t('cta')}</Link>
-              <p className="text-xs text-slate-400 text-center mt-3">Best for: Single scam, one blockchain</p>
+              <p className="text-xs text-slate-400 text-center mt-3">{tp('best_for.basic')}</p>
             </div>
 
             {/* Full - Featured */}
@@ -91,7 +92,7 @@ export default function PricingPage() {
               <Link href={`${base}/free-evaluation`} className="btn-primary w-full justify-center text-sm">
                 {t('cta')} <ArrowRight size={15} />
               </Link>
-              <p className="text-xs text-brand-600 text-center mt-3 font-medium">Best for: Romance scams, divorce, litigation</p>
+              <p className="text-xs text-brand-600 text-center mt-3 font-medium">{tp('best_for.full')}</p>
             </div>
 
             {/* Expert */}
@@ -111,17 +112,17 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Link href={`${base}/contact`} className="btn-outline text-sm">{t('cta_quote')}</Link>
-              <p className="text-xs text-slate-400 text-center mt-3">Best for: Attorneys & legal proceedings</p>
+              <p className="text-xs text-slate-400 text-center mt-3">{tp('best_for.expert')}</p>
             </div>
           </div>
 
           {/* Note */}
           <div className="mt-10 bg-slate-50 border border-slate-100 rounded-2xl p-6 text-center">
             <p className="text-sm text-slate-600">
-              <strong className="text-slate-900">Not sure which package you need?</strong>{' '}
-              Start with our free evaluation. We'll assess your case and recommend the right service — no pressure.{' '}
+              <strong className="text-slate-900">{tp('not_sure.title')}</strong>{' '}
+              {tp('not_sure.body')}{' '}
               <Link href={`${base}/free-evaluation`} className="text-brand-600 font-semibold hover:underline">
-                Get free evaluation →
+                {tp('not_sure.link')}
               </Link>
             </p>
           </div>
@@ -132,14 +133,14 @@ export default function PricingPage() {
       <section className="py-16 bg-slate-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="section-title text-3xl">All Plans Include</h2>
+            <h2 className="section-title text-3xl">{tp('all_plans.title')}</h2>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { icon: '🔒', title: 'Confidential Investigation', desc: 'Your case details are strictly confidential.' },
-              { icon: '📋', title: 'Certified Investigators', desc: 'CTCE and CFE certified professionals on every case.' },
-              { icon: '⚡', title: 'Fast Turnaround', desc: '48–72 hours for most investigations.' },
-              { icon: '🤝', title: 'Attorney Collaboration', desc: 'We work directly with your legal team.' },
+              { icon: '🔒', title: tp('all_plans.confidential_title'), desc: tp('all_plans.confidential_desc') },
+              { icon: '📋', title: tp('all_plans.certified_title'), desc: tp('all_plans.certified_desc') },
+              { icon: '⚡', title: tp('all_plans.fast_title'), desc: tp('all_plans.fast_desc') },
+              { icon: '🤝', title: tp('all_plans.attorney_title'), desc: tp('all_plans.attorney_desc') },
             ].map((item) => (
               <div key={item.title} className="card text-center">
                 <div className="text-3xl mb-3">{item.icon}</div>
@@ -158,7 +159,7 @@ export default function PricingPage() {
             <div className="inline-flex items-center justify-center w-10 h-10 bg-brand-50 rounded-xl mb-4">
               <HelpCircle size={20} className="text-brand-600" />
             </div>
-            <h2 className="section-title text-3xl">Pricing Questions</h2>
+            <h2 className="section-title text-3xl">{tp('faq.title')}</h2>
           </div>
           <div className="space-y-4">
             {faqs.map((faq) => (
