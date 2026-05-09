@@ -1,5 +1,6 @@
 import { getValidPathsForPrompt, getValidBlogSlugs } from '@/lib/blog/valid-internal-paths';
 import { validateAndCleanArticle } from '@/lib/blog/validate-article';
+import { logValidationEvent } from '@/lib/blog/validation-log';
 
 /**
  * Build the system prompt. Whitelist sections are computed at request time
@@ -460,9 +461,16 @@ Return ONLY the JSON object. No markdown, no explanations.`;
       try {
         const parsed = extractJson(raw, 'object');
         // Last-line-of-defense: strip any links to paths the LLM hallucinated.
-        const { cleaned, warnings } = validateAndCleanArticle(parsed);
-        if (warnings.length > 0) {
-          console.warn('[blog-agent] Generate: stripped invalid links:', warnings);
+        const { cleaned, stripped, warnings } = validateAndCleanArticle(parsed);
+        if (stripped.length > 0) {
+          // fire-and-forget: don't block response on logging
+          void logValidationEvent({
+            ts: new Date().toISOString(),
+            mode: 'generate',
+            slug: (cleaned as any)?.slug || 'pending',
+            stripped,
+            articleTitle: (cleaned as any)?.title,
+          });
         }
         return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {
@@ -510,9 +518,16 @@ Return ONLY the translated JSON object.`;
         const parsed = extractJson(raw, 'object');
         // Translate is supposed to preserve link URLs, but models occasionally
         // mangle or invent paths during translation. Re-validate to be safe.
-        const { cleaned, warnings } = validateAndCleanArticle(parsed);
-        if (warnings.length > 0) {
-          console.warn('[blog-agent] Translate: stripped invalid links:', warnings);
+        const { cleaned, stripped, warnings } = validateAndCleanArticle(parsed);
+        if (stripped.length > 0) {
+          void logValidationEvent({
+            ts: new Date().toISOString(),
+            mode: 'translate',
+            slug: (cleaned as any)?.slug || 'pending',
+            locale,
+            stripped,
+            articleTitle: (cleaned as any)?.title,
+          });
         }
         return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {
@@ -547,9 +562,15 @@ Return the humanized JSON.`;
       try {
         const parsed = extractJson(raw, 'object');
         // Re-validate after humanize — the model can introduce new links during rewrite.
-        const { cleaned, warnings } = validateAndCleanArticle(parsed);
-        if (warnings.length > 0) {
-          console.warn('[blog-agent] Humanize: stripped invalid links:', warnings);
+        const { cleaned, stripped, warnings } = validateAndCleanArticle(parsed);
+        if (stripped.length > 0) {
+          void logValidationEvent({
+            ts: new Date().toISOString(),
+            mode: 'humanize',
+            slug: (cleaned as any)?.slug || 'pending',
+            stripped,
+            articleTitle: (cleaned as any)?.title,
+          });
         }
         return Response.json({ article: cleaned, ...(warnings.length > 0 && { linkWarnings: warnings }) });
       } catch (parseErr: any) {

@@ -91,16 +91,24 @@ export async function POST(request: Request) {
   try {
     // ── Final guardrail: validate every translation before committing.
     // Even if the agent already cleaned them, re-running validation here
-    // means publish CANNOT ship a dead internal link. If the article still
-    // contains 5+ broken links per locale, abort — something's wrong upstream.
+    // means publish CANNOT ship a dead internal link.
     const { validateAndCleanArticle } = await import('@/lib/blog/validate-article');
+    const { logValidationEvent } = await import('@/lib/blog/validation-log');
     const totalWarnings: string[] = [];
     for (const loc of LOCALES) {
-      const { cleaned, warnings } = validateAndCleanArticle(translations[loc]);
+      const { cleaned, stripped } = validateAndCleanArticle(translations[loc]);
       translations[loc] = cleaned as any;
-      if (warnings.length > 0) {
-        totalWarnings.push(`[${loc}] ${warnings.length} link(s) stripped`);
-        logger.warn({ slug, loc, warnings }, '[blog-publish] Stripped invalid links pre-commit');
+      if (stripped.length > 0) {
+        totalWarnings.push(`[${loc}] ${stripped.length} link(s) stripped`);
+        // Persist for trend analysis (non-blocking)
+        void logValidationEvent({
+          ts: new Date().toISOString(),
+          mode: 'publish',
+          slug,
+          locale: loc,
+          stripped,
+          articleTitle: translations[loc].title,
+        });
       }
     }
 

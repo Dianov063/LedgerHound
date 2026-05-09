@@ -15,11 +15,38 @@ import { getValidInternalPaths, getValidBlogSlugs } from './valid-internal-paths
 
 const INLINE_LINK_RE = /\[([^\]]+)\]\(([^)]+)\)/g;
 
+/**
+ * Structured event describing a single stripped link.
+ * Logged to S3 for monthly trend analysis (see lib/blog/validation-log.ts).
+ */
+export interface StrippedLink {
+  /** What kind of stripping happened. */
+  kind: 'inline-link' | 'midcta-href' | 'related-slug';
+  /** The bad path (or slug). */
+  path: string;
+  /** Human-readable location in the article (e.g. "intro[1]", "sections[2].blocks[3].paragraph"). */
+  context: string;
+  /** The visible text that wrapped the link, if any (only for inline links). */
+  linkText?: string;
+}
+
 interface ValidateResult {
   /** Article with bad links stripped (text kept, just the link removed). */
   cleaned: any;
-  /** Human-readable warnings about stripped links. */
+  /** Structured records of every strip — for logging + analytics. */
+  stripped: StrippedLink[];
+  /** Pre-formatted warnings, one per strip — for UI display. */
   warnings: string[];
+}
+
+function fmt(s: StrippedLink): string {
+  if (s.kind === 'inline-link') {
+    return `${s.context}: stripped invalid link [${s.linkText}](${s.path})`;
+  }
+  if (s.kind === 'midcta-href') {
+    return `${s.context}: invalid midCta href "${s.path}" → defaulted to /free-evaluation`;
+  }
+  return `${s.context}: stripped non-existent slug "${s.path}"`;
 }
 
 /**
@@ -30,7 +57,7 @@ interface ValidateResult {
 function cleanInlineLinks(
   text: string,
   validPaths: Set<string>,
-  warnings: string[],
+  stripped: StrippedLink[],
   context: string,
 ): string {
   return text.replace(INLINE_LINK_RE, (full, linkText: string, url: string) => {
@@ -46,7 +73,7 @@ function cleanInlineLinks(
     if (validPaths.has(path)) return full; // valid — keep
 
     // Invalid internal link — strip
-    warnings.push(`${context}: stripped invalid link [${linkText}](${url})`);
+    stripped.push({ kind: 'inline-link', path: url, context, linkText });
     return linkText;
   });
 }
@@ -57,7 +84,7 @@ function cleanInlineLinks(
  * and a list of human-readable warnings.
  */
 export function validateAndCleanArticle(article: any): ValidateResult {
-  const warnings: string[] = [];
+  const stripped: StrippedLink[] = [];
   const validPaths = getValidInternalPaths();
   const validSlugs = new Set(getValidBlogSlugs());
 
@@ -68,7 +95,7 @@ export function validateAndCleanArticle(article: any): ValidateResult {
   if (Array.isArray(cleaned.intro)) {
     cleaned.intro = cleaned.intro.map((p: string, i: number) =>
       typeof p === 'string'
-        ? cleanInlineLinks(p, validPaths, warnings, `intro[${i}]`)
+        ? cleanInlineLinks(p, validPaths, stripped, `intro[${i}]`)
         : p,
     );
   }
@@ -89,21 +116,21 @@ export function validateAndCleanArticle(article: any): ValidateResult {
           case 'paragraph':
           case 'h3':
             if (typeof block.text === 'string') {
-              block.text = cleanInlineLinks(block.text, validPaths, warnings, blockCtx);
+              block.text = cleanInlineLinks(block.text, validPaths, stripped, blockCtx);
             }
             break;
           case 'list':
             if (Array.isArray(block.items)) {
               block.items = block.items.map((item: string, i: number) =>
                 typeof item === 'string'
-                  ? cleanInlineLinks(item, validPaths, warnings, `${blockCtx}.items[${i}]`)
+                  ? cleanInlineLinks(item, validPaths, stripped, `${blockCtx}.items[${i}]`)
                   : item,
               );
             }
             break;
           case 'pullQuote':
             if (typeof block.text === 'string') {
-              block.text = cleanInlineLinks(block.text, validPaths, warnings, `${blockCtx}.text`);
+              block.text = cleanInlineLinks(block.text, validPaths, stripped, `${blockCtx}.text`);
             }
             break;
           case 'warningBox':
@@ -113,7 +140,7 @@ export function validateAndCleanArticle(article: any): ValidateResult {
                 if (sub && Array.isArray(sub.items)) {
                   sub.items = sub.items.map((item: string, j: number) =>
                     typeof item === 'string'
-                      ? cleanInlineLinks(item, validPaths, warnings, `${blockCtx}.subsections[${i}].items[${j}]`)
+                      ? cleanInlineLinks(item, validPaths, stripped, `${blockCtx}.subsections[${i}].items[${j}]`)
                       : item,
                   );
                 }
@@ -126,10 +153,10 @@ export function validateAndCleanArticle(article: any): ValidateResult {
                 const step = block.steps[i];
                 if (!step) continue;
                 if (typeof step.text === 'string') {
-                  step.text = cleanInlineLinks(step.text, validPaths, warnings, `${blockCtx}.steps[${i}].text`);
+                  step.text = cleanInlineLinks(step.text, validPaths, stripped, `${blockCtx}.steps[${i}].text`);
                 }
                 if (step.note?.text && typeof step.note.text === 'string') {
-                  step.note.text = cleanInlineLinks(step.note.text, validPaths, warnings, `${blockCtx}.steps[${i}].note.text`);
+                  step.note.text = cleanInlineLinks(step.note.text, validPaths, stripped, `${blockCtx}.steps[${i}].note.text`);
                 }
               }
             }
@@ -139,7 +166,7 @@ export function validateAndCleanArticle(article: any): ValidateResult {
               if (Array.isArray(block[side])) {
                 block[side] = block[side].map((item: string, i: number) =>
                   typeof item === 'string'
-                    ? cleanInlineLinks(item, validPaths, warnings, `${blockCtx}.${side}[${i}]`)
+                    ? cleanInlineLinks(item, validPaths, stripped, `${blockCtx}.${side}[${i}]`)
                     : item,
                 );
               }
@@ -150,7 +177,7 @@ export function validateAndCleanArticle(article: any): ValidateResult {
             if (typeof block.href === 'string') {
               const path = block.href.replace(/[?#].*$/, '').replace(/\/$/, '') || '/';
               if (!/^https?:\/\//i.test(block.href) && !validPaths.has(path)) {
-                warnings.push(`${blockCtx}.href: invalid path "${block.href}" → defaulting to /free-evaluation`);
+                stripped.push({ kind: 'midcta-href', path: block.href, context: `${blockCtx}.href` });
                 block.href = '/free-evaluation';
               }
             }
@@ -166,11 +193,12 @@ export function validateAndCleanArticle(article: any): ValidateResult {
     const filtered = cleaned.relatedSlugs.filter((slug: string) => {
       if (typeof slug !== 'string') return false;
       if (validSlugs.has(slug)) return true;
-      warnings.push(`relatedSlugs: stripped non-existent slug "${slug}"`);
+      stripped.push({ kind: 'related-slug', path: slug, context: 'relatedSlugs' });
       return false;
     });
     cleaned.relatedSlugs = filtered;
   }
 
-  return { cleaned, warnings };
+  const warnings = stripped.map(fmt);
+  return { cleaned, stripped, warnings };
 }
