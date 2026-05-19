@@ -30,6 +30,15 @@ export interface BlogPostMeta {
 
 export const BLOG_POSTS: BlogPostMeta[] = [
   {
+    slug: 'new-york-ag-uphold-settlement-crypto-platform-liability-2026',
+    category: 'Legal',
+    title: 'How New York AG\'s $5M Uphold Settlement Exposes Crypto Platform Liability',
+    excerpt: 'The New York Attorney General\'s $5 million settlement with Uphold over a Cred-linked fraud scheme sets a precedent for platform liability. Learn how exchanges must vet investments or face consequences.',
+    date: '2026-05-19',
+    readMinutes: 10,
+    featured: true,
+  },
+  {
     slug: 'northeast-cartel-casinos-crypto-forensics-2026',
     category: 'Education',
     title: 'Why the Northeast Cartel Uses Casinos: A Crypto-Forensics Perspective',
