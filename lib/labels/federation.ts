@@ -17,7 +17,12 @@
 import { getKnownEntity } from '../known-entities';
 import { getPhishingEntry } from '../known-phishing';
 import { getAddressIndex } from '../scam-db';
-import { queryChainabuse } from './chainabuse';
+import {
+  queryChainabuse,
+  shouldQueryChainabuse,
+  getMonthlyUsage,
+  incrementUsage,
+} from './chainabuse';
 import { queryGoPlus } from './goplus';
 import { checkOfac } from './ofac';
 import { getFromCache, saveToCache } from './cache';
@@ -63,7 +68,15 @@ export async function getAddressLabels(
 
   const labels: AddressLabel[] = [];
 
-  // 2. Local sources (sync, no failure modes)
+  // ── 2. Phase A: local sources + OFAC + GoPlus in parallel ───────────
+  // Chainabuse is gated AFTER Phase A so we can skip it when other
+  // sources already flagged or whitelisted the address. This is the
+  // monthly-quota guard for free-tier Chainabuse keys (10 calls/month).
+  // Local sync sources (KNOWN_ENTITIES, KNOWN_PHISHING) cost nothing —
+  // run them in the sync section below. Scam-DB + OFAC + GoPlus are
+  // promisified.
+
+  // 2a. Sync local sources
   const known = getKnownEntity(normalized);
   if (known) {
     labels.push({
@@ -90,50 +103,101 @@ export async function getAddressLabels(
     });
   }
 
-  // 3. Scam-DB (S3-backed local source — can throw on bucket unavailability)
-  let scamDbFailed = false;
-  try {
-    const idx = await getAddressIndex(normalized);
-    if (idx && idx.platforms.length > 0) {
-      labels.push({
-        source: 'ledgerhound_scam_db',
-        tag: idx.platformNames.join(', '),
-        category: 'scam',
-        confidence: 0.85,
-        reportCount: idx.reports.length,
-        notes: idx.totalLoss > 0 ? `$${idx.totalLoss.toLocaleString()} reported losses` : undefined,
-      });
-    }
-  } catch (e: any) {
-    scamDbFailed = true;
-    console.warn('[federation] scam-db lookup failed:', e?.message || e);
-  }
-
-  // 4. External sources in parallel — none of these can throw out of here.
-  const results = await Promise.allSettled([
-    queryChainabuse(normalized),
-    queryGoPlus(normalized, network),
+  // 2b. Phase A async — scam-db (S3) + OFAC (S3) + GoPlus (HTTP), parallel.
+  const phaseA = await Promise.allSettled([
+    getAddressIndex(normalized),
     checkOfac(normalized),
+    queryGoPlus(normalized, network),
   ]);
 
-  const sourceNames = ['chainabuse', 'goplus', 'ofac'] as const;
+  const phaseASourceNames = ['scam_db', 'ofac', 'goplus'] as const;
   const sourceSucceeded: Record<string, boolean> = {};
   let externalSourceFailureCount = 0;
-
-  for (let i = 0; i < results.length; i++) {
-    const r = results[i];
-    const name = sourceNames[i];
-    if (r.status === 'fulfilled') {
-      sourceSucceeded[name] = true;
-      if (r.value) labels.push(r.value);
-    } else {
+  for (let i = 0; i < phaseA.length; i++) {
+    const name = phaseASourceNames[i];
+    if (phaseA[i].status === 'rejected') {
       sourceSucceeded[name] = false;
       externalSourceFailureCount++;
-      console.warn(`[federation] ${name} rejected:`, r.reason?.message || r.reason);
+      const reason = (phaseA[i] as PromiseRejectedResult).reason;
+      console.warn(`[federation] ${name} rejected:`, reason?.message || reason);
+    } else {
+      sourceSucceeded[name] = true;
+    }
+  }
+
+  const scamDbResult = phaseA[0].status === 'fulfilled' ? phaseA[0].value : null;
+  const ofacResult = phaseA[1].status === 'fulfilled' ? phaseA[1].value : null;
+  const goplusResult = phaseA[2].status === 'fulfilled' ? phaseA[2].value : null;
+
+  if (scamDbResult && scamDbResult.platforms.length > 0) {
+    labels.push({
+      source: 'ledgerhound_scam_db',
+      tag: scamDbResult.platformNames.join(', '),
+      category: 'scam',
+      confidence: 0.85,
+      reportCount: scamDbResult.reports.length,
+      notes: scamDbResult.totalLoss > 0 ? `$${scamDbResult.totalLoss.toLocaleString()} reported losses` : undefined,
+    });
+  }
+  if (ofacResult) labels.push(ofacResult);
+  if (goplusResult) labels.push(goplusResult);
+
+  // ── 3. Phase B: gated Chainabuse call ────────────────────────────────
+  // We only spend monthly quota when no other source has already flagged
+  // or whitelisted the address. See shouldQueryChainabuse() for the rules.
+  const usage = await getMonthlyUsage();
+  const decision = shouldQueryChainabuse({
+    address: normalized,
+    knownEntity: known,
+    isKnownPhishing: !!phishing,
+    scamDbMatch: scamDbResult && scamDbResult.platforms.length > 0 ? scamDbResult : null,
+    ofacMatch: ofacResult,
+    monthlyCallsUsed: usage.calls_used,
+    hasApiKey: !!process.env.CHAINABUSE_API_KEY,
+  });
+
+  if (!decision.shouldQuery) {
+    console.log(JSON.stringify({
+      event: 'chainabuse_skip',
+      address: normalized,
+      reason: decision.reason,
+      monthly_used: usage.calls_used,
+      monthly_cap: usage.calls_limit,
+    }));
+    sourceSucceeded.chainabuse_skipped = true;
+  } else {
+    try {
+      const chainabuseLabel = await queryChainabuse(normalized);
+      // Increment counter only on a successful billable round-trip — we treat
+      // "no reports" (null) as a billable call since the API was hit.
+      // queryChainabuse returns null both for "no reports" and for transient
+      // errors, so to be conservative we only increment when we got a
+      // response object back. The conservative path slightly under-counts
+      // but never over-counts.
+      if (chainabuseLabel) {
+        labels.push(chainabuseLabel);
+      }
+      // Always increment after a fetch attempt — even null responses count
+      // toward quota per Chainabuse billing. Doing so protects the budget.
+      await incrementUsage();
+      sourceSucceeded.chainabuse = true;
+      console.log(JSON.stringify({
+        event: 'chainabuse_call',
+        address: normalized,
+        had_match: !!chainabuseLabel,
+        monthly_used_after: usage.calls_used + 1,
+      }));
+    } catch (e: any) {
+      // queryChainabuse already swallows errors and returns null, so a throw
+      // here would be from unexpected code. Treat as soft failure.
+      sourceSucceeded.chainabuse = false;
+      externalSourceFailureCount++;
+      console.warn('[federation] chainabuse threw:', e?.message || e);
     }
   }
 
   // Treat scam-db failure as a partial external failure for the footnote.
+  const scamDbFailed = phaseA[0].status === 'rejected';
   const hadExternalSourceFailure = externalSourceFailureCount > 0 || scamDbFailed;
 
   const response: AddressLabelResponse = {
@@ -158,7 +222,12 @@ export async function getAddressLabels(
     address: normalized,
     network,
     cache_hit: false,
-    sources_queried: ['chainabuse', 'goplus', 'ofac'],
+    // Phase A queried unconditionally; Chainabuse only when gate allowed it.
+    sources_queried: decision.shouldQuery
+      ? ['scam_db', 'ofac', 'goplus', 'chainabuse']
+      : ['scam_db', 'ofac', 'goplus'],
+    chainabuse_decision: decision.reason,
+    chainabuse_monthly_used: usage.calls_used + (decision.shouldQuery ? 1 : 0),
     sources_succeeded: sourceSucceeded,
     scam_db_failed: scamDbFailed,
     total_labels: labels.length,
