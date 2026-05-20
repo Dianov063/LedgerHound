@@ -52,7 +52,11 @@ export function getNodeColor(type: string): string {
 
 function shortAddr(addr: string): string {
   if (!addr || addr.length < 14) return addr || '?';
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  // 2026-05-20 fix 1.4: was slice(0, 6)+slice(-4) — produced identical
+  // "0x073a...609f" labels for both DZHLWK address-poisoning siblings
+  // (0x073a4abb…f4609f and 0x073a4e18…d4d609f). Bumping prefix to 10 chars
+  // makes them visually distinct in the Fund Flow graph.
+  return `${addr.slice(0, 10)}...${addr.slice(-4)}`;
 }
 
 function fmtValue(v: number, currency: string): string {

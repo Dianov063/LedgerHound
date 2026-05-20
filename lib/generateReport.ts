@@ -17,8 +17,10 @@ import { analyzeScamPatterns } from './patternDetection';
 export type { PatternAnalysis, ScamPattern } from './patternDetection';
 import { traceCrossChain } from './crossChainTracer';
 export type { CrossChainTrace, CrossChainHop, BridgeInteraction, ChainActivity } from './crossChainTracer';
-import { KNOWN_ENTITIES, getKnownEntity } from './known-entities';
+import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailByParent } from './known-entities';
 import { isKnownPhishing, getPhishingTag } from './known-phishing';
+import { getAddressLabelsBatch } from './labels/federation';
+import type { AddressLabelResponse } from './labels/types';
 
 function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
@@ -437,7 +439,12 @@ export interface ReportData {
   lastActivity: string;
   inactiveDays: number;
   topCounterparties: { address: string; label: string; count: number; volume: number }[];
-  identifiedEntities: { address: string; label: string; type: string; interactions: number }[];
+  /**
+   * Known counterparties. `parentEntity` (added 2026-05-20) groups multiple
+   * hot wallets under the same brand (e.g. 5 Binance hot wallets → one
+   * Binance entry in dedup logic). Falls back to `label` when absent.
+   */
+  identifiedEntities: { address: string; label: string; type: string; interactions: number; parentEntity?: string; complianceEmail?: string }[];
   riskScore: number;
   riskLabel: string;
   /**
@@ -481,6 +488,32 @@ export interface ReportData {
   legalWeight: { label: string; suitable: boolean }[];
   /** Primary asset by volume — token with highest total flow (e.g. USDT instead of BNB) */
   primaryAsset: { symbol: string; totalIn: number; totalOut: number } | null;
+  /**
+   * Number of counterparty addresses that match `lib/known-phishing.ts`.
+   * Used by Evidence Strength to distinguish subject-vs-counterparty matches —
+   * a victim's evidence is the counterparty's flags, not their own.
+   * Added 2026-05-20 (Phase 0 fix 1.3).
+   */
+  counterpartyPhishingFlags: number;
+  /**
+   * Number of counterparty addresses that appear in the LedgerHound scam DB.
+   * Same role as `counterpartyPhishingFlags`. Added 2026-05-20.
+   */
+  counterpartyScamDbMatches: number;
+  /**
+   * Phase 1 federation — labels for the top-N counterparties merged from
+   * Chainabuse, GoPlus, OFAC, KNOWN_ENTITIES, KNOWN_PHISHING and scam-db.
+   * Limited to the top 20 by volume to keep generation under Vercel's
+   * function timeout. Empty when federation is disabled/failed.
+   * Added 2026-05-20.
+   */
+  addressLabels: import('./labels/types').AddressLabelResponse[];
+  /**
+   * True when at least one external source (Chainabuse/GoPlus/OFAC) failed
+   * during federation. The PDF shows a footnote when set so readers know
+   * intelligence may be incomplete. Added 2026-05-20.
+   */
+  externalIntelligenceDegraded: boolean;
 }
 
 export type WalletRole =
@@ -854,7 +887,7 @@ export async function generateReport(
   let ethSent = 0;
   const tokenSet = new Set<string>();
   const counterpartyMap = new Map<string, { count: number; volume: number }>();
-  const entityMap = new Map<string, { label: string; type: string; interactions: number }>();
+  const entityMap = new Map<string, { label: string; type: string; interactions: number; parentEntity?: string; complianceEmail?: string }>();
   const timestamps: number[] = [];
 
   /** Only count native currency toward totals — token values are different units */
@@ -873,7 +906,13 @@ export async function generateReport(
 
     const entity = KNOWN_ENTITIES[lower];
     if (entity && !entityMap.has(lower)) {
-      entityMap.set(lower, { label: entity.label, type: entity.type, interactions: 0 });
+      entityMap.set(lower, {
+        label: entity.label,
+        type: entity.type,
+        interactions: 0,
+        parentEntity: entity.parentEntity,
+        complianceEmail: entity.complianceEmail,
+      });
     }
     if (entity) {
       entityMap.get(lower)!.interactions++;
@@ -955,14 +994,50 @@ export async function generateReport(
     }
   }
 
-  // ── Risk score (improved with OFAC + scam DB) ──
+  // ── Phase 1: Address Labels Federation ──
+  // 2026-05-20: cross-reference top-20 counterparties by volume against
+  // Chainabuse, GoPlus, OFAC SDN and local sources. Hard-capped at 20 so
+  // total federation time stays under Vercel's function timeout budget
+  // (concurrency 8 → ~10s worst case for cold cache; near-instant when
+  // warmed by the 7-day S3 cache).
+  let addressLabels: AddressLabelResponse[] = [];
+  let externalIntelligenceDegraded = false;
+  try {
+    const top20 = Array.from(counterpartyMap.entries())
+      .sort((a, b) => b[1].volume - a[1].volume)
+      .slice(0, 20)
+      .map(([addr]) => addr);
+    addressLabels = await getAddressLabelsBatch(top20, network, 8);
+    externalIntelligenceDegraded = addressLabels.some(r => r.hadExternalSourceFailure);
+    const flaggedCount = addressLabels.filter(r => r.hasPhishingFlag || r.hasSanctionsFlag || r.hasScamFlag).length;
+    logger.info({
+      analyzed: top20.length,
+      flagged: flaggedCount,
+      degraded: externalIntelligenceDegraded,
+    }, '[generateReport] Address labels federation done');
+  } catch (err) {
+    logger.error({ err }, '[generateReport] Address labels federation crashed — continuing without');
+    externalIntelligenceDegraded = true;
+  }
+
+  // ── Risk score (improved with OFAC + scam DB + Phase 1 federation) ──
   let riskScore = 50; // baseline
   const hasMixer = identifiedEntities.some((e) => e.type === 'mixer');
   const hasExchange = identifiedEntities.some((e) => e.type === 'exchange');
   const hasScam = identifiedEntities.some((e) => e.type === 'scam');
 
-  if (ofacWarning) riskScore = 95; // OFAC = instant CRITICAL
-  else {
+  // Phase 1 signals from federation
+  const federationSanctionsHits = addressLabels.filter(r => r.hasSanctionsFlag).length;
+  const federationPhishingHits = addressLabels.filter(r => r.hasPhishingFlag).length;
+  const federationScamHits = addressLabels.filter(r => r.hasScamFlag && !r.hasPhishingFlag).length;
+  const externalOfacFound = addressLabels.some(r =>
+    r.labels.some(l => l.source === 'ofac' && l.category === 'sanctions')
+  );
+
+  if (ofacWarning || externalOfacFound) {
+    // OFAC = instant CRITICAL (whether from local KNOWN_ENTITIES or external OFAC list)
+    riskScore = 95;
+  } else {
     if (hasMixer) riskScore += 30;
     if (hasScam) riskScore += 25;
     if (scamDbMatches.length > 0) riskScore += 20; // Scam DB match
@@ -972,10 +1047,22 @@ export async function generateReport(
     // Smaller adjustment, just to break ties between otherwise-equal scores.
     if (hasExchange) riskScore -= 10;
     if (outgoing.length + incoming.length < 5) riskScore -= 15;
-    // Phishing-tagged counterparty is strong signal (Phase 1 federation
-    // will expand this beyond our manual list).
-    const anyCounterpartyPhishing = Array.from(counterpartyMap.keys()).some((a) => isKnownPhishing(a));
-    if (anyCounterpartyPhishing) riskScore += 30;
+
+    // Phishing-tagged counterparty is strong signal — combine local list
+    // (KNOWN_PHISHING) with anything the federation found from external sources.
+    const localPhishingHits = Array.from(counterpartyMap.keys()).filter(isKnownPhishing).length;
+    const totalPhishingHits = Math.max(localPhishingHits, federationPhishingHits);
+    if (totalPhishingHits > 0) {
+      // +10 per phishing-tagged counterparty, capped at +30.
+      riskScore += Math.min(30, totalPhishingHits * 10);
+    }
+
+    // Federation scam-only hits (no phishing) — moderate boost.
+    if (federationScamHits > 0) riskScore += Math.min(15, federationScamHits * 5);
+
+    // Sanctions hits NOT covered by ofacWarning (e.g. GoPlus 'sanctioned' flag
+    // on an address not in our KNOWN_ENTITIES). Hard-bump to CRITICAL.
+    if (federationSanctionsHits > 0) riskScore = Math.max(riskScore, 85);
   }
 
   riskScore = Math.max(0, Math.min(100, riskScore));
@@ -1160,7 +1247,15 @@ export async function generateReport(
   }
   if (hasMixer) keyFindings.push('Interactions with known mixer/tumbler services detected (Tornado Cash or similar). This is a significant risk indicator.');
   if (hasExchange) {
-    const exchanges = identifiedEntities.filter((e) => e.type === 'exchange').map((e) => e.label);
+    // 2026-05-20 fix 1.2: dedupe by parentEntity so we don't print
+    // "Binance Hot Wallet, Binance Hot Wallet, Binance 14 (Hot Wallet)…" —
+    // collapse to a single "Binance" entry. Fall back to label when there's
+    // no parentEntity recorded.
+    const exchanges = Array.from(new Set(
+      identifiedEntities
+        .filter((e) => e.type === 'exchange')
+        .map((e) => e.parentEntity || e.label)
+    ));
     keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
   }
   if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
@@ -1197,7 +1292,12 @@ export async function generateReport(
     recommendations.push('IMMEDIATE: Cease all interactions with this wallet. OFAC-sanctioned addresses carry severe legal penalties for US persons.');
   }
   if (hasExchange) {
-    const exchanges = identifiedEntities.filter((e) => e.type === 'exchange').map((e) => e.label);
+    // 2026-05-20 fix 1.2: dedupe by parentEntity so we don't recommend
+    // subpoenaing "Binance Hot Wallet" (label of a single hot wallet) — we
+    // recommend "Binance" (the brand).
+    const exchanges = Array.from(new Set(
+      identifiedEntities.filter((e) => e.type === 'exchange').map((e) => e.parentEntity || e.label)
+    ));
     recommendations.push(`Subpoena target identified: ${exchanges[0]}. Attorney can file discovery request for account holder information.`);
   }
   if (hasMixer) recommendations.push('Mixer usage detected. Professional demixing analysis recommended to trace funds through mixing service.');
@@ -1301,25 +1401,55 @@ export async function generateReport(
   }
   const forwardingPercent = totalInValue > 0 ? Math.round((forwardedWithin24h / totalInValue) * 100) : 0;
 
-  // Primary exit exchange
-  const kycExchangesSorted = identifiedEntities
-    .filter(e => e.type === 'exchange')
-    .sort((a, b) => b.interactions - a.interactions);
-  const primaryExitExchange = kycExchangesSorted[0]?.label || '';
-  const EXCHANGE_COMPLIANCE_EMAILS: Record<string, string> = {
-    'Binance': 'compliance@binance.com',
-    'Coinbase': 'compliance@coinbase.com',
-    'Kraken': 'compliance@kraken.com',
-    'OKX': 'compliance@okx.com',
-    'Bybit': 'compliance@bybit.com',
-    'KuCoin': 'support@kucoin.com',
-    'Huobi': 'compliance@huobi.com',
-    'Gate.io': 'compliance@gate.io',
-    'Bitfinex': 'compliance@bitfinex.com',
-    'Gemini': 'compliance@gemini.com',
+  // 2026-05-20 fix 1.1+1.2: group exchange addresses by parentEntity to pick
+  // the dominant *brand* (not a specific hot wallet). Email comes from
+  // lib/known-entities.ts — no more synthesised compliance@binancehotwallet.com.
+  type ExchangeBrand = {
+    brand: string;            // e.g. "Binance"
+    label: string;            // fallback display when no parent (e.g. "Gate.io")
+    interactions: number;     // sum across all hot wallets of this brand
+    addresses: string[];      // all hot wallet addresses
+    complianceEmail: string;  // single brand-wide email, '' if unknown
   };
-  const primaryExitExchangeEmail = EXCHANGE_COMPLIANCE_EMAILS[primaryExitExchange]
-    || (primaryExitExchange ? `compliance@${primaryExitExchange.toLowerCase().replace(/[^a-z]/g, '')}.com` : '');
+  const exchangeBrandsMap = new Map<string, ExchangeBrand>();
+  for (const e of identifiedEntities) {
+    if (e.type !== 'exchange') continue;
+    const brand = e.parentEntity || e.label;
+    const existing = exchangeBrandsMap.get(brand);
+    if (existing) {
+      existing.interactions += e.interactions;
+      existing.addresses.push(e.address);
+      // Prefer a non-empty complianceEmail when first one was empty
+      if (!existing.complianceEmail && e.complianceEmail) {
+        existing.complianceEmail = e.complianceEmail;
+      }
+    } else {
+      exchangeBrandsMap.set(brand, {
+        brand,
+        label: e.label,
+        interactions: e.interactions,
+        addresses: [e.address],
+        complianceEmail: e.complianceEmail || getComplianceEmailByParent(brand) || '',
+      });
+    }
+  }
+  const kycExchangeBrands: ExchangeBrand[] = Array.from(exchangeBrandsMap.values())
+    .sort((a, b) => b.interactions - a.interactions);
+
+  // Kept for backwards compatibility — kycExchangesSorted referenced elsewhere.
+  // 2026-05-20: now exposes brand-level grouping rather than per-hot-wallet
+  // entries, so consumers see "Binance" (13 interactions) instead of five
+  // separate "Binance Hot Wallet" rows.
+  const kycExchangesSorted = kycExchangeBrands.map(b => ({
+    address: b.addresses[0],
+    label: b.brand,
+    type: 'exchange' as const,
+    interactions: b.interactions,
+    parentEntity: b.brand,
+    complianceEmail: b.complianceEmail || undefined,
+  }));
+  const primaryExitExchange = kycExchangeBrands[0]?.brand || '';
+  const primaryExitExchangeEmail = kycExchangeBrands[0]?.complianceEmail || '';
 
   // ── Wallet role classification (priority cascade) ──
   // 2026-05-20 rewrite:
@@ -1475,14 +1605,41 @@ export async function generateReport(
   };
 
   // ── Evidence Strength Score ──
+  // 2026-05-20 fix 1.3: distinguish subject-vs-counterparty matches. When the
+  // subject is a victim, the scam-db / phishing hits are on the COUNTERPARTY,
+  // not the subject — so the bullet must say so to avoid implying the victim
+  // wallet is itself the scam.
   const criticalPatterns = patternAnalysis.patterns.filter(p => p.severity === 'CRITICAL' || p.severity === 'HIGH').length;
+  const subjectInScamDb = scamDbMatches.some(m => m.address.toLowerCase() === address.toLowerCase());
+  const counterpartyScamDbMatches = scamDbMatches.filter(m => m.address.toLowerCase() !== address.toLowerCase()).length;
+  const counterpartyPhishingFlags = Array.from(counterpartyMap.keys())
+    .filter(a => a.toLowerCase() !== address.toLowerCase() && isKnownPhishing(a))
+    .length;
+  const isVictimRole = walletRole === 'victim';
+
   const evidenceFactors: EvidenceStrength['factors'] = [
     { label: `${incoming.length + outgoing.length} transactions analyzed`, met: incoming.length + outgoing.length > 10 },
     { label: `${uniqueSenders} unique sender addresses identified`, met: uniqueSenders >= 3 },
     { label: `${forwardingPercent}% rapid forwarding pattern`, met: forwardingPercent >= 50 },
     { label: 'KYC exchange exit confirmed', met: kycExchangesSorted.length > 0 },
     { label: `${criticalPatterns} critical behavioral pattern(s) detected`, met: criticalPatterns > 0 },
-    { label: 'Scam database match found', met: scamDbMatches.length > 0 },
+    // Scam-DB / phishing — wording differs by role.
+    isVictimRole
+      ? {
+          label: counterpartyScamDbMatches > 0
+            ? `Counterparty in LedgerHound Scam Database (${counterpartyScamDbMatches} match${counterpartyScamDbMatches > 1 ? 'es' : ''})`
+            : 'Counterparty in LedgerHound Scam Database',
+          met: counterpartyScamDbMatches > 0,
+        }
+      : { label: 'Scam database match found', met: scamDbMatches.length > 0 },
+    isVictimRole
+      ? {
+          label: counterpartyPhishingFlags > 0
+            ? `Counterparty phishing flag confirmed (${counterpartyPhishingFlags} wallet${counterpartyPhishingFlags > 1 ? 's' : ''})`
+            : 'Counterparty phishing flag confirmed (external sources)',
+          met: counterpartyPhishingFlags > 0,
+        }
+      : { label: 'Phishing-tagged counterparty (Etherscan)', met: counterpartyPhishingFlags > 0 },
     { label: 'Timestamps verified on-chain', met: timestamps.length > 0 },
     { label: 'Cross-chain activity traced', met: crossChainTrace?.detected === true },
   ];
@@ -1503,16 +1660,14 @@ export async function generateReport(
       date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
     }));
 
-  // ── Exchange Compliance Emails for ALL identified exchanges ──
-  const exchangeComplianceEmails = identifiedEntities
-    .filter(e => e.type === 'exchange')
-    .map(e => ({
-      name: e.label,
-      email: EXCHANGE_COMPLIANCE_EMAILS[e.label]
-        || `compliance@${e.label.toLowerCase().replace(/[^a-z]/g, '')}.com`,
-    }))
-    // Deduplicate by name
-    .filter((e, i, arr) => arr.findIndex(x => x.name === e.name) === i);
+  // ── Exchange Compliance Emails (one per brand) ──
+  // 2026-05-20 fix 1.1+1.2: build from brand-level grouping so we get a
+  // single Binance entry (not 5×). Emails come from lib/known-entities.ts —
+  // no synthesis fallback (the old code produced broken
+  // compliance@binancehotwallet.com style addresses).
+  const exchangeComplianceEmails = kycExchangeBrands
+    .filter(b => b.complianceEmail)
+    .map(b => ({ name: b.brand, email: b.complianceEmail }));
 
   // ── Legal Weight Assessment ──
   const legalWeight = [
@@ -1583,6 +1738,10 @@ export async function generateReport(
     })(),
     patternAnalysis,
     crossChainTrace,
+    counterpartyPhishingFlags,
+    counterpartyScamDbMatches,
+    addressLabels,
+    externalIntelligenceDegraded,
   };
 
   // Generate PDF
