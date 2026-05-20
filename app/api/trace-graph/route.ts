@@ -517,7 +517,9 @@ export async function POST(req: NextRequest) {
         const entity = getKnownEntity(key);
         nodes.set(key, {
           id: key,
-          label: entity?.label || `${key.slice(0, 6)}…${key.slice(-4)}`,
+          // 2026-05-20 fix 1.4: bump prefix to 10 chars so look-alike addresses
+          // (address-poisoning clusters) get visually distinct labels.
+          label: entity?.label || `${key.slice(0, 10)}…${key.slice(-4)}`,
           type: isSource ? 'source' : getNodeType(key),
           totalIn: 0,
           totalOut: 0,

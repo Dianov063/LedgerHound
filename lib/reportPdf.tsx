@@ -788,6 +788,109 @@ const recoveryDiffColor = (d: string) => {
   return slate600;
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   PAGE: ADDRESS VERIFICATION & EXTERNAL INTELLIGENCE
+   2026-05-20 (Phase 1): cross-reference counterparty addresses with
+   Chainabuse, GoPlus, OFAC SDN, KNOWN_ENTITIES, KNOWN_PHISHING and the
+   LedgerHound Scam Database. Capped at 15 entries to keep the section
+   within 1-2 pages. Hidden when federation produced no labels at all.
+   ═══════════════════════════════════════════════════════════════ */
+const SOURCE_LABELS: Record<string, string> = {
+  etherscan_manual: 'ETHERSCAN',
+  chainabuse: 'CHAINABUSE',
+  goplus: 'GOPLUS',
+  ofac: 'OFAC SDN',
+  ledgerhound_scam_db: 'LEDGERHOUND DB',
+  cex_whitelist: 'KYC EXCHANGE',
+  known_entity: 'KNOWN ENTITY',
+  known_phishing: 'ETHERSCAN',
+};
+
+function severityRankFor(r: { hasSanctionsFlag: boolean; hasPhishingFlag: boolean; hasScamFlag: boolean; isKycExchange: boolean; labels: { length: number } }): number {
+  // Higher = more important to surface. Sanctions > phishing > scam > CEX > other > clean.
+  if (r.hasSanctionsFlag) return 4;
+  if (r.hasPhishingFlag) return 3;
+  if (r.hasScamFlag) return 2;
+  if (r.isKycExchange) return 1;
+  if (r.labels.length > 0) return 0;
+  return -1;
+}
+
+const AddressLabelsPage = ({ data }: { data: ReportData }) => {
+  if (!data.addressLabels || data.addressLabels.length === 0) return null;
+
+  // Sort: severity DESC, then by highestConfidence DESC.
+  const sorted = [...data.addressLabels].sort((a, b) => {
+    const sa = severityRankFor(a);
+    const sb = severityRankFor(b);
+    if (sa !== sb) return sb - sa;
+    return b.highestConfidence - a.highestConfidence;
+  });
+
+  const MAX_ENTRIES = 15;
+  const shown = sorted.slice(0, MAX_ENTRIES);
+  const remaining = Math.max(0, sorted.length - MAX_ENTRIES);
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Address Verification & External Intelligence</Text>
+      <Text style={{ ...s.p, marginBottom: 10 }}>
+        Top counterparty addresses (by volume) cross-referenced with multiple verification sources: LedgerHound Scam Database, OFAC SDN, Chainabuse community reports, GoPlus Security risk flags, and our curated Etherscan Fake_Phishing list. Sources are queried independently; agreement across sources increases confidence.
+      </Text>
+
+      {data.externalIntelligenceDegraded && (
+        <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>External intelligence partially unavailable</Text>
+          <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
+            One or more external sources (Chainabuse, GoPlus, OFAC) were unavailable during report generation. Some labels may be incomplete. Internal database matches and curated Etherscan tags are unaffected.
+          </Text>
+        </View>
+      )}
+
+      {shown.map((r, i) => {
+        const sev = severityRankFor(r);
+        const borderColor = sev >= 3 ? red : sev === 2 ? amber : sev === 1 ? green : slate400;
+        const bg = sev >= 3 ? '#fef2f2' : sev === 2 ? '#fffbeb' : sev === 1 ? '#f0fdf4' : '#f8fafc';
+        const symbol = sev >= 3 ? '!!' : sev === 2 ? '!' : sev === 1 ? '✓' : '·';
+        return (
+          <View key={i} style={{ backgroundColor: bg, borderRadius: 4, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: borderColor }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+              <Text style={{ ...s.mono, fontSize: 7, color: slate900 }}>{symbol} {shortAddr(r.address)}</Text>
+              <Text style={{ fontSize: 6, color: slate400 }}>{r.labels.length} source{r.labels.length === 1 ? '' : 's'}</Text>
+            </View>
+            {r.labels.length === 0 ? (
+              <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>No matches in any verification source.</Text>
+            ) : (
+              r.labels.slice(0, 4).map((l, j) => (
+                <Text key={j} style={{ fontSize: 7, color: slate600, marginBottom: 1, lineHeight: 1.3 }}>
+                  [{SOURCE_LABELS[l.source] || l.source}] {l.tag}
+                  {l.reportCount ? `  (${l.reportCount} reports)` : ''}
+                  {l.confidence < 1 ? `  conf=${Math.round(l.confidence * 100)}%` : ''}
+                </Text>
+              ))
+            )}
+          </View>
+        );
+      })}
+
+      {remaining > 0 && (
+        <Text style={{ fontSize: 7, color: slate400, marginTop: 4, fontStyle: 'italic' }}>
+          + {remaining} more counterpart{remaining === 1 ? 'y' : 'ies'} analyzed but not shown (capped at {MAX_ENTRIES}). Full data available via the LedgerHound API.
+        </Text>
+      )}
+
+      <View style={{ marginTop: 'auto', paddingTop: 10 }}>
+        <Text style={{ fontSize: 6, color: slate400, lineHeight: 1.4 }}>
+          Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days.
+        </Text>
+      </View>
+
+      <Footer data={data} />
+    </Page>
+  );
+};
+
 const EntitiesExitPage = ({ data }: { data: ReportData }) => {
   const exits = data.exitPointAnalysis;
 
@@ -1292,8 +1395,38 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
    ═══════════════════════════════════════════════════════════════ */
 const ActionableStepsPage = ({ data }: { data: ReportData }) => {
   const n = data.narrative;
-  const exchanges = data.identifiedEntities.filter(e => e.type === 'exchange');
-  const hasExchanges = exchanges.length > 0;
+  // 2026-05-20 fix 1.2: group exchanges by parentEntity so we render one row
+  // per brand instead of five identical "Binance Hot Wallet" cards. Each
+  // brand row shows the brand name, summed interactions, comma-separated
+  // short hot-wallet addresses, and the brand-wide compliance email.
+  type ExchangeBrandView = {
+    brand: string;
+    interactions: number;
+    addresses: string[];
+    email: string;
+  };
+  const brandMap = new Map<string, ExchangeBrandView>();
+  for (const e of data.identifiedEntities) {
+    if (e.type !== 'exchange') continue;
+    const brand = e.parentEntity || e.label;
+    const existing = brandMap.get(brand);
+    if (existing) {
+      existing.interactions += e.interactions;
+      existing.addresses.push(e.address);
+      if (!existing.email && e.complianceEmail) existing.email = e.complianceEmail;
+    } else {
+      const found = data.exchangeComplianceEmails.find(ec => ec.name === brand);
+      brandMap.set(brand, {
+        brand,
+        interactions: e.interactions,
+        addresses: [e.address],
+        email: e.complianceEmail || found?.email || '',
+      });
+    }
+  }
+  const exchangeBrands: ExchangeBrandView[] = Array.from(brandMap.values())
+    .sort((a, b) => b.interactions - a.interactions);
+  const hasExchanges = exchangeBrands.length > 0;
 
   return (
     <Page size="A4" style={s.page}>
@@ -1316,21 +1449,26 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
           <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>STEP 1: Contact Exchange Compliance (URGENT — within 24h)</Text>
-          {exchanges.slice(0, 3).map((e, i) => {
-            const emailEntry = data.exchangeComplianceEmails.find(ec => ec.name === e.label);
-            return (
-              <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{e.label}</Text>
-                  <Text style={{ fontSize: 8, color: slate600 }}>{e.interactions} interaction(s)</Text>
-                </View>
-                <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>{e.address}</Text>
-                {emailEntry ? (
-                  <Text style={{ fontSize: 8, color: blue }}>{emailEntry.email}</Text>
-                ) : null}
+          {exchangeBrands.slice(0, 3).map((b, i) => (
+            <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{b.brand}</Text>
+                <Text style={{ fontSize: 8, color: slate600 }}>
+                  {b.interactions} interaction(s) · {b.addresses.length} hot wallet{b.addresses.length > 1 ? 's' : ''}
+                </Text>
               </View>
-            );
-          })}
+              <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>
+                {b.addresses.slice(0, 3).map(a => shortAddr(a)).join(', ')}{b.addresses.length > 3 ? ` (+${b.addresses.length - 3} more)` : ''}
+              </Text>
+              {b.email ? (
+                <Text style={{ fontSize: 8, color: blue }}>{b.email}</Text>
+              ) : (
+                <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>
+                  No published law-enforcement contact recorded — consult attorney for proper service channel.
+                </Text>
+              )}
+            </View>
+          ))}
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
             Send a preservation request to the compliance department referencing your police report number and this case ID ({data.caseId}). Request immediate account freeze and subscriber information disclosure.
           </Text>
@@ -1360,7 +1498,7 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
         </Text>
         {hasExchanges ? (
           <>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Retain attorney for emergency subpoena to {exchanges[0].label}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Retain attorney for emergency subpoena to {exchangeBrands[0].brand}</Text>
             <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request account holder identity: name, address, government ID, bank info</Text>
             <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} File civil asset recovery proceedings once identity obtained</Text>
             <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Send Preservation Letter to freeze suspect accounts</Text>
@@ -1450,6 +1588,9 @@ const DisclaimerPage = ({ data }: { data: ReportData }) => (
    ═══════════════════════════════════════════════════════════════ */
 export const ReportDocument = ({ data }: { data: ReportData }) => {
   const hasCrossChain = data.crossChainTrace?.detected === true;
+  // 2026-05-20 Phase 1: only render the new federation page when at least
+  // one counterparty was analyzed. Avoids a blank section on tiny wallets.
+  const hasAddressLabels = (data.addressLabels?.length ?? 0) > 0;
 
   return (
     <Document>
@@ -1460,6 +1601,7 @@ export const ReportDocument = ({ data }: { data: ReportData }) => {
       <PatternPage data={data} />
       <AnalyticsPage data={data} />
       <EntitiesExitPage data={data} />
+      {hasAddressLabels && <AddressLabelsPage data={data} />}
       {hasCrossChain && <CrossChainPage data={data} />}
       <FundFlowPage data={data} />
       <TransactionsPage data={data} />
