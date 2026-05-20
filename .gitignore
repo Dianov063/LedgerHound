@@ -32,3 +32,6 @@ next-env.d.ts
 # S3 backups (cleanup operations)
 /backups
 /*.tar.gz
+
+# Test report regeneration output
+/test-reports

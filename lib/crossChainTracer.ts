@@ -9,6 +9,7 @@
 
 import { fetchWithTimeout } from './fetch-timeout';
 import logger from '@/lib/logger';
+import { getKnownEntity } from './known-entities';
 
 /* ── Bridge contract addresses ── */
 const BRIDGE_CONTRACTS: Record<string, { name: string; chains: string[] }> = {
@@ -42,24 +43,9 @@ const BRIDGE_CONTRACTS: Record<string, { name: string; chains: string[] }> = {
   '0xe4edb277e41dc89ab076a1f049f4a3efa700bce8': { name: 'Orbiter Finance 2', chains: ['ETH', 'ARB', 'OP', 'BASE', 'ZKSYNC'] },
 };
 
-/* ── Known entities for final destination identification ── */
-const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
-  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
-  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 2', type: 'exchange' },
-  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 3', type: 'exchange' },
-  '0x71660c4005ba85c37ccec55d0c4493e66fe775d3': { label: 'Coinbase', type: 'exchange' },
-  '0x503828976d22510aad0201ac7ec88293211d23da': { label: 'Coinbase 3', type: 'exchange' },
-  '0x2910543af39aba0cd09dbb2d50200b3e800a63d2': { label: 'Kraken', type: 'exchange' },
-  '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b': { label: 'OKX', type: 'exchange' },
-  '0xab5c66752a9e8167967685f1450532fb96d5d24f': { label: 'Huobi', type: 'exchange' },
-  '0xf89d7b9c864f589bbf53a82105107622b35eaa40': { label: 'Bybit', type: 'exchange' },
-  '0x2b5634c42055806a59e9107ed44d43c426e58258': { label: 'KuCoin', type: 'exchange' },
-  '0x0d0707963952f2fba59dd06f2b425ace40b492fe': { label: 'Gate.io', type: 'exchange' },
-  '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange' },
-  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash', type: 'mixer' },
-  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 2', type: 'mixer' },
-  '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer' },
-};
+// 2026-05-20: Local KNOWN_ENTITIES removed. Source of truth is now
+// `lib/known-entities.ts` — accessed via `getKnownEntity()`. The 4 files
+// that previously had local copies are now consolidated.
 
 const CHAIN_LABELS: Record<string, string> = {
   eth: 'Ethereum', arb: 'Arbitrum', op: 'Optimism', base: 'Base',
@@ -291,7 +277,7 @@ function identifyFinalDestination(
 
   for (const tx of outTxs) {
     const to = (tx.to || '').toLowerCase();
-    const entity = KNOWN_ENTITIES[to];
+    const entity = getKnownEntity(to);
     if (entity) {
       return {
         chain: hops.length > 0 ? hops[hops.length - 1].toChain : 'eth',

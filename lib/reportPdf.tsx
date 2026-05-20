@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path } from '@react-pdf/renderer';
-import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength } from './generateReport';
+import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength, type RecoveryAssessment, type WalletRole } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 
 const blue = '#2563eb';
@@ -70,9 +70,16 @@ const riskColor = (score: number) => {
   return green;
 };
 
+/**
+ * Recovery score color scale.
+ * 2026-05-20: Recovery score is now hard-capped at 35% (see recoveryAssessment
+ * in generateReport.ts). The old thresholds (>=60 green) are unreachable now,
+ * so we use the new tiers: HIGHER_THAN_AVERAGE (>=25) is amber; MODERATE/LOW
+ * (15-24, 8-14) is amber; VERY_LOW (<8) is red. We deliberately never return
+ * green — the cap exists precisely because we don't want to imply high recovery.
+ */
 const recoveryColor = (score: number) => {
-  if (score >= 60) return green;
-  if (score >= 35) return amber;
+  if (score >= 15) return amber;
   return red;
 };
 
@@ -153,11 +160,39 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
         </View>
         <View style={{ flex: 1, alignItems: 'center', padding: 14, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
           <Text style={{ fontSize: 8, color: slate400, marginBottom: 6, letterSpacing: 1 }}>RECOVERY PROBABILITY</Text>
-          <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: recoveryColor(data.recoveryScore), alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-            <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryScore) }}>{data.recoveryScore}</Text>
+          <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: recoveryColor(data.recoveryAssessment.score), alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+            <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryAssessment.score) }}>{data.recoveryAssessment.score}%</Text>
           </View>
-          <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', maxWidth: 180 }}>{data.recoveryLabel}</Text>
+          <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', maxWidth: 180 }}>{data.recoveryAssessment.label}</Text>
         </View>
+      </View>
+
+      {/* Recovery disclaimer + factors — mandatory transparency block.
+          2026-05-20: New since recoveryAssessment was introduced; we always
+          show the disclaimer to avoid implying guarantees. */}
+      <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fde68a' }}>
+        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>RECOVERY PROBABILITY — IMPORTANT DISCLAIMER</Text>
+        <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.5, marginBottom: 6 }}>{data.recoveryAssessment.disclaimer}</Text>
+        {(data.recoveryAssessment.factors.positive.length > 0 || data.recoveryAssessment.factors.negative.length > 0) && (
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {data.recoveryAssessment.factors.positive.length > 0 && (
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 2 }}>POSITIVE FACTORS</Text>
+                {data.recoveryAssessment.factors.positive.slice(0, 5).map((f, i) => (
+                  <Text key={i} style={{ fontSize: 7, color: slate600, marginBottom: 1, paddingLeft: 4 }}>+ {f}</Text>
+                ))}
+              </View>
+            )}
+            {data.recoveryAssessment.factors.negative.length > 0 && (
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 2 }}>NEGATIVE FACTORS</Text>
+                {data.recoveryAssessment.factors.negative.slice(0, 5).map((f, i) => (
+                  <Text key={i} style={{ fontSize: 7, color: slate600, marginBottom: 1, paddingLeft: 4 }}>- {f}</Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* RISK BREAKDOWN TABLE */}
@@ -188,10 +223,18 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      {/* Scam Database Matches */}
-      {data.scamDbMatches && data.scamDbMatches.length > 0 && (
+      {/* Scam Database Matches.
+          2026-05-20: For victim subject, scamDbMatches are all COUNTERPARTY
+          hits (the scammer cluster), not the subject. Disambiguate the header
+          to avoid implying the subject wallet itself is in the scam DB. */}
+      {data.scamDbMatches && data.scamDbMatches.length > 0 && (() => {
+        const subjectMatched = data.scamDbMatches.some(m => m.address.toLowerCase() === data.walletAddress.toLowerCase());
+        const headerText = subjectMatched
+          ? 'Linked to LedgerHound Scam Database'
+          : 'Counterparty Linked to LedgerHound Scam Database';
+        return (
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 6 }}>Linked to LedgerHound Scam Database</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 6 }}>{headerText}</Text>
           {data.scamDbMatches.map((m, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               {m.qrDataUri && (
@@ -207,7 +250,8 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
             </View>
           ))}
         </View>
-      )}
+        );
+      })()}
 
       <View style={s.sectionDivider} />
 
@@ -228,7 +272,12 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
   const n = data.narrative;
   const ev = data.evidenceStrength;
   const evColor = ev.score >= 70 ? green : ev.score >= 40 ? amber : red;
-  const isDangerous = n.walletType === 'transit' || n.walletType === 'aggregation';
+  // 2026-05-20: Classify role for badge colouring and copy.
+  // - 'isVictim' must NEVER trigger the red "SCAM WALLET" badge or "LIKELY SCAM" labels:
+  //   the subject wallet is the victim, the scammer is the counterparty cluster.
+  // - 'isDangerous' (transit / aggregator / aggregation) keeps the original red treatment.
+  const isVictim = n.walletType === 'victim';
+  const isDangerous = n.walletType === 'transit' || n.walletType === 'aggregator' || n.walletType === 'aggregation';
   // Use primary asset (by volume) if it exists and is different from native currency
   const pa = data.primaryAsset;
   const flowIn = pa ? fmtEth(pa.totalIn) : fmtEth(data.ethReceived);
@@ -242,10 +291,26 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
 
       {/* Wallet Type Badge */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-        <View style={{ backgroundColor: isDangerous ? '#fef2f2' : n.walletType === 'exchange_deposit' ? '#fffbeb' : '#f0fdf4', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: isDangerous ? '#fecaca' : n.walletType === 'exchange_deposit' ? '#fde68a' : '#bbf7d0' }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: isDangerous ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
+        <View style={{ backgroundColor: isVictim ? '#fffbeb' : isDangerous ? '#fef2f2' : n.walletType === 'exchange_deposit' ? '#fffbeb' : '#f0fdf4', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: isVictim ? '#fde68a' : isDangerous ? '#fecaca' : n.walletType === 'exchange_deposit' ? '#fde68a' : '#bbf7d0' }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: isVictim ? amber : isDangerous ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
         </View>
+        {n.roleConfidence > 0 && (
+          <Text style={{ fontSize: 8, color: slate400 }}>Confidence: {Math.round(n.roleConfidence * 100)}%</Text>
+        )}
       </View>
+
+      {/* How we classified this wallet — reasoning bullets.
+          2026-05-20: Added for transparency. The classifier is a priority
+          cascade (scam-db → KNOWN_ENTITIES → victim heuristic → other roles).
+          See lib/generateReport.ts for the rules. */}
+      {n.roleReasoning && n.roleReasoning.length > 0 && (
+        <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>HOW WE CLASSIFIED THIS WALLET</Text>
+          {n.roleReasoning.slice(0, 5).map((r, i) => (
+            <Text key={i} style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 4, marginBottom: 2 }}>{'•'} {r}</Text>
+          ))}
+        </View>
+      )}
 
       {/* Key Stats Row */}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
@@ -270,7 +335,7 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
       {/* Narrative Text */}
       <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
         <Text style={{ ...s.p, fontSize: 9, lineHeight: 1.5, marginBottom: 4 }}>{n.summary}</Text>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: isDangerous ? red : blue, lineHeight: 1.4 }}>{n.conclusion}</Text>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: isVictim ? amber : isDangerous ? red : blue, lineHeight: 1.4 }}>{n.conclusion}</Text>
       </View>
 
       {/* Simplified Fund Flow Diagram — 3 boxes, 1 line */}
@@ -278,21 +343,37 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
         <Text style={{ ...s.h3, marginBottom: 6 }}>Fund Flow</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <View style={{ alignItems: 'center', backgroundColor: '#eff6ff', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: '#bfdbfe' }}>
-            <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders} Victims</Text>
+            <Text style={{ fontSize: isVictim ? 10 : 14, fontFamily: 'Helvetica-Bold', color: blue, textAlign: 'center' }}>
+              {isVictim ? `~${n.uniqueSenders} Source Deposit(s)` : `${n.uniqueSenders} Victims`}
+            </Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{flowIn} {flowSymbol}</Text>
+            {isVictim && (
+              <Text style={{ fontSize: 6, color: slate400, marginTop: 1, textAlign: 'center' }}>(incl. CEX deposits)</Text>
+            )}
           </View>
           <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
-          <View style={{ alignItems: 'center', backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, flex: 1, borderWidth: 2, borderColor: red }}>
-            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>SCAM WALLET</Text>
+          <View style={{ alignItems: 'center', backgroundColor: isVictim ? '#fffbeb' : '#fef2f2', borderRadius: 6, padding: 8, flex: 1, borderWidth: 2, borderColor: isVictim ? amber : red }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: isVictim ? amber : red }}>
+              {isVictim ? 'VICTIM WALLET' : 'SCAM WALLET'}
+            </Text>
             <Text style={{ fontFamily: 'Courier', fontSize: 6, color: slate600, marginTop: 1 }}>{shortAddr(data.walletAddress)}</Text>
           </View>
           <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
-          <View style={{ alignItems: 'center', backgroundColor: n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: n.primaryExitExchange ? green : amber }}>{n.primaryExitExchange || `${n.uniqueReceivers} Receivers`}</Text>
+          <View style={{ alignItems: 'center', backgroundColor: isVictim ? '#fef2f2' : n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: isVictim ? '#fecaca' : n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: isVictim ? red : n.primaryExitExchange ? green : amber }}>
+              {isVictim ? `${n.uniqueReceivers} Counterparty Wallet(s)` : (n.primaryExitExchange || `${n.uniqueReceivers} Receivers`)}
+            </Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{flowOut} {flowSymbol}</Text>
-            {n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>KYC Exchange</Text>}
+            {!isVictim && n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>KYC Exchange</Text>}
+            {isVictim && <Text style={{ fontSize: 6, color: red, marginTop: 1 }}>Suspected Scammer Cluster</Text>}
           </View>
         </View>
+        {/* Victim-context note: this wallet is one of N senders — see user spec on Elayne case */}
+        {isVictim && (
+          <Text style={{ fontSize: 7, color: slate600, marginTop: 6, paddingHorizontal: 8, lineHeight: 1.4 }}>
+            Note: This wallet is one of approximately {n.uniqueSenders > 0 ? n.uniqueSenders : 'several'} source(s) sending funds to the same recipient cluster. The pattern is consistent with the wallet owner being a victim, not a scam operator.
+          </Text>
+        )}
       </View>
 
       {/* Victim Guidance Block */}
@@ -506,39 +587,53 @@ const overallRiskLabel = (risk: string) => {
 
 const PatternPage = ({ data }: { data: ReportData }) => {
   const pa = data.patternAnalysis;
+  // 2026-05-20: When the subject wallet is itself the victim, we must NOT
+  // label this wallet as "LIKELY SCAM" / "CONFIRMED SCAM" — the detected
+  // patterns describe the counterparty cluster's behaviour, not the subject.
+  // Show "VICTIM PATTERN DETECTED" with the subject framed as the harmed party.
+  const isVictim = data.narrative.walletType === 'victim';
+  const effectiveRisk = isVictim ? 'VICTIM_PATTERN' : (pa?.overallRisk || 'CLEAN');
+  const effectiveLabel = isVictim ? 'VICTIM PATTERN DETECTED' : overallRiskLabel(pa?.overallRisk || 'CLEAN');
+  const effectiveColor = isVictim ? amber : overallRiskColor(pa?.overallRisk || 'CLEAN');
+  const bannerBg = isVictim ? '#fffbeb' : pa?.overallRisk === 'CLEAN' ? '#f0fdf4' : pa?.overallRisk === 'SUSPICIOUS' ? '#fffbeb' : '#fef2f2';
+  const bannerBorder = isVictim ? '#fde68a' : pa?.overallRisk === 'CLEAN' ? '#bbf7d0' : pa?.overallRisk === 'SUSPICIOUS' ? '#fde68a' : '#fecaca';
 
   return (
     <Page size="A4" style={s.page}>
       <Header data={data} />
       <Text style={s.h2}>Behavioral Pattern Analysis</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
-        Automated detection of scam-associated behavioral patterns based on transaction timing, flow structure, and counterparty analysis.
+        {isVictim
+          ? 'The subject wallet was classified as a victim wallet. The patterns below describe characteristics of the counterparty cluster that received funds, not allegations against the subject wallet.'
+          : 'Automated detection of scam-associated behavioral patterns based on transaction timing, flow structure, and counterparty analysis.'}
       </Text>
 
       {/* Overall Assessment */}
       {pa && (
         <View style={{
-          backgroundColor: pa.overallRisk === 'CLEAN' ? '#f0fdf4' : pa.overallRisk === 'SUSPICIOUS' ? '#fffbeb' : '#fef2f2',
+          backgroundColor: bannerBg,
           borderRadius: 8,
           padding: 14,
           marginBottom: 16,
           borderWidth: 1,
-          borderColor: pa.overallRisk === 'CLEAN' ? '#bbf7d0' : pa.overallRisk === 'SUSPICIOUS' ? '#fde68a' : '#fecaca',
+          borderColor: bannerBorder,
           alignItems: 'center',
         }}>
           <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>OVERALL BEHAVIORAL ASSESSMENT</Text>
           <Text style={{
             ...s.badge,
             fontSize: 12,
-            backgroundColor: overallRiskColor(pa.overallRisk),
+            backgroundColor: effectiveColor,
             color: 'white',
             paddingHorizontal: 16,
             paddingVertical: 5,
           }}>
-            {overallRiskLabel(pa.overallRisk)}
+            {effectiveLabel}
           </Text>
           <Text style={{ fontSize: 8, color: slate600, marginTop: 8, textAlign: 'center', maxWidth: 400, lineHeight: 1.4 }}>
-            {pa.interpretation}
+            {isVictim
+              ? 'The subject wallet shows the behavioral fingerprint of a victim wallet (CEX-funded, low-history, rapid forwarding to a small unknown counterparty set). Detected patterns characterise the counterparty cluster — not the subject.'
+              : pa.interpretation}
           </Text>
         </View>
       )}
@@ -1159,11 +1254,15 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      {/* Overall recovery */}
+      {/* Overall recovery — uses structured recoveryAssessment.
+          2026-05-20: Score hard-capped at 35%; disclaimer is mandatory. */}
       <View style={{ backgroundColor: '#f1f5f9', borderRadius: 6, padding: 12, marginBottom: 14, alignItems: 'center' }}>
         <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>OVERALL RECOVERY PROBABILITY</Text>
-        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryScore) }}>{data.recoveryScore}%</Text>
-        <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', marginTop: 4 }}>{data.recoveryLabel}</Text>
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryAssessment.score) }}>{data.recoveryAssessment.score}%</Text>
+        <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', marginTop: 4 }}>{data.recoveryAssessment.label}</Text>
+        <Text style={{ fontSize: 7, color: slate400, textAlign: 'center', marginTop: 8, maxWidth: 420, lineHeight: 1.4, fontStyle: 'italic' }}>
+          {data.recoveryAssessment.disclaimer}
+        </Text>
       </View>
 
       <View style={s.sectionDivider} />

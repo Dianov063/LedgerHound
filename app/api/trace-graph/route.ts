@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { getAddressIndex } from '@/lib/scam-db';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { getKnownEntity } from '@/lib/known-entities';
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
 type NetworkOrAuto = NetworkType | 'auto';
@@ -18,132 +19,15 @@ function getAlchemyKey(): string {
 const getAlchemyEthUrl = () => `https://eth-mainnet.g.alchemy.com/v2/${getAlchemyKey()}`;
 const getAlchemyPolygonUrl = () => `https://polygon-mainnet.g.alchemy.com/v2/${getAlchemyKey()}`;
 
-const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
-  // Binance
-  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
-  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 2', type: 'exchange' },
-  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 3', type: 'exchange' },
-  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance 4', type: 'exchange' },
-  '0x21a31ee1afc51d94c2efccaa2092ad1028285549': { label: 'Binance 5', type: 'exchange' },
-
-  // Coinbase
-  '0x71660c4005ba85c37ccec55d0c4493e66fe775d3': { label: 'Coinbase', type: 'exchange' },
-  '0xa090e606e30bd747d4e6245a1517ebe430f0057e': { label: 'Coinbase 2', type: 'exchange' },
-  '0x503828976d22510aad0201ac7ec88293211d23da': { label: 'Coinbase 3', type: 'exchange' },
-
-  // Kraken
-  '0x2910543af39aba0cd09dbb2d50200b3e800a63d2': { label: 'Kraken', type: 'exchange' },
-  '0x0a869d79a7052c7f1b55a8ebabbea3420f0d1e13': { label: 'Kraken 2', type: 'exchange' },
-
-  // OKX
-  '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b': { label: 'OKX', type: 'exchange' },
-  '0x236f9f97e0e62388479bf9e5ba4889e46b0273c3': { label: 'OKX 2', type: 'exchange' },
-
-  // Huobi / HTX
-  '0xab5c66752a9e8167967685f1450532fb96d5d24f': { label: 'Huobi', type: 'exchange' },
-  '0x6748f50f686bfbca6fe8ad62b22228b87f31ff2b': { label: 'Huobi 2', type: 'exchange' },
-
-  // Bybit
-  '0xf89d7b9c864f589bbf53a82105107622b35eaa40': { label: 'Bybit', type: 'exchange' },
-
-  // KuCoin
-  '0x2b5634c42055806a59e9107ed44d43c426e58258': { label: 'KuCoin', type: 'exchange' },
-
-  // Gate.io
-  '0x0d0707963952f2fba59dd06f2b425ace40b492fe': { label: 'Gate.io', type: 'exchange' },
-
-  // Bitfinex
-  '0x77134cbc06cb00b66f4c7e623d5fdbf6777635ec': { label: 'Bitfinex', type: 'exchange' },
-
-  // Crypto.com
-  '0x6262998ced04146fa42253a5c0af90ca02dfd2a3': { label: 'Crypto.com', type: 'exchange' },
-
-  // ChangeNOW
-  '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange' },
-
-  // Tornado Cash (mixers - high risk)
-  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash', type: 'mixer' },
-  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 2', type: 'mixer' },
-  '0x910cbd523d972eb0a6f4cae4618ad62622b39dbf': { label: 'Tornado Cash 3', type: 'mixer' },
-  '0xa160cdab225685da1d56aa342ad8841c3b53f291': { label: 'Tornado Cash 4', type: 'mixer' },
-
-  // FixedFloat (used by scammers)
-  '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer' },
-
-  // Uniswap
-  '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': { label: 'Uniswap V2', type: 'defi' },
-  '0xe592427a0aece92de3edee1f18e0157c05861564': { label: 'Uniswap V3', type: 'defi' },
-  '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': { label: 'SushiSwap', type: 'defi' },
-  '0xdef1c0ded9bec7f1a1670819833240f027b25eff': { label: '0x Exchange', type: 'defi' },
-
-  // Known scam-related
-  '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Flagged Address', type: 'scam' },
-};
-
-const KNOWN_TRON_ENTITIES: Record<string, { label: string; type: string }> = {
-  'TN5C4p6n8jBHEBEFVCEFkEzakAVAoHjE68': { label: 'Binance TRON', type: 'exchange' },
-  'TFTWqeM8TErPWxitPUAH9rMuREjMCGEFSe': { label: 'Huobi TRON', type: 'exchange' },
-  'TYASr5UV6HEcXatwdFQfmLVUqQQQMUxHLS': { label: 'OKX TRON', type: 'exchange' },
-  'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange' },
-  'TCYSmggLNfJm8KXKDVL9HF93gHqJbGcTH3': { label: 'KuCoin TRON', type: 'exchange' },
-  'TKbQQJigNqXXe3Fx1EMseSJaJD3UJSg5FG': { label: 'Gate.io TRON', type: 'exchange' },
-  'TVGDpEqR1GbK2mhpBECQuJCz3SWJzHaXvz': { label: 'Bybit TRON', type: 'exchange' },
-  'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange' },
-  'TNaRAoLUyYEV2uF7GUrzSjRQTU8v5ZJ5VR': { label: 'SunSwap V2', type: 'defi' },
-  'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy': { label: 'Pig Butchering TRON 1', type: 'scam' },
-  'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG': { label: 'Pig Butchering TRON 2', type: 'scam' },
-  'THMciKzTHCw2YHaUka8Cq8MQGhBYDttx7c': { label: 'Pig Butchering TRON 3', type: 'scam' },
-  'TGzz8gjYiYRqpfmDwnLxfCAQasYZgqX9Bb': { label: 'Fake Exchange TRON', type: 'scam' },
-  'TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT': { label: 'USDT Scam Collector', type: 'scam' },
-};
-
-const KNOWN_BSC_ENTITIES: Record<string, { label: string; type: string }> = {
-  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance BSC', type: 'exchange' },
-  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance BSC 2', type: 'exchange' },
-  '0x10ed43c718714eb63d5aa57b78b54704e256024e': { label: 'PancakeSwap V2', type: 'defi' },
-  '0x13f4ea83d0bd40e75c8222255bc855a974568dd4': { label: 'PancakeSwap V3', type: 'defi' },
-  '0x1111111254eeb25477b68fb85ed929f73a960582': { label: '1inch BSC', type: 'defi' },
-  '0x55d398326f99059ff775485246999027b3197955': { label: 'USDT BSC Contract', type: 'defi' },
-};
-
-const KNOWN_BTC_ENTITIES: Record<string, { label: string; type: string }> = {
-  '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo': { label: 'Binance', type: 'exchange' },
-  '3FHNBLobJnbCPujupTVaaeeMLDPFJRCXsX': { label: 'Coinbase', type: 'exchange' },
-  '3AfP9N8mHkNQWx3FfKMJg9RFhJhRGJkFBv': { label: 'Kraken', type: 'exchange' },
-  'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97': { label: 'Binance Cold', type: 'exchange' },
-  '385cR5DM96n1HvBDMzLHPYcw89fZAXULJP': { label: 'Binance 2', type: 'exchange' },
-  '3Cbq7aT1tY8kMxWLbitaG7yT6bPbKChq64': { label: 'Bitfinex', type: 'exchange' },
-  '1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF': { label: 'Bitcoin Fog', type: 'mixer' },
-  '1FRmxkMPh5U7qHZKtYhYQfScDGBHbdBGpj': { label: 'Helix Mixer', type: 'mixer' },
-  '12tkqA9xSoowkzoERHMWNKsTey55YEBqkv': { label: 'WannaCry', type: 'scam' },
-};
-
-const KNOWN_SOL_ENTITIES: Record<string, { label: string; type: string }> = {
-  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM': { label: 'Binance', type: 'exchange' },
-  '5tzFkiKscXHK5ZXCGbClgAGNBRDSBHGBfmfgUpBhFDqJ': { label: 'Coinbase', type: 'exchange' },
-  'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': { label: 'Binance 2', type: 'exchange' },
-  '2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S': { label: 'Kraken', type: 'exchange' },
-  'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4': { label: 'Jupiter', type: 'defi' },
-  'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc': { label: 'Orca Whirlpool', type: 'defi' },
-};
-
-function getEntitiesForNetwork(network: NetworkType): Record<string, { label: string; type: string }> {
-  switch (network) {
-    case 'btc':
-      return KNOWN_BTC_ENTITIES;
-    case 'eth':
-      return KNOWN_ENTITIES;
-    case 'sol':
-      return KNOWN_SOL_ENTITIES;
-    case 'trx':
-      return KNOWN_TRON_ENTITIES;
-    case 'bnb':
-      return KNOWN_BSC_ENTITIES;
-    default:
-      // All other EVM chains reuse ETH entities (many overlap)
-      return KNOWN_ENTITIES;
-  }
-}
+// 2026-05-20: Per-network KNOWN_*_ENTITIES tables removed. Source of truth
+// is now `lib/known-entities.ts` — accessed via `getKnownEntity()` which
+// handles ETH (case-insensitive) and TRON/BTC/SOL (case-sensitive) lookups.
+//
+// Fabricated entries removed in this consolidation (no provenance):
+//   - 0xd882cfc20f... "Flagged Address"
+//   - 5 fabricated TRON "Pig Butchering"/"Fake Exchange"/"USDT Scam" entries
+//   - WannaCry was reclassified from 'scam' to 'ransomware' (correct type).
+// See docs/removed-fabricated-entries.md for full audit trail.
 
 function isValidAddress(network: NetworkType, addr: string): boolean {
   if (network === 'btc') {
@@ -611,7 +495,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Invalid ${net.toUpperCase()} address` }, { status: 400 });
     }
 
-    const entities = getEntitiesForNetwork(net);
     const maxDepth = Math.min(Math.max(1, depth), 3);
     const nodes = new Map<string, GraphNode>();
     const edges: GraphEdge[] = [];
@@ -623,8 +506,7 @@ export async function POST(req: NextRequest) {
     const normalizeAddr = (addr: string) => (caseSensitive ? addr : addr.toLowerCase());
 
     const getNodeType = (addr: string): GraphNode['type'] => {
-      const key = net === 'trx' ? addr : addr.toLowerCase();
-      const entity = entities[key];
+      const entity = getKnownEntity(addr);
       if (entity) return entity.type as GraphNode['type'];
       return 'unknown';
     };
@@ -632,7 +514,7 @@ export async function POST(req: NextRequest) {
     const ensureNode = (addr: string, isSource = false) => {
       const key = normalizeAddr(addr);
       if (!nodes.has(key)) {
-        const entity = entities[key];
+        const entity = getKnownEntity(key);
         nodes.set(key, {
           id: key,
           label: entity?.label || `${key.slice(0, 6)}…${key.slice(-4)}`,
@@ -698,7 +580,7 @@ export async function POST(req: NextRequest) {
       if (currentDepth < maxDepth) {
         const nextAddresses = outgoing
           .map((tx: any) => normalizeAddr(tx.to || ''))
-          .filter((a: string) => a && !visited.has(a) && !entities[a])
+          .filter((a: string) => a && !visited.has(a) && !getKnownEntity(a))
           .slice(0, 5); // limit branches
 
         for (const next of nextAddresses) {
