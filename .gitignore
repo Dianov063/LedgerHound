@@ -28,3 +28,7 @@ next-env.d.ts
 
 # generated test artifacts
 /*.pdf
+
+# S3 backups (cleanup operations)
+/backups
+/*.tar.gz

@@ -43,20 +43,11 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: st
   '0xc455f7fd3e0e12afd51fba5c106909934d8a0e4a': { label: 'Blender.io (OFAC)', type: 'sanctioned', category: 'Sanctions' },
   '0x36dd7b862746fddfa5108aeb58fc831ae3961230': { label: 'Sinbad.io (OFAC)', type: 'sanctioned', category: 'Sanctions' },
 
-  // Known Scam / Pig Butchering / Fraud Addresses (public lists)
-  '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Reported Scam Address', type: 'scam', category: 'Scam' },
-  '0x3cffd56b47b7b41c56258d9c7731abadc360e460': { label: 'Pig Butchering Scam', type: 'scam', category: 'Scam' },
-  '0x19aa5fe80d33a56d56c78e82ea5e50e5d80b4dff': { label: 'Fake Exchange Scam', type: 'scam', category: 'Scam' },
-  '0xef3a930e1ffffffacd2b664822cb7d1c51e0c36e': { label: 'Phishing Wallet', type: 'scam', category: 'Scam' },
-  '0x707012c9cf97c4c3a481603f98d593ecd3a44621': { label: 'Romance Scam Collector', type: 'scam', category: 'Scam' },
-  '0x56eddb7aa87536c09ccc2793473599fd21a8b17f': { label: 'Investment Fraud', type: 'scam', category: 'Scam' },
-  '0x39d908dac893cbcb53cc86e0ecc369aa4def1a29': { label: 'Pig Butchering Network', type: 'scam', category: 'Scam' },
-  '0x0681d8db095565fe8a346fa0277bffde9c0edbbf': { label: 'Address Poisoning Attacker', type: 'scam', category: 'Scam' },
-  '0xbad0000bad0000bad0000bad0000bad0000bad00': { label: 'Known Scam Wallet', type: 'scam', category: 'Scam' },
-
-  // Darknet / Ransomware (public attributions)
-  '0x04786aada9deea2150deab7b3b8911c309f5ed90': { label: 'Darknet Market Deposit', type: 'darknet', category: 'Darknet' },
-  '0x19f4f2f9f3daca875611c03ecf0a8c6e5c9d60e3': { label: 'Ransomware Payment Collector', type: 'ransomware', category: 'Ransomware' },
+  // ── 2026-05-20 CLEANUP ──
+  // Removed 9 fabricated "scam" entries + 1 placeholder + 2 darknet/ransomware
+  // (no provenance, generic labels, one falsely labeled Binance hot wallet).
+  // See docs/removed-fabricated-entries.md for full audit trail.
+  // To re-add: lib/scam-db-verified-seed.ts with documented evidence chain.
 
   // Other Mixers
   '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer', category: 'Mixer' },
@@ -70,15 +61,8 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: st
   'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange', category: 'Exchange' },
   'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange', category: 'Exchange' },
   'TCYSmggLNfJm8KXKDVL9HF93gHqJbGcTH3': { label: 'KuCoin TRON', type: 'exchange', category: 'Exchange' },
-  // TRON Scams
-  'TXF1yNp2yvUwUvSgzUSTfP8VFN5jAH5rzy': { label: 'Pig Butchering TRON 1', type: 'scam', category: 'Scam' },
-  'TDqVegmPEb3juFCkEMS9K94xVcNSc5EYAG': { label: 'Pig Butchering TRON 2', type: 'scam', category: 'Scam' },
-  'THMciKzTHCw2YHaUka8Cq8MQGhBYDttx7c': { label: 'Pig Butchering TRON 3', type: 'scam', category: 'Scam' },
-  'TGzz8gjYiYRqpfmDwnLxfCAQasYZgqX9Bb': { label: 'Fake Exchange TRON', type: 'scam', category: 'Scam' },
-  'TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT': { label: 'USDT Scam Collector TRON', type: 'scam', category: 'Scam' },
-  'TVj7RNVHy6thbM7BWdSe9G6gXwKhjhdNZS': { label: 'Romance Scam TRON', type: 'scam', category: 'Scam' },
-  'TJNhWi2sWrZWoFqMpoRWPSFkBqaDDNNiEi': { label: 'Investment Fraud TRON', type: 'scam', category: 'Scam' },
-  'TLWBp82bGJuiFoFVS6RqQ7HM6Wf3cFNMXn': { label: 'Approval Scam TRON', type: 'scam', category: 'Scam' },
+  // TRON Scams — removed 8 fabricated entries (2026-05-20 cleanup).
+  // See docs/removed-fabricated-entries.md.
 
   // ── BNB Chain (BSC) Addresses ──
   // Exchanges
@@ -88,9 +72,8 @@ const KNOWN_ENTITIES: Record<string, { label: string; type: string; category: st
   '0x13f4ea83d0bd40e75c8222255bc855a974568dd4': { label: 'PancakeSwap V3 Router', type: 'defi', category: 'DeFi' },
   '0x1111111254eeb25477b68fb85ed929f73a960582': { label: '1inch BSC', type: 'defi', category: 'DeFi' },
   // BSC Scams
-  '0x7e1116d3109f17bc5ec04c0d241ae637489e4ac2': { label: 'BSC Rug Pull', type: 'scam', category: 'Scam' },
-  '0x9c2dc0c3cc2badde84b0025cf4df1c5af288d835': { label: 'BSC Honeypot Deployer', type: 'scam', category: 'Scam' },
-  '0x6e47dfa22fe4c0e5cf7a24490e8eaab407d7f1d0': { label: 'BSC Phishing', type: 'scam', category: 'Scam' },
+  // BSC Scams — removed 3 fabricated entries (2026-05-20 cleanup).
+  // See docs/removed-fabricated-entries.md.
 
   // ── Bitcoin Addresses ──
   // Bitcoin Exchanges

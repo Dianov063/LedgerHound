@@ -35,15 +35,23 @@ export async function GET(request: NextRequest) {
 
   try {
     console.log('[seed/route] GET seed called, force:', force)
-    await seedDatabase(force)
+    const result = await seedDatabase(force)
 
     // Return verification data
     const index = await getPlatformIndex()
     const stats = await getStats()
 
+    const message = result.skipped
+      ? `Already seeded with ${index.length} platforms. Pass force=true to re-seed.`
+      : result.seeded === 0
+        ? 'No verified seed platforms defined. Add entries to lib/scam-db-verified-seed.ts. Database is empty (this is expected post-2026-05-20 cleanup).'
+        : `Database seeded with ${result.seeded} verified platforms.`
+
     return Response.json({
       success: true,
-      message: `Database seeded with ${index.length} platforms`,
+      seeded: result.seeded,
+      skipped: result.skipped,
+      message,
       platforms: index.map(p => ({ slug: p.slug, name: p.name, victims: p.victims, trustScore: p.trustScore })),
       stats,
     })
@@ -88,14 +96,22 @@ export async function POST(request: NextRequest) {
 
   try {
     console.log('[seed/route] POST seed called, force:', force)
-    await seedDatabase(force)
+    const result = await seedDatabase(force)
 
     const index = await getPlatformIndex()
     const stats = await getStats()
 
+    const message = result.skipped
+      ? `Already seeded with ${index.length} platforms. Pass force=true to re-seed.`
+      : result.seeded === 0
+        ? 'No verified seed platforms defined. Add entries to lib/scam-db-verified-seed.ts. Database is empty (this is expected post-2026-05-20 cleanup).'
+        : `Database seeded with ${result.seeded} verified platforms.`
+
     return Response.json({
       success: true,
-      message: `Database seeded with ${index.length} platforms`,
+      seeded: result.seeded,
+      skipped: result.skipped,
+      message,
       platforms: index.map(p => ({ slug: p.slug, name: p.name, victims: p.victims, trustScore: p.trustScore })),
       stats,
     })
