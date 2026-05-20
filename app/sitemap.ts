@@ -38,19 +38,14 @@ const pages = [
 // to keep sitemap, blog index, and related-posts in sync.
 const blogPosts = BLOG_POSTS.map((p) => `/blog/${p.slug}`);
 
-/* Seed platform slugs — always included even if S3 is unavailable at build time */
-const seedPlatformSlugs = [
-  'cryptotrade-pro',
-  'bitinvestment-club',
-  'coinprofit-ai',
-  'metatrader-crypto-pro',
-  'cryptoyield-platform',
-  'tradingproai',
-  'coinbase-pro-trade',
-  'btc-cloud-mining-pro',
-  'cryptofx-global-markets',
-  'defi-yield-optimizer',
-];
+/* Seed platform slugs — always included even if S3 is unavailable at build time.
+ *
+ * 2026-05-20 CLEANUP: removed 10 fabricated slugs that pointed to non-existent
+ * platforms (defamation risk). Sitemap now derives platforms exclusively from
+ * S3 at build time. If S3 is unavailable, no fabricated URLs are emitted —
+ * better to skip platforms than to mis-index. See docs/removed-fabricated-entries.md.
+ */
+const seedPlatformSlugs: string[] = [];
 
 /* Try to fetch dynamic platforms from S3 at build time */
 async function getDynamicPlatforms(): Promise<{ slug: string; lastReported?: string }[]> {

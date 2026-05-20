@@ -17,6 +17,8 @@ import { analyzeScamPatterns } from './patternDetection';
 export type { PatternAnalysis, ScamPattern } from './patternDetection';
 import { traceCrossChain } from './crossChainTracer';
 export type { CrossChainTrace, CrossChainHop, BridgeInteraction, ChainActivity } from './crossChainTracer';
+import { KNOWN_ENTITIES, getKnownEntity } from './known-entities';
+import { isKnownPhishing, getPhishingTag } from './known-phishing';
 
 function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
@@ -51,49 +53,10 @@ const NATIVE_CURRENCY: Record<string, string> = {
 /** EVM chains that use etherscan-v2-tracker */
 const EVM_CHAINS = new Set(['base', 'arb', 'op', 'avax', 'linea', 'zksync', 'scroll', 'mantle', 'bnb', 'polygon']);
 
-const KNOWN_ENTITIES: Record<string, { label: string; type: 'exchange' | 'mixer' | 'defi' | 'scam' }> = {
-  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance', type: 'exchange' },
-  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 2', type: 'exchange' },
-  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 3', type: 'exchange' },
-  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance 4', type: 'exchange' },
-  '0x21a31ee1afc51d94c2efccaa2092ad1028285549': { label: 'Binance 5', type: 'exchange' },
-  '0x71660c4005ba85c37ccec55d0c4493e66fe775d3': { label: 'Coinbase', type: 'exchange' },
-  '0xa090e606e30bd747d4e6245a1517ebe430f0057e': { label: 'Coinbase 2', type: 'exchange' },
-  '0x503828976d22510aad0201ac7ec88293211d23da': { label: 'Coinbase 3', type: 'exchange' },
-  '0x2910543af39aba0cd09dbb2d50200b3e800a63d2': { label: 'Kraken', type: 'exchange' },
-  '0x0a869d79a7052c7f1b55a8ebabbea3420f0d1e13': { label: 'Kraken 2', type: 'exchange' },
-  '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b': { label: 'OKX', type: 'exchange' },
-  '0x236f9f97e0e62388479bf9e5ba4889e46b0273c3': { label: 'OKX 2', type: 'exchange' },
-  '0xab5c66752a9e8167967685f1450532fb96d5d24f': { label: 'Huobi', type: 'exchange' },
-  '0x6748f50f686bfbca6fe8ad62b22228b87f31ff2b': { label: 'Huobi 2', type: 'exchange' },
-  '0xf89d7b9c864f589bbf53a82105107622b35eaa40': { label: 'Bybit', type: 'exchange' },
-  '0x2b5634c42055806a59e9107ed44d43c426e58258': { label: 'KuCoin', type: 'exchange' },
-  '0x0d0707963952f2fba59dd06f2b425ace40b492fe': { label: 'Gate.io', type: 'exchange' },
-  '0x77134cbc06cb00b66f4c7e623d5fdbf6777635ec': { label: 'Bitfinex', type: 'exchange' },
-  '0x6262998ced04146fa42253a5c0af90ca02dfd2a3': { label: 'Crypto.com', type: 'exchange' },
-  '0x077d360f11d220e4d5d9ba269170a1ef1fe5b62d': { label: 'ChangeNOW', type: 'exchange' },
-  // OFAC-Sanctioned Mixers (Tornado Cash)
-  '0x12d66f87a04a9e220c9d5078b7961664a758ad11': { label: 'Tornado Cash (OFAC)', type: 'mixer' },
-  '0x47ce0c6ed5b0ce3d3a51fdb1c52dc66a7c3c2936': { label: 'Tornado Cash 0.1 ETH (OFAC)', type: 'mixer' },
-  '0x910cbd523d972eb0a6f4cae4618ad62622b39dbf': { label: 'Tornado Cash 10 ETH (OFAC)', type: 'mixer' },
-  '0xa160cdab225685da1d56aa342ad8841c3b53f291': { label: 'Tornado Cash 100 ETH (OFAC)', type: 'mixer' },
-  '0xd90e2f925da726b50c4ed8d0fb90ad053324f31b': { label: 'Tornado Cash 1 ETH (OFAC)', type: 'mixer' },
-  '0xd4b88df4d29f5cedd6857912842cff3b20c8cfa3': { label: 'Tornado Cash 1000 DAI (OFAC)', type: 'mixer' },
-  '0xfd8610d20aa15b7b2e3be39b396a1bc3516c7144': { label: 'Tornado Cash 10000 DAI (OFAC)', type: 'mixer' },
-  '0x23773e65ed146a459791799d01336db287f25334': { label: 'Tornado Cash Governance (OFAC)', type: 'mixer' },
-  // OFAC-Sanctioned Entities (Lazarus Group, Blender, Sinbad)
-  '0x8589427373d6d84e98730d7795d8f6f8731fda16': { label: 'Ronin Bridge Exploiter (Lazarus/OFAC)', type: 'scam' },
-  '0x098b716b8aaf21512996dc57eb0615e2383e2f96': { label: 'Ronin Bridge Exploiter 2 (OFAC)', type: 'scam' },
-  '0xc455f7fd3e0e12afd51fba5c106909934d8a0e4a': { label: 'Blender.io (OFAC)', type: 'mixer' },
-  '0x36dd7b862746fddfa5108aeb58fc831ae3961230': { label: 'Sinbad.io (OFAC)', type: 'mixer' },
-  // Other Mixers
-  '0x7f268357a8c2552623316e2562d90e642bb538e5': { label: 'FixedFloat', type: 'mixer' },
-  '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': { label: 'Uniswap V2', type: 'defi' },
-  '0xe592427a0aece92de3edee1f18e0157c05861564': { label: 'Uniswap V3', type: 'defi' },
-  '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': { label: 'SushiSwap', type: 'defi' },
-  '0xdef1c0ded9bec7f1a1670819833240f027b25eff': { label: '0x Exchange', type: 'defi' },
-  '0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b': { label: 'Flagged Address', type: 'scam' },
-};
+// KNOWN_ENTITIES moved to lib/known-entities.ts (single source of truth).
+// Removed fabricated entry 0xd882cfc20f... "Flagged Address" (was tied to
+// fictional CryptoTrade Pro SEED platform — see docs/removed-fabricated-entries.md).
+// 2026-05-20
 
 /* ── Known legitimate tokens (used to separate ETH stats from junk) ── */
 const KNOWN_TOKENS = new Set([
@@ -477,7 +440,16 @@ export interface ReportData {
   identifiedEntities: { address: string; label: string; type: string; interactions: number }[];
   riskScore: number;
   riskLabel: string;
+  /**
+   * Recovery probability assessment.
+   * 2026-05-20: Replaced raw `recoveryScore`/`recoveryLabel` pair with this
+   * structured object — adds disclaimer + transparent factors and hard-caps
+   * the score at 35% to avoid making implicit guarantees.
+   */
+  recoveryAssessment: RecoveryAssessment;
+  /** @deprecated Use recoveryAssessment.score. Kept for transitional PDF rendering. */
   recoveryScore: number;
+  /** @deprecated Use recoveryAssessment.label. Kept for transitional PDF rendering. */
   recoveryLabel: string;
   ofacWarning: boolean;
   scamDbMatches: ScamDbMatch[];
@@ -511,9 +483,23 @@ export interface ReportData {
   primaryAsset: { symbol: string; totalIn: number; totalOut: number } | null;
 }
 
+export type WalletRole =
+  | 'victim'             // funds RECEIVED from CEX, sent to unknown counterparties — typical scam victim
+  | 'aggregator'         // collects from many senders, forwards to CEX (scam collector)
+  | 'transit'            // high throughput, no CEX in/out (pure routing)
+  | 'distributor'        // few senders → many recipients
+  | 'exchange_deposit'   // single recipient = CEX (deposit funnel)
+  | 'aggregation'        // legacy alias for aggregator
+  | 'personal'           // low activity
+  | 'unknown';
+
 export interface NarrativeData {
-  walletType: 'transit' | 'aggregation' | 'personal' | 'exchange_deposit' | 'unknown';
+  walletType: WalletRole;
   walletTypeLabel: string;
+  /** Confidence 0-1 from role classifier. Higher = more decisive evidence. */
+  roleConfidence: number;
+  /** Human-readable bullets explaining WHY this role was chosen. */
+  roleReasoning: string[];
   uniqueSenders: number;
   uniqueReceivers: number;
   forwardingPercent: number;     // % of funds forwarded within 24h
@@ -521,6 +507,23 @@ export interface NarrativeData {
   primaryExitExchangeEmail: string;
   summary: string;               // Auto-generated narrative paragraph
   conclusion: string;            // One-line conclusion
+}
+
+export interface RecoveryAssessment {
+  /** 2-35. Recovery probability percentage, hard-capped at 35% — most
+   *  cryptocurrency fraud cases do not result in full recovery. */
+  score: number;
+  /** Human-readable label, e.g. "Low — recovery requires sustained legal effort..." */
+  label: string;
+  /** Bucket for UI coloring/sorting. */
+  tier: 'VERY_LOW' | 'LOW' | 'MODERATE' | 'HIGHER_THAN_AVERAGE';
+  /** Mandatory legal disclaimer — must always be displayed alongside the score. */
+  disclaimer: string;
+  /** Factors that pushed score up/down — for transparency. */
+  factors: {
+    positive: string[];
+    negative: string[];
+  };
 }
 
 export interface EvidenceStrength {
@@ -964,27 +967,97 @@ export async function generateReport(
     if (hasScam) riskScore += 25;
     if (scamDbMatches.length > 0) riskScore += 20; // Scam DB match
     if (!hasExchange && ethSent > 10) riskScore += 10;
-    if (hasExchange) riskScore -= 20;
+    // 2026-05-20: was -20. CEX interaction does NOT lower risk by itself —
+    // victims interact with CEX too (deposit before sending to scammer).
+    // Smaller adjustment, just to break ties between otherwise-equal scores.
+    if (hasExchange) riskScore -= 10;
     if (outgoing.length + incoming.length < 5) riskScore -= 15;
+    // Phishing-tagged counterparty is strong signal (Phase 1 federation
+    // will expand this beyond our manual list).
+    const anyCounterpartyPhishing = Array.from(counterpartyMap.keys()).some((a) => isKnownPhishing(a));
+    if (anyCounterpartyPhishing) riskScore += 30;
   }
 
   riskScore = Math.max(0, Math.min(100, riskScore));
   // riskLabel assigned after patternAnalysis (behavioral boost may adjust score)
 
-  // ── Recovery score ──
-  let recoveryScore = 30; // baseline
+  // ── Recovery Probability — realistic formula with hard cap ──
+  // 2026-05-20 rewrite: cap at 35%, structured factors, mandatory disclaimer.
+  // The previous formula could return up to 90% which created false expectations.
   const kycExchanges = identifiedEntities.filter(e => e.type === 'exchange');
-  if (kycExchanges.length > 0) recoveryScore += 40; // Funds on KYC exchange
-  if (hasMixer) recoveryScore -= 25; // Through mixer = much harder
-  if (outgoing.length + incoming.length < 20) recoveryScore += 10; // Simple flow
-  if (ethSent < 1) recoveryScore += 5; // Small amount not distributed far
+  const positiveFactors: string[] = [];
+  const negativeFactors: string[] = [];
+  let recoveryScore = 5; // baseline — realistically low
 
-  recoveryScore = Math.max(5, Math.min(90, recoveryScore));
+  if (kycExchanges.length > 0) {
+    recoveryScore += 10;
+    positiveFactors.push(`Funds routed through KYC exchange (${kycExchanges[0].label}) — subpoena possible`);
+  }
+  if (scamDbMatches.length > 0) {
+    recoveryScore += 5;
+    positiveFactors.push('Counterparty linked to identified fraud cluster — strengthens legal case');
+  }
+  // Phishing-tag check on any counterparty
+  const counterpartiesWithPhishingTag = Array.from(counterpartyMap.keys()).filter((a) => isKnownPhishing(a));
+  if (counterpartiesWithPhishingTag.length > 0) {
+    recoveryScore += 8;
+    positiveFactors.push(`${counterpartiesWithPhishingTag.length} counterparty wallet(s) officially tagged Fake_Phishing on Etherscan`);
+  }
+  // Inactivity gates (rough — final 'inactiveDays' is computed slightly later in the existing flow)
+  const lastTs = timestamps.length > 0 ? timestamps[timestamps.length - 1] : 0;
+  const daysSinceLast = lastTs ? Math.floor((Date.now() - lastTs) / 86400000) : 9999;
+  if (daysSinceLast < 30) {
+    recoveryScore += 5;
+    positiveFactors.push('Recent activity (<30 days) — funds may still be in early laundering stages');
+  }
+  if (daysSinceLast < 7) {
+    recoveryScore += 3;
+    positiveFactors.push('Very recent activity (<7 days) — urgent freeze action possible');
+  }
 
+  if (hasMixer) {
+    recoveryScore -= 15;
+    negativeFactors.push('Mixer (Tornado Cash / Blender / Sinbad) usage detected — funds heavily obfuscated');
+  }
+  // ethSent here is in native units (ETH/BNB/etc.). For a rough USD-equivalent cutoff
+  // we use a coarse "large flow" signal: >100 ETH or >$100k assumed average.
+  if (ethSent > 100) {
+    recoveryScore -= 3;
+    negativeFactors.push('Large outflow volume — scammers prioritize rapid cash-out for high-value cases');
+  }
+  if (daysSinceLast > 180) {
+    recoveryScore -= 5;
+    negativeFactors.push('Stale activity (>6 months) — funds likely already cashed out');
+  }
+
+  recoveryScore = Math.max(2, Math.min(35, recoveryScore));
+
+  let recoveryTier: RecoveryAssessment['tier'];
   let recoveryLabel: string;
-  if (recoveryScore >= 60) recoveryLabel = 'HIGH — Funds likely on KYC exchange, subpoena possible';
-  else if (recoveryScore >= 35) recoveryLabel = 'MEDIUM — Some exchange interaction, partial recovery possible';
-  else recoveryLabel = 'LOW — Funds obfuscated through mixer or distributed';
+  if (recoveryScore >= 25) {
+    recoveryTier = 'HIGHER_THAN_AVERAGE';
+    recoveryLabel = 'Higher than average — multiple positive factors present, but recovery still requires sustained legal action';
+  } else if (recoveryScore >= 15) {
+    recoveryTier = 'MODERATE';
+    recoveryLabel = 'Moderate — some positive factors, recovery possible with proper legal action';
+  } else if (recoveryScore >= 8) {
+    recoveryTier = 'LOW';
+    recoveryLabel = 'Low — recovery requires sustained legal effort and may take 6-18 months';
+  } else {
+    recoveryTier = 'VERY_LOW';
+    recoveryLabel = 'Very low — recovery is unlikely but documentation enables legal/tax claims';
+  }
+
+  const recoveryAssessment: RecoveryAssessment = {
+    score: recoveryScore,
+    label: recoveryLabel,
+    tier: recoveryTier,
+    disclaimer: 'Statistical estimate based on case characteristics. Most cryptocurrency fraud cases do not result in full recovery. This metric is not a guarantee, prediction, or promise. Actual recovery depends on law enforcement action, exchange cooperation, and legal proceedings.',
+    factors: {
+      positive: positiveFactors,
+      negative: negativeFactors,
+    },
+  };
 
   // ── Last activity / inactivity check ──
   const inactiveDays = timestamps.length > 0
@@ -1248,20 +1321,101 @@ export async function generateReport(
   const primaryExitExchangeEmail = EXCHANGE_COMPLIANCE_EMAILS[primaryExitExchange]
     || (primaryExitExchange ? `compliance@${primaryExitExchange.toLowerCase().replace(/[^a-z]/g, '')}.com` : '');
 
-  // Wallet type classification
+  // ── Wallet role classification (priority cascade) ──
+  // 2026-05-20 rewrite:
+  //   PRIORITY 1: subject in scam-db → 'aggregator'
+  //   PRIORITY 2: subject in KNOWN_ENTITIES → exchange_deposit / etc.
+  //   PRIORITY 3: VICTIM heuristic (received from CEX, sent to unknown)
+  //   PRIORITY 4: existing transit / aggregation / exchange_deposit / personal
+  // Reasoning bullets are accumulated for the PDF "How we classified this wallet" block.
+
+  const subjectScamDbHit = scamDbMatches.find((m) => m.address.toLowerCase() === address.toLowerCase());
+  const subjectKnownEntity = getKnownEntity(address);
+  const cexInboundCount = incoming.filter((tx) => tx.from && getKnownEntity(tx.from)?.type === 'exchange').length;
+  const cexOutboundCount = outgoing.filter((tx) => tx.to && getKnownEntity(tx.to)?.type === 'exchange').length;
+
   const inOutRatio = incoming.length > 0 ? outgoing.length / incoming.length : 0;
-  const isTransit = forwardingPercent >= 70 && uniqueSenders >= 3;
-  const isAggregation = uniqueSenders >= 10 && uniqueReceivers <= 5;
+  const isTransit = forwardingPercent >= 70 && uniqueSenders >= 3 && cexInboundCount === 0;
+  const isAggregator = uniqueSenders >= 10 && uniqueReceivers <= 5;
   const isExchangeDeposit = uniqueReceivers === 1 && kycExchangesSorted.length > 0;
-  const walletType: NarrativeData['walletType'] = isTransit ? 'transit'
-    : isAggregation ? 'aggregation'
-    : isExchangeDeposit ? 'exchange_deposit'
-    : (incoming.length + outgoing.length < 20) ? 'personal'
-    : 'unknown';
-  const walletTypeLabels: Record<string, string> = {
+  const totalTxCount = incoming.length + outgoing.length;
+
+  // VICTIM heuristic — a wallet that received from a KYC exchange (its own funds),
+  // then sent them to a small number of unknown addresses (the scammer).
+  // Distinct from a transit wallet (which routes funds it didn't originally own).
+  const isVictim =
+    cexInboundCount > 0 &&
+    uniqueReceivers > 0 &&
+    uniqueReceivers <= 8 &&
+    incoming.length <= 80 &&
+    forwardingPercent >= 40 &&
+    !subjectScamDbHit &&
+    !subjectKnownEntity;
+
+  let walletRole: WalletRole;
+  let roleConfidence: number;
+  const roleReasoning: string[] = [];
+
+  if (subjectScamDbHit) {
+    walletRole = 'aggregator';
+    roleConfidence = 0.95;
+    roleReasoning.push(`Subject wallet is listed in LedgerHound Scam Database as part of "${(subjectScamDbHit.platformNames || []).join(', ')}"`);
+    if (subjectScamDbHit.totalLoss) roleReasoning.push(`Linked to documented losses of approximately $${subjectScamDbHit.totalLoss.toLocaleString()}`);
+  } else if (subjectKnownEntity?.type === 'exchange') {
+    walletRole = 'exchange_deposit';
+    roleConfidence = 1.0;
+    roleReasoning.push(`Subject wallet is a known ${subjectKnownEntity.label} address (KYC exchange)`);
+  } else if (subjectKnownEntity?.type === 'mixer' || subjectKnownEntity?.type === 'sanctioned') {
+    walletRole = 'unknown';
+    roleConfidence = 1.0;
+    roleReasoning.push(`Subject wallet is a known ${subjectKnownEntity.label} — analyzing as opaque infrastructure, not as victim/scammer`);
+  } else if (isVictim) {
+    walletRole = 'victim';
+    roleConfidence = 0.85;
+    roleReasoning.push(`Received funds from ${cexInboundCount} KYC exchange deposit(s) — characteristic of a victim funding their own wallet`);
+    roleReasoning.push(`Forwarded funds to ${uniqueReceivers} unknown address(es) — consistent with sending to scammer-controlled wallets`);
+    roleReasoning.push(`Limited transaction history (${totalTxCount} txs) — typical retail user profile`);
+    if (forwardingPercent >= 80) {
+      roleReasoning.push(`${forwardingPercent}% of funds forwarded within 24h — rapid action under social engineering pressure`);
+    }
+  } else if (isAggregator && cexOutboundCount > 0) {
+    walletRole = 'aggregator';
+    roleConfidence = 0.9;
+    roleReasoning.push(`${uniqueSenders} unique senders aggregated into ${uniqueReceivers} destination(s)`);
+    roleReasoning.push(`Funds consolidated and forwarded to KYC exchange (${primaryExitExchange}) — characteristic of a scam collection wallet`);
+  } else if (isTransit) {
+    walletRole = 'transit';
+    roleConfidence = 0.75;
+    roleReasoning.push(`${forwardingPercent}% of funds forwarded within 24h`);
+    roleReasoning.push(`No CEX deposits in incoming flow — pure on-chain routing pattern`);
+    roleReasoning.push(`${uniqueSenders} unique senders feeding this wallet`);
+  } else if (isExchangeDeposit) {
+    walletRole = 'exchange_deposit';
+    roleConfidence = 0.7;
+    roleReasoning.push(`Single recipient identified — a KYC exchange (${primaryExitExchange})`);
+    roleReasoning.push(`${uniqueSenders} senders consolidated to one exit point — exchange deposit funnel pattern`);
+  } else if (uniqueSenders <= 3 && uniqueReceivers > 10) {
+    walletRole = 'distributor';
+    roleConfidence = 0.7;
+    roleReasoning.push(`${uniqueSenders} sender(s) distributing to ${uniqueReceivers} recipients`);
+  } else if (totalTxCount < 20) {
+    walletRole = 'personal';
+    roleConfidence = 0.6;
+    roleReasoning.push(`Low transaction count (${totalTxCount}) and no fraud-network indicators — likely a personal/low-activity wallet`);
+  } else {
+    walletRole = 'unknown';
+    roleConfidence = 0.3;
+    roleReasoning.push(`Activity does not match any clear-cut pattern (${totalTxCount} transactions, ${uniqueSenders} senders, ${uniqueReceivers} receivers)`);
+    roleReasoning.push('Manual review recommended for confident classification');
+  }
+
+  const walletTypeLabels: Record<WalletRole, string> = {
+    victim: 'Victim Wallet — Funds Sent to Identified Counterparty',
+    aggregator: 'Scam Aggregation Wallet — Multiple Victims Identified',
     transit: 'Transit/Forwarding Wallet',
-    aggregation: 'Scam Aggregation Point',
+    distributor: 'Distribution Wallet',
     exchange_deposit: 'Exchange Deposit Funnel',
+    aggregation: 'Scam Aggregation Point',
     personal: 'Personal/Low-Activity Wallet',
     unknown: 'Unclassified Wallet',
   };
@@ -1271,17 +1425,33 @@ export async function generateReport(
   const totalOutDisplay = `${fmtEth(ethSent)} ${nativeCurrency}`;
   let narrativeSummary = '';
   let narrativeConclusion = '';
-  if (walletType === 'transit' || walletType === 'aggregation') {
-    narrativeSummary = `This wallet functions as a ${walletTypeLabels[walletType].toLowerCase()}. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
+
+  if (walletRole === 'victim') {
+    narrativeSummary = `This wallet shows the behavioral profile of a victim wallet. It received ${totalInDisplay} from ${cexInboundCount} KYC exchange deposit(s), then forwarded ${forwardingPercent}% of those funds to ${uniqueReceivers} unknown counterparty address(es) within 24 hours. Total outflow: ${totalOutDisplay}.`;
+    if (subjectKnownEntity || cexOutboundCount > 0) {
+      // (defensive — shouldn't hit for victim role)
+    }
+    narrativeConclusion = `Conclusion: This wallet was used by a victim to send funds to an organized counterparty cluster — not a scammer-controlled wallet.`;
+  } else if (walletRole === 'aggregator') {
+    narrativeSummary = `This wallet functions as a scam aggregation point. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
     if (primaryExitExchange) {
       narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity is obtainable via legal subpoena.`;
     }
-    narrativeConclusion = `Conclusion: This is a ${walletType === 'transit' ? 'transit wallet used in organized fraud' : 'scam aggregation point collecting victim funds'}, not a legitimate user account.`;
-  } else if (walletType === 'exchange_deposit') {
+    narrativeConclusion = `Conclusion: This is a scam aggregation point collecting victim funds, not a legitimate user account.`;
+  } else if (walletRole === 'transit') {
+    narrativeSummary = `This wallet functions as a transit/forwarding wallet. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
+    if (primaryExitExchange) {
+      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity is obtainable via legal subpoena.`;
+    }
+    narrativeConclusion = `Conclusion: This is a transit wallet used in organized fund routing, not a legitimate user account.`;
+  } else if (walletRole === 'exchange_deposit') {
     narrativeSummary = `This wallet appears to funnel funds to ${primaryExitExchange}. It received from ${uniqueSenders} senders and consolidated to a single exchange destination. Total flow: ${totalInDisplay} in, ${totalOutDisplay} out.`;
     narrativeConclusion = `Conclusion: Exchange deposit funnel — identity likely recoverable via ${primaryExitExchange} KYC records.`;
+  } else if (walletRole === 'distributor') {
+    narrativeSummary = `This wallet distributes funds to a large number of recipients. ${uniqueSenders} sender(s) deposited a total of ${totalInDisplay}, then funds flowed to ${uniqueReceivers} recipients (${totalOutDisplay} total outflow).`;
+    narrativeConclusion = `Conclusion: Distribution pattern — possible airdrop, payroll, or victim payout mechanism.`;
   } else {
-    narrativeSummary = `This wallet shows ${incoming.length + outgoing.length} total transactions across ${uniqueSenders} unique senders and ${uniqueReceivers} unique receivers. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
+    narrativeSummary = `This wallet shows ${totalTxCount} total transactions across ${uniqueSenders} unique senders and ${uniqueReceivers} unique receivers. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
     if (primaryExitExchange) narrativeSummary += ` Funds were routed through ${primaryExitExchange}.`;
     narrativeConclusion = hasMixer
       ? 'Conclusion: Mixer usage detected — funds were deliberately obfuscated.'
@@ -1291,8 +1461,10 @@ export async function generateReport(
   }
 
   const narrative: NarrativeData = {
-    walletType,
-    walletTypeLabel: walletTypeLabels[walletType],
+    walletType: walletRole,
+    walletTypeLabel: walletTypeLabels[walletRole],
+    roleConfidence,
+    roleReasoning,
     uniqueSenders,
     uniqueReceivers,
     forwardingPercent,
@@ -1374,6 +1546,7 @@ export async function generateReport(
     identifiedEntities,
     riskScore,
     riskLabel,
+    recoveryAssessment,
     recoveryScore,
     recoveryLabel,
     ofacWarning,
