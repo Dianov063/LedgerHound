@@ -17,13 +17,13 @@ import { analyzeScamPatterns } from './patternDetection';
 export type { PatternAnalysis, ScamPattern } from './patternDetection';
 import { traceCrossChain } from './crossChainTracer';
 export type { CrossChainTrace, CrossChainHop, BridgeInteraction, ChainActivity } from './crossChainTracer';
-import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailByParent } from './known-entities';
+import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailByParent, isCexAddress } from './known-entities';
 import { isKnownPhishing, getPhishingTag } from './known-phishing';
 import { getAddressLabelsBatch } from './labels/federation';
 import type { AddressLabelResponse } from './labels/types';
 import { detectSpoofTarget, detectScriptCategory, LEGITIMATE_TOKENS, detectUnicodeSpoofing } from './unicode-spoofing';
 import { detectAddressPoisoning } from './address-poisoning';
-export type { PoisoningAnalysis, PoisoningMatch, VanityCluster } from './address-poisoning';
+export type { PoisoningAnalysis, AddressPoisoningCampaign, FraudClusterEntry } from './address-poisoning';
 export type { UnicodeSpoofingAnalysis, UnicodeSpoofEvidence } from './unicode-spoofing';
 
 function getAlchemyKey(): string {
@@ -551,6 +551,12 @@ export interface ReportData {
     to: string;
     value: number;
     token: string;
+    /** Raw symbol (Phase 2.5) — display the original Unicode for spoof rows. */
+    assetRaw?: string | null;
+    /** True when this transfer's token is a Unicode spoof of a legit ticker. */
+    isSpoof?: boolean;
+    /** The legitimate ticker the spoof mimics (e.g. 'USDT'). */
+    spoofTarget?: string;
   }[];
   graphData: GraphData | null;
   riskBreakdown: RiskBreakdown;
@@ -605,6 +611,11 @@ export interface ReportData {
     addressPoisoning: import('./address-poisoning').PoisoningAnalysis;
     unicodeSpoofing: import('./unicode-spoofing').UnicodeSpoofingAnalysis;
   };
+  /**
+   * Phase 2.5 (Part 7): exchange KYC entry vs exit separation. Distinguishes
+   * the victim's own funding exchange from any cash-out exchange.
+   */
+  exchangeAnalysis: ExchangeAnalysis;
 }
 
 export type WalletRole =
@@ -648,6 +659,30 @@ export interface RecoveryAssessment {
     positive: string[];
     negative: string[];
   };
+}
+
+/**
+ * 2026-05-21 (Phase 2.5 / Part 7): distinguishes a CEX the VICTIM funded
+ * from (entry — their own KYC) vs a CEX funds flowed TO (exit — potential
+ * scammer cash-out KYC). Critical so legal counsel doesn't conflate the
+ * victim's own Binance account with the scammer's.
+ */
+export interface ExchangeEntry {
+  address: string;
+  label: string;
+  parentEntity: string;
+  type: 'entry' | 'exit';
+  interactionCount: number;
+  totalValue: number;
+  token: string;
+  complianceEmail?: string;
+}
+
+export interface ExchangeAnalysis {
+  entryPoints: ExchangeEntry[];   // CEX → victim wallet (victim's own funding)
+  exitPoints: ExchangeEntry[];    // victim wallet → CEX (rare for victims)
+  hasEntryKyc: boolean;
+  hasExitKyc: boolean;
 }
 
 export interface EvidenceStrength {
@@ -1020,9 +1055,10 @@ export async function generateReport(
   logger.info({
     event: 'attack_techniques_analyzed',
     poisoning_detected: addressPoisoning.detected,
-    poisoning_spoofs: addressPoisoning.totalSpoofAttempts,
-    poisoning_misdirected: addressPoisoning.totalVictimMisdirected,
-    poisoning_misdirected_value: addressPoisoning.totalMisdirectedValue,
+    poisoning_campaigns: addressPoisoning.campaigns.length,
+    poisoning_spoofs: addressPoisoning.totalSpoofsAcrossAllCampaigns,
+    poisoning_successful_misdirections: addressPoisoning.campaigns.reduce((s, c) => s + c.successfulMisdirections, 0),
+    poisoning_misdirected_value: addressPoisoning.totalMisdirectedToSecondarySpoofs,
     unicode_detected: unicodeSpoofing.detected,
     unicode_spoof_symbols: unicodeSpoofing.uniqueSpoofSymbols,
   }, '[generateReport] Attack techniques analyzed');
@@ -1451,18 +1487,26 @@ export async function generateReport(
   recommendations.push('For court-ready certified investigation with expert testimony, contact LedgerHound at contact@ledgerhound.vip.');
 
   // Build transaction list: ETH first → major tokens → rest, dedup by token (max 3)
-  type TxRow = { date: string; direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string };
+  type TxRow = { date: string; direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string; assetRaw?: string | null; isSpoof?: boolean; spoofTarget?: string };
   const MAJOR_TOKENS = new Set(['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC', 'BNB', 'WBNB', 'MATIC', 'AVAX', 'MNT']);
   const nativeUpper2 = nativeCurrency.toUpperCase();
 
-  const toRow = (tx: Transfer, dir: 'IN' | 'OUT'): TxRow => ({
-    date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
-    direction: dir,
-    from: dir === 'IN' ? (tx.from || 'N/A') : (tx.from || address),
-    to: dir === 'OUT' ? (tx.to || 'N/A') : (tx.to || address),
-    value: safeValue(tx),
-    token: tx.asset || nativeCurrency,
-  });
+  const toRow = (tx: Transfer, dir: 'IN' | 'OUT'): TxRow => {
+    // 2026-05-21 (Phase 2.5): mark Unicode-spoof rows so the PDF can flag
+    // them. Token displays the RAW symbol so the reader sees the real spoof.
+    const cls = classifyToken(tx);
+    return {
+      date: tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toISOString().split('T')[0] : 'N/A',
+      direction: dir,
+      from: dir === 'IN' ? (tx.from || 'N/A') : (tx.from || address),
+      to: dir === 'OUT' ? (tx.to || 'N/A') : (tx.to || address),
+      value: safeValue(tx),
+      token: cls.isSpoof && tx.assetRaw ? tx.assetRaw : (tx.asset || nativeCurrency),
+      assetRaw: tx.assetRaw ?? null,
+      isSpoof: cls.isSpoof,
+      spoofTarget: cls.spoofTarget,
+    };
+  };
 
   const rawTxs: TxRow[] = [
     ...incoming.map((tx) => toRow(tx, 'IN')),
@@ -1710,13 +1754,13 @@ export async function generateReport(
   } else if (walletRole === 'aggregator') {
     narrativeSummary = `This wallet functions as a scam aggregation point. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
     if (primaryExitExchange) {
-      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity is obtainable via legal subpoena.`;
+      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity may be obtainable via legal subpoena (subject to exchange policy and data availability).`;
     }
     narrativeConclusion = `Conclusion: This is a scam aggregation point collecting victim funds, not a legitimate user account.`;
   } else if (walletRole === 'transit') {
     narrativeSummary = `This wallet functions as a transit/forwarding wallet. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
     if (primaryExitExchange) {
-      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity is obtainable via legal subpoena.`;
+      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity may be obtainable via legal subpoena (subject to exchange policy and data availability).`;
     }
     narrativeConclusion = `Conclusion: This is a transit wallet used in organized fund routing, not a legitimate user account.`;
   } else if (walletRole === 'exchange_deposit') {
@@ -1789,20 +1833,21 @@ export async function generateReport(
     { label: 'Cross-chain activity traced', met: crossChainTrace?.detected === true },
   ];
 
-  // 2026-05-21 (Phase 2): attack-technique evidence bullets. Only added when
-  // detected, so they always render as "met" positive findings.
+  // 2026-05-21 (Phase 2.5): attack-technique evidence bullets, campaign model.
+  const poisoningSuccessfulMisdirections = addressPoisoning.campaigns.reduce((s, c) => s + c.successfulMisdirections, 0);
   if (addressPoisoning.detected) {
+    const totalLookalikes = addressPoisoning.totalSpoofsAcrossAllCampaigns + addressPoisoning.campaigns.length;
     evidenceFactors.push({
-      label: `Address poisoning attack identified (${addressPoisoning.totalSpoofAttempts} spoof address${addressPoisoning.totalSpoofAttempts > 1 ? 'es' : ''})`,
+      label: `Address poisoning campaign identified (${totalLookalikes} look-alike address${totalLookalikes > 1 ? 'es' : ''} in ${addressPoisoning.campaigns.length} cluster${addressPoisoning.campaigns.length > 1 ? 's' : ''})`,
       met: true,
       severity: 'high',
     });
   }
-  if (addressPoisoning.totalVictimMisdirected > 0) {
-    const tokens = new Set(addressPoisoning.matches.filter(m => m.victimMisdirected).map(m => m.misdirectedToken));
+  if (poisoningSuccessfulMisdirections > 0) {
+    const tokens = new Set(addressPoisoning.campaigns.map(c => c.primaryToken));
     const tokenLabel = tokens.size === 1 ? ` ${Array.from(tokens)[0]}` : '';
     evidenceFactors.push({
-      label: `CRITICAL: victim misdirected ${addressPoisoning.totalMisdirectedValue.toFixed(2)}${tokenLabel} to spoof address(es)`,
+      label: `CRITICAL: address poisoning succeeded ${poisoningSuccessfulMisdirections} time(s) — ${addressPoisoning.totalMisdirectedToSecondarySpoofs.toFixed(2)}${tokenLabel} sent to secondary spoof addresses`,
       met: true,
       severity: 'critical',
     });
@@ -1818,7 +1863,7 @@ export async function generateReport(
   const evidenceMetCount = evidenceFactors.filter(f => f.met).length;
   let evidenceScore = Math.min(100, Math.round((evidenceMetCount / evidenceFactors.length) * 100));
   // 2026-05-21: confirmed misdirection is decisive forensic evidence — bump.
-  if (addressPoisoning.totalVictimMisdirected > 0) {
+  if (poisoningSuccessfulMisdirections > 0) {
     evidenceScore = Math.min(100, evidenceScore + 10);
   }
   const evidenceLabel = evidenceScore >= 70 ? 'STRONG' : evidenceScore >= 40 ? 'MODERATE' : 'WEAK';
@@ -1844,6 +1889,47 @@ export async function generateReport(
   const exchangeComplianceEmails = kycExchangeBrands
     .filter(b => b.complianceEmail)
     .map(b => ({ name: b.brand, email: b.complianceEmail }));
+
+  // ── Exchange Entry vs Exit (Phase 2.5 / Part 7) ──
+  // Entry = CEX → subject (the victim's OWN funding source / KYC).
+  // Exit  = subject → CEX (rare for victims; would be the cash-out KYC).
+  // Counterparty→CEX (one hop beyond) is out of scope for the base report —
+  // see the "expanded counterparty trace" framing in the PDF/Actionable Steps.
+  function aggregateExchanges(txs: (Transfer | UnifiedTransfer)[], dir: 'entry' | 'exit'): ExchangeEntry[] {
+    const byBrand = new Map<string, ExchangeEntry>();
+    for (const tx of txs) {
+      const cexAddr = (dir === 'entry' ? tx.from : tx.to) || '';
+      if (!isCexAddress(cexAddr)) continue;
+      const entity = getKnownEntity(cexAddr)!;
+      const brand = entity.parentEntity || entity.label;
+      const val = isNativeLike(tx) ? safeValue(tx) : 0;
+      const existing = byBrand.get(brand);
+      if (existing) {
+        existing.interactionCount += 1;
+        existing.totalValue += val;
+      } else {
+        byBrand.set(brand, {
+          address: cexAddr.toLowerCase(),
+          label: entity.label,
+          parentEntity: brand,
+          type: dir,
+          interactionCount: 1,
+          totalValue: val,
+          token: nativeCurrency,
+          complianceEmail: entity.complianceEmail || getComplianceEmailByParent(brand) || undefined,
+        });
+      }
+    }
+    return Array.from(byBrand.values()).sort((a, b) => b.interactionCount - a.interactionCount);
+  }
+  const entryPoints = aggregateExchanges(incoming, 'entry');
+  const exitPoints = aggregateExchanges(outgoing, 'exit');
+  const exchangeAnalysis: ExchangeAnalysis = {
+    entryPoints,
+    exitPoints,
+    hasEntryKyc: entryPoints.length > 0,
+    hasExitKyc: exitPoints.length > 0,
+  };
 
   // ── Legal Weight Assessment ──
   const legalWeight = [
@@ -1922,6 +2008,7 @@ export async function generateReport(
       addressPoisoning,
       unicodeSpoofing,
     },
+    exchangeAnalysis,
   };
 
   // Generate PDF

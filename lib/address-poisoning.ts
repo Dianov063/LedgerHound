@@ -1,117 +1,102 @@
 /**
- * Address Poisoning Detector — Phase 2 attack-technique analysis.
+ * Address Poisoning Detector — Phase 2 / Phase 2.5 "campaign" model.
  *
- * What it detects:
- *   Attackers generate "vanity" wallet addresses whose hex prefix and suffix
- *   match a victim's real intended recipient (e.g. real = 0x073a4abbf262…4609f,
- *   spoof = 0x073acba9caa5…609f — both start "0x073a" and end "609f"). They
- *   then send dust transactions to the victim's wallet, hoping the victim
- *   later copies the spoof out of their history when paying the real
- *   recipient.
+ * 2026-05-21 (Phase 2.5) — REWRITE of the semantic model.
  *
- * How:
- *   1. Identify "real recipients" — addresses the subject deliberately sent
- *      meaningful value to. Threshold is token-aware (stablecoins ≥ ~$50,
- *      native ≥ ~0.01) so the detector works without USD price oracles.
- *   2. For each real recipient, scan IN transactions for senders whose
- *      first-8-hex-chars (including `0x`) AND last-4-hex-chars match the
- *      real recipient's, but the full address differs. That's the vanity
- *      pattern attackers exploit.
- *   3. Check whether the victim later sent meaningful value TO the spoof
- *      (`victimMisdirected`) — the smoking-gun evidence.
- *   4. Group all spoofs against the same real address into vanity clusters.
+ * The original model paired one "real recipient" with one "spoof", which
+ * mis-describes reality: in the DZHLWK case EVERY address in the
+ * 0x073a…609f cluster is fraudulent. There is no legitimate recipient — the
+ * highest-volume address is the scam network's MAIN COLLECTOR, and the
+ * other look-alikes are SECONDARY SPOOFS used for address poisoning.
  *
- * 2026-05-20: Created. Operates on the `UnifiedTransfer`-shaped objects
- * `generateReport.ts` already produces — we DO NOT use USD valuation
- * (we don't have a price oracle in the pipeline), so thresholds are
- * defined per token category.
+ * New model — "Address Poisoning Campaign":
+ *   1. Find addresses the subject sent significant value to.
+ *   2. Group them by vanity pattern (prefix + suffix). Also fold in any
+ *      same-pattern addresses that merely dusted the subject (poisoning
+ *      fingerprint) so the cluster picture is complete.
+ *   3. A cluster with ≥2 members = a campaign. Highest value-received =
+ *      main collector; the rest = secondary spoofs.
+ *   4. "Misdirection loss" = total the subject sent to secondary spoofs.
+ *
+ * Threshold note: matching uses a 4-hex prefix + 4-hex suffix (8 hex chars).
+ * The DZHLWK siblings share only the first 4 hex chars (073a) + last 4
+ * (609f); the 6/8-hex thresholds suggested in specs miss them. Configurable
+ * via options. False-positive rate ≈ 1/16^8 per pair — negligible.
  */
 
 /* ─── Public types ────────────────────────────────────────────────── */
 
-export interface PoisoningMatch {
-  /** The legitimate intended recipient the spoof targets. */
-  realAddress: string;
-  /** ISO date when subject first sent value to the real recipient. */
-  realAddressFirstSent: string;
-  /** Total value subject sent to the real recipient (in token units —
-   *  see `realAddressToken` for the unit. We deliberately don't aggregate
-   *  USD because the pipeline lacks a price oracle.) */
-  realAddressTotalValue: number;
-  /** Token symbol used in the dominant flow to the real recipient. */
-  realAddressToken: string;
+export type FraudClusterRole = 'main_collector' | 'secondary_spoof';
 
-  /** The spoofed address (visually similar to real, but a distinct wallet). */
-  spoofedAddress: string;
-
-  /** Match strength descriptor. Always 'strong' under the strict prefix-8/
-   *  suffix-4 rule used here; reserved for future relaxations. */
-  patternStrength: 'strong' | 'moderate' | 'weak';
-  /** Number of hex chars matched at the prefix (NOT counting "0x"). */
-  prefixMatchLength: number;
-  /** Number of hex chars matched at the suffix. */
-  suffixMatchLength: number;
-
-  /** The dust transaction that established the spoof in the victim's
-   *  wallet history. Hash optional because some chains/providers don't
-   *  return it consistently. */
+export interface FraudClusterEntry {
+  address: string;
+  role: FraudClusterRole;
+  /** Total value the SUBJECT sent to this address, in `totalReceivedToken` units. */
+  totalReceivedFromSubject: number;
+  /** Dominant token the subject sent to this address. */
+  totalReceivedToken: string;
+  /** Number of OUT transactions from subject to this address. */
+  transactionCount: number;
+  /** ISO date of first/last value received from subject (empty if dust-only). */
+  firstReceived: string;
+  lastReceived: string;
+  /** True if this address ALSO dusted the subject (classic poisoning fingerprint). */
+  receivedDustFromCluster: boolean;
   dustTransactionHash?: string;
-  dustValue: number;
-  dustToken: string;
-  dustTimestamp: string;
-
-  /** CRITICAL evidence: did the victim later send real funds to the spoof? */
-  victimMisdirected: boolean;
-  misdirectedTxHash?: string;
-  /** Value (in token units) of the misdirected transaction. */
-  misdirectedAmount?: number;
-  misdirectedToken?: string;
-  misdirectedTimestamp?: string;
+  /** Etherscan Fake_Phishing tag, if this address is in lib/known-phishing.ts. */
+  etherscanFakePhishingTag?: string;
 }
 
-export interface VanityCluster {
-  /** Human-readable pattern descriptor — e.g. "0x073a…609f". */
-  pattern: string;
-  /** First 8 chars including "0x". */
+export interface AddressPoisoningCampaign {
+  detected: boolean;
+  /** "0x073a…609f" */
+  vanityPattern: string;
   prefix: string;
-  /** Last 4 chars. */
   suffix: string;
-  /** All addresses in this cluster — first entry is the real address (anchor). */
-  addresses: string[];
-  /** The real (intended) recipient the subject deliberately sent value to. */
-  realAddress: string;
+  totalClusterAddresses: number;
+
+  mainCollector: FraudClusterEntry;
+  secondarySpoofs: FraudClusterEntry[]; // sorted by value received desc
+
+  /** Sum the subject sent to ALL cluster members (main + spoofs), dominant token. */
+  totalSentByVictim: number;
+  totalToMainCollector: number;
+  /** = misdirection loss (value sent to secondary spoofs). */
+  totalToSecondarySpoofs: number;
+  primaryToken: string;
+
+  /** Count of secondary spoofs that received > significance threshold. */
+  successfulMisdirections: number;
+  hasFakePhishingTag: boolean;
+  fakePhishingAddresses: string[];
+
+  summary: string;
 }
 
 export interface PoisoningAnalysis {
   detected: boolean;
-  technique: 'address_poisoning' | null;
-  /** Total spoof addresses identified across all real recipients. */
-  totalSpoofAttempts: number;
-  /** Count of spoofs that the victim actually sent value to. */
-  totalVictimMisdirected: number;
-  /** Sum of misdirected values (in the originating token's units —
-   *  pragmatic stand-in for USD until we add a price oracle). */
-  totalMisdirectedValue: number;
-  matches: PoisoningMatch[];
-  vanityClusters: VanityCluster[];
-  /** One-line human-readable summary suitable for the PDF. */
+  technique: 'address_poisoning_campaign' | null;
+  campaigns: AddressPoisoningCampaign[];
+  /** Aggregate across all campaigns. */
+  totalSpoofsAcrossAllCampaigns: number;
+  totalMisdirectedToSecondarySpoofs: number;
+  /** One-line summary across all campaigns, for logging / quick reads. */
   summary: string;
 }
 
 /* ─── Input shape ─────────────────────────────────────────────────── */
 
 /**
- * Structural subset of `UnifiedTransfer` / `Transfer` from generateReport.ts.
- * The detector only needs these fields — adapt at the call site by passing
- * the raw (un-spam-filtered) `incoming.concat(outgoing)` arrays directly.
+ * Structural subset of `UnifiedTransfer` / `Transfer`. Pass the RAW
+ * (un-spam-filtered) `incoming.concat(outgoing)` arrays — dust IS the signal.
+ * `assetRaw` is used for dust classification when present.
  */
 export interface PoisonTx {
   from: string;
   to: string;
-  /** Already normalised (post-`safeValue`) numeric amount in token-native units. */
   value: number;
-  /** Token symbol (e.g. 'USDT', 'ETH'). May be null for some raw streams. */
   asset: string | null;
+  assetRaw?: string | null;
   hash?: string;
   metadata?: { blockTimestamp?: string };
 }
@@ -121,27 +106,25 @@ export interface PoisonTx {
 const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'FRAX', 'USDP', 'PYUSD']);
 const NATIVES = new Set(['ETH', 'WETH', 'BNB', 'WBNB', 'MATIC', 'AVAX', 'MNT', 'BTC', 'WBTC', 'TRX', 'SOL']);
 
-/** Is `value` significant enough to suggest the subject *meant* to send to
- *  this recipient (vs a fee/dust)? */
+/** Is `value` significant enough to suggest the subject *meant* to send here? */
 function isSignificantSend(value: number, asset: string | null): boolean {
   if (!Number.isFinite(value) || value <= 0) return false;
   const upper = (asset || '').toUpperCase();
-  if (STABLECOINS.has(upper)) return value >= 50;       // ~$50 USD equivalent
-  if (NATIVES.has(upper)) return value >= 0.01;          // ~0.01 ETH ≈ $30
-  return value >= 1;                                     // generous for "other" tokens
+  if (STABLECOINS.has(upper)) return value >= 50;
+  if (NATIVES.has(upper)) return value >= 0.01;
+  return value >= 1;
 }
 
-/** Is `value` low enough to qualify as a dust transaction (typical
- *  poisoning signal)? Note: with strict address-similarity matching we
- *  also accept moderate values, because some attackers send larger
- *  fake-token amounts. The signal is the address similarity, not the value. */
+/** "Successful misdirection" threshold — a spoof that received real money. */
+function isMisdirectionValue(value: number, token: string): boolean {
+  return isSignificantSend(value, token);
+}
+
+/** Is `value` low enough to qualify as a dust transaction? */
 function looksLikeDust(value: number, asset: string | null): boolean {
   if (!Number.isFinite(value) || value < 0) return false;
-  // Anything tiny is dust regardless of asset.
   if (value < 1) return true;
   const upper = (asset || '').toUpperCase();
-  // For stables: anything under $10 effectively dust for "we just want to
-  // appear in your history" purposes.
   if (STABLECOINS.has(upper)) return value < 10;
   return value < 0.1;
 }
@@ -156,202 +139,9 @@ function isEvm(addr: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(addr);
 }
 
-/* ─── Detector ────────────────────────────────────────────────────── */
-
-/**
- * Match thresholds. Default = 4 hex prefix + 4 hex suffix (8 hex chars
- * visual match total). This is calibrated to the real-world DZHLWK
- * attack pattern (e.g. 0x073a4abb… vs 0x073acba9… share only the first
- * 4 hex chars). The spec's 6-hex threshold misses these — vanity-address
- * generation is cheap enough that attackers routinely settle for 4+4.
- *
- * False-positive rate at 4+4: 1 / 16^8 ≈ 1 / 4.3 billion per pair, well
- * below noise floor for any realistic wallet (10 OUT recipients × 1000 IN
- * txs = 10k pairs → < 1e-5 expected false positives).
- *
- * Override via the `prefixHexLen`/`suffixHexLen` options when calling
- * `detectAddressPoisoning` if a use case needs stricter matching.
- */
-const DEFAULT_PREFIX_HEX = 4;
-const DEFAULT_SUFFIX_HEX = 4;
-const MAX_TX_DEFAULT = 5000;
-
-/**
- * Detect address poisoning attacks against the subject wallet.
- *
- * The caller should pass the RAW (un-spam-filtered) `incoming.concat(outgoing)`
- * arrays — dust and Unicode-named tokens are the very signals we look for and
- * MUST NOT be filtered upstream.
- */
-export function detectAddressPoisoning(input: {
-  allTransactions: PoisonTx[];
-  subjectAddress: string;
-  maxTransactionsToAnalyze?: number;
-  /** Hex chars matched at the prefix (excluding "0x"). Default 4. */
-  prefixHexLen?: number;
-  /** Hex chars matched at the suffix. Default 4. */
-  suffixHexLen?: number;
-}): PoisoningAnalysis {
-  const SUBJECT = (input.subjectAddress || '').toLowerCase();
-  const cap = input.maxTransactionsToAnalyze ?? MAX_TX_DEFAULT;
-  const txs = input.allTransactions.slice(0, cap);
-
-  const PREFIX_HEX = input.prefixHexLen ?? DEFAULT_PREFIX_HEX;
-  const SUFFIX_HEX = input.suffixHexLen ?? DEFAULT_SUFFIX_HEX;
-  const PREFIX_LEN = PREFIX_HEX + 2; // include leading "0x"
-  const SUFFIX_LEN = SUFFIX_HEX;
-
-  // EVM-only: BTC/SOL/TRON address formats need a different similarity model,
-  // and the spec calls out EVM patterns specifically. Filter to EVM transactions.
-  const evmTxs = txs.filter(t => isEvm(t.from) && isEvm(t.to));
-
-  // ── 1. Real recipients (significant OUTs) ────────────────────────
-  type RealInfo = { totalValue: number; firstSent: string; count: number; token: string };
-  const realRecipients = new Map<string, RealInfo>();
-  for (const tx of evmTxs) {
-    if (tx.from.toLowerCase() !== SUBJECT) continue;
-    if (!isSignificantSend(tx.value, tx.asset)) continue;
-    const to = tx.to.toLowerCase();
-    const token = (tx.asset || 'ETH').toUpperCase();
-    const ts = tsOf(tx);
-    const prior = realRecipients.get(to);
-    if (prior) {
-      prior.totalValue += tx.value;
-      prior.count += 1;
-      if (ts && (!prior.firstSent || ts < prior.firstSent)) prior.firstSent = ts;
-    } else {
-      realRecipients.set(to, { totalValue: tx.value, firstSent: ts, count: 1, token });
-    }
-  }
-
-  // ── 2. For each real recipient, find prefix+suffix-matching INs ──
-  const matches: PoisoningMatch[] = [];
-
-  for (const [realAddr, realInfo] of Array.from(realRecipients.entries())) {
-    const realPrefix = realAddr.slice(0, PREFIX_LEN); // "0x" + 6 hex
-    const realSuffix = realAddr.slice(-SUFFIX_LEN);   // 4 hex
-
-    // Track which spoof addresses we've already recorded against this real,
-    // so we don't emit one PoisoningMatch per dust tx — one per (real, spoof) pair.
-    const seenSpoofs = new Set<string>();
-
-    for (const tx of evmTxs) {
-      if (tx.to.toLowerCase() !== SUBJECT) continue;     // must be IN to subject
-      const sender = tx.from.toLowerCase();
-      if (sender === realAddr) continue;                  // legitimate echo — skip
-      if (sender === SUBJECT) continue;                   // self-tx — skip
-      if (sender.slice(0, PREFIX_LEN) !== realPrefix) continue;
-      if (sender.slice(-SUFFIX_LEN) !== realSuffix) continue;
-
-      // Strict visual-match found. Most poisoning IS dust, but the pattern
-      // itself is the smoking gun — we accept any IN value.
-      const dust = looksLikeDust(tx.value, tx.asset);
-      const _unused = dust; // dust label is informational; we don't gate on it
-
-      if (seenSpoofs.has(sender)) continue;
-      seenSpoofs.add(sender);
-
-      // Did the victim later send meaningful value to this spoof?
-      const misdirected = evmTxs.find(t =>
-        t.from.toLowerCase() === SUBJECT &&
-        t.to.toLowerCase() === sender &&
-        isSignificantSend(t.value, t.asset),
-      );
-
-      matches.push({
-        realAddress: realAddr,
-        realAddressFirstSent: realInfo.firstSent,
-        realAddressTotalValue: realInfo.totalValue,
-        realAddressToken: realInfo.token,
-        spoofedAddress: sender,
-        // 'strong' at the default 4+4 threshold (8 hex visual chars matching);
-        // tightening to 5+4 or 6+4 would qualify as 'stronger' but we keep
-        // the label conservative for now.
-        patternStrength: 'strong',
-        prefixMatchLength: PREFIX_HEX,
-        suffixMatchLength: SUFFIX_HEX,
-        dustTransactionHash: tx.hash,
-        dustValue: tx.value,
-        dustToken: (tx.asset || 'ETH').toUpperCase(),
-        dustTimestamp: tsOf(tx),
-        victimMisdirected: !!misdirected,
-        misdirectedTxHash: misdirected?.hash,
-        misdirectedAmount: misdirected?.value,
-        misdirectedToken: misdirected ? (misdirected.asset || 'ETH').toUpperCase() : undefined,
-        misdirectedTimestamp: misdirected ? tsOf(misdirected) : undefined,
-      });
-    }
-  }
-
-  // ── 3. Build vanity clusters ─────────────────────────────────────
-  const clusters = buildVanityClusters(matches);
-
-  // ── 4. Build summary ─────────────────────────────────────────────
-  const totalVictimMisdirected = matches.filter(m => m.victimMisdirected).length;
-  const totalMisdirectedValue = matches
-    .filter(m => m.victimMisdirected)
-    .reduce((sum, m) => sum + (m.misdirectedAmount || 0), 0);
-
-  const detected = matches.length > 0;
-  let summary: string;
-  if (!detected) {
-    summary = 'No address poisoning indicators detected in the analyzed transaction set.';
-  } else {
-    const clusterTxt = clusters.length === 1 ? '1 vanity cluster' : `${clusters.length} vanity clusters`;
-    summary =
-      `Address poisoning attack identified — ${matches.length} spoofed address(es) across ${clusterTxt} ` +
-      `targeting ${realRecipients.size} real recipient(s).`;
-    if (totalVictimMisdirected > 0) {
-      // Use the dominant misdirected token for the value label (a heuristic,
-      // since the pipeline doesn't carry USD).
-      const tokenMix = new Set(matches.filter(m => m.victimMisdirected).map(m => m.misdirectedToken));
-      const tokenLabel = tokenMix.size === 1 ? Array.from(tokenMix)[0] : 'mixed';
-      summary +=
-        ` CRITICAL: subject sent ${totalMisdirectedValue.toFixed(2)} ${tokenLabel} to ` +
-        `${totalVictimMisdirected} spoof address(es) — successful misdirection.`;
-    }
-  }
-
-  return {
-    detected,
-    technique: detected ? 'address_poisoning' : null,
-    totalSpoofAttempts: matches.length,
-    totalVictimMisdirected,
-    totalMisdirectedValue,
-    matches,
-    vanityClusters: clusters,
-    summary,
-  };
-}
-
-function buildVanityClusters(matches: PoisoningMatch[]): VanityCluster[] {
-  const byPattern = new Map<string, VanityCluster>();
-  for (const m of matches) {
-    const real = m.realAddress;
-    // Derive prefix/suffix lengths from each match record so this works
-    // regardless of the threshold the detector ran with.
-    const prefixLen = 2 + m.prefixMatchLength; // include "0x"
-    const suffixLen = m.suffixMatchLength;
-    const prefix = real.slice(0, prefixLen);
-    const suffix = real.slice(-suffixLen);
-    const key = `${prefix}…${suffix}`;
-    let c = byPattern.get(key);
-    if (!c) {
-      c = { pattern: key, prefix, suffix, addresses: [real], realAddress: real };
-      byPattern.set(key, c);
-    }
-    if (!c.addresses.includes(m.spoofedAddress)) {
-      c.addresses.push(m.spoofedAddress);
-    }
-  }
-  return Array.from(byPattern.values()).sort((a, b) => b.addresses.length - a.addresses.length);
-}
-
-/* ─── Utilities exposed for the PDF renderer ──────────────────────── */
-
 /**
  * Return a "position N: 'a' vs 'b'" string for the first differing
- * character between two addresses. Useful for PDF call-outs.
+ * character between two addresses. Exported for the PDF renderer.
  */
 export function firstDifferingChar(addr1: string, addr2: string): string {
   const n = Math.min(addr1.length, addr2.length);
@@ -361,4 +151,208 @@ export function firstDifferingChar(addr1: string, addr2: string): string {
     }
   }
   return 'identical';
+}
+
+/* ─── Detector ────────────────────────────────────────────────────── */
+
+const DEFAULT_PREFIX_HEX = 4;
+const DEFAULT_SUFFIX_HEX = 4;
+const MAX_TX_DEFAULT = 5000;
+
+// Lazy import to avoid a hard dependency cycle at module load.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+function phishingTagFor(address: string): string | undefined {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getPhishingTag } = require('./known-phishing');
+    return getPhishingTag(address);
+  } catch {
+    return undefined;
+  }
+}
+
+interface PerTokenAgg { value: number; count: number; first: string; last: string }
+
+/** Aggregate the subject's OUT value to one address, grouped by token, and
+ *  return the dominant token + its summed value + tx count + date range. */
+function dominantToken(perToken: Map<string, PerTokenAgg>): { token: string; value: number; count: number; first: string; last: string } {
+  let best: { token: string; agg: PerTokenAgg } | null = null;
+  let totalCount = 0;
+  for (const [token, agg] of Array.from(perToken.entries())) {
+    totalCount += agg.count;
+    if (!best || agg.value > best.agg.value) best = { token, agg };
+  }
+  if (!best) return { token: 'ETH', value: 0, count: 0, first: '', last: '' };
+  return { token: best.token, value: best.agg.value, count: totalCount, first: best.agg.first, last: best.agg.last };
+}
+
+export function detectAddressPoisoning(input: {
+  allTransactions: PoisonTx[];
+  subjectAddress: string;
+  maxTransactionsToAnalyze?: number;
+  prefixHexLen?: number;
+  suffixHexLen?: number;
+}): PoisoningAnalysis {
+  const SUBJECT = (input.subjectAddress || '').toLowerCase();
+  const cap = input.maxTransactionsToAnalyze ?? MAX_TX_DEFAULT;
+  const txs = input.allTransactions.slice(0, cap).filter((t) => isEvm(t.from) && isEvm(t.to));
+
+  const PREFIX_HEX = input.prefixHexLen ?? DEFAULT_PREFIX_HEX;
+  const SUFFIX_HEX = input.suffixHexLen ?? DEFAULT_SUFFIX_HEX;
+  const PREFIX_LEN = PREFIX_HEX + 2; // include "0x"
+  const SUFFIX_LEN = SUFFIX_HEX;
+
+  const patternOf = (addr: string) => `${addr.slice(0, PREFIX_LEN)}…${addr.slice(-SUFFIX_LEN)}`;
+
+  // ── Step 1: per-address aggregation of the subject's significant OUTs ──
+  // outValue[addr] = Map<token, agg>
+  const outValue = new Map<string, Map<string, PerTokenAgg>>();
+  for (const tx of txs) {
+    if (tx.from.toLowerCase() !== SUBJECT) continue;
+    if (!isSignificantSend(tx.value, tx.asset)) continue;
+    const to = tx.to.toLowerCase();
+    const token = (tx.asset || 'ETH').toUpperCase();
+    const ts = tsOf(tx);
+    let perToken = outValue.get(to);
+    if (!perToken) { perToken = new Map(); outValue.set(to, perToken); }
+    const agg = perToken.get(token) || { value: 0, count: 0, first: ts, last: ts };
+    agg.value += tx.value;
+    agg.count += 1;
+    if (ts && (!agg.first || ts < agg.first)) agg.first = ts;
+    if (ts && (!agg.last || ts > agg.last)) agg.last = ts;
+    perToken.set(token, agg);
+  }
+
+  // ── Step 2: dust-in senders (poisoning fingerprint) ──
+  // dustIn[addr] = first dust tx hash
+  const dustIn = new Map<string, string | undefined>();
+  for (const tx of txs) {
+    if (tx.to.toLowerCase() !== SUBJECT) continue;
+    const from = tx.from.toLowerCase();
+    if (from === SUBJECT) continue;
+    if (!looksLikeDust(tx.value, tx.assetRaw ?? tx.asset)) continue;
+    if (!dustIn.has(from)) dustIn.set(from, tx.hash);
+  }
+
+  // ── Step 3: build clusters keyed by vanity pattern ──
+  // Members = value-destinations PLUS dust-senders sharing a pattern that
+  // also appears among value-destinations (avoids clustering random dust).
+  interface ClusterAcc {
+    pattern: string;
+    members: Set<string>;
+  }
+  const clusters = new Map<string, ClusterAcc>();
+
+  // Seed clusters from value destinations.
+  for (const addr of Array.from(outValue.keys())) {
+    const key = patternOf(addr);
+    let c = clusters.get(key);
+    if (!c) { c = { pattern: key, members: new Set() }; clusters.set(key, c); }
+    c.members.add(addr);
+  }
+  // Fold in dust-senders that match an existing cluster pattern.
+  for (const addr of Array.from(dustIn.keys())) {
+    const key = patternOf(addr);
+    const c = clusters.get(key);
+    if (c) c.members.add(addr);
+  }
+
+  // ── Step 4: build campaigns from clusters with ≥2 members ──
+  const campaigns: AddressPoisoningCampaign[] = [];
+  for (const c of Array.from(clusters.values())) {
+    if (c.members.size < 2) continue;
+
+    const entries: FraudClusterEntry[] = Array.from(c.members).map((addr) => {
+      const perToken = outValue.get(addr);
+      const dom = perToken ? dominantToken(perToken) : { token: 'ETH', value: 0, count: 0, first: '', last: '' };
+      return {
+        address: addr,
+        role: 'secondary_spoof' as FraudClusterRole, // fixed below
+        totalReceivedFromSubject: dom.value,
+        totalReceivedToken: dom.token,
+        transactionCount: dom.count,
+        firstReceived: dom.first,
+        lastReceived: dom.last,
+        receivedDustFromCluster: dustIn.has(addr),
+        dustTransactionHash: dustIn.get(addr),
+        etherscanFakePhishingTag: phishingTagFor(addr),
+      };
+    });
+
+    // Sort by value received desc; highest = main collector.
+    entries.sort((a, b) => b.totalReceivedFromSubject - a.totalReceivedFromSubject);
+    const mainCollector = { ...entries[0], role: 'main_collector' as FraudClusterRole };
+    const secondarySpoofs = entries.slice(1).map((e) => ({ ...e, role: 'secondary_spoof' as FraudClusterRole }));
+
+    // Primary token = dominant token across cluster (by total value).
+    const tokenTotals = new Map<string, number>();
+    for (const e of entries) tokenTotals.set(e.totalReceivedToken, (tokenTotals.get(e.totalReceivedToken) || 0) + e.totalReceivedFromSubject);
+    let primaryToken = mainCollector.totalReceivedToken;
+    let best = -1;
+    for (const [tok, v] of Array.from(tokenTotals.entries())) { if (v > best) { best = v; primaryToken = tok; } }
+
+    const totalToMainCollector = mainCollector.totalReceivedFromSubject;
+    const totalToSecondarySpoofs = secondarySpoofs.reduce((s, e) => s + e.totalReceivedFromSubject, 0);
+    const totalSentByVictim = totalToMainCollector + totalToSecondarySpoofs;
+    const successfulMisdirections = secondarySpoofs.filter((e) => isMisdirectionValue(e.totalReceivedFromSubject, e.totalReceivedToken)).length;
+    const fakePhishingAddresses = entries.filter((e) => e.etherscanFakePhishingTag).map((e) => e.address);
+
+    const [prefix, suffix] = c.pattern.split('…');
+
+    const summary = (() => {
+      let s = `Address poisoning campaign on vanity pattern ${c.pattern} — ${entries.length} look-alike addresses. `;
+      s += `Main collector received ${totalToMainCollector.toFixed(2)} ${mainCollector.totalReceivedToken}. `;
+      if (successfulMisdirections > 0) {
+        s += `CRITICAL: ${successfulMisdirections} secondary spoof(s) received a total of ${totalToSecondarySpoofs.toFixed(2)} ${primaryToken} — successful misdirection.`;
+      } else {
+        s += `No funds reached secondary spoofs (poisoning attempted, misdirection unsuccessful).`;
+      }
+      return s;
+    })();
+
+    campaigns.push({
+      detected: true,
+      vanityPattern: c.pattern,
+      prefix,
+      suffix,
+      totalClusterAddresses: entries.length,
+      mainCollector,
+      secondarySpoofs,
+      totalSentByVictim,
+      totalToMainCollector,
+      totalToSecondarySpoofs,
+      primaryToken,
+      successfulMisdirections,
+      hasFakePhishingTag: fakePhishingAddresses.length > 0,
+      fakePhishingAddresses,
+      summary,
+    });
+  }
+
+  // Sort campaigns by total victim outflow desc.
+  campaigns.sort((a, b) => b.totalSentByVictim - a.totalSentByVictim);
+
+  const detected = campaigns.length > 0;
+  const totalMisdirectedToSecondarySpoofs = campaigns.reduce((s, c) => s + c.totalToSecondarySpoofs, 0);
+  const totalSpoofsAcrossAllCampaigns = campaigns.reduce((s, c) => s + c.secondarySpoofs.length, 0);
+
+  let summary: string;
+  if (!detected) {
+    summary = 'No address poisoning campaign detected in the analyzed transaction set.';
+  } else {
+    const successful = campaigns.reduce((s, c) => s + c.successfulMisdirections, 0);
+    summary = `${campaigns.length} address poisoning campaign(s) detected across ${totalSpoofsAcrossAllCampaigns + campaigns.length} look-alike addresses.`;
+    if (successful > 0) {
+      summary += ` CRITICAL: ${successful} successful misdirection(s) totalling ${totalMisdirectedToSecondarySpoofs.toFixed(2)} (token-native units) sent to secondary spoof addresses.`;
+    }
+  }
+
+  return {
+    detected,
+    technique: detected ? 'address_poisoning_campaign' : null,
+    campaigns,
+    totalSpoofsAcrossAllCampaigns,
+    totalMisdirectedToSecondarySpoofs,
+    summary,
+  };
 }

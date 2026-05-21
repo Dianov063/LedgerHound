@@ -85,11 +85,17 @@ const mock: ReportData = {
   addressLabels: [],
   externalIntelligenceDegraded: false,
   attackTechniques: { addressPoisoning, unicodeSpoofing },
+  exchangeAnalysis: {
+    entryPoints: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance 14 (Hot Wallet)', parentEntity: 'Binance', type: 'entry', interactionCount: 9, totalValue: 30, token: 'ETH', complianceEmail: 'ce@binance.com' }],
+    exitPoints: [],
+    hasEntryKyc: true,
+    hasExitKyc: false,
+  },
 };
 
 async function main() {
   console.log('Attack analyses built:');
-  console.log(`  poisoning: detected=${addressPoisoning.detected} spoofs=${addressPoisoning.totalSpoofAttempts} misdirected=${addressPoisoning.totalVictimMisdirected} clusters=${addressPoisoning.vanityClusters.length}`);
+  console.log(`  poisoning: detected=${addressPoisoning.detected} campaigns=${addressPoisoning.campaigns.length} spoofs=${addressPoisoning.totalSpoofsAcrossAllCampaigns} misdirected=${addressPoisoning.totalMisdirectedToSecondarySpoofs}`);
   console.log(`  unicode:   detected=${unicodeSpoofing.detected} symbols=${unicodeSpoofing.uniqueSpoofSymbols}`);
   console.log();
 

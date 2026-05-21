@@ -27,6 +27,8 @@ export interface GraphEdge {
   /** Midpoint for label placement */
   labelX: number;
   labelY: number;
+  /** 2026-05-21 (Phase 2.5): true if this edge carries a Unicode-spoof token. */
+  isSpoof?: boolean;
 }
 
 export interface GraphData {
@@ -72,7 +74,7 @@ function fmtValue(v: number, currency: string): string {
  */
 export function buildGraphData(params: {
   walletAddress: string;
-  transactions: { direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string }[];
+  transactions: { direction: 'IN' | 'OUT'; from: string; to: string; value: number; token: string; isSpoof?: boolean; spoofTarget?: string }[];
   identifiedEntities: { address: string; label: string; type: string }[];
   nativeCurrency: string;
 }): GraphData | null {
@@ -80,7 +82,7 @@ export function buildGraphData(params: {
   const addr = walletAddress.toLowerCase();
 
   // Aggregate counterparties by volume
-  const counterparties = new Map<string, { volume: number; direction: 'IN' | 'OUT'; label: string; type: string; token: string }>();
+  const counterparties = new Map<string, { volume: number; direction: 'IN' | 'OUT'; label: string; type: string; token: string; isSpoof?: boolean; spoofTarget?: string }>();
   const entityMap = new Map<string, { label: string; type: string }>();
   for (const e of identifiedEntities) {
     entityMap.set(e.address.toLowerCase(), { label: e.label, type: e.type });
@@ -104,6 +106,8 @@ export function buildGraphData(params: {
         label: entity?.label || shortAddr(counterparty),
         type: entity?.type || 'unknown',
         token: tx.token || nativeCurrency,
+        isSpoof: tx.isSpoof,
+        spoofTarget: tx.spoofTarget,
       });
     }
   }
@@ -165,8 +169,13 @@ export function buildGraphData(params: {
     const ux = dx / dist;
     const uy = dy / dist;
 
-    // Determine the value label
-    const valueLabel = fmtValue(data.volume, data.token);
+    // Determine the value label. 2026-05-21 (Phase 2.5): for Unicode-spoof
+    // tokens, label with the MIMICKED ticker + ⚠ — the raw Unicode glyph
+    // can't render in the SVG layer (no Lisu in @react-pdf Svg <Text>), so
+    // showing "USDT⚠" is clearer than tofu boxes.
+    const valueLabel = data.isSpoof
+      ? `${fmtValue(data.volume, data.spoofTarget || 'spoof')} ⚠`
+      : fmtValue(data.volume, data.token);
 
     if (data.direction === 'OUT') {
       // Arrow from center → counterparty
@@ -181,6 +190,7 @@ export function buildGraphData(params: {
         label: valueLabel,
         labelX: (sx + ex) / 2,
         labelY: (sy + ey) / 2,
+        isSpoof: data.isSpoof,
       });
     } else {
       // Arrow from counterparty → center
@@ -195,6 +205,7 @@ export function buildGraphData(params: {
         label: valueLabel,
         labelX: (sx + ex) / 2,
         labelY: (sy + ey) / 2,
+        isSpoof: data.isSpoof,
       });
     }
   });
