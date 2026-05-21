@@ -814,6 +814,8 @@
     "link_valid": "Enlace válido por 7 días",
     "case_label": "Caso",
     "email_fallback": "Su informe ha sido enviado a su correo con un archivo PDF adjunto.",
+    "slow_generation": "La generación está tardando más de lo habitual — seguimos trabajando...",
+    "email_backup": "Su informe también será enviado a {email} cuando esté listo.",
     "wallet_tracker": "Rastreador de Billeteras",
     "graph_tracer": "Grafo de Transacciones"
   },

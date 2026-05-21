@@ -87,11 +87,11 @@ function ReportSuccessContent() {
 
   useEffect(() => {
     if (!sessionId || reportStatus.status === 'ready' || reportStatus.status === 'error') return;
-    // Poll every 5 seconds for up to 2 minutes
-    if (pollCount >= 24) {
+    // Poll every 5s for up to 5 minutes (60 polls). After that, show email fallback.
+    if (pollCount >= 60) {
       setReportStatus((prev) => ({
         ...prev,
-        status: 'ready', // Show email fallback
+        status: 'ready',
         message: 'Report generation may still be in progress.',
       }));
       return;
@@ -99,6 +99,8 @@ function ReportSuccessContent() {
     const timer = setTimeout(checkStatus, pollCount === 0 ? 1000 : 5000);
     return () => clearTimeout(timer);
   }, [pollCount, sessionId, reportStatus.status, checkStatus]);
+
+  const isSlowGeneration = reportStatus.status === 'processing' && pollCount >= 24;
 
   const isReady = reportStatus.status === 'ready';
   const isProcessing = reportStatus.status === 'processing' || reportStatus.status === 'pending';
@@ -138,10 +140,26 @@ function ReportSuccessContent() {
           )}
 
           {/* Processing indicator */}
-          {isProcessing && (
+          {isProcessing && !isSlowGeneration && (
             <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium px-5 py-3 rounded-xl mb-6">
               <Loader2 size={16} className="animate-spin" />
               {reportStatus.message || ts('analyzing')}
+            </div>
+          )}
+
+          {/* Slow generation — still polling but reassure user */}
+          {isProcessing && isSlowGeneration && (
+            <div className="space-y-3 mb-6">
+              <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium px-5 py-3 rounded-xl">
+                <Loader2 size={16} className="animate-spin" />
+                {ts('slow_generation')}
+              </div>
+              <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium px-5 py-3 rounded-xl">
+                <Mail size={16} />
+                {reportStatus.email
+                  ? ts('email_backup', { email: reportStatus.email })
+                  : ts('email_fallback')}
+              </div>
             </div>
           )}
 

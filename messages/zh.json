@@ -814,6 +814,8 @@
     "link_valid": "链接7天内有效",
     "case_label": "案件",
     "email_fallback": "您的报告已通过电子邮件发送，附有PDF附件。",
+    "slow_generation": "生成时间比平常稍长——仍在处理中...",
+    "email_backup": "报告准备好后也将发送到 {email}。",
     "wallet_tracker": "钱包追踪器",
     "graph_tracer": "交易图谱"
   },

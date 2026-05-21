@@ -814,6 +814,8 @@
     "link_valid": "Lien valide 7 jours",
     "case_label": "Dossier",
     "email_fallback": "Votre rapport a été envoyé à votre e-mail avec une pièce jointe PDF.",
+    "slow_generation": "La génération prend plus de temps que d'habitude — nous continuons...",
+    "email_backup": "Votre rapport sera également envoyé à {email} dès qu'il sera prêt.",
     "wallet_tracker": "Suivi de portefeuille",
     "graph_tracer": "Graphe de transactions"
   },

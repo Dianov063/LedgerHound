@@ -814,6 +814,8 @@
     "link_valid": "Link valid for 7 days",
     "case_label": "Case",
     "email_fallback": "Your report has been sent to your email with a PDF attachment.",
+    "slow_generation": "Generation is taking longer than usual — still working...",
+    "email_backup": "Your report will also be sent to {email} once ready.",
     "wallet_tracker": "Wallet Tracker",
     "graph_tracer": "Graph Tracer"
   },

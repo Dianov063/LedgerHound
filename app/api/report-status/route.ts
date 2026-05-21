@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getReports } from '@/lib/reports-log';
 import { getReportDownloadUrl } from '@/lib/s3-storage';
+import logger from '@/lib/logger';
 
 const getStripe = (): any => {
   // @ts-expect-error Stripe types mismatch with ESM default import
@@ -12,8 +13,9 @@ const getStripe = (): any => {
  * GET /api/report-status?session_id=cs_...
  *
  * Looks up a completed Stripe checkout session, extracts the payment intent,
- * then searches the reports log for a matching report. Returns the download URL
- * and case ID if found.
+ * then searches the reports log for a report generated for THIS specific
+ * payment. Match is by stripePaymentId ONLY — never by wallet+email+network,
+ * which would return stale reports from previous purchases of the same wallet.
  */
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get('session_id');
@@ -23,7 +25,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Get the Stripe session to find payment intent and metadata
     const session = await getStripe().checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status !== 'paid') {
@@ -33,17 +34,12 @@ export async function GET(req: NextRequest) {
     const paymentId = session.payment_intent || session.id || '';
     const email = session.metadata?.email || session.customer_email || '';
     const walletAddress = session.metadata?.walletAddress || '';
-    const network = session.metadata?.network || 'eth';
 
-    // Search the reports log for this payment
-    // First try exact match by paymentId, then by wallet+email+network
     const reports = await getReports();
-    const report = reports.find(
-      (r) => r.stripePaymentId === paymentId ||
-             (r.walletAddress === walletAddress && r.email === email && r.network === network),
-    );
+    const report = reports.find((r) => r.stripePaymentId === paymentId);
 
     if (!report) {
+      logger.info({ paymentId, walletAddress, sessionId }, '[report-status] No report yet for this payment — still generating');
       return NextResponse.json({
         status: 'processing',
         message: 'Report is being generated. This usually takes 30-60 seconds.',
@@ -52,7 +48,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Generate a fresh presigned URL
     let downloadUrl = report.downloadUrl;
     try {
       downloadUrl = await getReportDownloadUrl(report.caseId);
@@ -68,7 +63,7 @@ export async function GET(req: NextRequest) {
       walletAddress,
     });
   } catch (err: any) {
-    console.error('[report-status] Error:', err.message);
+    logger.error({ err: err.message, sessionId }, '[report-status] Error');
     return NextResponse.json({ error: err.message || 'Failed to check status' }, { status: 500 });
   }
 }
