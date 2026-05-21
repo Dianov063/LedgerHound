@@ -45,10 +45,19 @@ export type SpoofScriptCategory =
   | 'Other';
 
 export interface UnicodeSpoofEvidence {
-  /** The fake symbol as it appears in transaction data. */
+  /** The fake symbol exactly as it appears on-chain (RAW — forensic source). */
   fakeSymbol: string;
-  /** Codepoints in standard U+HHHH notation (e.g. "U+A4F4 U+A4E2 U+A4D3 U+A4D4"). */
+  /** Codepoints of the RAW symbol (forensic audit trail). */
   fakeSymbolCodepoints: string;
+  /**
+   * 2026-05-21 (Phase 2.5 polish): NFC-normalised form for human display.
+   * Composes combining diacritical marks (e.g. "U"+◌́ → "Ú") so the symbol
+   * renders correctly in the PDF instead of dropping the mark. The raw form
+   * above is preserved for the audit trail.
+   */
+  fakeSymbolDisplay: string;
+  /** Codepoints of the NFC-normalised display form. */
+  fakeSymbolDisplayCodepoints: string;
   /** Legitimate ticker the spoof mimics (e.g. "USDT"). */
   mimicsLegitimate: string;
   /** Which Unicode script category(ies) the spoof draws from. */
@@ -213,6 +222,18 @@ export function hasNonAsciiChars(s: string): boolean {
   return /[^\x00-\x7F]/.test(s);
 }
 
+/**
+ * NFC-normalise a symbol for human display. Composes combining marks into
+ * precomposed characters (e.g. "U" + U+0301 → "Ú" U+00DA) so @react-pdf
+ * renders the glyph rather than dropping the standalone combining mark.
+ * Lisu and Cyrillic look-alikes are unaffected (no NFC composition exists),
+ * so the visual spoof is preserved. Lossless for forensic purposes — the
+ * raw form is retained separately.
+ */
+export function normalizeForDisplay(symbol: string): string {
+  return (symbol || '').normalize('NFC');
+}
+
 /** Count non-ASCII characters (code-points). */
 export function countNonAscii(s: string): number {
   let n = 0;
@@ -335,9 +356,12 @@ export function detectUnicodeSpoofing(input: {
     const target = detectSpoofTarget(sym, tokens);
     if (!target) continue;
 
+    const display = normalizeForDisplay(sym);
     const ev = byFakeSymbol.get(sym) || {
       fakeSymbol: sym,
       fakeSymbolCodepoints: getCodepoints(sym),
+      fakeSymbolDisplay: display,
+      fakeSymbolDisplayCodepoints: getCodepoints(display),
       mimicsLegitimate: target,
       scriptCategory: detectScriptCategory(sym),
       occurrences: 0,

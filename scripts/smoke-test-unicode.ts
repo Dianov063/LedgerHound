@@ -16,6 +16,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 import {
   normalizeForVisualMatch,
+  normalizeForDisplay,
   detectSpoofTarget,
   detectUnicodeSpoofing,
   getCodepoints,
@@ -51,6 +52,14 @@ assert('ÚЅDТ (Latin Ú + Cyrillic Ѕ + D + Cyrillic Т) → USDT',
 const fullwidthETH = '\u{FF25}\u{FF34}\u{FF28}'; // ETH (fullwidth)
 assert('Fullwidth ETH → ETH', normalizeForVisualMatch(fullwidthETH) === 'ETH',
   `got "${normalizeForVisualMatch(fullwidthETH)}"`);
+
+// NFC display normalization (Phase 2.5 polish): combining-mark form composes.
+const combiningUSDT = 'U\u{0301}\u{0405}D\u{0422}'; // U + combining-acute + Ѕ + D + Т (5 cps)
+assert('normalizeForDisplay composes U+0301 → Ú (5 cps → 4 cps)',
+  normalizeForDisplay(combiningUSDT) === '\u{00DA}\u{0405}D\u{0422}' && Array.from(normalizeForDisplay(combiningUSDT)).length === 4,
+  `got "${normalizeForDisplay(combiningUSDT)}" (${Array.from(normalizeForDisplay(combiningUSDT)).length} cps)`);
+assert('normalizeForDisplay leaves Lisu untouched',
+  normalizeForDisplay(lisuUSDT) === lisuUSDT);
 
 // Mathematical Alphanumeric (𝐔𝐒𝐃𝐓 = U+1D414 + U+1D412 + U+1D403 + U+1D413)
 const mathUSDT = '\u{1D414}\u{1D412}\u{1D403}\u{1D413}';

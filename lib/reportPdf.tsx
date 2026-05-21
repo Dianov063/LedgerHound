@@ -4,7 +4,7 @@ import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Ima
 import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength, type RecoveryAssessment, type WalletRole } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 import { firstDifferingChar } from './address-poisoning';
-import { getCodepoints } from './unicode-spoofing';
+import { getCodepoints, normalizeForDisplay, detectScriptCategory } from './unicode-spoofing';
 
 /**
  * Noto Sans Lisu — needed to render the Lisu-letter token spoofs (e.g.
@@ -32,6 +32,41 @@ try {
   // Registration failed — keep Helvetica fallback. Codepoints still render.
   // eslint-disable-next-line no-console
   console.warn('[reportPdf] NotoSansLisu registration failed, using codepoint fallback:', (e as Error)?.message);
+}
+
+/**
+ * Noto Sans (Latin + Cyrillic + Greek) — needed to render Cyrillic/mixed
+ * spoof symbols like "ÚЅDТ". NotoSansLisu does NOT cover Cyrillic, so we pick
+ * the font per script: Lisu → NotoSansLisu, everything else → NotoSansRpt.
+ * 2026-05-21 (Phase 2.5 polish). Distinct family name avoids colliding with
+ * legal-packs' global 'NotoSans' registration.
+ */
+const NOTO_SANS_CDN = 'https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99d.ttf';
+let SANS_FONT_FAMILY = 'Helvetica'; // fallback (Helvetica lacks Cyrillic, but never crashes)
+try {
+  const resolveSans = (): string => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      const local = path.resolve(process.cwd(), 'lib', 'fonts', 'NotoSans-Regular.ttf');
+      if (fs.existsSync(local)) return local;
+    } catch { /* bundled env — use CDN */ }
+    return NOTO_SANS_CDN;
+  };
+  Font.register({ family: 'NotoSansRpt', src: resolveSans() });
+  SANS_FONT_FAMILY = 'NotoSansRpt';
+} catch (e) {
+  // eslint-disable-next-line no-console
+  console.warn('[reportPdf] NotoSansRpt registration failed, using Helvetica fallback:', (e as Error)?.message);
+}
+
+/**
+ * Pick the right font for a spoof symbol based on its Unicode script.
+ * Lisu needs NotoSansLisu; Cyrillic/Greek/Latin-diacritic/Mixed need
+ * NotoSansRpt (Latin+Cyrillic+Greek). 2026-05-21.
+ */
+function fontForScript(scriptCategory: string): string {
+  return scriptCategory === 'Lisu' ? LISU_FONT_FAMILY : SANS_FONT_FAMILY;
 }
 
 const blue = '#2563eb';
@@ -702,15 +737,24 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>
             Unicode Spoofing Evidence: {assets.spoofTokens.length} fake token{assets.spoofTokens.length > 1 ? 's' : ''} detected
           </Text>
-          {assets.spoofTokens.slice(0, 6).map((t, i) => (
-            <View key={i} style={{ marginBottom: 3 }}>
-              <Text style={{ fontSize: 7, color: slate900 }}>
-                <Text style={{ fontFamily: LISU_FONT_FAMILY }}>{t.symbol}</Text>
-                {' '}— mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
-              </Text>
-              <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>{getCodepoints(t.symbol)}</Text>
-            </View>
-          ))}
+          {assets.spoofTokens.slice(0, 6).map((t, i) => {
+            const display = t.symbolDisplay || t.symbol;
+            const composed = display !== t.symbol;
+            return (
+              <View key={i} style={{ marginBottom: 3 }}>
+                <Text style={{ fontSize: 7, color: slate900 }}>
+                  <Text style={{ fontFamily: fontForScript(t.scriptCategory) }}>{display}</Text>
+                  {' '}— mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
+                </Text>
+                <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>
+                  {composed ? 'Original: ' : 'Codepoints: '}{getCodepoints(t.symbol)}
+                </Text>
+                {composed && (
+                  <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>Display: {getCodepoints(display)}</Text>
+                )}
+              </View>
+            );
+          })}
           <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
             These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.
           </Text>
@@ -733,42 +777,62 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
       <Text style={s.h2}>Activity Timeline</Text>
       {timeline && timeline.length > 0 ? (
         <View style={{ paddingLeft: 8 }}>
-          {timeline.map((event, i) => {
-            const isHighlight = event.highlight;
-            const typeColor = event.type === 'MAJOR_OUTFLOW' ? red
-              : event.type === 'EXCHANGE_INTERACTION' ? green
-              : event.type === 'MIXER_INTERACTION' ? red
-              : event.type === 'MAJOR_INFLOW' ? green
-              : blue;
+          {(() => {
+            // 2026-05-21 (Phase 2.5 Fix 3): set of secondary-spoof addresses
+            // that actually received victim funds — used to flag misdirection
+            // events distinctly from legitimate sends.
+            const spoofAddrs = new Set<string>();
+            for (const c of data.attackTechniques?.addressPoisoning?.campaigns || []) {
+              for (const sp of c.secondarySpoofs) {
+                if (sp.totalReceivedFromSubject > 0) spoofAddrs.add(sp.address.toLowerCase());
+              }
+            }
+            return timeline.map((event, i) => {
+              const isHighlight = event.highlight;
+              const isMisdirection = !!event.counterparty && spoofAddrs.has(event.counterparty.toLowerCase());
+              const typeColor = isMisdirection ? amber
+                : event.type === 'MAJOR_OUTFLOW' ? red
+                : event.type === 'EXCHANGE_INTERACTION' ? green
+                : event.type === 'MIXER_INTERACTION' ? red
+                : event.type === 'MAJOR_INFLOW' ? green
+                : blue;
 
-            return (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 8 }}>
-                {/* Timeline dot and line */}
-                <View style={{ width: 20, alignItems: 'center' }}>
-                  <View style={{
-                    width: isHighlight ? 10 : 8,
-                    height: isHighlight ? 10 : 8,
-                    borderRadius: isHighlight ? 5 : 4,
-                    backgroundColor: typeColor,
-                    marginTop: 2,
-                  }} />
-                  {i < timeline.length - 1 && (
-                    <View style={{ width: 1, flex: 1, backgroundColor: '#e2e8f0', marginTop: 2 }} />
-                  )}
-                </View>
-                {/* Event content */}
-                <View style={{ flex: 1, paddingLeft: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900 }}>{event.date}</Text>
-                    {isHighlight && (
-                      <Text style={{ fontSize: 6, color: red, fontFamily: 'Helvetica-Bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>KEY EVENT</Text>
+              return (
+                <View key={i} style={{ flexDirection: 'row', marginBottom: 8 }}>
+                  {/* Timeline dot and line */}
+                  <View style={{ width: 20, alignItems: 'center' }}>
+                    <View style={{
+                      width: isHighlight ? 10 : 8,
+                      height: isHighlight ? 10 : 8,
+                      borderRadius: isHighlight ? 5 : 4,
+                      backgroundColor: typeColor,
+                      marginTop: 2,
+                    }} />
+                    {i < timeline.length - 1 && (
+                      <View style={{ width: 1, flex: 1, backgroundColor: '#e2e8f0', marginTop: 2 }} />
                     )}
                   </View>
-                  <Text style={{ fontSize: 8, color: slate600, marginTop: 1 }}>{event.description}</Text>
+                  {/* Event content */}
+                  <View style={{ flex: 1, paddingLeft: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900 }}>{event.date}</Text>
+                      {isMisdirection ? (
+                        <Text style={{ fontSize: 6, color: 'white', fontFamily: 'Helvetica-Bold', backgroundColor: amber, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>⚠ MISDIRECTION</Text>
+                      ) : isHighlight && (
+                        <Text style={{ fontSize: 6, color: red, fontFamily: 'Helvetica-Bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>KEY EVENT</Text>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 8, color: slate600, marginTop: 1 }}>{event.description}</Text>
+                    {isMisdirection && (
+                      <Text style={{ fontSize: 6.5, color: amber, marginTop: 0.5, fontStyle: 'italic' }}>
+                        Sent to an address-poisoning spoof — not the intended recipient.
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            });
+          })()}
 
           {/* Active period */}
           {data.firstActivity !== 'N/A' && data.lastActivity !== 'N/A' && (
@@ -1246,22 +1310,36 @@ const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
             <AttackStat label="SPOOF TRANSFERS" value={String(us.totalSpoofTokenTransfers)} />
           </View>
 
-          {us.evidence.slice(0, 6).map((e, i) => (
-            <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: red }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                <Text style={{ fontFamily: LISU_FONT_FAMILY, fontSize: 11, color: slate900 }}>{e.fakeSymbol}</Text>
-                <Text style={{ fontSize: 8, color: slate600, marginLeft: 6 }}>— masquerading as </Text>
-                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>{e.mimicsLegitimate}</Text>
-              </View>
-              <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>Unicode: {e.fakeSymbolCodepoints}</Text>
-              <Text style={{ fontSize: 6.5, color: slate600 }}>Script: {e.scriptCategory} {'·'} {e.occurrences} transfer{e.occurrences > 1 ? 's' : ''}{e.sourceAddresses.length ? ` from ${e.sourceAddresses.length} address(es)` : ''}</Text>
-              {e.transactionExamples.length > 0 && (
-                <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>
-                  e.g. {(e.transactionExamples[0].timestamp || '').split('T')[0]} {'·'} from {shortAddr(e.transactionExamples[0].from)}
+          {us.evidence.slice(0, 6).map((e, i) => {
+            const display = e.fakeSymbolDisplay || e.fakeSymbol;
+            const composed = display !== e.fakeSymbol;
+            return (
+              <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: red }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                  <Text style={{ fontFamily: fontForScript(e.scriptCategory), fontSize: 11, color: slate900 }}>{display}</Text>
+                  <Text style={{ fontSize: 8, color: slate600, marginLeft: 6 }}>— masquerading as </Text>
+                  <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>{e.mimicsLegitimate}</Text>
+                </View>
+                <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>
+                  {composed ? 'Original Unicode: ' : 'Unicode: '}{e.fakeSymbolCodepoints}
                 </Text>
-              )}
-            </View>
-          ))}
+                {composed && (
+                  <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>Display (NFC): {e.fakeSymbolDisplayCodepoints}</Text>
+                )}
+                <Text style={{ fontSize: 6.5, color: slate600 }}>Script: {e.scriptCategory} {'·'} {e.occurrences} transfer{e.occurrences > 1 ? 's' : ''}{e.sourceAddresses.length ? ` from ${e.sourceAddresses.length} address(es)` : ''}</Text>
+                {composed && (
+                  <Text style={{ fontSize: 6, color: slate400, marginTop: 1, fontStyle: 'italic' }}>
+                    Uses combining diacritical marks; display shows NFC-normalised form for readability — original byte sequence preserved above.
+                  </Text>
+                )}
+                {e.transactionExamples.length > 0 && (
+                  <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>
+                    e.g. {(e.transactionExamples[0].timestamp || '').split('T')[0]} {'·'} from {shortAddr(e.transactionExamples[0].from)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -1698,7 +1776,7 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
             <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{tx.value > 0 ? fmtEth(tx.value) : '—'}</Text>
             {tx.isSpoof ? (
               <Text style={{ ...s.td, width: '12%', fontSize: 6, color: red }}>
-                <Text style={{ fontFamily: LISU_FONT_FAMILY }}>{truncToken(tx.token)}</Text> {'⚠'}
+                <Text style={{ fontFamily: fontForScript(detectScriptCategory(tx.token)) }}>{truncToken(normalizeForDisplay(tx.token))}</Text> {'⚠'}
               </Text>
             ) : (
               <Text style={{ ...s.td, width: '12%', fontSize: 7 }}>{truncToken(tx.token)}</Text>
@@ -1783,10 +1861,62 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
+      {/* 2026-05-21 (Phase 2.5 Fix 2): structured, entry/exit-aware
+          recommendations. Resolves the contradiction where the report both
+          said "Binance = victim entry" (p.4) and "Subpoena Binance to
+          identify the account holder" (here) — which could mislead counsel
+          into thinking a Binance subpoena yields the scammer's identity. */}
       <Text style={s.h3}>Recommended Actions</Text>
-      {data.recommendations.map((r, i) => (
-        <Text key={i} style={s.bullet}>{i + 1}. {r}</Text>
-      ))}
+      {(() => {
+        const ea = data.exchangeAnalysis;
+        const entryBrand = ea?.entryPoints?.[0]?.parentEntity;
+        const usesUsdt = (data.assetSummary?.realAssets || []).some(a => a.symbol === 'USDT')
+          || (data.attackTechniques?.unicodeSpoofing?.evidence || []).some(e => e.mimicsLegitimate === 'USDT')
+          || (data.attackTechniques?.addressPoisoning?.campaigns || []).some(c => c.primaryToken === 'USDT');
+        const items: { bold: string; text: string }[] = [];
+
+        if (ea?.hasEntryKyc && entryBrand) {
+          items.push({
+            bold: `${entryBrand} Entry Point (Victim Funding):`,
+            text: `The victim funded this wallet via ${entryBrand}. A subpoena to ${entryBrand} compliance can confirm victim identity for case-file completeness, but does NOT identify the scammer. Use this primarily for (a) victim identity verification in legal proceedings, and (b) detecting whether the scammer ever transferred funds back to a ${entryBrand} account.`,
+          });
+        }
+        if (!ea?.hasExitKyc) {
+          items.push({
+            bold: 'Counterparty Exit Trace (required for scammer identification):',
+            text: 'The fraud cluster controls the funds within this wallet’s transaction history. Identifying the scammer’s cash-out exchange requires tracing one or more hops beyond the cluster — this expanded analysis is the recommended next investigative step.',
+          });
+        } else {
+          items.push({
+            bold: 'KYC Exit Point Identified:',
+            text: `Funds reached ${ea.exitPoints[0]?.parentEntity || 'a KYC exchange'}. File an urgent preservation/discovery request with that exchange’s compliance team to pursue the account holder behind the cash-out.`,
+          });
+        }
+        items.push({
+          bold: 'File FBI IC3 / Local Police Report:',
+          text: 'Report at ic3.gov (if US-based) or via your local cybercrime unit. Reference this Case ID and attach this report as supporting documentation.',
+        });
+        items.push({
+          bold: 'Exchange Compliance Notification:',
+          text: 'Submit a preservation request to the compliance teams of the identified exchanges. Even absent a scammer KYC exit, this creates an official record and may trigger internal blacklisting.',
+        });
+        if (usesUsdt) {
+          items.push({
+            bold: 'Token Issuer Coordination:',
+            text: 'For USDT-denominated transfers to flagged wallets, contact Tether legal (legal@tether.to) to request blacklist inclusion / freeze of the implicated addresses.',
+          });
+        }
+        items.push({
+          bold: 'Court-Certified Forensic Investigation:',
+          text: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a full forensic engagement.',
+        });
+
+        return items.map((it, i) => (
+          <Text key={i} style={{ ...s.bullet, marginBottom: 5 }}>
+            {i + 1}. <Text style={{ fontFamily: 'Helvetica-Bold' }}>{it.bold}</Text> {it.text}
+          </Text>
+        ));
+      })()}
 
       <Footer data={data} />
     </Page>
