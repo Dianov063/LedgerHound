@@ -8,14 +8,13 @@ import { getCodepoints, normalizeForDisplay, detectScriptCategory } from './unic
 import { getReportTranslations, type ReportTranslations, type ReportLocale } from './report-i18n';
 
 /**
- * Report i18n via React context (verified to propagate through @react-pdf's
- * renderer). ReportDocument wraps all pages in the provider; pages read
- * translations with useT(). Default = English. 2026-05-21 (Phase 3).
+ * Report i18n. Translations are resolved once in ReportDocument via
+ * getReportTranslations(locale) and prop-drilled (`t`) into every page +
+ * Header/Footer. We deliberately do NOT use React.createContext/useContext:
+ * those are stripped from the `react-server` build Next.js uses for route
+ * handlers, so any module-level createContext crashes the production build
+ * ("collect page data"). Mirrors lib/legal-packs/templates.tsx. 2026-05-21.
  */
-const ReportI18nContext = React.createContext<ReportTranslations>(getReportTranslations('en'));
-function useT(): ReportTranslations {
-  return React.useContext(ReportI18nContext);
-}
 
 /**
  * Noto Sans Lisu — needed to render the Lisu-letter token spoofs (e.g.
@@ -118,8 +117,7 @@ const s = StyleSheet.create({
   sectionDivider: { borderBottomWidth: 1, borderBottomColor: '#cbd5e1', marginVertical: 16 },
 });
 
-const Header = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const Header = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
     <View style={s.header}>
       <Text style={s.logo}>LedgerHound</Text>
@@ -131,8 +129,7 @@ const Header = ({ data }: { data: ReportData }) => {
   );
 };
 
-const Footer = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const Footer = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
     <View style={s.footer} fixed>
       <Text>{t.common.confidential}</Text>
@@ -169,8 +166,7 @@ const recoveryColor = (score: number) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 1: COVER
    ═══════════════════════════════════════════════════════════════ */
-const CoverPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const CoverPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
     <Page size="A4" style={{ ...s.page, justifyContent: 'center', alignItems: 'center' }}>
       <View style={{ alignItems: 'center' }}>
@@ -198,7 +194,7 @@ const CoverPage = ({ data }: { data: ReportData }) => {
         <Text style={{ fontSize: 10, color: red, fontFamily: 'Helvetica-Bold', marginTop: 10 }}>{t.cover.confidential}</Text>
         <Text style={{ fontSize: 8, color: slate400, marginTop: 20 }}>{t.cover.generatedBy}</Text>
       </View>
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -218,14 +214,13 @@ const RiskBreakdownRow = ({ label, score }: { label: string; score: number }) =>
   );
 };
 
-const SummaryPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const SummaryPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const bd = data.riskBreakdown;
   // Map the data-driven risk enum to its localized label.
   const riskLabelL = t.riskLabels[data.riskLabel as keyof typeof t.riskLabels] ?? data.riskLabel;
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.executiveSummary}</Text>
 
       {/* OFAC Warning Banner */}
@@ -349,7 +344,7 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
         <Text key={i} style={s.bullet}>{'\u2022'} {f}</Text>
       ))}
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -452,8 +447,7 @@ const ReadinessCheck = ({ checked, label }: { checked: boolean; label: string })
   </View>
 );
 
-const RecoveryReadinessPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const RecoveryReadinessPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const r = t.readiness;
   const readiness = calculateReadinessScore(data, t);
   const difficulty = calculateInvestigationDifficulty(data, t);
@@ -464,7 +458,7 @@ const RecoveryReadinessPage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.recoveryReadiness}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
         {r.subtitle}
@@ -514,7 +508,7 @@ const RecoveryReadinessPage = ({ data }: { data: ReportData }) => {
         <Text style={{ fontSize: 8, color: slate900 }}>4. <Text style={{ fontFamily: 'Helvetica-Bold' }}>{r.howToUse4Bold}</Text> {r.howToUse4}</Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -522,8 +516,7 @@ const RecoveryReadinessPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 4: INVESTIGATION NARRATIVE + EVIDENCE STRENGTH + VICTIM FLOW
    ═══════════════════════════════════════════════════════════════ */
-const NarrativePage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const n = data.narrative;
   const ev = data.evidenceStrength;
   const evColor = ev.score >= 70 ? green : ev.score >= 40 ? amber : red;
@@ -541,7 +534,7 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.investigationSummary}</Text>
 
       {/* Wallet Type Badge */}
@@ -728,7 +721,7 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
         </View>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -736,14 +729,13 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 4: ASSET SUMMARY + ACTIVITY TIMELINE
    ═══════════════════════════════════════════════════════════════ */
-const AssetTimelinePage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const assets = data.assetSummary;
   const timeline = data.timeline;
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
 
       {/* ASSET SUMMARY */}
       <Text style={s.h2}>{t.sections.assetSummary}</Text>
@@ -902,7 +894,7 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -937,8 +929,7 @@ const overallRiskLabel = (risk: string) => {
   }
 };
 
-const PatternPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const pa = data.patternAnalysis;
   // 2026-05-20: When the subject wallet is itself the victim, we must NOT
   // label this wallet as "LIKELY SCAM" / "CONFIRMED SCAM" — the detected
@@ -953,7 +944,7 @@ const PatternPage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.behavioralPatterns}</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
         {isVictim
@@ -1055,7 +1046,7 @@ const PatternPage = ({ data }: { data: ReportData }) => {
         </Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1063,11 +1054,10 @@ const PatternPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 6: WALLET ANALYTICS
    ═══════════════════════════════════════════════════════════════ */
-const AnalyticsPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
   <Page size="A4" style={s.page}>
-    <Header data={data} />
+    <Header data={data} t={t} />
     <Text style={s.h2}>{t.sections.walletAnalytics}</Text>
 
     <View style={{ ...s.row, marginBottom: 12 }}>
@@ -1129,7 +1119,7 @@ const AnalyticsPage = ({ data }: { data: ReportData }) => {
       ))}
     </View>
 
-    <Footer data={data} />
+    <Footer data={data} t={t} />
   </Page>
   );
 };
@@ -1172,8 +1162,7 @@ function severityRankFor(r: { hasSanctionsFlag: boolean; hasPhishingFlag: boolea
   return -1;
 }
 
-const AddressLabelsPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   if (!data.addressLabels || data.addressLabels.length === 0) return null;
 
   // Sort: severity DESC, then by highestConfidence DESC.
@@ -1190,7 +1179,7 @@ const AddressLabelsPage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.addressVerification}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
         Top counterparty addresses (by volume) cross-referenced with multiple verification sources: LedgerHound Scam Database, OFAC SDN, Chainabuse community reports, GoPlus Security risk flags, and our curated Etherscan Fake_Phishing list. Sources are queried independently; agreement across sources increases confidence.
@@ -1243,7 +1232,7 @@ const AddressLabelsPage = ({ data }: { data: ReportData }) => {
         </Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1261,8 +1250,7 @@ const AttackStat = ({ label, value, highlight }: { label: string; value: string;
   </View>
 );
 
-const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const ap = data.attackTechniques?.addressPoisoning;
   const us = data.attackTechniques?.unicodeSpoofing;
   // Skip page entirely when nothing detected (no "all clear" placeholder).
@@ -1270,7 +1258,7 @@ const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.attackTechnique}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
         Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by organized cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
@@ -1407,18 +1395,17 @@ const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
         </Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
 
-const EntitiesExitPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const exits = data.exitPointAnalysis;
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.entityIdentification}</Text>
 
       {data.identifiedEntities.length === 0 ? (
@@ -1503,7 +1490,7 @@ const EntitiesExitPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1519,14 +1506,13 @@ const intentColor = (label: string) => {
   }
 };
 
-const CrossChainPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const CrossChainPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const cc = data.crossChainTrace;
   if (!cc || !cc.detected) return null;
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.crossChainTrace}</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
         Analysis of cross-chain bridge interactions and multi-chain activity for this wallet address.
@@ -1646,7 +1632,7 @@ const CrossChainPage = ({ data }: { data: ReportData }) => {
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{cc.intent.reason}</Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1654,13 +1640,12 @@ const CrossChainPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 8/9: FUND FLOW GRAPH
    ═══════════════════════════════════════════════════════════════ */
-const FundFlowPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const graph = data.graphData;
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.fundFlow}</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
         Visual representation of fund movements between the analyzed wallet and its top counterparties by transaction volume.
@@ -1802,7 +1787,7 @@ const FundFlowPage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1810,11 +1795,10 @@ const FundFlowPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 9/10: TRANSACTION HISTORY (filtered to real assets, top 30)
    ═══════════════════════════════════════════════════════════════ */
-const TransactionsPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const TransactionsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
   <Page size="A4" style={s.page} wrap>
-    <Header data={data} />
+    <Header data={data} t={t} />
     <Text style={s.h2}>{t.sections.transactionHistory} (Top {data.transactions.length})</Text>
 
     <View style={s.table}>
@@ -1861,7 +1845,7 @@ const TransactionsPage = ({ data }: { data: ReportData }) => {
       </Text>
     )}
 
-    <Footer data={data} />
+    <Footer data={data} t={t} />
   </Page>
   );
 };
@@ -1871,13 +1855,12 @@ const TransactionsPage = ({ data }: { data: ReportData }) => {
    ═══════════════════════════════════════════════════════════════ */
 const probColor = (p: string) => p === 'HIGH' ? red : p === 'LOW' ? green : amber;
 
-const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const scenarios = data.recoveryScenarios;
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.recoveryAssessment}</Text>
 
       {/* Recovery Scenarios */}
@@ -1983,7 +1966,7 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
         ));
       })()}
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -1991,8 +1974,7 @@ const RecoveryLegalPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 11/12: ACTIONABLE NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
-const ActionableStepsPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const n = data.narrative;
   // 2026-05-20 fix 1.2: group exchanges by parentEntity so we render one row
   // per brand instead of five identical "Binance Hot Wallet" cards. Each
@@ -2029,7 +2011,7 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
 
   return (
     <Page size="A4" style={s.page}>
-      <Header data={data} />
+      <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.actionableSteps}</Text>
 
       {/* Priority banner */}
@@ -2139,7 +2121,7 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
         </Text>
       </View>
 
-      <Footer data={data} />
+      <Footer data={data} t={t} />
     </Page>
   );
 };
@@ -2147,11 +2129,10 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 12/13: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
-const DisclaimerPage = ({ data }: { data: ReportData }) => {
-  const t = useT();
+const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   return (
   <Page size="A4" style={s.page}>
-    <Header data={data} />
+    <Header data={data} t={t} />
     <Text style={s.h2}>{t.sections.disclaimer}</Text>
 
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
@@ -2183,7 +2164,7 @@ const DisclaimerPage = ({ data }: { data: ReportData }) => {
       <Text style={{ fontSize: 9, color: slate400 }}>+1 (833) 559-1334</Text>
     </View>
 
-    <Footer data={data} />
+    <Footer data={data} t={t} />
   </Page>
   );
 };
@@ -2203,25 +2184,23 @@ export const ReportDocument = ({ data, locale }: { data: ReportData; locale?: Re
   const t = getReportTranslations(locale);
 
   return (
-    <ReportI18nContext.Provider value={t}>
-      <Document>
-        <CoverPage data={data} />
-        <SummaryPage data={data} />
-        <RecoveryReadinessPage data={data} />
-        <NarrativePage data={data} />
-        <AssetTimelinePage data={data} />
-        <PatternPage data={data} />
-        <AnalyticsPage data={data} />
-        <EntitiesExitPage data={data} />
-        {hasAddressLabels && <AddressLabelsPage data={data} />}
-        {hasAttackTechniques && <AttackTechniqueAnalysisPage data={data} />}
-        {hasCrossChain && <CrossChainPage data={data} />}
-        <FundFlowPage data={data} />
-        <TransactionsPage data={data} />
-        <RecoveryLegalPage data={data} />
-        <ActionableStepsPage data={data} />
-        <DisclaimerPage data={data} />
-      </Document>
-    </ReportI18nContext.Provider>
+    <Document>
+      <CoverPage data={data} t={t} />
+      <SummaryPage data={data} t={t} />
+      <RecoveryReadinessPage data={data} t={t} />
+      <NarrativePage data={data} t={t} />
+      <AssetTimelinePage data={data} t={t} />
+      <PatternPage data={data} t={t} />
+      <AnalyticsPage data={data} t={t} />
+      <EntitiesExitPage data={data} t={t} />
+      {hasAddressLabels && <AddressLabelsPage data={data} t={t} />}
+      {hasAttackTechniques && <AttackTechniqueAnalysisPage data={data} t={t} />}
+      {hasCrossChain && <CrossChainPage data={data} t={t} />}
+      <FundFlowPage data={data} t={t} />
+      <TransactionsPage data={data} t={t} />
+      <RecoveryLegalPage data={data} t={t} />
+      <ActionableStepsPage data={data} t={t} />
+      <DisclaimerPage data={data} t={t} />
+    </Document>
   );
 };
