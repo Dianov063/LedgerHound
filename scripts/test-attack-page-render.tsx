@@ -65,7 +65,7 @@ const mock: ReportData = {
   assetSummary: {
     realAssets: [{ symbol: 'USDT', totalIn: 22187, totalOut: 11020 }],
     spamTokens: [{ symbol: 'HEX', count: 1 }],
-    spoofTokens: unicodeSpoofing.evidence.map(e => ({ symbol: e.fakeSymbol, mimicsLegitimate: e.mimicsLegitimate, scriptCategory: e.scriptCategory, count: e.occurrences })),
+    spoofTokens: unicodeSpoofing.evidence.map(e => ({ symbol: e.fakeSymbol, symbolDisplay: e.fakeSymbolDisplay, mimicsLegitimate: e.mimicsLegitimate, scriptCategory: e.scriptCategory, count: e.occurrences })),
     spamCount: 1,
   },
   patternAnalysis: { overallRisk: 'SUSPICIOUS', interpretation: 'Test', patterns: [] } as any,

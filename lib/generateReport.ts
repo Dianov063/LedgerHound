@@ -21,7 +21,7 @@ import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailB
 import { isKnownPhishing, getPhishingTag } from './known-phishing';
 import { getAddressLabelsBatch } from './labels/federation';
 import type { AddressLabelResponse } from './labels/types';
-import { detectSpoofTarget, detectScriptCategory, LEGITIMATE_TOKENS, detectUnicodeSpoofing } from './unicode-spoofing';
+import { detectSpoofTarget, detectScriptCategory, LEGITIMATE_TOKENS, detectUnicodeSpoofing, normalizeForDisplay } from './unicode-spoofing';
 import { detectAddressPoisoning } from './address-poisoning';
 export type { PoisoningAnalysis, AddressPoisoningCampaign, FraudClusterEntry } from './address-poisoning';
 export type { UnicodeSpoofingAnalysis, UnicodeSpoofEvidence } from './unicode-spoofing';
@@ -451,6 +451,9 @@ export interface TimelineEvent {
   type: 'ACTIVATION' | 'MAJOR_INFLOW' | 'MAJOR_OUTFLOW' | 'EXCHANGE_INTERACTION' | 'MIXER_INTERACTION' | 'LAST_ACTIVITY';
   description: string;
   highlight?: boolean;
+  /** Counterparty address (Phase 2.5 Fix 3) — lets the PDF flag misdirection
+   *  events (OUT to a secondary spoof) distinctly from legitimate sends. */
+  counterparty?: string;
 }
 
 export interface ExitPoint {
@@ -481,8 +484,10 @@ export interface RecoveryScenario {
 
 /** Unicode-spoof token evidence surfaced in the Asset Summary (Phase 2). */
 export interface SpoofTokenEvidence {
-  /** Raw spoof symbol (the original Unicode, e.g. "ꓴꓢꓓꓔ"). */
+  /** Raw spoof symbol (the original Unicode, e.g. "ꓴꓢꓓꓔ"). Forensic source. */
   symbol: string;
+  /** NFC-normalised display form (composes combining marks). 2026-05-21. */
+  symbolDisplay: string;
   /** Legitimate ticker it mimics (e.g. "USDT"). */
   mimicsLegitimate: string;
   /** Unicode script category for context. */
@@ -767,6 +772,7 @@ function classifyAssets(
       } else {
         spoof.set(key, {
           symbol: tx.assetRaw,
+          symbolDisplay: normalizeForDisplay(tx.assetRaw),
           mimicsLegitimate: spoofTarget || 'unknown',
           scriptCategory: detectScriptCategory(tx.assetRaw),
           count: 1,
@@ -886,6 +892,7 @@ function generateTimeline(
       type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
       description: `Sent ${fmtEth(val)} ${tx.asset || nativeCurrency} to ${entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'}`,
       highlight: true,
+      counterparty: (tx.to || '').toLowerCase(),
     });
   }
 
