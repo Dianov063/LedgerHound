@@ -21,6 +21,10 @@ import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailB
 import { isKnownPhishing, getPhishingTag } from './known-phishing';
 import { getAddressLabelsBatch } from './labels/federation';
 import type { AddressLabelResponse } from './labels/types';
+import { detectSpoofTarget, detectScriptCategory, LEGITIMATE_TOKENS, detectUnicodeSpoofing } from './unicode-spoofing';
+import { detectAddressPoisoning } from './address-poisoning';
+export type { PoisoningAnalysis, PoisoningMatch, VanityCluster } from './address-poisoning';
+export type { UnicodeSpoofingAnalysis, UnicodeSpoofEvidence } from './unicode-spoofing';
 
 function getAlchemyKey(): string {
   const key = process.env.ALCHEMY_API_KEY;
@@ -86,6 +90,15 @@ interface Transfer {
   to: string;
   value: number | null;
   asset: string | null;
+  /**
+   * Raw token symbol exactly as returned upstream, BEFORE `sanitizeAsset()`
+   * strips non-ASCII chars. `asset` is the display-safe (ASCII-only) form;
+   * `assetRaw` preserves Unicode for attack-technique detection (Phase 2).
+   * Invariant: always set when any symbol exists — equals `asset` for chains
+   * that don't sanitize, equals the original for the Alchemy/ETH path.
+   * 2026-05-21.
+   */
+  assetRaw?: string | null;
   hash?: string;
   category?: string;
   rawContract?: { value?: string; decimal?: string; address?: string };
@@ -163,47 +176,73 @@ function sanitizeAsset(raw: string | null | undefined): string | null {
   return clean || null;
 }
 
-/** Check if a token is likely spam/airdrop */
-function isSpamToken(tx: Transfer | UnifiedTransfer): boolean {
+/**
+ * Classify a token transfer into spam / unicode-spoof / clean.
+ *
+ * 2026-05-21 (Phase 2): Unicode-spoof tokens are forensic EVIDENCE, not
+ * spam — so we check them FIRST (using `assetRaw`, the un-sanitized symbol)
+ * and short-circuit before the spam heuristics. `detectSpoofTarget` requires
+ * ≥3 non-ASCII chars, so sanitized fragments like "UD" (from "ÚЅDТ") can
+ * never false-positive here — only the genuine raw Unicode symbol matches.
+ */
+export function classifyToken(tx: Transfer | UnifiedTransfer): { isSpam: boolean; isSpoof: boolean; spoofTarget?: string } {
+  // 1. Unicode-spoof check on the RAW symbol (never the sanitized `asset`).
+  const raw = tx.assetRaw;
+  if (raw) {
+    const spoofTarget = detectSpoofTarget(raw, LEGITIMATE_TOKENS as string[]);
+    if (spoofTarget) {
+      return { isSpam: false, isSpoof: true, spoofTarget };
+    }
+  }
+
+  // 2. Existing spam heuristics on the sanitized display symbol.
   const asset = (tx.asset || '').trim();
 
   // No asset name or control characters → spam
-  if (!asset || asset.charCodeAt(0) < 32) return true;
+  if (!asset || asset.charCodeAt(0) < 32) return { isSpam: true, isSpoof: false };
 
   // Non-ASCII characters (¿, °, Ñ, ¹, Ž, etc.) → almost always spam on EVM chains
-  if (/[^\x20-\x7E]/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+  if (/[^\x20-\x7E]/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return { isSpam: true, isSpoof: false };
 
   const lower = asset.toLowerCase();
 
   // URL patterns, very long names, suspicious chars, @-handles, spaces in name
-  if (/[/:.<>@~+]/.test(asset) || asset.length > 15) return true;
-  if (/\s/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
-  if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return true;
+  if (/[/:.<>@~+]/.test(asset) || asset.length > 15) return { isSpam: true, isSpoof: false };
+  if (/\s/.test(asset) && !KNOWN_TOKENS.has(asset.toUpperCase())) return { isSpam: true, isSpoof: false };
+  if (/^https?/i.test(asset) || /\.(com|io|org|net|xyz|co)/i.test(asset)) return { isSpam: true, isSpoof: false };
 
   // Exact-match spam names
-  if (SPAM_EXACT.has(lower)) return true;
+  if (SPAM_EXACT.has(lower)) return { isSpam: true, isSpoof: false };
 
   // Substring-match spam keywords
-  if (SPAM_KEYWORDS.some((s) => lower.includes(s))) return true;
+  if (SPAM_KEYWORDS.some((s) => lower.includes(s))) return { isSpam: true, isSpoof: false };
 
   // Minted from null address AND not a known legitimate token → spam airdrop
-  if (tx.from === NULL_ADDRESS && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+  if (tx.from === NULL_ADDRESS && !KNOWN_TOKENS.has(asset.toUpperCase())) return { isSpam: true, isSpoof: false };
 
   // Absurdly large value (>1M) for unknown tokens → spam airdrop
   // Legitimate tokens rarely exceed 1M units in a single transfer unless it's SHIB/PEPE
   const val = safeValue(tx);
-  if (val > 1e6 && !KNOWN_TOKENS.has(asset.toUpperCase())) return true;
+  if (val > 1e6 && !KNOWN_TOKENS.has(asset.toUpperCase())) return { isSpam: true, isSpoof: false };
 
-  return false;
+  return { isSpam: false, isSpoof: false };
 }
 
-/** Filter out spam tokens — keep only transfers with meaningful value or known assets */
+/** Backwards-compatible boolean wrapper. */
+function isSpamToken(tx: Transfer | UnifiedTransfer): boolean {
+  return classifyToken(tx).isSpam;
+}
+
+/** Filter out spam tokens — keep meaningful value, known assets AND spoof evidence */
 function filterSpam(transfers: (Transfer | UnifiedTransfer)[]): (Transfer | UnifiedTransfer)[] {
   return transfers.filter((tx) => {
     // Always keep ETH/native transfers
     if (tx.category === 'external') return true;
+    const { isSpam, isSpoof } = classifyToken(tx);
+    // 2026-05-21: keep Unicode-spoof tokens — they're attack evidence, not noise.
+    if (isSpoof) return true;
     // Filter spam
-    if (isSpamToken(tx)) return false;
+    if (isSpam) return false;
     // Filter dust: value rounds to ~0
     const val = safeValue(tx);
     if (val > 0 && val < 0.0001) return false;
@@ -265,8 +304,13 @@ async function fetchAllTransfers(address: string, direction: 'from' | 'to', alch
     if (json.error) throw new Error(json.error.message);
 
     const transfers = json.result?.transfers || [];
-    // Sanitize asset names (Alchemy can return non-ASCII in token symbols)
+    // Sanitize asset names (Alchemy can return non-ASCII in token symbols).
+    // 2026-05-21: preserve the ORIGINAL symbol in `assetRaw` BEFORE stripping
+    // non-ASCII — Phase 2 attack detectors need the raw Unicode (e.g. the
+    // Lisu "ꓴꓢꓓꓔ" / mixed-script "ÚЅDТ" USDT spoofs would otherwise be
+    // destroyed by sanitizeAsset → null / "UD").
     for (const t of transfers) {
+      t.assetRaw = t.asset ?? null;
       t.asset = sanitizeAsset(t.asset);
     }
     // Log first transfer structure on first page for debugging
@@ -300,6 +344,8 @@ interface UnifiedTransfer {
   to: string;
   value: number | null;
   asset: string | null;
+  /** See `Transfer.assetRaw`. Raw upstream symbol, pre-sanitization. 2026-05-21. */
+  assetRaw?: string | null;
   category: string;
   direction: 'IN' | 'OUT';
   hash?: string;
@@ -310,8 +356,27 @@ interface UnifiedTransfer {
 /**
  * Fetch transfers from the correct chain tracker.
  * Returns { incoming, outgoing } arrays in a unified format.
+ *
+ * 2026-05-21: wraps `fetchTransfersForNetworkInner` to guarantee the
+ * `assetRaw` invariant across ALL chains — non-ETH trackers don't sanitize,
+ * so for them `assetRaw` simply mirrors `asset`; the Alchemy/ETH path sets
+ * `assetRaw` itself (to the original) inside `fetchAllTransfers`. Detectors
+ * can therefore always read `assetRaw` without per-chain branching.
  */
 async function fetchTransfersForNetwork(
+  address: string,
+  network: string,
+): Promise<{ incoming: UnifiedTransfer[]; outgoing: UnifiedTransfer[] }> {
+  const { incoming, outgoing } = await fetchTransfersForNetworkInner(address, network);
+  const ensure = (t: UnifiedTransfer) => {
+    if (t.assetRaw === undefined) t.assetRaw = t.asset;
+  };
+  incoming.forEach(ensure);
+  outgoing.forEach(ensure);
+  return { incoming, outgoing };
+}
+
+async function fetchTransfersForNetworkInner(
   address: string,
   network: string,
 ): Promise<{ incoming: UnifiedTransfer[]; outgoing: UnifiedTransfer[] }> {
@@ -414,9 +479,26 @@ export interface RecoveryScenario {
   action: string;
 }
 
+/** Unicode-spoof token evidence surfaced in the Asset Summary (Phase 2). */
+export interface SpoofTokenEvidence {
+  /** Raw spoof symbol (the original Unicode, e.g. "ꓴꓢꓓꓔ"). */
+  symbol: string;
+  /** Legitimate ticker it mimics (e.g. "USDT"). */
+  mimicsLegitimate: string;
+  /** Unicode script category for context. */
+  scriptCategory: string;
+  /** Number of transfers carrying this spoof symbol. */
+  count: number;
+}
+
 export interface AssetSummary {
   realAssets: { symbol: string; totalIn: number; totalOut: number }[];
   spamTokens: { symbol: string; count: number }[];
+  /**
+   * 2026-05-21 (Phase 2): Unicode-spoof tokens, kept SEPARATE from spam —
+   * these are forensic evidence of a spoofing attack, not airdrop noise.
+   */
+  spoofTokens: SpoofTokenEvidence[];
   spamCount: number;
 }
 
@@ -514,6 +596,15 @@ export interface ReportData {
    * intelligence may be incomplete. Added 2026-05-20.
    */
   externalIntelligenceDegraded: boolean;
+  /**
+   * Phase 2 attack-technique analysis: address poisoning (vanity-address
+   * spoofing) and Unicode spoofing (look-alike token symbols). Both run on
+   * the RAW (un-spam-filtered) transaction set. Added 2026-05-21.
+   */
+  attackTechniques: {
+    addressPoisoning: import('./address-poisoning').PoisoningAnalysis;
+    unicodeSpoofing: import('./unicode-spoofing').UnicodeSpoofingAnalysis;
+  };
 }
 
 export type WalletRole =
@@ -562,7 +653,12 @@ export interface RecoveryAssessment {
 export interface EvidenceStrength {
   score: number;                // 0–100
   label: string;                // STRONG / MODERATE / WEAK
-  factors: { label: string; met: boolean }[];
+  /**
+   * `severity` (2026-05-21) flags a met factor that should be visually
+   * emphasised — 'critical' renders red in the PDF (e.g. confirmed
+   * misdirection of victim funds to a spoof address).
+   */
+  factors: { label: string; met: boolean; severity?: 'critical' | 'high' }[];
 }
 
 function calculateRiskBreakdown(
@@ -620,8 +716,30 @@ function classifyAssets(
   const realIn = new Map<string, number>();
   const realOut = new Map<string, number>();
   const spam = new Map<string, number>();
+  // 2026-05-21 (Phase 2): separate bucket for Unicode-spoof evidence.
+  // Keyed by the RAW spoof symbol so "ꓴꓢꓓꓔ" and "ÚЅDТ" are distinct entries.
+  const spoof = new Map<string, SpoofTokenEvidence>();
 
   const classify = (tx: Transfer | UnifiedTransfer, dir: 'in' | 'out') => {
+    const { isSpoof, spoofTarget } = classifyToken(tx);
+
+    // Unicode-spoof tokens → dedicated bucket (NOT spam, NOT real).
+    if (isSpoof && tx.assetRaw) {
+      const key = tx.assetRaw;
+      const existing = spoof.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        spoof.set(key, {
+          symbol: tx.assetRaw,
+          mimicsLegitimate: spoofTarget || 'unknown',
+          scriptCategory: detectScriptCategory(tx.assetRaw),
+          count: 1,
+        });
+      }
+      return;
+    }
+
     const asset = (tx.asset || '').toUpperCase().trim();
     if (!asset) return;
     const val = safeValue(tx);
@@ -672,6 +790,7 @@ function classifyAssets(
       .map(([symbol, count]) => ({ symbol, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10),
+    spoofTokens: Array.from(spoof.values()).sort((a, b) => b.count - a.count),
     spamCount: spam.size,
   };
 }
@@ -881,6 +1000,32 @@ export async function generateReport(
     sampleBlockTimestamp: sampleTx?.metadata?.blockTimestamp || 'MISSING',
     sampleAsset: sampleTx?.asset || 'NONE',
   }, '[generateReport] Transfers fetched');
+
+  // ── Phase 2: Attack Technique Analysis ──
+  // 2026-05-21: run on RAW (un-spam-filtered) transfers — dust and
+  // Unicode-named tokens are the very signals these detectors hunt for and
+  // must NOT be stripped first. `assetRaw` carries the un-sanitized symbol.
+  const rawAll = [...rawIncoming, ...rawOutgoing];
+  const attackTxs = rawAll.map((tx) => ({
+    from: tx.from || '',
+    to: tx.to || '',
+    value: safeValue(tx),
+    asset: tx.asset ?? null,
+    assetRaw: tx.assetRaw ?? tx.asset ?? null,
+    hash: tx.hash,
+    metadata: tx.metadata,
+  }));
+  const addressPoisoning = detectAddressPoisoning({ allTransactions: attackTxs, subjectAddress: address });
+  const unicodeSpoofing = detectUnicodeSpoofing({ allTransactions: attackTxs });
+  logger.info({
+    event: 'attack_techniques_analyzed',
+    poisoning_detected: addressPoisoning.detected,
+    poisoning_spoofs: addressPoisoning.totalSpoofAttempts,
+    poisoning_misdirected: addressPoisoning.totalVictimMisdirected,
+    poisoning_misdirected_value: addressPoisoning.totalMisdirectedValue,
+    unicode_detected: unicodeSpoofing.detected,
+    unicode_spoof_symbols: unicodeSpoofing.uniqueSpoofSymbols,
+  }, '[generateReport] Attack techniques analyzed');
 
   // Calculate stats — ETH-only totals (different tokens can't be summed)
   let ethReceived = 0;
@@ -1643,8 +1788,39 @@ export async function generateReport(
     { label: 'Timestamps verified on-chain', met: timestamps.length > 0 },
     { label: 'Cross-chain activity traced', met: crossChainTrace?.detected === true },
   ];
+
+  // 2026-05-21 (Phase 2): attack-technique evidence bullets. Only added when
+  // detected, so they always render as "met" positive findings.
+  if (addressPoisoning.detected) {
+    evidenceFactors.push({
+      label: `Address poisoning attack identified (${addressPoisoning.totalSpoofAttempts} spoof address${addressPoisoning.totalSpoofAttempts > 1 ? 'es' : ''})`,
+      met: true,
+      severity: 'high',
+    });
+  }
+  if (addressPoisoning.totalVictimMisdirected > 0) {
+    const tokens = new Set(addressPoisoning.matches.filter(m => m.victimMisdirected).map(m => m.misdirectedToken));
+    const tokenLabel = tokens.size === 1 ? ` ${Array.from(tokens)[0]}` : '';
+    evidenceFactors.push({
+      label: `CRITICAL: victim misdirected ${addressPoisoning.totalMisdirectedValue.toFixed(2)}${tokenLabel} to spoof address(es)`,
+      met: true,
+      severity: 'critical',
+    });
+  }
+  if (unicodeSpoofing.detected) {
+    evidenceFactors.push({
+      label: `Unicode spoofing tokens detected (${unicodeSpoofing.uniqueSpoofSymbols} fake symbol${unicodeSpoofing.uniqueSpoofSymbols > 1 ? 's' : ''})`,
+      met: true,
+      severity: 'high',
+    });
+  }
+
   const evidenceMetCount = evidenceFactors.filter(f => f.met).length;
-  const evidenceScore = Math.min(100, Math.round((evidenceMetCount / evidenceFactors.length) * 100));
+  let evidenceScore = Math.min(100, Math.round((evidenceMetCount / evidenceFactors.length) * 100));
+  // 2026-05-21: confirmed misdirection is decisive forensic evidence — bump.
+  if (addressPoisoning.totalVictimMisdirected > 0) {
+    evidenceScore = Math.min(100, evidenceScore + 10);
+  }
   const evidenceLabel = evidenceScore >= 70 ? 'STRONG' : evidenceScore >= 40 ? 'MODERATE' : 'WEAK';
   const evidenceStrength: EvidenceStrength = { score: evidenceScore, label: evidenceLabel, factors: evidenceFactors };
 
@@ -1742,6 +1918,10 @@ export async function generateReport(
     counterpartyScamDbMatches,
     addressLabels,
     externalIntelligenceDegraded,
+    attackTechniques: {
+      addressPoisoning,
+      unicodeSpoofing,
+    },
   };
 
   // Generate PDF

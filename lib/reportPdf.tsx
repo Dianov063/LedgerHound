@@ -1,7 +1,37 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path } from '@react-pdf/renderer';
+import path from 'path';
+import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path, Font } from '@react-pdf/renderer';
 import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength, type RecoveryAssessment, type WalletRole } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
+import { firstDifferingChar } from './address-poisoning';
+
+/**
+ * Noto Sans Lisu — needed to render the Lisu-letter token spoofs (e.g.
+ * "ꓴꓢꓓꓔ" = USDT) in the Attack Technique Analysis page. Same local-first /
+ * CDN-fallback strategy as legal-packs/templates.tsx. 2026-05-21 (Phase 2).
+ *
+ * If the font can't be resolved at render time, codepoints are ALWAYS shown
+ * alongside the glyph, so forensic value is never lost.
+ */
+const NOTO_LISU_CDN = 'https://fonts.gstatic.com/s/notosanslisu/v27/uk-3EGO3o6EruUbnwovcYhz6kh57_nqbcTdjJnHP2Vwt2w.ttf';
+let LISU_FONT_FAMILY = 'Helvetica'; // safe fallback — overwritten on success
+try {
+  const resolveLisu = (): string => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      const local = path.resolve(process.cwd(), 'lib', 'fonts', 'NotoSansLisu-Regular.ttf');
+      if (fs.existsSync(local)) return local;
+    } catch { /* bundled env — use CDN */ }
+    return NOTO_LISU_CDN;
+  };
+  Font.register({ family: 'NotoSansLisu', src: resolveLisu() });
+  LISU_FONT_FAMILY = 'NotoSansLisu';
+} catch (e) {
+  // Registration failed — keep Helvetica fallback. Codepoints still render.
+  // eslint-disable-next-line no-console
+  console.warn('[reportPdf] NotoSansLisu registration failed, using codepoint fallback:', (e as Error)?.message);
+}
 
 const blue = '#2563eb';
 const slate900 = '#0f172a';
@@ -407,12 +437,18 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
             </View>
           </View>
           <View style={{ ...s.card, padding: 6 }}>
-            {ev.factors.map((f, i) => (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 2, alignItems: 'center' }}>
-                <Text style={{ fontSize: 8, width: 12, color: f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
-                <Text style={{ fontSize: 7, color: f.met ? slate900 : slate400, flex: 1 }}>{f.label}</Text>
-              </View>
-            ))}
+            {ev.factors.map((f, i) => {
+              // 2026-05-21: critical factors (e.g. confirmed misdirection)
+              // render red + bold; high-severity stays slate but bold.
+              const isCritical = f.severity === 'critical';
+              const textColor = isCritical ? red : f.met ? slate900 : slate400;
+              return (
+                <View key={i} style={{ flexDirection: 'row', marginBottom: 2, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 8, width: 12, color: isCritical ? red : f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
+                  <Text style={{ fontSize: 7, color: textColor, flex: 1, fontFamily: isCritical ? 'Helvetica-Bold' : 'Helvetica' }}>{f.label}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -487,6 +523,25 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
           </Text>
           <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
             Spam tokens are common on active wallets and typically have no real value.
+          </Text>
+        </View>
+      )}
+
+      {/* 2026-05-21 (Phase 2): Unicode-spoofing evidence — kept SEPARATE from
+          spam. These fake tokens visually mimic legitimate tickers (USDT/ETH)
+          and are forensic evidence, cross-referenced in Attack Technique Analysis. */}
+      {assets && assets.spoofTokens && assets.spoofTokens.length > 0 && (
+        <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>
+            Unicode Spoofing Evidence: {assets.spoofTokens.length} fake token{assets.spoofTokens.length > 1 ? 's' : ''} detected
+          </Text>
+          {assets.spoofTokens.slice(0, 6).map((t, i) => (
+            <Text key={i} style={{ fontSize: 7, color: slate900, marginBottom: 1 }}>
+              "{t.symbol}" — mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
+            </Text>
+          ))}
+          <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
+            These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.
           </Text>
         </View>
       )}
@@ -883,6 +938,134 @@ const AddressLabelsPage = ({ data }: { data: ReportData }) => {
       <View style={{ marginTop: 'auto', paddingTop: 10 }}>
         <Text style={{ fontSize: 6, color: slate400, lineHeight: 1.4 }}>
           Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days.
+        </Text>
+      </View>
+
+      <Footer data={data} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE: ATTACK TECHNIQUE ANALYSIS (Phase 2)
+   Address Poisoning + Unicode Spoofing deep-dive. Rendered only when at
+   least one technique is detected. Placed after Address Verification so the
+   evidence sections read as escalating detail. 2026-05-21.
+   ═══════════════════════════════════════════════════════════════ */
+const AttackStat = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
+  <View style={{ flex: 1, backgroundColor: highlight ? '#fef2f2' : '#f8fafc', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: highlight ? '#fecaca' : '#e2e8f0' }}>
+    <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: highlight ? red : slate900 }}>{value}</Text>
+    <Text style={{ fontSize: 6, color: slate600, marginTop: 2, textAlign: 'center' }}>{label}</Text>
+  </View>
+);
+
+const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
+  const ap = data.attackTechniques?.addressPoisoning;
+  const us = data.attackTechniques?.unicodeSpoofing;
+  // Skip page entirely when nothing detected (no "all clear" placeholder).
+  if ((!ap || !ap.detected) && (!us || !us.detected)) return null;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Attack Technique Analysis</Text>
+      <Text style={{ ...s.p, marginBottom: 10 }}>
+        Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by organized cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
+      </Text>
+
+      {/* ─── Address Poisoning ─── */}
+      {ap && ap.detected && (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Address Poisoning Attack</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
+            Attackers generate wallet addresses that visually mimic the victim&apos;s intended recipients (matching the first and last characters), then send dust (near-zero value) transactions to populate the victim&apos;s history — hoping the victim copies the spoofed address when sending real funds.
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+            <AttackStat label="SPOOF ADDRESSES" value={String(ap.totalSpoofAttempts)} />
+            <AttackStat label="VANITY CLUSTERS" value={String(ap.vanityClusters.length)} />
+            <AttackStat label="MISDIRECTIONS" value={String(ap.totalVictimMisdirected)} highlight={ap.totalVictimMisdirected > 0} />
+            {ap.totalMisdirectedValue > 0 && (
+              <AttackStat label="MISDIRECTED VALUE" value={fmtEth(ap.totalMisdirectedValue)} highlight />
+            )}
+          </View>
+
+          {/* CRITICAL misdirection alert */}
+          {ap.totalVictimMisdirected > 0 && (
+            <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 8, borderWidth: 2, borderColor: red }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>CRITICAL: Victim Misdirected to Spoof Address</Text>
+              {ap.matches.filter(m => m.victimMisdirected).slice(0, 4).map((m, i) => (
+                <View key={i} style={{ marginBottom: 5 }}>
+                  <Text style={{ fontSize: 7, color: slate900, lineHeight: 1.4 }}>
+                    On {(m.misdirectedTimestamp || '').split('T')[0]}, the subject sent {(m.misdirectedAmount || 0).toFixed(2)} {m.misdirectedToken || ''} to a SPOOF of the intended recipient:
+                  </Text>
+                  <Text style={{ ...s.mono, fontSize: 6.5, color: red, marginTop: 1 }}>spoof:  {m.spoofedAddress}</Text>
+                  <Text style={{ ...s.mono, fontSize: 6.5, color: green }}>real:   {m.realAddress}</Text>
+                  <Text style={{ fontSize: 6.5, color: slate600, marginTop: 1 }}>Difference at {firstDifferingChar(m.realAddress, m.spoofedAddress)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Vanity clusters */}
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Vanity Address Clusters</Text>
+          {ap.vanityClusters.slice(0, 4).map((c, i) => (
+            <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900 }}>Pattern: {c.pattern}</Text>
+                <Text style={{ fontSize: 6, color: slate400 }}>{c.addresses.length} addresses</Text>
+              </View>
+              {c.addresses.slice(0, 6).map((addr) => {
+                const isReal = addr === c.realAddress;
+                return (
+                  <Text key={addr} style={{ ...s.mono, fontSize: 6, color: isReal ? green : red, marginBottom: 0.5 }}>
+                    {isReal ? '✔ real ' : '✖ spoof'} {addr}
+                  </Text>
+                );
+              })}
+              {c.addresses.length > 6 && (
+                <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>+ {c.addresses.length - 6} more in cluster</Text>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* ─── Unicode Spoofing ─── */}
+      {us && us.detected && (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Unicode Spoofing Attack</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
+            Fake tokens use characters from non-Latin scripts (Lisu Letters, Cyrillic, Greek) that visually resemble legitimate ticker symbols. For example, &quot;{'ꓴꓢꓓꓔ'}&quot; (Lisu) appears identical to &quot;USDT&quot; but is a worthless contract. Attackers send these fake &quot;deposits&quot; to fabricate the appearance of returns or refunds in wallet history.
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+            <AttackStat label="UNIQUE FAKE TOKENS" value={String(us.uniqueSpoofSymbols)} highlight />
+            <AttackStat label="SPOOF TRANSFERS" value={String(us.totalSpoofTokenTransfers)} />
+          </View>
+
+          {us.evidence.slice(0, 6).map((e, i) => (
+            <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: red }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                <Text style={{ fontFamily: LISU_FONT_FAMILY, fontSize: 11, color: slate900 }}>{e.fakeSymbol}</Text>
+                <Text style={{ fontSize: 8, color: slate600, marginLeft: 6 }}>— masquerading as </Text>
+                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>{e.mimicsLegitimate}</Text>
+              </View>
+              <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>Unicode: {e.fakeSymbolCodepoints}</Text>
+              <Text style={{ fontSize: 6.5, color: slate600 }}>Script: {e.scriptCategory} {'·'} {e.occurrences} transfer{e.occurrences > 1 ? 's' : ''}{e.sourceAddresses.length ? ` from ${e.sourceAddresses.length} address(es)` : ''}</Text>
+              {e.transactionExamples.length > 0 && (
+                <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>
+                  e.g. {(e.transactionExamples[0].timestamp || '').split('T')[0]} {'·'} from {shortAddr(e.transactionExamples[0].from)}
+                </Text>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={{ marginTop: 'auto', paddingTop: 8 }}>
+        <Text style={{ fontSize: 6, color: slate400, lineHeight: 1.4 }}>
+          Methodology: Address poisoning detection matches counterparty addresses against actual recipients on a 4-character prefix + 4-character suffix basis (8 hex characters of visual overlap). Unicode spoofing detection normalises token symbols (NFKD decomposition + a curated confusable-character map across Lisu, Cyrillic, Greek and fullwidth Latin) and compares against legitimate tickers. Codepoints are shown in standard U+ notation so the evidence is verifiable independent of font rendering.
         </Text>
       </View>
 
@@ -1591,6 +1774,9 @@ export const ReportDocument = ({ data }: { data: ReportData }) => {
   // 2026-05-20 Phase 1: only render the new federation page when at least
   // one counterparty was analyzed. Avoids a blank section on tiny wallets.
   const hasAddressLabels = (data.addressLabels?.length ?? 0) > 0;
+  // Phase 2: only render the attack page when a technique was detected.
+  const at = data.attackTechniques;
+  const hasAttackTechniques = !!at && (at.addressPoisoning?.detected || at.unicodeSpoofing?.detected);
 
   return (
     <Document>
@@ -1602,6 +1788,7 @@ export const ReportDocument = ({ data }: { data: ReportData }) => {
       <AnalyticsPage data={data} />
       <EntitiesExitPage data={data} />
       {hasAddressLabels && <AddressLabelsPage data={data} />}
+      {hasAttackTechniques && <AttackTechniqueAnalysisPage data={data} />}
       {hasCrossChain && <CrossChainPage data={data} />}
       <FundFlowPage data={data} />
       <TransactionsPage data={data} />
