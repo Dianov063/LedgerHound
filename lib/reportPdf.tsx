@@ -344,13 +344,32 @@ interface ReadinessResult {
   evidenceItems: { included: boolean; label: string }[];
 }
 
+/**
+ * 2026-05-21 (Phase 2.5 Fix 1): A subject→CEX transfer only counts as the
+ * SCAMMER's cash-out exit when the subject is NOT the victim. For a victim
+ * wallet, sends to a CEX are the victim's OWN exchange — the scammer's
+ * cash-out lies one or more hops beyond the cluster and isn't in this
+ * wallet's direct history. Used consistently across the readiness checklist
+ * and the difficulty factors so the page can't contradict itself.
+ */
+function scammerCashOutDetected(data: ReportData): boolean {
+  return data.narrative?.walletType !== 'victim' && !!data.exchangeAnalysis?.hasExitKyc;
+}
+
 function calculateReadinessScore(data: ReportData): ReadinessResult {
   const ap = data.attackTechniques?.addressPoisoning;
   const us = data.attackTechniques?.unicodeSpoofing;
+  const scammerExit = scammerCashOutDetected(data);
   const items = [
     { included: true, label: 'On-chain transaction history (complete)', weight: 5 },
     { included: !!data.exchangeAnalysis?.hasEntryKyc, label: 'Victim KYC entry point identified', weight: 10 },
-    { included: !!data.exchangeAnalysis?.hasExitKyc, label: 'Scammer cash-out exit identified (KYC exchange)', weight: 25 },
+    {
+      included: scammerExit,
+      label: scammerExit
+        ? 'Scammer cash-out exit identified (KYC exchange)'
+        : 'Scammer cash-out exit NOT detected — expanded counterparty trace required',
+      weight: 25,
+    },
     { included: (data.scamDbMatches?.length > 0) || !!ap?.detected, label: 'Counterparty linked to known fraud network', weight: 15 },
     { included: data.addressLabels?.some(l => l.hasPhishingFlag) || false, label: 'Counterparty officially tagged by Etherscan (Fake_Phishing)', weight: 15 },
     { included: !!ap?.detected, label: 'Address poisoning attack documented', weight: 10 },
@@ -389,7 +408,9 @@ function calculateInvestigationDifficulty(data: ReportData): DifficultyResult {
   if (hasMixer) { factors.push({ positive: false, text: 'Mixer/tumbler interaction detected — complicates fund tracing' }); d += 30; }
   if (hasCrossChain) { factors.push({ positive: false, text: 'Cross-chain bridging detected — multi-jurisdiction investigation' }); d += 25; }
   if ((ap?.campaigns?.length ?? 0) > 1) { factors.push({ positive: false, text: 'Multiple fraud clusters — fragmented destinations' }); d += 15; }
-  if (!data.exchangeAnalysis?.hasExitKyc) { factors.push({ positive: false, text: 'No KYC exit point identified — requires expanded counterparty trace' }); d += 20; }
+  // Consistent with the readiness checklist: a victim's own CEX sends are not
+  // the scammer's cash-out, so use the role-aware helper here too.
+  if (!scammerCashOutDetected(data)) { factors.push({ positive: false, text: 'No scammer cash-out exit identified — requires expanded counterparty trace' }); d += 20; }
 
   let tier: DifficultyResult['tier'];
   let explanation: string;
@@ -1302,7 +1323,7 @@ const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
         <View style={{ marginBottom: 10 }}>
           <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Unicode Spoofing Attack</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
-            Fake tokens use characters from non-Latin scripts (Lisu Letters, Cyrillic, Greek) that visually resemble legitimate ticker symbols. For example, &quot;{'ꓴꓢꓓꓔ'}&quot; (Lisu) appears identical to &quot;USDT&quot; but is a worthless contract. Attackers send these fake &quot;deposits&quot; to fabricate the appearance of returns or refunds in wallet history.
+            Fake tokens use characters from non-Latin scripts (Lisu Letters, Cyrillic, Greek) that visually resemble legitimate ticker symbols. For example, &quot;<Text style={{ fontFamily: LISU_FONT_FAMILY }}>{'ꓴꓢꓓꓔ'}</Text>&quot; (Lisu Letters, U+A4F4 U+A4E2 U+A4D3 U+A4D4) appears identical to &quot;USDT&quot; but is a worthless contract. Attackers send these fake &quot;deposits&quot; to fabricate the appearance of returns or refunds in wallet history.
           </Text>
 
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
