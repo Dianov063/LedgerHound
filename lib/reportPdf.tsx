@@ -4,6 +4,7 @@ import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Ima
 import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength, type RecoveryAssessment, type WalletRole } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
 import { firstDifferingChar } from './address-poisoning';
+import { getCodepoints } from './unicode-spoofing';
 
 /**
  * Noto Sans Lisu — needed to render the Lisu-letter token spoofs (e.g.
@@ -298,6 +299,144 @@ const SummaryPage = ({ data }: { data: ReportData }) => {
 /* ═══════════════════════════════════════════════════════════════
    PAGE 3: INVESTIGATION NARRATIVE + EVIDENCE STRENGTH + VICTIM FLOW
    ═══════════════════════════════════════════════════════════════ */
+/* ─── Recovery Readiness Assessment (Phase 2.5 / Part 9) ───
+   Inserted after Executive Summary. Page numbers in footers are dynamic
+   (react-pdf render callback), so no hardcoded numbers shift. */
+interface ReadinessResult {
+  score: number;
+  tier: 'Excellent' | 'Strong' | 'Moderate' | 'Limited';
+  label: string;
+  evidenceItems: { included: boolean; label: string }[];
+}
+
+function calculateReadinessScore(data: ReportData): ReadinessResult {
+  const ap = data.attackTechniques?.addressPoisoning;
+  const us = data.attackTechniques?.unicodeSpoofing;
+  const items = [
+    { included: true, label: 'On-chain transaction history (complete)', weight: 5 },
+    { included: !!data.exchangeAnalysis?.hasEntryKyc, label: 'Victim KYC entry point identified', weight: 10 },
+    { included: !!data.exchangeAnalysis?.hasExitKyc, label: 'Scammer cash-out exit identified (KYC exchange)', weight: 25 },
+    { included: (data.scamDbMatches?.length > 0) || !!ap?.detected, label: 'Counterparty linked to known fraud network', weight: 15 },
+    { included: data.addressLabels?.some(l => l.hasPhishingFlag) || false, label: 'Counterparty officially tagged by Etherscan (Fake_Phishing)', weight: 15 },
+    { included: !!ap?.detected, label: 'Address poisoning attack documented', weight: 10 },
+    { included: !!us?.detected, label: 'Unicode spoofing evidence documented', weight: 5 },
+    { included: data.narrative?.walletType === 'victim', label: 'Victim wallet classification with reasoning', weight: 5 },
+    { included: (data.patternAnalysis?.patterns?.length ?? 0) > 0, label: 'Behavioral pattern analysis (counterparty)', weight: 5 },
+    { included: true, label: 'Recovery probability with factor breakdown', weight: 5 },
+  ];
+  const score = items.reduce((sum, it) => sum + (it.included ? it.weight : 0), 0);
+  let tier: ReadinessResult['tier'];
+  let label: string;
+  if (score >= 75) { tier = 'Excellent'; label = 'Comprehensive evidence package — ready for legal action and exchange compliance review.'; }
+  else if (score >= 55) { tier = 'Strong'; label = 'Sufficient evidence for police report and exchange compliance request.'; }
+  else if (score >= 35) { tier = 'Moderate'; label = 'Evidence available; additional tracing may strengthen recovery prospects.'; }
+  else { tier = 'Limited'; label = 'Basic documentation completed; further investigation strongly recommended.'; }
+  return { score, tier, label, evidenceItems: items.map(({ included, label }) => ({ included, label })) };
+}
+
+interface DifficultyResult {
+  tier: 'LOW' | 'MEDIUM' | 'HIGH';
+  explanation: string;
+  factors: { positive: boolean; text: string }[];
+}
+
+function calculateInvestigationDifficulty(data: ReportData): DifficultyResult {
+  const factors: { positive: boolean; text: string }[] = [];
+  let d = 50;
+  const hasMixer = data.identifiedEntities?.some(e => e.type === 'mixer') || (data.riskBreakdown?.mixerInteraction ?? 0) > 0;
+  const hasCrossChain = data.crossChainTrace?.detected === true;
+  const ap = data.attackTechniques?.addressPoisoning;
+
+  if (data.exchangeAnalysis?.hasEntryKyc) { factors.push({ positive: true, text: 'KYC exchange entry point identified' }); d -= 15; }
+  if (data.addressLabels?.some(l => l.hasPhishingFlag)) { factors.push({ positive: true, text: 'Counterparty pre-verified by Etherscan (Fake_Phishing tag)' }); d -= 10; }
+  if (ap?.detected) { factors.push({ positive: true, text: 'Coordinated fraud campaign documented (organized-crime classification)' }); d -= 10; }
+
+  if (hasMixer) { factors.push({ positive: false, text: 'Mixer/tumbler interaction detected — complicates fund tracing' }); d += 30; }
+  if (hasCrossChain) { factors.push({ positive: false, text: 'Cross-chain bridging detected — multi-jurisdiction investigation' }); d += 25; }
+  if ((ap?.campaigns?.length ?? 0) > 1) { factors.push({ positive: false, text: 'Multiple fraud clusters — fragmented destinations' }); d += 15; }
+  if (!data.exchangeAnalysis?.hasExitKyc) { factors.push({ positive: false, text: 'No KYC exit point identified — requires expanded counterparty trace' }); d += 20; }
+
+  let tier: DifficultyResult['tier'];
+  let explanation: string;
+  if (d <= 30) { tier = 'LOW'; explanation = 'This case has clear evidence trails and identified parties. Recovery efforts can proceed through standard legal channels.'; }
+  else if (d <= 65) { tier = 'MEDIUM'; explanation = 'Investigation is feasible but requires coordination across multiple parties (law enforcement, exchanges, payment processors). Typical timeframe: 6–18 months.'; }
+  else { tier = 'HIGH'; explanation = 'Investigation faces significant obstacles (anonymisation, jurisdictional complexity, or fragmented evidence). Standard recovery channels may be insufficient — specialised cyber-forensics counsel is recommended.'; }
+  return { tier, explanation, factors };
+}
+
+const ReadinessCheck = ({ checked, label }: { checked: boolean; label: string }) => (
+  <View style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'flex-start' }}>
+    <Text style={{ fontSize: 8, width: 12, color: checked ? green : slate400 }}>{checked ? '✔' : '✖'}</Text>
+    <Text style={{ fontSize: 7, color: checked ? slate900 : slate400, flex: 1, lineHeight: 1.3 }}>{label}</Text>
+  </View>
+);
+
+const RecoveryReadinessPage = ({ data }: { data: ReportData }) => {
+  const readiness = calculateReadinessScore(data);
+  const difficulty = calculateInvestigationDifficulty(data);
+  const tierColor = readiness.score >= 55 ? green : readiness.score >= 35 ? amber : red;
+  const diffColor = difficulty.tier === 'LOW' ? green : difficulty.tier === 'MEDIUM' ? amber : red;
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} />
+      <Text style={s.h2}>Recovery Readiness Assessment</Text>
+      <Text style={{ ...s.p, marginBottom: 10 }}>
+        Quick reference for legal counsel and law enforcement: what evidence is documented, what investigation difficulty to expect, and what is included in this report package.
+      </Text>
+
+      <View style={{ alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ fontSize: 30, fontFamily: 'Helvetica-Bold', color: tierColor }}>{readiness.score}%</Text>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: tierColor, marginTop: 2 }}>{readiness.tier}</Text>
+        <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', maxWidth: 380, marginTop: 4, lineHeight: 1.4 }}>{readiness.label}</Text>
+      </View>
+      <Text style={{ fontSize: 7, color: slate400, textAlign: 'center', marginBottom: 12, lineHeight: 1.4 }}>
+        Readiness reflects evidence completeness, not recovery probability. High readiness means the case is well-documented for legal action — actual recovery depends on law-enforcement response, exchange cooperation, and legal proceedings.
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...s.h3, marginBottom: 6 }}>Evidence Package Included</Text>
+          <View style={{ ...s.card, padding: 8 }}>
+            {readiness.evidenceItems.map((it, i) => (
+              <ReadinessCheck key={i} checked={it.included} label={it.label} />
+            ))}
+          </View>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...s.h3, marginBottom: 6 }}>Investigation Difficulty</Text>
+          <View style={{ ...s.card, padding: 8 }}>
+            <View style={{ alignSelf: 'flex-start', backgroundColor: diffColor, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 6 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: 'white' }}>{difficulty.tier}</Text>
+            </View>
+            <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 6 }}>{difficulty.explanation}</Text>
+            <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Key Factors</Text>
+            {difficulty.factors.map((f, i) => (
+              <Text key={i} style={{ fontSize: 7, color: f.positive ? green : red, marginBottom: 1, lineHeight: 1.3 }}>
+                {f.positive ? '+ ' : '− '}{f.text}
+              </Text>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={{ ...s.card, padding: 10, marginTop: 10, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>How to Use This Report</Text>
+        <Text style={{ fontSize: 8, color: slate900, marginBottom: 2 }}>1. <Text style={{ fontFamily: 'Helvetica-Bold' }}>File a police report</Text> — attach this PDF as supporting documentation.</Text>
+        <Text style={{ fontSize: 8, color: slate900, marginBottom: 2 }}>2. <Text style={{ fontFamily: 'Helvetica-Bold' }}>Submit to exchange compliance</Text> — request preservation of counterparty data.</Text>
+        <Text style={{ fontSize: 8, color: slate900, marginBottom: 2 }}>3. <Text style={{ fontFamily: 'Helvetica-Bold' }}>Request a stablecoin freeze</Text> — for USDT-denominated transfers to flagged wallets, contact the issuer (Tether) with this report.</Text>
+        <Text style={{ fontSize: 8, color: slate900 }}>4. <Text style={{ fontFamily: 'Helvetica-Bold' }}>Consult legal counsel</Text> — share this evidence package for case evaluation.</Text>
+      </View>
+
+      <Footer data={data} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE 4: INVESTIGATION NARRATIVE + EVIDENCE STRENGTH + VICTIM FLOW
+   ═══════════════════════════════════════════════════════════════ */
 const NarrativePage = ({ data }: { data: ReportData }) => {
   const n = data.narrative;
   const ev = data.evidenceStrength;
@@ -463,13 +602,41 @@ const NarrativePage = ({ data }: { data: ReportData }) => {
               </View>
             ))}
           </View>
-          {/* Exchange compliance contacts */}
-          {data.exchangeComplianceEmails.length > 0 && (
+          {/* 2026-05-21 (Phase 2.5 / Part 7): KYC Entry vs Exit — do NOT
+              conflate the victim's own funding exchange with a scammer
+              cash-out exchange. */}
+          {data.exchangeAnalysis && (data.exchangeAnalysis.hasEntryKyc || data.exchangeAnalysis.hasExitKyc) && (
             <View style={{ ...s.card, padding: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>Exchange Compliance Contacts</Text>
-              {data.exchangeComplianceEmails.slice(0, 4).map((ec, i) => (
-                <Text key={i} style={{ fontSize: 7, color: blue, marginBottom: 1 }}>{ec.name}: {ec.email}</Text>
-              ))}
+              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>Exchange KYC — Entry vs Exit</Text>
+
+              {/* Entry */}
+              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: amber, marginTop: 2 }}>KYC ENTRY POINT (victim&apos;s funding source)</Text>
+              {data.exchangeAnalysis.entryPoints.length > 0 ? (
+                data.exchangeAnalysis.entryPoints.slice(0, 3).map((e, i) => (
+                  <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
+                    {e.parentEntity}: {e.interactionCount} interaction(s){e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                  </Text>
+                ))
+              ) : (
+                <Text style={{ fontSize: 6.5, color: slate400 }}>None detected.</Text>
+              )}
+              <Text style={{ fontSize: 6, color: slate400, marginTop: 1, lineHeight: 1.3 }}>
+                Identifies the VICTIM&apos;S exchange account — useful to confirm victim identity for legal proceedings, not the scammer&apos;s.
+              </Text>
+
+              {/* Exit */}
+              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: red, marginTop: 4 }}>KYC EXIT POINT (scammer cash-out)</Text>
+              {data.exchangeAnalysis.exitPoints.length > 0 ? (
+                data.exchangeAnalysis.exitPoints.slice(0, 3).map((e, i) => (
+                  <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
+                    {e.parentEntity}: {e.interactionCount} interaction(s){e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                  </Text>
+                ))
+              ) : (
+                <Text style={{ fontSize: 6.5, color: slate600, lineHeight: 1.3 }}>
+                  Not detected in subject wallet&apos;s direct history. The fraud cluster controls the funds; identifying a cash-out exchange requires an expanded counterparty trace (one or more hops beyond this wallet).
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -527,21 +694,35 @@ const AssetTimelinePage = ({ data }: { data: ReportData }) => {
         </View>
       )}
 
-      {/* 2026-05-21 (Phase 2): Unicode-spoofing evidence — kept SEPARATE from
-          spam. These fake tokens visually mimic legitimate tickers (USDT/ETH)
-          and are forensic evidence, cross-referenced in Attack Technique Analysis. */}
+      {/* 2026-05-21 (Phase 2 / 2.5): Unicode-spoofing evidence — kept SEPARATE
+          from spam. Spoof symbols render in Noto Sans Lisu where available;
+          codepoints are ALWAYS shown so evidence survives any font failure. */}
       {assets && assets.spoofTokens && assets.spoofTokens.length > 0 && (
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>
             Unicode Spoofing Evidence: {assets.spoofTokens.length} fake token{assets.spoofTokens.length > 1 ? 's' : ''} detected
           </Text>
           {assets.spoofTokens.slice(0, 6).map((t, i) => (
-            <Text key={i} style={{ fontSize: 7, color: slate900, marginBottom: 1 }}>
-              "{t.symbol}" — mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
-            </Text>
+            <View key={i} style={{ marginBottom: 3 }}>
+              <Text style={{ fontSize: 7, color: slate900 }}>
+                <Text style={{ fontFamily: LISU_FONT_FAMILY }}>{t.symbol}</Text>
+                {' '}— mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
+              </Text>
+              <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>{getCodepoints(t.symbol)}</Text>
+            </View>
           ))}
           <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
             These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.
+          </Text>
+        </View>
+      )}
+
+      {/* 2026-05-21 (Phase 2.5 / Part 4): footnote — apparent net balance
+          understates the true loss when funds went to poisoning spoofs. */}
+      {data.attackTechniques?.addressPoisoning?.totalMisdirectedToSecondarySpoofs > 0 && (
+        <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 8, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: amber }}>
+          <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
+            Note: The apparent net balance understates the true economic loss. {data.attackTechniques.addressPoisoning.totalMisdirectedToSecondarySpoofs.toFixed(2)} {data.attackTechniques.addressPoisoning.campaigns[0]?.primaryToken || ''} was sent to address-poisoning spoof addresses (see Attack Technique Analysis). These funds were lost to visual address confusion, not legitimately transferred — the full loss to this victim exceeds the on-chain net figure.
           </Text>
         </View>
       )}
@@ -973,63 +1154,84 @@ const AttackTechniqueAnalysisPage = ({ data }: { data: ReportData }) => {
         Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by organized cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
       </Text>
 
-      {/* ─── Address Poisoning ─── */}
-      {ap && ap.detected && (
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Address Poisoning Attack</Text>
+      {/* ─── Address Poisoning Campaign (Phase 2.5 model) ─── */}
+      {ap && ap.detected && ap.campaigns.map((campaign, ci) => (
+        <View key={ci} style={{ marginBottom: 14 }}>
+          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Address Poisoning Campaign Detected</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
-            Attackers generate wallet addresses that visually mimic the victim&apos;s intended recipients (matching the first and last characters), then send dust (near-zero value) transactions to populate the victim&apos;s history — hoping the victim copies the spoofed address when sending real funds.
+            A coordinated address poisoning attack was identified. The attacker deployed a cluster of visually similar addresses (sharing prefix and suffix patterns) to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are attacker-controlled; the highest-volume address is the main collector, the rest are secondary spoofs.
           </Text>
 
-          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-            <AttackStat label="SPOOF ADDRESSES" value={String(ap.totalSpoofAttempts)} />
-            <AttackStat label="VANITY CLUSTERS" value={String(ap.vanityClusters.length)} />
-            <AttackStat label="MISDIRECTIONS" value={String(ap.totalVictimMisdirected)} highlight={ap.totalVictimMisdirected > 0} />
-            {ap.totalMisdirectedValue > 0 && (
-              <AttackStat label="MISDIRECTED VALUE" value={fmtEth(ap.totalMisdirectedValue)} highlight />
+          {/* Cluster overview */}
+          <View style={{ ...s.card, padding: 8, marginBottom: 8 }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Vanity Cluster: {campaign.vanityPattern}</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <AttackStat label="CLUSTER ADDRESSES" value={String(campaign.totalClusterAddresses)} />
+              <AttackStat label="SUCCESSFUL SPOOFS" value={String(campaign.successfulMisdirections)} highlight={campaign.successfulMisdirections > 0} />
+              <AttackStat label={`TO CLUSTER (${campaign.primaryToken})`} value={fmtEth(campaign.totalSentByVictim)} highlight />
+              <AttackStat label={`TO SPOOFS (${campaign.primaryToken})`} value={fmtEth(campaign.totalToSecondarySpoofs)} highlight={campaign.totalToSecondarySpoofs > 0} />
+            </View>
+            {campaign.hasFakePhishingTag && (
+              <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>
+                {campaign.fakePhishingAddresses.length} address(es) in this cluster are officially tagged by Etherscan as Fake_Phishing.
+              </Text>
             )}
           </View>
 
-          {/* CRITICAL misdirection alert */}
-          {ap.totalVictimMisdirected > 0 && (
-            <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 8, borderWidth: 2, borderColor: red }}>
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>CRITICAL: Victim Misdirected to Spoof Address</Text>
-              {ap.matches.filter(m => m.victimMisdirected).slice(0, 4).map((m, i) => (
-                <View key={i} style={{ marginBottom: 5 }}>
-                  <Text style={{ fontSize: 7, color: slate900, lineHeight: 1.4 }}>
-                    On {(m.misdirectedTimestamp || '').split('T')[0]}, the subject sent {(m.misdirectedAmount || 0).toFixed(2)} {m.misdirectedToken || ''} to a SPOOF of the intended recipient:
-                  </Text>
-                  <Text style={{ ...s.mono, fontSize: 6.5, color: red, marginTop: 1 }}>spoof:  {m.spoofedAddress}</Text>
-                  <Text style={{ ...s.mono, fontSize: 6.5, color: green }}>real:   {m.realAddress}</Text>
-                  <Text style={{ fontSize: 6.5, color: slate600, marginTop: 1 }}>Difference at {firstDifferingChar(m.realAddress, m.spoofedAddress)}</Text>
-                </View>
-              ))}
+          {/* Main collector */}
+          <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fecaca' }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 2 }}>Main Collector (Highest Volume)</Text>
+            <Text style={{ ...s.mono, fontSize: 6.5, color: slate900 }}>{campaign.mainCollector.address}</Text>
+            <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>
+              Received {campaign.mainCollector.totalReceivedFromSubject.toFixed(2)} {campaign.mainCollector.totalReceivedToken} across {campaign.mainCollector.transactionCount} transaction(s) — the primary scam wallet in this fraud network.
+            </Text>
+            {campaign.mainCollector.etherscanFakePhishingTag && (
+              <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>Etherscan: {campaign.mainCollector.etherscanFakePhishingTag}</Text>
+            )}
+          </View>
+
+          {/* Secondary spoofs */}
+          {campaign.secondarySpoofs.length > 0 && (
+            <View>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Secondary Spoofs (Address Poisoning Targets)</Text>
+              <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 4 }}>
+                These addresses share the same visual pattern as the main collector but are separate wallets. Funds the victim sent here indicate successful confusion induced by the poisoning attack.
+              </Text>
+              {campaign.secondarySpoofs.slice(0, 10).map((spoof, si) => {
+                const misdirected = spoof.totalReceivedFromSubject > 0;
+                return (
+                  <View key={si} style={{ ...s.card, padding: 5, marginBottom: 4, borderLeftWidth: 2, borderLeftColor: misdirected ? red : slate400 }}>
+                    <Text style={{ ...s.mono, fontSize: 6, color: misdirected ? red : slate600 }}>✖ {spoof.address}</Text>
+                    <Text style={{ fontSize: 6.5, color: slate900, marginTop: 1 }}>
+                      {misdirected
+                        ? `MISDIRECTION CONFIRMED: ${spoof.totalReceivedFromSubject.toFixed(2)} ${spoof.totalReceivedToken} across ${spoof.transactionCount} tx`
+                        : 'No funds received (poisoning only)'}
+                      {spoof.receivedDustFromCluster ? ' · dusted the victim' : ''}
+                    </Text>
+                    <Text style={{ fontSize: 6, color: slate400, marginTop: 0.5 }}>
+                      Differs from main collector at {firstDifferingChar(campaign.mainCollector.address, spoof.address)}
+                    </Text>
+                    {spoof.etherscanFakePhishingTag && (
+                      <Text style={{ fontSize: 6, color: red }}>Etherscan: {spoof.etherscanFakePhishingTag}</Text>
+                    )}
+                  </View>
+                );
+              })}
+              {campaign.secondarySpoofs.length > 10 && (
+                <Text style={{ fontSize: 6, color: slate400 }}>+ {campaign.secondarySpoofs.length - 10} additional spoof addresses in cluster</Text>
+              )}
             </View>
           )}
 
-          {/* Vanity clusters */}
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Vanity Address Clusters</Text>
-          {ap.vanityClusters.slice(0, 4).map((c, i) => (
-            <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900 }}>Pattern: {c.pattern}</Text>
-                <Text style={{ fontSize: 6, color: slate400 }}>{c.addresses.length} addresses</Text>
-              </View>
-              {c.addresses.slice(0, 6).map((addr) => {
-                const isReal = addr === c.realAddress;
-                return (
-                  <Text key={addr} style={{ ...s.mono, fontSize: 6, color: isReal ? green : red, marginBottom: 0.5 }}>
-                    {isReal ? '✔ real ' : '✖ spoof'} {addr}
-                  </Text>
-                );
-              })}
-              {c.addresses.length > 6 && (
-                <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>+ {c.addresses.length - 6} more in cluster</Text>
-              )}
-            </View>
-          ))}
+          {/* Forensic interpretation */}
+          <View style={{ ...s.card, padding: 8, marginTop: 6 }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Forensic Interpretation</Text>
+            <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
+              The vanity pattern ({campaign.vanityPattern}) shared across {campaign.totalClusterAddresses} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by an organized fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.
+            </Text>
+          </View>
         </View>
-      )}
+      ))}
 
       {/* ─── Unicode Spoofing ─── */}
       {us && us.detected && (
@@ -1115,7 +1317,7 @@ const EntitiesExitPage = ({ data }: { data: ReportData }) => {
       {data.identifiedEntities.some(e => e.type === 'exchange') && (
         <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 10, marginTop: 8 }}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 3 }}>Exchange Identified — Subpoena Target Available</Text>
-          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>KYC exchanges maintain identity records obtainable via legal subpoena.</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>KYC exchanges maintain identity records that may be obtainable via legal subpoena (subject to exchange policy and data availability).</Text>
         </View>
       )}
 
@@ -1336,7 +1538,8 @@ const FundFlowPage = ({ data }: { data: ReportData }) => {
 
               {/* Edges with arrows */}
               {graph.edges.map((edge, i) => {
-                const color = edge.direction === 'OUT' ? red : green;
+                // 2026-05-21 (Phase 2.5 / Part 5): spoof edges drawn amber + ⚠.
+                const color = edge.isSpoof ? amber : edge.direction === 'OUT' ? red : green;
                 const dx = edge.x2 - edge.x1;
                 const dy = edge.y2 - edge.y1;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1482,17 +1685,34 @@ const TransactionsPage = ({ data }: { data: ReportData }) => (
         <Text style={{ ...s.th, width: '14%' }}>Value</Text>
         <Text style={{ ...s.th, width: '12%' }}>Token</Text>
       </View>
-      {data.transactions.map((tx, i) => (
-        <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt} wrap={false}>
-          <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{tx.date || '—'}</Text>
-          <Text style={{ ...s.td, width: '8%', color: tx.direction === 'IN' ? green : red, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{tx.direction}</Text>
-          <Text style={{ ...s.td, ...s.mono, width: '26%', fontSize: 6 }}>{shortAddr(tx.from)}</Text>
-          <Text style={{ ...s.td, ...s.mono, width: '26%', fontSize: 6 }}>{shortAddr(tx.to)}</Text>
-          <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{tx.value > 0 ? fmtEth(tx.value) : '—'}</Text>
-          <Text style={{ ...s.td, width: '12%', fontSize: 7 }}>{truncToken(tx.token)}</Text>
-        </View>
-      ))}
+      {data.transactions.map((tx, i) => {
+        // 2026-05-21 (Phase 2.5 / Part 6): highlight Unicode-spoof token rows.
+        const rowBase = i % 2 === 0 ? s.tableRow : s.tableRowAlt;
+        const rowStyle = tx.isSpoof ? { ...rowBase, backgroundColor: '#fffbeb' } : rowBase;
+        return (
+          <View key={i} style={rowStyle} wrap={false}>
+            <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{tx.date || '—'}</Text>
+            <Text style={{ ...s.td, width: '8%', color: tx.direction === 'IN' ? green : red, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{tx.direction}</Text>
+            <Text style={{ ...s.td, ...s.mono, width: '26%', fontSize: 6 }}>{shortAddr(tx.from)}</Text>
+            <Text style={{ ...s.td, ...s.mono, width: '26%', fontSize: 6 }}>{shortAddr(tx.to)}</Text>
+            <Text style={{ ...s.td, width: '14%', fontSize: 7 }}>{tx.value > 0 ? fmtEth(tx.value) : '—'}</Text>
+            {tx.isSpoof ? (
+              <Text style={{ ...s.td, width: '12%', fontSize: 6, color: red }}>
+                <Text style={{ fontFamily: LISU_FONT_FAMILY }}>{truncToken(tx.token)}</Text> {'⚠'}
+              </Text>
+            ) : (
+              <Text style={{ ...s.td, width: '12%', fontSize: 7 }}>{truncToken(tx.token)}</Text>
+            )}
+          </View>
+        );
+      })}
     </View>
+
+    {data.transactions.some(t => t.isSpoof) && (
+      <Text style={{ fontSize: 7, color: red, marginTop: 6 }}>
+        ⚠ Highlighted rows are Unicode-spoof tokens (fake symbols mimicking real currencies) — see Attack Technique Analysis.
+      </Text>
+    )}
 
     {data.spamFiltered > 0 && (
       <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 6 }}>
@@ -1623,7 +1843,7 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
         </Text>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
           {hasExchanges
-            ? `Funds were traced to KYC-regulated exchange(s). The account holder identity is obtainable through legal process. Time-sensitive action is required to prevent fund withdrawal.`
+            ? `Funds were traced to KYC-regulated exchange(s). The account holder identity may be obtainable through legal process (subject to exchange cooperation and data availability). Time-sensitive action is required to prevent fund withdrawal.`
             : `No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.`}
         </Text>
       </View>
@@ -1631,7 +1851,10 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
       {/* Step 1: Exchange Compliance Contact */}
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>STEP 1: Contact Exchange Compliance (URGENT — within 24h)</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>STEP 1: Submit Preservation Request to Exchange Compliance</Text>
+          <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 6 }}>
+            The exchange(s) below hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal blacklist. Even where the scammer did not cash out through this exchange directly, an early preservation request becomes part of the official record.
+          </Text>
           {exchangeBrands.slice(0, 3).map((b, i) => (
             <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -1701,7 +1924,7 @@ const ActionableStepsPage = ({ data }: { data: ReportData }) => {
           {hasExchanges ? 'STEP 4' : 'STEP 3'}: Preserve Evidence
         </Text>
         <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Save all communications with the scammer (screenshots, emails, messages)</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Keep this forensic report as court-admissible evidence</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Preserve this forensic report as supporting documentation for legal proceedings</Text>
         <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Document the timeline of events in writing</Text>
         <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>{'\u2022'} Do not communicate with the scammer further</Text>
       </View>
@@ -1782,6 +2005,7 @@ export const ReportDocument = ({ data }: { data: ReportData }) => {
     <Document>
       <CoverPage data={data} />
       <SummaryPage data={data} />
+      <RecoveryReadinessPage data={data} />
       <NarrativePage data={data} />
       <AssetTimelinePage data={data} />
       <PatternPage data={data} />
