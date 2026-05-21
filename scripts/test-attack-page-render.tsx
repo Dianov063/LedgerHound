@@ -99,13 +99,19 @@ async function main() {
   console.log(`  unicode:   detected=${unicodeSpoofing.detected} symbols=${unicodeSpoofing.uniqueSpoofSymbols}`);
   console.log();
 
-  const buf = await renderToBuffer(React.createElement(ReportDocument, { data: mock }) as any);
   const out = path.join(process.cwd(), 'test-reports');
   fs.mkdirSync(out, { recursive: true });
-  const file = path.join(out, 'attack-page-render-test.pdf');
-  fs.writeFileSync(file, buf);
-  console.log(`✓ Full ReportDocument rendered: ${buf.length} bytes → ${file}`);
-  console.log('  (Attack Technique Analysis page included; Lisu font embedded)');
+
+  // EN
+  const bufEn = await renderToBuffer(React.createElement(ReportDocument, { data: mock, locale: 'en' }) as any);
+  fs.writeFileSync(path.join(out, 'attack-page-render-test.pdf'), bufEn);
+  console.log(`✓ EN ReportDocument rendered: ${bufEn.length} bytes`);
+
+  // ES (Phase 3) — verify Spanish locale path doesn't crash and embeds fonts
+  const bufEs = await renderToBuffer(React.createElement(ReportDocument, { data: mock, locale: 'es' }) as any);
+  fs.writeFileSync(path.join(out, 'attack-page-render-test-es.pdf'), bufEs);
+  console.log(`✓ ES ReportDocument rendered: ${bufEs.length} bytes`);
+  console.log('  (Attack Technique Analysis page included; Lisu + NotoSansRpt embedded)');
 }
 
 main().catch((e) => { console.error('RENDER FAILED:', e); process.exit(1); });

@@ -1,0 +1,366 @@
+/**
+ * Forensic Report internationalization (Phase 3).
+ *
+ * SEPARATE from the UI's next-intl setup. next-intl's `getTranslations` reads
+ * the locale from the *request* context — but reports are rendered in a
+ * background task (Stripe webhook → waitUntil), where there is no user request
+ * context. So we use a self-contained translation table keyed by locale, the
+ * same proven pattern as lib/legal-packs/pdf-i18n.ts.
+ *
+ * Spanish here is LATAM Spanish (Peru-friendly): "ustedes" not "vosotros",
+ * "computadora"/"celular", Peru government terminology (PNP, DIVINDAT, DNI).
+ *
+ * 2026-05-21: Phase 3 Part 1 — infrastructure + structural strings. Body-text
+ * strings are migrated in Part 2.
+ */
+
+export type ReportLocale = 'en' | 'es';
+export const SUPPORTED_REPORT_LOCALES: ReportLocale[] = ['en', 'es'];
+
+export function isSupportedReportLocale(x: string | undefined | null): x is ReportLocale {
+  return x === 'en' || x === 'es';
+}
+
+/**
+ * Translation shape. Part 1 covers cover page, footer, all page section
+ * titles, and the Recovery Readiness hero. Part 2 extends this interface
+ * with body-paragraph keys. Keep keys namespaced by area.
+ */
+export interface ReportTranslations {
+  locale: ReportLocale;
+  common: {
+    confidential: string;     // footer left
+    pageOf: (n: number, total: number) => string; // "Page X of Y" / "Página X de Y"
+    caseId: string;
+    date: string;
+    generatedBy: string;
+  };
+  cover: {
+    line1: string;            // "FORENSIC WALLET"
+    line2: string;            // "ANALYSIS REPORT"
+    walletAddress: string;
+    date: string;
+    caseId: string;
+    premium: string;
+    confidential: string;     // "CONFIDENTIAL — For Legal Use"
+    generatedBy: string;
+  };
+  /** Risk severity enum labels (data-driven values mapped at display). */
+  riskLabels: {
+    CRITICAL: string;
+    HIGH: string;
+    MODERATE: string;
+    LOW: string;
+  };
+  /** Executive Summary page chrome (static labels). */
+  exec: {
+    ofacAlertTitle: string;
+    ofacAlertBody: string;
+    riskScore: string;
+    recoveryProbability: string;
+    recoveryDisclaimerTitle: string;
+    positiveFactors: string;
+    negativeFactors: string;
+    riskBreakdownTitle: string;
+    colFactor: string;
+    colScore: string;
+    baseline: string;
+    rowUnknownWallet: string;
+    rowMixer: string;
+    rowKycExchange: string;
+    rowMultiHop: string;
+    rowStablecoin: string;
+    rowOfac: string;
+    rowScamDb: string;
+    totalRiskScore: string;
+    scamDbLinked: string;
+    scamDbCounterpartyLinked: string;
+    reportsLosses: (reports: number, loss: string) => string;
+    keyFindings: string;
+  };
+  /** Recovery Readiness page (content computed in reportPdf, fully localized). */
+  readiness: {
+    subtitle: string;
+    disclaimerNote: string;
+    evidencePackageIncluded: string;
+    investigationDifficulty: string;
+    keyFactors: string;
+    howToUseTitle: string;
+    howToUse1Bold: string; howToUse1: string;
+    howToUse2Bold: string; howToUse2: string;
+    howToUse3Bold: string; howToUse3: string;
+    howToUse4Bold: string; howToUse4: string;
+    // tier labels + descriptions
+    tierExcellent: string; tierStrong: string; tierModerate: string; tierLimited: string;
+    labelExcellent: string; labelStrong: string; labelModerate: string; labelLimited: string;
+    // difficulty tiers + explanations
+    diffLow: string; diffMedium: string; diffHigh: string;
+    diffLowExpl: string; diffMediumExpl: string; diffHighExpl: string;
+    // evidence checklist items
+    evOnChain: string;
+    evVictimEntry: string;
+    evScammerExit: string;
+    evScammerExitNot: string;
+    evFraudNetwork: string;
+    evEtherscanTag: string;
+    evPoisoning: string;
+    evUnicode: string;
+    evVictimClass: string;
+    evBehavioral: string;
+    evRecoveryProb: string;
+    // difficulty factors
+    dfKycEntry: string;
+    dfEtherscanVerified: string;
+    dfCampaignDocumented: string;
+    dfMixer: string;
+    dfCrossChain: string;
+    dfMultiCluster: string;
+    dfNoExit: string;
+  };
+  /** H2 page titles, keyed by a stable id. */
+  sections: {
+    executiveSummary: string;
+    recoveryReadiness: string;
+    investigationSummary: string;
+    assetSummary: string;
+    activityTimeline: string;
+    behavioralPatterns: string;
+    walletAnalytics: string;
+    entityIdentification: string;
+    exitPointAnalysis: string;
+    crossChainTrace: string;
+    addressVerification: string;
+    attackTechnique: string;
+    fundFlow: string;
+    transactionHistory: string;
+    recoveryAssessment: string;
+    legalRecommendations: string;
+    actionableSteps: string;
+    disclaimer: string;
+    peruResources: string;    // Phase 3 Part 3
+  };
+}
+
+const en: ReportTranslations = {
+  locale: 'en',
+  common: {
+    confidential: 'LedgerHound · USPROJECT LLC · Confidential',
+    pageOf: (n, total) => `Page ${n} of ${total}`,
+    caseId: 'Case ID',
+    date: 'Date',
+    generatedBy: 'Generated by LedgerHound · USPROJECT LLC',
+  },
+  cover: {
+    line1: 'FORENSIC WALLET',
+    line2: 'ANALYSIS REPORT',
+    walletAddress: 'WALLET ADDRESS',
+    date: 'DATE',
+    caseId: 'CASE ID',
+    premium: 'PREMIUM FORENSIC REPORT',
+    confidential: 'CONFIDENTIAL — For Legal Use',
+    generatedBy: 'Generated by LedgerHound · USPROJECT LLC',
+  },
+  riskLabels: { CRITICAL: 'CRITICAL', HIGH: 'HIGH', MODERATE: 'MODERATE', LOW: 'LOW' },
+  exec: {
+    ofacAlertTitle: 'OFAC SANCTIONS ALERT',
+    ofacAlertBody: 'This wallet has interacted with OFAC-sanctioned addresses. US persons are prohibited from transacting with sanctioned entities under penalty of law.',
+    riskScore: 'RISK SCORE',
+    recoveryProbability: 'RECOVERY PROBABILITY',
+    recoveryDisclaimerTitle: 'RECOVERY PROBABILITY — IMPORTANT DISCLAIMER',
+    positiveFactors: 'POSITIVE FACTORS',
+    negativeFactors: 'NEGATIVE FACTORS',
+    riskBreakdownTitle: 'RISK SCORE BREAKDOWN',
+    colFactor: 'Factor',
+    colScore: 'Score',
+    baseline: 'Baseline',
+    rowUnknownWallet: 'Unknown wallet interactions (>80% unidentified)',
+    rowMixer: 'Mixer/tumbler interaction detected',
+    rowKycExchange: 'KYC exchange interaction (recovery aid)',
+    rowMultiHop: 'Multi-hop transfer pattern (3+ same day)',
+    rowStablecoin: 'Stablecoin movement detected',
+    rowOfac: 'OFAC sanctioned address interaction',
+    rowScamDb: 'LedgerHound Scam Database match',
+    totalRiskScore: 'TOTAL RISK SCORE',
+    scamDbLinked: 'Linked to LedgerHound Scam Database',
+    scamDbCounterpartyLinked: 'Counterparty Linked to LedgerHound Scam Database',
+    reportsLosses: (reports, loss) => `${reports} reports, $${loss} losses`,
+    keyFindings: 'Key Findings',
+  },
+  readiness: {
+    subtitle: 'Quick reference for legal counsel and law enforcement: what evidence is documented, what investigation difficulty to expect, and what is included in this report package.',
+    disclaimerNote: 'Readiness reflects evidence completeness, not recovery probability. High readiness means the case is well-documented for legal action — actual recovery depends on law-enforcement response, exchange cooperation, and legal proceedings.',
+    evidencePackageIncluded: 'Evidence Package Included',
+    investigationDifficulty: 'Investigation Difficulty',
+    keyFactors: 'Key Factors',
+    howToUseTitle: 'How to Use This Report',
+    howToUse1Bold: 'File a police report', howToUse1: '— attach this PDF as supporting documentation.',
+    howToUse2Bold: 'Submit to exchange compliance', howToUse2: '— request preservation of counterparty data.',
+    howToUse3Bold: 'Request a stablecoin freeze', howToUse3: '— for USDT-denominated transfers to flagged wallets, contact the issuer (Tether) with this report.',
+    howToUse4Bold: 'Consult legal counsel', howToUse4: '— share this evidence package for case evaluation.',
+    tierExcellent: 'Excellent', tierStrong: 'Strong', tierModerate: 'Moderate', tierLimited: 'Limited',
+    labelExcellent: 'Comprehensive evidence package — ready for legal action and exchange compliance review.',
+    labelStrong: 'Sufficient evidence for police report and exchange compliance request.',
+    labelModerate: 'Evidence available; additional tracing may strengthen recovery prospects.',
+    labelLimited: 'Basic documentation completed; further investigation strongly recommended.',
+    diffLow: 'LOW', diffMedium: 'MEDIUM', diffHigh: 'HIGH',
+    diffLowExpl: 'This case has clear evidence trails and identified parties. Recovery efforts can proceed through standard legal channels.',
+    diffMediumExpl: 'Investigation is feasible but requires coordination across multiple parties (law enforcement, exchanges, payment processors). Typical timeframe: 6–18 months.',
+    diffHighExpl: 'Investigation faces significant obstacles (anonymisation, jurisdictional complexity, or fragmented evidence). Standard recovery channels may be insufficient — specialised cyber-forensics counsel is recommended.',
+    evOnChain: 'On-chain transaction history (complete)',
+    evVictimEntry: 'Victim KYC entry point identified',
+    evScammerExit: 'Scammer cash-out exit identified (KYC exchange)',
+    evScammerExitNot: 'Scammer cash-out exit NOT detected — expanded counterparty trace required',
+    evFraudNetwork: 'Counterparty linked to known fraud network',
+    evEtherscanTag: 'Counterparty officially tagged by Etherscan (Fake_Phishing)',
+    evPoisoning: 'Address poisoning attack documented',
+    evUnicode: 'Unicode spoofing evidence documented',
+    evVictimClass: 'Victim wallet classification with reasoning',
+    evBehavioral: 'Behavioral pattern analysis (counterparty)',
+    evRecoveryProb: 'Recovery probability with factor breakdown',
+    dfKycEntry: 'KYC exchange entry point identified',
+    dfEtherscanVerified: 'Counterparty pre-verified by Etherscan (Fake_Phishing tag)',
+    dfCampaignDocumented: 'Coordinated fraud campaign documented (organized-crime classification)',
+    dfMixer: 'Mixer/tumbler interaction detected — complicates fund tracing',
+    dfCrossChain: 'Cross-chain bridging detected — multi-jurisdiction investigation',
+    dfMultiCluster: 'Multiple fraud clusters — fragmented destinations',
+    dfNoExit: 'No scammer cash-out exit identified — requires expanded counterparty trace',
+  },
+  sections: {
+    executiveSummary: 'Executive Summary',
+    recoveryReadiness: 'Recovery Readiness Assessment',
+    investigationSummary: 'Investigation Summary',
+    assetSummary: 'Asset Summary',
+    activityTimeline: 'Activity Timeline',
+    behavioralPatterns: 'Behavioral Pattern Analysis',
+    walletAnalytics: 'Wallet Analytics',
+    entityIdentification: 'Entity Identification',
+    exitPointAnalysis: 'Exit Point Analysis',
+    crossChainTrace: 'Cross-Chain Trace Summary',
+    addressVerification: 'Address Verification & External Intelligence',
+    attackTechnique: 'Attack Technique Analysis',
+    fundFlow: 'Fund Flow Graph',
+    transactionHistory: 'Transaction History',
+    recoveryAssessment: 'Recovery Assessment',
+    legalRecommendations: 'Legal Recommendations',
+    actionableSteps: 'Actionable Recovery Steps',
+    disclaimer: 'Disclaimer & Legal Notice',
+    peruResources: 'Peru-Specific Resources',
+  },
+};
+
+const es: ReportTranslations = {
+  locale: 'es',
+  common: {
+    confidential: 'LedgerHound · USPROJECT LLC · Confidencial',
+    pageOf: (n, total) => `Página ${n} de ${total}`,
+    caseId: 'ID de Caso',
+    date: 'Fecha',
+    generatedBy: 'Generado por LedgerHound · USPROJECT LLC',
+  },
+  cover: {
+    line1: 'INFORME FORENSE',
+    line2: 'DE WALLET',
+    walletAddress: 'DIRECCIÓN DE WALLET',
+    date: 'FECHA',
+    caseId: 'ID DE CASO',
+    premium: 'INFORME FORENSE PREMIUM',
+    confidential: 'CONFIDENCIAL — Para Uso Legal',
+    generatedBy: 'Generado por LedgerHound · USPROJECT LLC',
+  },
+  riskLabels: { CRITICAL: 'CRÍTICA', HIGH: 'ALTA', MODERATE: 'MODERADA', LOW: 'BAJA' },
+  exec: {
+    ofacAlertTitle: 'ALERTA DE SANCIONES OFAC',
+    ofacAlertBody: 'Esta wallet ha interactuado con direcciones sancionadas por la OFAC. A las personas estadounidenses se les prohíbe realizar transacciones con entidades sancionadas bajo pena de ley.',
+    riskScore: 'PUNTUACIÓN DE RIESGO',
+    recoveryProbability: 'PROBABILIDAD DE RECUPERACIÓN',
+    recoveryDisclaimerTitle: 'PROBABILIDAD DE RECUPERACIÓN — AVISO IMPORTANTE',
+    positiveFactors: 'FACTORES POSITIVOS',
+    negativeFactors: 'FACTORES NEGATIVOS',
+    riskBreakdownTitle: 'DESGLOSE DE LA PUNTUACIÓN DE RIESGO',
+    colFactor: 'Factor',
+    colScore: 'Puntuación',
+    baseline: 'Base',
+    rowUnknownWallet: 'Interacciones con wallets desconocidas (>80% no identificadas)',
+    rowMixer: 'Interacción con mixer/tumbler detectada',
+    rowKycExchange: 'Interacción con exchange KYC (ayuda a la recuperación)',
+    rowMultiHop: 'Patrón de transferencias multi-salto (3+ el mismo día)',
+    rowStablecoin: 'Movimiento de stablecoins detectado',
+    rowOfac: 'Interacción con dirección sancionada por OFAC',
+    rowScamDb: 'Coincidencia en la Base de Datos de Estafas de LedgerHound',
+    totalRiskScore: 'PUNTUACIÓN TOTAL DE RIESGO',
+    scamDbLinked: 'Vinculada a la Base de Datos de Estafas de LedgerHound',
+    scamDbCounterpartyLinked: 'Contraparte Vinculada a la Base de Datos de Estafas de LedgerHound',
+    reportsLosses: (reports, loss) => `${reports} reportes, $${loss} en pérdidas`,
+    keyFindings: 'Hallazgos Clave',
+  },
+  readiness: {
+    subtitle: 'Referencia rápida para asesores legales y autoridades: qué evidencia está documentada, qué dificultad de investigación esperar y qué incluye este paquete del informe.',
+    disclaimerNote: 'La preparación refleja la integridad de la evidencia, no la probabilidad de recuperación. Una preparación alta significa que el caso está bien documentado para la acción legal — la recuperación real depende de la respuesta de las autoridades, la cooperación del exchange y los procedimientos legales.',
+    evidencePackageIncluded: 'Paquete de Evidencia Incluido',
+    investigationDifficulty: 'Dificultad de Investigación',
+    keyFactors: 'Factores Clave',
+    howToUseTitle: 'Cómo Usar Este Informe',
+    howToUse1Bold: 'Presente una denuncia policial', howToUse1: '— adjunte este PDF como documentación de apoyo.',
+    howToUse2Bold: 'Envíelo al área de cumplimiento del exchange', howToUse2: '— solicite la preservación de los datos de la contraparte.',
+    howToUse3Bold: 'Solicite el congelamiento de la stablecoin', howToUse3: '— para transferencias en USDT a wallets marcadas, contacte al emisor (Tether) con este informe.',
+    howToUse4Bold: 'Consulte con un asesor legal', howToUse4: '— comparta este paquete de evidencia para la evaluación del caso.',
+    tierExcellent: 'Excelente', tierStrong: 'Sólida', tierModerate: 'Moderada', tierLimited: 'Limitada',
+    labelExcellent: 'Paquete de evidencia integral — listo para la acción legal y la revisión de cumplimiento del exchange.',
+    labelStrong: 'Evidencia suficiente para una denuncia policial y una solicitud de cumplimiento al exchange.',
+    labelModerate: 'Evidencia disponible; un rastreo adicional puede fortalecer las perspectivas de recuperación.',
+    labelLimited: 'Documentación básica completada; se recomienda encarecidamente una investigación adicional.',
+    diffLow: 'BAJA', diffMedium: 'MEDIA', diffHigh: 'ALTA',
+    diffLowExpl: 'Este caso tiene rastros de evidencia claros y partes identificadas. Los esfuerzos de recuperación pueden avanzar por los canales legales habituales.',
+    diffMediumExpl: 'La investigación es viable pero requiere coordinación entre múltiples partes (autoridades, exchanges, procesadores de pago). Plazo típico: 6 a 18 meses.',
+    diffHighExpl: 'La investigación enfrenta obstáculos significativos (anonimización, complejidad jurisdiccional o evidencia fragmentada). Los canales de recuperación habituales pueden ser insuficientes — se recomienda un asesor especializado en ciberforense.',
+    evOnChain: 'Historial de transacciones en cadena (completo)',
+    evVictimEntry: 'Punto de entrada KYC de la víctima identificado',
+    evScammerExit: 'Punto de salida de fondos del estafador identificado (exchange KYC)',
+    evScammerExitNot: 'Punto de salida del estafador NO detectado — se requiere rastreo ampliado de la contraparte',
+    evFraudNetwork: 'Contraparte vinculada a una red de fraude conocida',
+    evEtherscanTag: 'Contraparte etiquetada oficialmente por Etherscan (Fake_Phishing)',
+    evPoisoning: 'Ataque de envenenamiento de direcciones documentado',
+    evUnicode: 'Evidencia de suplantación con caracteres Unicode documentada',
+    evVictimClass: 'Clasificación de wallet de víctima con su fundamentación',
+    evBehavioral: 'Análisis de patrones de comportamiento (contraparte)',
+    evRecoveryProb: 'Probabilidad de recuperación con desglose de factores',
+    dfKycEntry: 'Punto de entrada a exchange KYC identificado',
+    dfEtherscanVerified: 'Contraparte preverificada por Etherscan (etiqueta Fake_Phishing)',
+    dfCampaignDocumented: 'Campaña coordinada de fraude documentada (clasificación de crimen organizado)',
+    dfMixer: 'Interacción con mixer/tumbler detectada — complica el rastreo de fondos',
+    dfCrossChain: 'Puenteo entre cadenas detectado — investigación multi-jurisdiccional',
+    dfMultiCluster: 'Múltiples grupos de fraude — destinos fragmentados',
+    dfNoExit: 'No se identificó un punto de salida de fondos del estafador — se requiere rastreo ampliado de la contraparte',
+  },
+  sections: {
+    executiveSummary: 'Resumen Ejecutivo',
+    recoveryReadiness: 'Evaluación de Preparación para la Recuperación',
+    investigationSummary: 'Resumen de la Investigación',
+    assetSummary: 'Resumen de Activos',
+    activityTimeline: 'Cronología de Actividad',
+    behavioralPatterns: 'Análisis de Patrones de Comportamiento',
+    walletAnalytics: 'Analítica de la Wallet',
+    entityIdentification: 'Identificación de Entidades',
+    exitPointAnalysis: 'Análisis de Puntos de Salida',
+    crossChainTrace: 'Resumen de Rastreo Multi-Cadena',
+    addressVerification: 'Verificación de Direcciones e Inteligencia Externa',
+    attackTechnique: 'Análisis de Técnicas de Ataque',
+    fundFlow: 'Gráfico de Flujo de Fondos',
+    transactionHistory: 'Historial de Transacciones',
+    recoveryAssessment: 'Evaluación de Recuperación',
+    legalRecommendations: 'Recomendaciones Legales',
+    actionableSteps: 'Pasos Concretos para la Recuperación',
+    disclaimer: 'Aviso Legal y Descargo de Responsabilidad',
+    peruResources: 'Recursos Específicos para Perú',
+  },
+};
+
+const TABLE: Record<ReportLocale, ReportTranslations> = { en, es };
+
+/**
+ * Resolve translations for a locale. Unsupported locales fall back to English.
+ */
+export function getReportTranslations(locale: string | undefined | null): ReportTranslations {
+  if (isSupportedReportLocale(locale || '')) return TABLE[locale as ReportLocale];
+  return en;
+}

@@ -59,6 +59,9 @@ export default function ReportPage() {
   const [wallet, setWallet] = useState('');
   const [email, setEmail] = useState('');
   const [network, setNetwork] = useState<Network>('eth');
+  // Phase 3: report language. Defaults to the current UI locale where a
+  // translated report exists (en/es today), otherwise English.
+  const [reportLang, setReportLang] = useState<'en' | 'es'>(locale === 'es' ? 'es' : 'en');
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [walletInfo, setWalletInfo] = useState<{
@@ -125,7 +128,7 @@ export default function ReportPage() {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: wallet, email, network }),
+        body: JSON.stringify({ walletAddress: wallet, email, network, locale: reportLang }),
       });
       const data = await res.json();
       if (data.error) {
@@ -331,6 +334,21 @@ export default function ReportPage() {
                           : 'border-slate-200 bg-white focus:border-brand-500'
                       }`}
                     />
+                  </div>
+
+                  {/* Phase 3: report language selector. Defaults to UI locale. */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      {locale === 'es' ? 'Idioma del informe' : 'Report language'}
+                    </label>
+                    <select
+                      value={reportLang}
+                      onChange={(e) => setReportLang(e.target.value as 'en' | 'es')}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm outline-none focus:border-brand-500"
+                    >
+                      <option value="en">English</option>
+                      <option value="es">Español (América Latina)</option>
+                    </select>
                   </div>
 
                   {error && (

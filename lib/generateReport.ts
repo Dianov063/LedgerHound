@@ -1013,9 +1013,11 @@ function generateRecoveryScenarios(exitAnalysis: ExitPointAnalysis, recoveryScor
 export async function generateReport(
   walletAddress: string,
   email: string,
-  options?: { stripePaymentId?: string; amount?: number; network?: string },
+  options?: { stripePaymentId?: string; amount?: number; network?: string; locale?: string },
 ) {
   const network = (options?.network || 'eth').toLowerCase();
+  // Phase 3: report locale (en|es; others fall back to en in getReportTranslations).
+  const reportLocale = options?.locale || 'en';
   const networkLabel = NETWORK_LABELS[network] || network.toUpperCase();
   const nativeCurrency = NATIVE_CURRENCY[network] || 'ETH';
   // Only lowercase for EVM addresses
@@ -2019,7 +2021,7 @@ export async function generateReport(
   };
 
   // Generate PDF
-  const doc = React.createElement(ReportDocument, { data: reportData }) as any;
+  const doc = React.createElement(ReportDocument, { data: reportData, locale: reportLocale }) as any;
   const pdfBuffer = await renderToBuffer(doc);
   const buf = Buffer.from(pdfBuffer);
 

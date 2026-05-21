@@ -234,6 +234,8 @@ async function processCheckout(event: any): Promise<void> {
   const email = session.metadata?.email;
   const network = session.metadata?.network || 'eth';
   const caseId = session.metadata?.caseId || '';
+  // Phase 3: report language (en|es). Falls back to en if absent/unsupported.
+  const reportLocale = session.metadata?.locale || 'en';
 
   logger.info({ product, walletAddress, email, eventId: event.id }, '[webhook] Processing checkout (background)');
 
@@ -278,6 +280,7 @@ async function processCheckout(event: any): Promise<void> {
             stripePaymentId: paymentId,
             amount: session.amount_total || 7900,
             network: detectedNetwork,
+            locale: reportLocale,
           });
           logger.info({ caseId: reportResult.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
 
@@ -335,6 +338,7 @@ async function processCheckout(event: any): Promise<void> {
           stripePaymentId: paymentId,
           amount: session.amount_total || 1900,
           network,
+          locale: reportLocale,
         });
         logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Summary Report generated');
       } else {
@@ -349,6 +353,7 @@ async function processCheckout(event: any): Promise<void> {
           stripePaymentId: paymentId,
           amount: session.amount_total || 4900,
           network,
+          locale: reportLocale,
         });
         logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
       } else {

@@ -49,7 +49,11 @@ export async function POST(req: NextRequest) {
       rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
-    const { walletAddress, email, network = 'eth' } = await req.json();
+    const { walletAddress, email, network = 'eth', locale } = await req.json();
+
+    // Phase 3: report language. Only en/es produce a fully-translated report
+    // today; anything else falls back to English at render time.
+    const reportLocale = (typeof locale === 'string' && ['en', 'es'].includes(locale)) ? locale : 'en';
 
     const net = (network || 'eth').toLowerCase();
     const validator = ADDRESS_VALIDATORS[net];
@@ -90,6 +94,7 @@ export async function POST(req: NextRequest) {
           : walletAddress.toLowerCase(),
         email,
         network: net,
+        locale: reportLocale,
       },
       customer_email: email,
       success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,
