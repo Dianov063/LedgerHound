@@ -1289,7 +1289,7 @@ export async function generateReport(
   }
   if (daysSinceLast < 7) {
     recoveryScore += 3;
-    positiveFactors.push('Very recent activity (<7 days) — urgent freeze action possible');
+    positiveFactors.push('Very recent activity (<7 days) — improves the chance of an exchange/issuer compliance hold (at their discretion)');
   }
 
   if (hasMixer) {
@@ -1759,7 +1759,7 @@ export async function generateReport(
     if (subjectKnownEntity || cexOutboundCount > 0) {
       // (defensive — shouldn't hit for victim role)
     }
-    narrativeConclusion = `Conclusion: This wallet was used by a victim to send funds to an organized counterparty cluster — not a scammer-controlled wallet.`;
+    narrativeConclusion = `Conclusion: This wallet was used by a victim to send funds to a coordinated counterparty cluster — not a scammer-controlled wallet.`;
   } else if (walletRole === 'aggregator') {
     narrativeSummary = `This wallet functions as a scam aggregation point. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
     if (primaryExitExchange) {
@@ -1771,7 +1771,7 @@ export async function generateReport(
     if (primaryExitExchange) {
       narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity may be obtainable via legal subpoena (subject to exchange policy and data availability).`;
     }
-    narrativeConclusion = `Conclusion: This is a transit wallet used in organized fund routing, not a legitimate user account.`;
+    narrativeConclusion = `Conclusion: This is a transit wallet used in coordinated fund routing, not a legitimate user account.`;
   } else if (walletRole === 'exchange_deposit') {
     narrativeSummary = `This wallet appears to funnel funds to ${primaryExitExchange}. It received from ${uniqueSenders} senders and consolidated to a single exchange destination. Total flow: ${totalInDisplay} in, ${totalOutDisplay} out.`;
     narrativeConclusion = `Conclusion: Exchange deposit funnel — identity likely recoverable via ${primaryExitExchange} KYC records.`;
@@ -1819,7 +1819,15 @@ export async function generateReport(
     { label: `${incoming.length + outgoing.length} transactions analyzed`, met: incoming.length + outgoing.length > 10 },
     { label: `${uniqueSenders} unique sender addresses identified`, met: uniqueSenders >= 3 },
     { label: `${forwardingPercent}% rapid forwarding pattern`, met: forwardingPercent >= 50 },
-    { label: 'KYC exchange exit confirmed', met: kycExchangesSorted.length > 0 },
+    // Phase 2.6: role-aware KYC exit. Previously this was unconditionally
+    // "KYC exchange exit confirmed", which falsely triggered for a victim who
+    // sent funds to her OWN exchange — contradicting the Investigation Summary
+    // and Entity Identification pages. A subject→CEX outflow is the SCAMMER's
+    // cash-out exit only when the subject is NOT the victim. Mirrors
+    // scammerCashOutDetected() in reportPdf.tsx so the pages agree.
+    isVictimRole
+      ? { label: 'KYC entry point confirmed (victim funding source)', met: kycExchangesSorted.length > 0 }
+      : { label: 'Scammer KYC exit point confirmed', met: exitPointAnalysis.hasKycExit },
     { label: `${criticalPatterns} critical behavioral pattern(s) detected`, met: criticalPatterns > 0 },
     // Scam-DB / phishing — wording differs by role.
     isVictimRole

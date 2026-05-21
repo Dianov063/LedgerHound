@@ -1261,7 +1261,7 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.attackTechnique}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
-        Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by organized cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
+        Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
       </Text>
 
       {/* ─── Address Poisoning Campaign (Phase 2.5 model) ─── */}
@@ -1337,7 +1337,12 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
           <View style={{ ...s.card, padding: 8, marginTop: 6 }}>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Forensic Interpretation</Text>
             <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-              The vanity pattern ({campaign.vanityPattern}) shared across {campaign.totalClusterAddresses} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by an organized fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.
+              The vanity pattern ({campaign.vanityPattern}) shared across {campaign.totalClusterAddresses} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by a multi-wallet fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.
+            </Text>
+            {/* Phase 2.6: methodology footnote so the ~1-in-4.3-billion figure
+                is defensible if challenged by opposing counsel. */}
+            <Text style={{ fontSize: 6.5, color: slate400, fontStyle: 'italic', lineHeight: 1.4, marginTop: 4 }}>
+              Methodology: For an N-character hex match at fixed positions (case-insensitive), the probability that two independently generated addresses share those positions is (1/16)^N. With 8 fixed characters (4-character prefix + 4-character suffix), P ≈ 1 in 4.3 × 10^9. Real-world address generation involves additional patterns that reduce entropy further; this baseline is a conservative lower bound for the improbability of coincidental clustering.
             </Text>
           </View>
         </View>
@@ -1951,7 +1956,7 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
         if (usesUsdt) {
           items.push({
             bold: 'Token Issuer Coordination:',
-            text: 'For USDT-denominated transfers to flagged wallets, contact Tether legal (legal@tether.to) to request blacklist inclusion / freeze of the implicated addresses.',
+            text: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
           });
         }
         items.push({
@@ -2068,7 +2073,7 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
         <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Local police report — needed for exchange compliance requests</Text>
         <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} FTC report — reportfraud.ftc.gov</Text>
         {data.narrative.walletType === 'transit' && (
-          <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request SAR filing — transit wallet pattern indicates organized fraud</Text>
+          <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request SAR filing — transit wallet pattern indicates a coordinated fraud pattern</Text>
         )}
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
           Include Case ID {data.caseId}, wallet address, and attach this forensic report as evidence.
