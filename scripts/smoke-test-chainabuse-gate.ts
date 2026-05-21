@@ -196,12 +196,14 @@ async function main() {
       ServerSideEncryption: 'aws:kms',
     }));
 
-    // Read current usage — should be FRESH (calls_used=0) because the file
-    // for `thisMonth` doesn't exist, and getMonthlyUsage() doesn't fall back
-    // to last month's file.
+    // Read current usage. Auto-reset semantics: must report the CURRENT
+    // month (not the planted last-month file) and must NOT inherit the
+    // stale 99 value. The exact count may be non-zero because production
+    // shares this S3 bucket and may have spent real Chainabuse calls this
+    // month — that's legitimate, so we only assert it's not the stale value.
     const usage = await getMonthlyUsage();
-    const ok = usage.month === thisMonth && usage.calls_used === 0;
-    console.log(`  ${ok ? '✓' : '✗'} fresh counter for current month: month=${usage.month} calls_used=${usage.calls_used}`);
+    const ok = usage.month === thisMonth && usage.calls_used !== 99 && usage.calls_used >= 0;
+    console.log(`  ${ok ? '✓' : '✗'} auto-reset to current month (not stale ${lastMonth}): month=${usage.month} calls_used=${usage.calls_used} (stale value 99 correctly ignored)`);
     if (ok) pass++; else fail++;
 
     // Cleanup the stale file we planted
