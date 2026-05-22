@@ -2097,7 +2097,7 @@ export async function generateReport(
 
   // Send email with download link
   try {
-    await sendReport(email, address, buf, caseId, downloadUrl);
+    await sendReport(email, address, buf, caseId, downloadUrl, reportLocale, reportCountry);
     logger.info({ email, caseId }, '[generateReport] Email sent');
   } catch (emailErr: unknown) {
     logger.error({ err: emailErr, email }, '[generateReport] Email send failed (report still saved to S3)');
