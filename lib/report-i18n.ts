@@ -151,6 +151,51 @@ export interface ReportTranslations {
   behavioral: Behavioral;
   /** Wallet Analytics page (Phase 3 Batch 2.4). */
   analytics: Analytics;
+  /** Entity Identification + Exit Point Analysis (Phase 3 Batch 2.5). */
+  entityId: EntityId;
+  /** Address Verification & External Intelligence (Phase 3 Batch 2.5). */
+  addressVerification: AddressVerification;
+}
+
+/** Entity Identification + Exit Point Analysis (page 9) translations. */
+export interface EntityId {
+  noEntities: string;
+  colAddress: string;
+  colEntity: string;
+  colType: string;
+  colInteractions: string;
+  entityType: (type: string) => string;
+  mixerWarningTitle: string;
+  mixerWarningBody: string;
+  exchangeIdentifiedTitle: string;
+  exchangeIdentifiedBody: string;
+  exitColDestination: string;
+  exitColAmount: string;
+  exitColToken: string;
+  exitColType: string;
+  exitColRecovery: string;
+  exitKycTitle: string;
+  exitKycBody: string;
+  exitMixerTitle: string;
+  exitMixerBody: string;
+  exitNoneTitle: string;
+  exitNoneBody: string;
+  noOutflows: string;
+  recoveryDiff: (entityType: string) => string;
+}
+
+/** Address Verification & External Intelligence (page 10) translations. */
+export interface AddressVerification {
+  intro: string;
+  degradedTitle: string;
+  degradedBody: string;
+  sourcesSuffix: (n: number) => string;
+  noMatches: string;
+  reportsSuffix: (n: number) => string;
+  confLabel: (pct: number) => string;
+  remaining: (n: number) => string;
+  methodology: string;
+  sourceLabel: (source: string) => string;
 }
 
 /** Behavioral Pattern Analysis (page 7) — chrome + generated pattern strings. */
@@ -783,6 +828,54 @@ const en: ReportTranslations = {
     inactiveTitle: (n) => `Wallet Inactive — ${n} Days`,
     inactiveBody: (lastActivity) => `Last activity: ${lastActivity}. Possible: key loss, cooling-off, or fund redistribution.`,
   },
+  entityId: {
+    noEntities: 'No known entities identified in automated analysis. Manual investigation with commercial tools may reveal additional attributions.',
+    colAddress: 'Address',
+    colEntity: 'Entity',
+    colType: 'Type',
+    colInteractions: 'Interactions',
+    entityType: (type) => (({
+      exchange: 'EXCHANGE', mixer: 'MIXER', sanctioned: 'SANCTIONED', bridge: 'BRIDGE',
+      defi: 'DEFI', scam: 'SCAM', unknown: 'UNKNOWN',
+    } as Record<string, string>)[type.toLowerCase()] ?? type.toUpperCase()),
+    mixerWarningTitle: 'WARNING: Mixer Activity Detected',
+    mixerWarningBody: 'Mixing services obscure fund origins and are associated with money laundering.',
+    exchangeIdentifiedTitle: 'Exchange Identified — Subpoena Target Available',
+    exchangeIdentifiedBody: 'KYC exchanges maintain identity records that may be obtainable via legal subpoena (subject to exchange policy and data availability).',
+    exitColDestination: 'Destination',
+    exitColAmount: 'Amount',
+    exitColToken: 'Token',
+    exitColType: 'Type',
+    exitColRecovery: 'Recovery Difficulty',
+    exitKycTitle: 'KYC Exchange Exit Detected',
+    exitKycBody: 'Funds reached a KYC-compliant exchange. Attorney can file discovery request for account holder identification.',
+    exitMixerTitle: 'Mixer Exit Detected',
+    exitMixerBody: 'Funds passed through mixing services. Professional demixing analysis recommended.',
+    exitNoneTitle: 'No KYC Exchange Exit Detected',
+    exitNoneBody: 'Without exchange interaction, recovery requires deeper investigation. The largest outflow destination should be traced further.',
+    noOutflows: 'No significant outflows detected for exit point analysis.',
+    recoveryDiff: (entityType) => (({
+      exchange: 'LOW - Subpoena possible',
+      mixer: 'HIGH - Funds obfuscated',
+      defi: 'MEDIUM - On-chain analysis possible',
+    } as Record<string, string>)[entityType] ?? 'UNKNOWN - Further investigation needed'),
+  },
+  addressVerification: {
+    intro: 'Top counterparty addresses (by volume) cross-referenced with multiple verification sources: LedgerHound Scam Database, OFAC SDN, Chainabuse community reports, GoPlus Security risk flags, and our curated Etherscan Fake_Phishing list. Sources are queried independently; agreement across sources increases confidence.',
+    degradedTitle: 'External intelligence partially unavailable',
+    degradedBody: 'One or more external sources (Chainabuse, GoPlus, OFAC) were unavailable during report generation. Some labels may be incomplete. Internal database matches and curated Etherscan tags are unaffected.',
+    sourcesSuffix: (n) => `${n} source${n === 1 ? '' : 's'}`,
+    noMatches: 'No matches in any verification source.',
+    reportsSuffix: (n) => `  (${n} reports)`,
+    confLabel: (pct) => `  conf=${pct}%`,
+    remaining: (n) => `+ ${n} more counterpart${n === 1 ? 'y' : 'ies'} analyzed but not shown (capped at 15). Full data available via the LedgerHound API.`,
+    methodology: 'Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days.',
+    sourceLabel: (source) => (({
+      etherscan_manual: 'ETHERSCAN', chainabuse: 'CHAINABUSE', goplus: 'GOPLUS', ofac: 'OFAC SDN',
+      ledgerhound_scam_db: 'LEDGERHOUND DB', cex_whitelist: 'KYC EXCHANGE', known_entity: 'KNOWN ENTITY',
+      known_phishing: 'ETHERSCAN',
+    } as Record<string, string>)[source] ?? source),
+  },
 };
 
 const es: ReportTranslations = {
@@ -1158,6 +1251,54 @@ const es: ReportTranslations = {
     colVolume: (sym) => `Volumen (${sym})`,
     inactiveTitle: (n) => `Wallet Inactiva — ${n} Días`,
     inactiveBody: (lastActivity) => `Última actividad: ${lastActivity}. Posible: pérdida de claves, período de espera o redistribución de fondos.`,
+  },
+  entityId: {
+    noEntities: 'No se identificaron entidades conocidas en el análisis automatizado. Una investigación manual con herramientas comerciales podría revelar atribuciones adicionales.',
+    colAddress: 'Dirección',
+    colEntity: 'Entidad',
+    colType: 'Tipo',
+    colInteractions: 'Interacciones',
+    entityType: (type) => (({
+      exchange: 'EXCHANGE', mixer: 'MEZCLADOR', sanctioned: 'SANCIONADA', bridge: 'PUENTE',
+      defi: 'DEFI', scam: 'ESTAFA', unknown: 'DESCONOCIDA',
+    } as Record<string, string>)[type.toLowerCase()] ?? type.toUpperCase()),
+    mixerWarningTitle: 'ADVERTENCIA: Actividad de Mezclador Detectada',
+    mixerWarningBody: 'Los servicios de mezcla ocultan el origen de los fondos y están asociados con el lavado de dinero.',
+    exchangeIdentifiedTitle: 'Exchange Identificado — Objetivo de Citación Disponible',
+    exchangeIdentifiedBody: 'Los exchanges KYC mantienen registros de identidad que pueden obtenerse mediante citación judicial (sujeto a la política del exchange y disponibilidad de datos).',
+    exitColDestination: 'Destino',
+    exitColAmount: 'Monto',
+    exitColToken: 'Token',
+    exitColType: 'Tipo',
+    exitColRecovery: 'Dificultad de Recuperación',
+    exitKycTitle: 'Salida por Exchange KYC Detectada',
+    exitKycBody: 'Los fondos llegaron a un exchange con cumplimiento KYC. Un abogado puede presentar una solicitud de descubrimiento para identificar al titular de la cuenta.',
+    exitMixerTitle: 'Salida por Mezclador Detectada',
+    exitMixerBody: 'Los fondos pasaron por servicios de mezcla. Se recomienda un análisis profesional de desmezclado.',
+    exitNoneTitle: 'No se Detectó Salida por Exchange KYC',
+    exitNoneBody: 'Sin interacción con un exchange, la recuperación requiere una investigación más profunda. El mayor destino de salida debe rastrearse más a fondo.',
+    noOutflows: 'No se detectaron salidas significativas para el análisis de puntos de salida.',
+    recoveryDiff: (entityType) => (({
+      exchange: 'BAJA - Citación judicial posible',
+      mixer: 'ALTA - Fondos ofuscados',
+      defi: 'MEDIA - Análisis on-chain posible',
+    } as Record<string, string>)[entityType] ?? 'DESCONOCIDA - Se requiere investigación adicional'),
+  },
+  addressVerification: {
+    intro: 'Las principales direcciones de contraparte (por volumen) se cruzan con múltiples fuentes de verificación: la Base de Datos de Estafas de LedgerHound, OFAC SDN, reportes comunitarios de Chainabuse, indicadores de riesgo de GoPlus Security, y nuestra lista curada de Fake_Phishing de Etherscan. Las fuentes se consultan de forma independiente; la concordancia entre fuentes aumenta la confianza.',
+    degradedTitle: 'Inteligencia externa parcialmente no disponible',
+    degradedBody: 'Una o más fuentes externas (Chainabuse, GoPlus, OFAC) no estaban disponibles durante la generación del informe. Algunas etiquetas pueden estar incompletas. Las coincidencias de la base de datos interna y las etiquetas curadas de Etherscan no se ven afectadas.',
+    sourcesSuffix: (n) => `${n} fuente${n === 1 ? '' : 's'}`,
+    noMatches: 'Sin coincidencias en ninguna fuente de verificación.',
+    reportsSuffix: (n) => `  (${n} reportes)`,
+    confLabel: (pct) => `  conf=${pct}%`,
+    remaining: (n) => `+ ${n} contraparte${n === 1 ? '' : 's'} más analizada${n === 1 ? '' : 's'} pero no mostrada${n === 1 ? '' : 's'} (limitado a 15). Datos completos disponibles vía la API de LedgerHound.`,
+    methodology: 'Metodología: Las etiquetas se agregan de fuentes independientes. Las entradas de OFAC SDN reflejan la lista de sanciones del Tesoro de EE. UU. publicada en el espejo de github `0xB10C/ofac-sanctioned-digital-currency-addresses`. La confianza de Chainabuse escala con el número de reportes comunitarios. Las puntuaciones de GoPlus reflejan señales de riesgo on-chain (phishing, listas negras, atribución de fondos robados). Los resultados de federación se almacenan en caché en S3 durante 7 días.',
+    sourceLabel: (source) => (({
+      etherscan_manual: 'ETHERSCAN', chainabuse: 'CHAINABUSE', goplus: 'GOPLUS', ofac: 'OFAC SDN',
+      ledgerhound_scam_db: 'LEDGERHOUND DB', cex_whitelist: 'EXCHANGE KYC', known_entity: 'ENTIDAD CONOCIDA',
+      known_phishing: 'ETHERSCAN',
+    } as Record<string, string>)[source] ?? source),
   },
 };
 

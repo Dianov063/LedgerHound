@@ -3,7 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
-import { getReportTranslations, type TimelineT } from './report-i18n';
+import { getReportTranslations, type TimelineT, type EntityId } from './report-i18n';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
 import { fetchBtcTransfers } from './bitcoin-tracker';
@@ -913,19 +913,15 @@ function generateTimeline(
   return events;
 }
 
-function getRecoveryDifficulty(entityType: string): string {
-  switch (entityType) {
-    case 'exchange': return 'LOW - Subpoena possible';
-    case 'mixer': return 'HIGH - Funds obfuscated';
-    case 'defi': return 'MEDIUM - On-chain analysis possible';
-    default: return 'UNKNOWN - Further investigation needed';
-  }
+function getRecoveryDifficulty(entityType: string, ei: EntityId): string {
+  return ei.recoveryDiff(entityType);
 }
 
 function analyzeExitPoints(
   outgoing: (Transfer | UnifiedTransfer)[],
   identifiedEntities: { address: string; type: string; label: string }[],
   nativeCurrency: string = 'ETH',
+  ei: EntityId = getReportTranslations('en').entityId,
 ): ExitPointAnalysis {
   const realOutflows = outgoing.filter(tx => {
     const asset = (tx.asset || '').toUpperCase();
@@ -957,7 +953,7 @@ function analyzeExitPoints(
         date: data.date,
         entityType: entity?.type || 'unknown',
         entityName: entity?.label || null,
-        recoveryDifficulty: getRecoveryDifficulty(entity?.type || ''),
+        recoveryDifficulty: getRecoveryDifficulty(entity?.type || '', ei),
       };
     });
 
@@ -1368,7 +1364,7 @@ export async function generateReport(
 
   const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline);
 
-  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency);
+  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore);
 

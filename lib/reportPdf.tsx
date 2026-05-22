@@ -1221,20 +1221,21 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
   const MAX_ENTRIES = 15;
   const shown = sorted.slice(0, MAX_ENTRIES);
   const remaining = Math.max(0, sorted.length - MAX_ENTRIES);
+  const av = t.addressVerification;
 
   return (
     <Page size="A4" style={s.page}>
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.addressVerification}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
-        Top counterparty addresses (by volume) cross-referenced with multiple verification sources: LedgerHound Scam Database, OFAC SDN, Chainabuse community reports, GoPlus Security risk flags, and our curated Etherscan Fake_Phishing list. Sources are queried independently; agreement across sources increases confidence.
+        {av.intro}
       </Text>
 
       {data.externalIntelligenceDegraded && (
         <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>External intelligence partially unavailable</Text>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>{av.degradedTitle}</Text>
           <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-            One or more external sources (Chainabuse, GoPlus, OFAC) were unavailable during report generation. Some labels may be incomplete. Internal database matches and curated Etherscan tags are unaffected.
+            {av.degradedBody}
           </Text>
         </View>
       )}
@@ -1248,16 +1249,16 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
           <View key={i} style={{ backgroundColor: bg, borderRadius: 4, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: borderColor }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
               <Text style={{ ...s.mono, fontSize: 7, color: slate900 }}>{symbol} {shortAddr(r.address)}</Text>
-              <Text style={{ fontSize: 6, color: slate400 }}>{r.labels.length} source{r.labels.length === 1 ? '' : 's'}</Text>
+              <Text style={{ fontSize: 6, color: slate400 }}>{av.sourcesSuffix(r.labels.length)}</Text>
             </View>
             {r.labels.length === 0 ? (
-              <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>No matches in any verification source.</Text>
+              <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>{av.noMatches}</Text>
             ) : (
               r.labels.slice(0, 4).map((l, j) => (
                 <Text key={j} style={{ fontSize: 7, color: slate600, marginBottom: 1, lineHeight: 1.3 }}>
-                  [{SOURCE_LABELS[l.source] || l.source}] {l.tag}
-                  {l.reportCount ? `  (${l.reportCount} reports)` : ''}
-                  {l.confidence < 1 ? `  conf=${Math.round(l.confidence * 100)}%` : ''}
+                  [{av.sourceLabel(l.source)}] {l.tag}
+                  {l.reportCount ? av.reportsSuffix(l.reportCount) : ''}
+                  {l.confidence < 1 ? av.confLabel(Math.round(l.confidence * 100)) : ''}
                 </Text>
               ))
             )}
@@ -1267,13 +1268,13 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
 
       {remaining > 0 && (
         <Text style={{ fontSize: 7, color: slate400, marginTop: 4, fontStyle: 'italic' }}>
-          + {remaining} more counterpart{remaining === 1 ? 'y' : 'ies'} analyzed but not shown (capped at {MAX_ENTRIES}). Full data available via the LedgerHound API.
+          {av.remaining(remaining)}
         </Text>
       )}
 
       <View style={{ marginTop: 'auto', paddingTop: 10 }}>
         <Text style={{ fontSize: 6, color: slate400, lineHeight: 1.4 }}>
-          Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days.
+          {av.methodology}
         </Text>
       </View>
 
@@ -1501,6 +1502,7 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
 
 const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const exits = data.exitPointAnalysis;
+  const ei = t.entityId;
 
   return (
     <Page size="A4" style={s.page}>
@@ -1509,21 +1511,21 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
 
       {data.identifiedEntities.length === 0 ? (
         <View style={s.card}>
-          <Text style={s.p}>No known entities identified in automated analysis. Manual investigation with commercial tools may reveal additional attributions.</Text>
+          <Text style={s.p}>{ei.noEntities}</Text>
         </View>
       ) : (
         <View style={s.table}>
           <View style={s.tableHeader}>
-            <Text style={{ ...s.th, width: '35%' }}>Address</Text>
-            <Text style={{ ...s.th, width: '25%' }}>Entity</Text>
-            <Text style={{ ...s.th, width: '20%' }}>Type</Text>
-            <Text style={{ ...s.th, width: '20%' }}>Interactions</Text>
+            <Text style={{ ...s.th, width: '35%' }}>{ei.colAddress}</Text>
+            <Text style={{ ...s.th, width: '25%' }}>{ei.colEntity}</Text>
+            <Text style={{ ...s.th, width: '20%' }}>{ei.colType}</Text>
+            <Text style={{ ...s.th, width: '20%' }}>{ei.colInteractions}</Text>
           </View>
           {data.identifiedEntities.map((e, i) => (
             <View key={i} style={{ ...s.tableRow, backgroundColor: e.type === 'mixer' ? '#fef2f2' : e.type === 'exchange' ? '#f0fdf4' : i % 2 === 0 ? undefined : '#fafbfc' }}>
               <Text style={{ ...s.td, ...s.mono, width: '35%' }}>{shortAddr(e.address)}</Text>
               <Text style={{ ...s.td, width: '25%', fontFamily: 'Helvetica-Bold' }}>{e.label}</Text>
-              <Text style={{ ...s.td, width: '20%', color: e.type === 'mixer' ? red : e.type === 'exchange' ? green : slate600 }}>{e.type.toUpperCase()}</Text>
+              <Text style={{ ...s.td, width: '20%', color: e.type === 'mixer' ? red : e.type === 'exchange' ? green : slate600 }}>{ei.entityType(e.type)}</Text>
               <Text style={{ ...s.td, width: '20%' }}>{e.interactions}</Text>
             </View>
           ))}
@@ -1532,15 +1534,15 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
 
       {data.identifiedEntities.some(e => e.type === 'mixer') && (
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginTop: 10 }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 3 }}>WARNING: Mixer Activity Detected</Text>
-          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>Mixing services obscure fund origins and are associated with money laundering.</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 3 }}>{ei.mixerWarningTitle}</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ei.mixerWarningBody}</Text>
         </View>
       )}
 
       {data.identifiedEntities.some(e => e.type === 'exchange') && (
         <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 10, marginTop: 8 }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 3 }}>Exchange Identified — Subpoena Target Available</Text>
-          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>KYC exchanges maintain identity records that may be obtainable via legal subpoena (subject to exchange policy and data availability).</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 3 }}>{ei.exchangeIdentifiedTitle}</Text>
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>{ei.exchangeIdentifiedBody}</Text>
         </View>
       )}
 
@@ -1552,19 +1554,19 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
         <View>
           <View style={s.table}>
             <View style={s.tableHeader}>
-              <Text style={{ ...s.th, width: '28%' }}>Destination</Text>
-              <Text style={{ ...s.th, width: '18%' }}>Amount</Text>
-              <Text style={{ ...s.th, width: '10%' }}>Token</Text>
-              <Text style={{ ...s.th, width: '14%' }}>Type</Text>
-              <Text style={{ ...s.th, width: '30%' }}>Recovery Difficulty</Text>
+              <Text style={{ ...s.th, width: '28%' }}>{ei.exitColDestination}</Text>
+              <Text style={{ ...s.th, width: '18%' }}>{ei.exitColAmount}</Text>
+              <Text style={{ ...s.th, width: '10%' }}>{ei.exitColToken}</Text>
+              <Text style={{ ...s.th, width: '14%' }}>{ei.exitColType}</Text>
+              <Text style={{ ...s.th, width: '30%' }}>{ei.exitColRecovery}</Text>
             </View>
             {exits.exitPoints.slice(0, 6).map((ep, i) => (
               <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                 <Text style={{ ...s.td, ...s.mono, width: '28%' }}>{ep.entityName || shortAddr(ep.address)}</Text>
                 <Text style={{ ...s.td, width: '18%' }}>{fmtEth(ep.amount)}</Text>
                 <Text style={{ ...s.td, width: '10%' }}>{ep.token}</Text>
-                <Text style={{ ...s.td, width: '14%', color: ep.entityType === 'exchange' ? green : ep.entityType === 'mixer' ? red : slate600 }}>{ep.entityType.toUpperCase()}</Text>
-                <Text style={{ ...s.td, width: '30%', fontSize: 7, color: recoveryDiffColor(ep.recoveryDifficulty) }}>{ep.recoveryDifficulty}</Text>
+                <Text style={{ ...s.td, width: '14%', color: ep.entityType === 'exchange' ? green : ep.entityType === 'mixer' ? red : slate600 }}>{ei.entityType(ep.entityType)}</Text>
+                <Text style={{ ...s.td, width: '30%', fontSize: 7, color: ep.entityType === 'exchange' ? green : ep.entityType === 'mixer' ? red : ep.entityType === 'defi' ? amber : slate600 }}>{ep.recoveryDifficulty}</Text>
               </View>
             ))}
           </View>
@@ -1572,20 +1574,16 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
           {/* Assessment box */}
           <View style={{ ...s.card, marginTop: 10, borderLeftWidth: 3, borderLeftColor: exits.hasKycExit ? green : exits.hasMixerUsage ? red : amber }}>
             <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>
-              {exits.hasKycExit ? 'KYC Exchange Exit Detected' : exits.hasMixerUsage ? 'Mixer Exit Detected' : 'No KYC Exchange Exit Detected'}
+              {exits.hasKycExit ? ei.exitKycTitle : exits.hasMixerUsage ? ei.exitMixerTitle : ei.exitNoneTitle}
             </Text>
             <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4 }}>
-              {exits.hasKycExit
-                ? 'Funds reached a KYC-compliant exchange. Attorney can file discovery request for account holder identification.'
-                : exits.hasMixerUsage
-                  ? 'Funds passed through mixing services. Professional demixing analysis recommended.'
-                  : 'Without exchange interaction, recovery requires deeper investigation. The largest outflow destination should be traced further.'}
+              {exits.hasKycExit ? ei.exitKycBody : exits.hasMixerUsage ? ei.exitMixerBody : ei.exitNoneBody}
             </Text>
           </View>
         </View>
       ) : (
         <View style={s.card}>
-          <Text style={s.p}>No significant outflows detected for exit point analysis.</Text>
+          <Text style={s.p}>{ei.noOutflows}</Text>
         </View>
       )}
 
