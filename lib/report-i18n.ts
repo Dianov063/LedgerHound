@@ -141,6 +141,57 @@ export interface ReportTranslations {
   };
   /** Investigation Summary page (Phase 3 Batch 2.1) — chrome + generated prose. */
   investigation: Investigation;
+  /** Attack Technique Analysis page (Phase 3 Batch 2.2). */
+  attackTechnique: AttackTechnique;
+}
+
+/** Attack Technique Analysis (pages 11-12) translations. */
+export interface AttackTechnique {
+  intro: string;
+  // ── Address poisoning campaign ──
+  poisoningHeader: string;
+  poisoningIntro: string;
+  vanityCluster: (pattern: string) => string;
+  statClusterAddresses: string;
+  statRealMisdirections: string;
+  statSecondarySpoofs: string;
+  realFundsMisdirected: (breakdown: string) => string;
+  worthlessSpoofUnits: (breakdown: string) => string;
+  unclassifiedUnits: (breakdown: string) => string;
+  fakePhishingTagged: (n: number) => string;
+  mainCollectorTitle: string;
+  mainCollectorRealAmount: (amount: string, token: string) => string;
+  mainCollectorSpoofAmount: (amount: string, mimics: string) => string;
+  mainCollectorDesc: (desc: string, txCount: number) => string;
+  etherscan: (tag: string) => string;
+  secondarySpoofsTitle: string;
+  secondarySpoofsIntro: string;
+  misdirectionConfirmedReal: (amounts: string, txCount: number) => string;
+  spoofTokenRouted: (amount: string, mimics: string, scriptName: string | undefined, codepoints: string | undefined, contract: string | undefined) => string;
+  /** Localized Unicode script-category name (e.g. "Cyrillic" / "cirílica"). */
+  scriptName: (category: string) => string;
+  unclassifiedTokenUnits: (amount: string, symbol: string) => string;
+  noFundsReceived: (dusted: boolean) => string;
+  differsFromMainCollector: (pos: number, a: string, b: string) => string;
+  additionalSpoofs: (n: number) => string;
+  forensicInterpretationTitle: string;
+  forensicInterpretationBody: (pattern: string, count: number) => string;
+  methodologyFootnote: string;
+  forensicNote: string;
+  // ── Unicode spoofing ──
+  unicodeHeader: string;
+  unicodeIntroPart1: string;
+  unicodeIntroPart2: string;
+  statUniqueFakeTokens: string;
+  statSpoofTransfers: string;
+  masqueradingAs: string;
+  originalUnicodeLabel: string;
+  unicodeLabel: string;
+  displayNfcLabel: string;
+  scriptLine: (script: string, occurrences: number, addrCount: number) => string;
+  combiningMarksNote: string;
+  exampleLine: (date: string, addr: string) => string;
+  bottomMethodology: string;
 }
 
 /**
@@ -485,6 +536,60 @@ const en: ReportTranslations = {
       courtUpgrade: 'Court evidence (certified upgrade available)',
     },
   },
+  attackTechnique: {
+    intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.',
+    poisoningHeader: 'Address Poisoning Campaign Detected',
+    poisoningIntro: 'A coordinated address poisoning attack was identified. The attacker deployed a cluster of visually similar addresses (sharing prefix and suffix patterns) to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are attacker-controlled; the highest-volume address is the main collector, the rest are secondary spoofs.',
+    vanityCluster: (pattern) => `Vanity Cluster: ${pattern}`,
+    statClusterAddresses: 'CLUSTER ADDRESSES',
+    statRealMisdirections: 'REAL MISDIRECTIONS',
+    statSecondarySpoofs: 'SECONDARY SPOOFS',
+    realFundsMisdirected: (breakdown) => `Real funds misdirected to secondary spoofs: ${breakdown}`,
+    worthlessSpoofUnits: (breakdown) => `Worthless spoof-token units routed to secondary spoofs: ${breakdown} — no market value (see Unicode Spoofing section).`,
+    unclassifiedUnits: (breakdown) => `Unclassified token units routed: ${breakdown} (excluded from loss figures).`,
+    fakePhishingTagged: (n) => `${n} address(es) in this cluster are officially tagged by Etherscan as Fake_Phishing.`,
+    mainCollectorTitle: 'Main Collector (Highest Volume)',
+    mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
+    mainCollectorSpoofAmount: (amount, mimics) => `${amount} units of a fake "${mimics}" token (worthless spoof)`,
+    mainCollectorDesc: (desc, txCount) => `Received ${desc} across ${txCount} transaction(s) — the primary scam wallet in this fraud network.`,
+    etherscan: (tag) => `Etherscan: ${tag}`,
+    secondarySpoofsTitle: 'Secondary Spoofs (Address Poisoning Targets)',
+    secondarySpoofsIntro: 'These addresses share the same visual pattern as the main collector but are separate wallets. Real funds the victim sent here indicate successful confusion induced by the poisoning attack; worthless spoof-token transfers are reported separately.',
+    misdirectionConfirmedReal: (amounts, txCount) => `MISDIRECTION CONFIRMED (real funds): ${amounts} across ${txCount} tx`,
+    spoofTokenRouted: (amount, mimics, scriptName, codepoints, contract) =>
+      `Spoof-token routed: ${amount} units of a fake "${mimics}" token${scriptName && codepoints ? ` (Unicode spoof — ${scriptName} script: ${codepoints})` : ' (Unicode spoof)'} — worthless, not real ${mimics}.${contract ? ` Contract: ${contract}` : ''}`,
+    scriptName: (category) => ({
+      Lisu: 'Lisu',
+      Cyrillic: 'Cyrillic',
+      Greek: 'Greek',
+      'Latin Diacritics': 'Latin-diacritic',
+      'Fullwidth Latin': 'fullwidth-Latin',
+      Mathematical: 'Mathematical',
+      Mixed: 'mixed-script',
+      Other: 'other-script',
+    } as Record<string, string>)[category] ?? category,
+    unclassifiedTokenUnits: (amount, symbol) => `${amount} units of unclassified token "${symbol}" (excluded from loss figures).`,
+    noFundsReceived: (dusted) => `No funds received (poisoning only)${dusted ? ' · dusted the victim' : ''}`,
+    differsFromMainCollector: (pos, a, b) => `Differs from main collector at position ${pos}: "${a}" vs "${b}"`,
+    additionalSpoofs: (n) => `+ ${n} additional spoof addresses in cluster`,
+    forensicInterpretationTitle: 'Forensic Interpretation',
+    forensicInterpretationBody: (pattern, count) => `The vanity pattern (${pattern}) shared across ${count} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by a multi-wallet fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.`,
+    methodologyFootnote: 'Methodology: For an N-character hex match at fixed positions (case-insensitive), the probability that two independently generated addresses share those positions is (1/16)^N. With 8 fixed characters (4-character prefix + 4-character suffix), P ≈ 1 in 4.3 × 10^9. Real-world address generation involves additional patterns that reduce entropy further; this baseline is a conservative lower bound for the improbability of coincidental clustering.',
+    forensicNote: 'Forensic note: amounts shown as "spoof-token units" are worthless Unicode-impersonation tokens (e.g. a fake "USDT"), not real currency. They are reported separately and are NOT included in the real economic-loss figures above.',
+    unicodeHeader: 'Unicode Spoofing Attack',
+    unicodeIntroPart1: 'Fake tokens use characters from non-Latin scripts (Lisu Letters, Cyrillic, Greek) that visually resemble legitimate ticker symbols. For example, "',
+    unicodeIntroPart2: '" (Lisu Letters, U+A4F4 U+A4E2 U+A4D3 U+A4D4) appears identical to "USDT" but is a worthless contract. Attackers send these fake "deposits" to fabricate the appearance of returns or refunds in wallet history.',
+    statUniqueFakeTokens: 'UNIQUE FAKE TOKENS',
+    statSpoofTransfers: 'SPOOF TRANSFERS',
+    masqueradingAs: '— masquerading as ',
+    originalUnicodeLabel: 'Original Unicode: ',
+    unicodeLabel: 'Unicode: ',
+    displayNfcLabel: 'Display (NFC): ',
+    scriptLine: (script, occurrences, addrCount) => `Script: ${script} · ${occurrences} transfer${occurrences > 1 ? 's' : ''}${addrCount ? ` from ${addrCount} address(es)` : ''}`,
+    combiningMarksNote: 'Uses combining diacritical marks; display shows NFC-normalised form for readability — original byte sequence preserved above.',
+    exampleLine: (date, addr) => `e.g. ${date} · from ${addr}`,
+    bottomMethodology: 'Methodology: Address poisoning detection matches counterparty addresses against actual recipients on a 4-character prefix + 4-character suffix basis (8 hex characters of visual overlap). Unicode spoofing detection normalises token symbols (NFKD decomposition + a curated confusable-character map across Lisu, Cyrillic, Greek and fullwidth Latin) and compares against legitimate tickers. Codepoints are shown in standard U+ notation so the evidence is verifiable independent of font rendering.',
+  },
 };
 
 const es: ReportTranslations = {
@@ -706,6 +811,60 @@ const es: ReportTranslations = {
       regulatory: 'Presentación de denuncia regulatoria',
       courtUpgrade: 'Evidencia para tribunales (actualización certificada disponible)',
     },
+  },
+  attackTechnique: {
+    intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen evidencia crítica para las autoridades y los litigios civiles.',
+    poisoningHeader: 'Campaña de Envenenamiento de Direcciones Detectada',
+    poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. El atacante desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando el bloqueo y la incautación. Todas las direcciones de este grupo están controladas por el atacante; la dirección de mayor volumen es el recolector principal, el resto son suplantaciones secundarias.',
+    vanityCluster: (pattern) => `Grupo de Direcciones Vanity: ${pattern}`,
+    statClusterAddresses: 'DIRECCIONES DEL GRUPO',
+    statRealMisdirections: 'DESVÍOS REALES',
+    statSecondarySpoofs: 'SUPLANTACIONES SECUNDARIAS',
+    realFundsMisdirected: (breakdown) => `Fondos reales desviados a suplantaciones secundarias: ${breakdown}`,
+    worthlessSpoofUnits: (breakdown) => `Unidades de tokens falsificados enviadas a suplantaciones secundarias: ${breakdown} — sin valor de mercado (ver sección de Suplantación Unicode).`,
+    unclassifiedUnits: (breakdown) => `Unidades de token sin clasificar enviadas: ${breakdown} (excluidas de las cifras de pérdida).`,
+    fakePhishingTagged: (n) => `${n} dirección(es) en este grupo están etiquetadas oficialmente por Etherscan como Fake_Phishing.`,
+    mainCollectorTitle: 'Recolector Principal (Mayor Volumen)',
+    mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
+    mainCollectorSpoofAmount: (amount, mimics) => `${amount} unidades de un token falsificado de "${mimics}" (suplantación sin valor)`,
+    mainCollectorDesc: (desc, txCount) => `Recibió ${desc} en ${txCount} transacción(es) — la wallet principal de la estafa en esta red de fraude.`,
+    etherscan: (tag) => `Etherscan: ${tag}`,
+    secondarySpoofsTitle: 'Suplantaciones Secundarias (Objetivos de Envenenamiento)',
+    secondarySpoofsIntro: 'Estas direcciones comparten el mismo patrón visual que el recolector principal pero son wallets separadas. Los fondos reales que la víctima envió aquí indican una confusión exitosa inducida por el ataque de envenenamiento; las transferencias de tokens falsificados sin valor se reportan por separado.',
+    misdirectionConfirmedReal: (amounts, txCount) => `DESVÍO CONFIRMADO (fondos reales): ${amounts} en ${txCount} tx`,
+    spoofTokenRouted: (amount, mimics, scriptName, codepoints, contract) =>
+      `Token falsificado enviado: ${amount} unidades de un token falsificado de "${mimics}"${scriptName && codepoints ? ` (suplantación Unicode — escritura ${scriptName}: ${codepoints})` : ' (suplantación Unicode)'} — sin valor, no es ${mimics} real.${contract ? ` Contrato: ${contract}` : ''}`,
+    scriptName: (category) => ({
+      Lisu: 'lisu',
+      Cyrillic: 'cirílica',
+      Greek: 'griega',
+      'Latin Diacritics': 'latina con diacríticos',
+      'Fullwidth Latin': 'latina de ancho completo',
+      Mathematical: 'matemática',
+      Mixed: 'mixta',
+      Other: 'desconocida',
+    } as Record<string, string>)[category] ?? category,
+    unclassifiedTokenUnits: (amount, symbol) => `${amount} unidades de token sin clasificar "${symbol}" (excluido de las cifras de pérdida).`,
+    noFundsReceived: (dusted) => `No recibió fondos (solo envenenamiento)${dusted ? ' · envenenó a la víctima' : ''}`,
+    differsFromMainCollector: (pos, a, b) => `Difiere del recolector principal en la posición ${pos}: "${a}" vs "${b}"`,
+    additionalSpoofs: (n) => `+ ${n} direcciones de suplantación adicionales en el grupo`,
+    forensicInterpretationTitle: 'Interpretación Forense',
+    forensicInterpretationBody: (pattern, count) => `El patrón vanity (${pattern}) compartido entre ${count} direcciones es estadísticamente improbable por azar (~1 en 4.3 mil millones por par para 8 caracteres coincidentes). Esto es característico de una campaña de envenenamiento de direcciones deliberada y coordinada por una operación de fraude multi-wallet, con tres objetivos: (1) confusión — engañar a la víctima para que copie la dirección equivocada del historial; (2) distribución del riesgo — repartir las entradas entre wallets para evadir el bloqueo; (3) ofuscación de la investigación — fragmentar el destino para complicar el rastreo.`,
+    methodologyFootnote: 'Metodología: Para una coincidencia hexadecimal de N caracteres en posiciones fijas (insensible a mayúsculas/minúsculas), la probabilidad de que dos direcciones generadas aleatoriamente de manera independiente compartan esas posiciones es (1/16)^N. Con 8 caracteres fijos (prefijo de 4 caracteres + sufijo de 4 caracteres), P ≈ 1 en 4.3 × 10^9. La generación de direcciones en el mundo real involucra patrones adicionales que reducen aún más la entropía; esta línea base sirve como un límite inferior conservador para la improbabilidad de agrupamiento por coincidencia.',
+    forensicNote: 'Nota forense: los montos mostrados como "unidades de token falsificado" son tokens de suplantación Unicode sin valor (p. ej. un "USDT" falso), no moneda real. Se reportan por separado y NO se incluyen en las cifras de pérdida económica real anteriores.',
+    unicodeHeader: 'Ataque de Suplantación Unicode',
+    unicodeIntroPart1: 'Los tokens falsos usan caracteres de escrituras no latinas (letras Lisu, cirílico, griego) que se parecen visualmente a símbolos de tickers legítimos. Por ejemplo, "',
+    unicodeIntroPart2: '" (letras Lisu, U+A4F4 U+A4E2 U+A4D3 U+A4D4) parece idéntico a "USDT" pero es un contrato sin valor. Los atacantes envían estos "depósitos" falsos para fabricar la apariencia de retornos o reembolsos en el historial de la wallet.',
+    statUniqueFakeTokens: 'TOKENS FALSOS ÚNICOS',
+    statSpoofTransfers: 'TRANSFERENCIAS DE SUPLANTACIÓN',
+    masqueradingAs: '— haciéndose pasar por ',
+    originalUnicodeLabel: 'Unicode original: ',
+    unicodeLabel: 'Unicode: ',
+    displayNfcLabel: 'Visualización (NFC): ',
+    scriptLine: (script, occurrences, addrCount) => `Escritura: ${script} · ${occurrences} transferencia(s)${addrCount ? ` de ${addrCount} dirección(es)` : ''}`,
+    combiningMarksNote: 'Usa marcas diacríticas combinantes; la visualización muestra la forma normalizada NFC para legibilidad — la secuencia original de bytes se preserva arriba.',
+    exampleLine: (date, addr) => `ej. ${date} · de ${addr}`,
+    bottomMethodology: 'Metodología: La detección de envenenamiento de direcciones compara las direcciones de contraparte con los receptores reales sobre una base de prefijo de 4 caracteres + sufijo de 4 caracteres (8 caracteres hexadecimales de superposición visual). La detección de suplantación Unicode normaliza los símbolos de los tokens (descomposición NFKD + un mapa curado de caracteres confundibles entre Lisu, cirílico, griego y latín de ancho completo) y los compara con tickers legítimos. Los puntos de código se muestran en notación U+ estándar para que la evidencia sea verificable independientemente de la representación de la fuente.',
   },
 };
 

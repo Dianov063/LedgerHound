@@ -247,6 +247,18 @@ export function firstDifferingChar(addr1: string, addr2: string): string {
   return 'identical';
 }
 
+/**
+ * Like firstDifferingChar but returns the structured parts so the caller can
+ * localize the wording (Phase 3 Batch 2.2). Returns null if identical.
+ */
+export function firstDifferingCharParts(addr1: string, addr2: string): { position: number; a: string; b: string } | null {
+  const n = Math.min(addr1.length, addr2.length);
+  for (let i = 0; i < n; i++) {
+    if (addr1[i] !== addr2[i]) return { position: i, a: addr1[i], b: addr2[i] };
+  }
+  return null;
+}
+
 /* ─── Token classification (Phase 2.7) ────────────────────────────── */
 
 interface PoisonTokenClass {

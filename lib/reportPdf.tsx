@@ -3,7 +3,7 @@ import path from 'path';
 import { Document, Page, Text, View, StyleSheet, Svg, Circle, Line, Rect, G, Image, Path, Font } from '@react-pdf/renderer';
 import { fmtEth, type ReportData, type RiskBreakdown, type TimelineEvent, type ExitPoint, type RecoveryScenario, type AssetSummary, type PatternAnalysis, type ScamPattern, type CrossChainTrace, type BridgeInteraction, type ChainActivity, type CrossChainHop, type NarrativeData, type EvidenceStrength, type RecoveryAssessment, type WalletRole } from './generateReport';
 import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './generateGraphData';
-import { firstDifferingChar } from './address-poisoning';
+import { firstDifferingCharParts } from './address-poisoning';
 import { getCodepoints, normalizeForDisplay, detectScriptCategory } from './unicode-spoofing';
 import { getReportTranslations, type ReportTranslations, type ReportLocale } from './report-i18n';
 
@@ -1296,6 +1296,7 @@ const AttackStat = ({ label, value, highlight }: { label: string; value: string;
 const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const ap = data.attackTechniques?.addressPoisoning;
   const us = data.attackTechniques?.unicodeSpoofing;
+  const ta = t.attackTechnique;
   // Skip page entirely when nothing detected (no "all clear" placeholder).
   if ((!ap || !ap.detected) && (!us || !us.detected)) return null;
 
@@ -1304,7 +1305,7 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.attackTechnique}</Text>
       <Text style={{ ...s.p, marginBottom: 10 }}>
-        Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.
+        {ta.intro}
       </Text>
 
       {/* ─── Address Poisoning Campaign (Phase 2.5 model) ─── */}
@@ -1316,57 +1317,57 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
         const spoofUnitsStr = fmtTokenRecord(campaign.totalMisdirectedSpoof);
         const unknownStr = fmtTokenRecord(campaign.totalMisdirectedUnknown);
         const mcDesc = mc.tokenCategory === 'spoof'
-          ? `${fmtEth(mc.totalReceivedFromSubject)} units of a fake "${mc.spoofMimicsToken}" token (worthless spoof)`
-          : `${fmtEth(mc.totalReceivedFromSubject)} ${mc.totalReceivedToken}`;
+          ? ta.mainCollectorSpoofAmount(fmtEth(mc.totalReceivedFromSubject), mc.spoofMimicsToken || '')
+          : ta.mainCollectorRealAmount(fmtEth(mc.totalReceivedFromSubject), mc.totalReceivedToken);
         return (
         <View key={ci} style={{ marginBottom: 14 }}>
-          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Address Poisoning Campaign Detected</Text>
+          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>{ta.poisoningHeader}</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
-            A coordinated address poisoning attack was identified. The attacker deployed a cluster of visually similar addresses (sharing prefix and suffix patterns) to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are attacker-controlled; the highest-volume address is the main collector, the rest are secondary spoofs.
+            {ta.poisoningIntro}
           </Text>
 
           {/* Cluster overview */}
           <View style={{ ...s.card, padding: 8, marginBottom: 8 }}>
-            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Vanity Cluster: {campaign.vanityPattern}</Text>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>{ta.vanityCluster(campaign.vanityPattern)}</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>
-              <AttackStat label="CLUSTER ADDRESSES" value={String(campaign.totalClusterAddresses)} />
-              <AttackStat label="REAL MISDIRECTIONS" value={String(campaign.successfulMisdirections)} highlight={campaign.successfulMisdirections > 0} />
-              <AttackStat label="SECONDARY SPOOFS" value={String(campaign.secondarySpoofs.length)} />
+              <AttackStat label={ta.statClusterAddresses} value={String(campaign.totalClusterAddresses)} />
+              <AttackStat label={ta.statRealMisdirections} value={String(campaign.successfulMisdirections)} highlight={campaign.successfulMisdirections > 0} />
+              <AttackStat label={ta.statSecondarySpoofs} value={String(campaign.secondarySpoofs.length)} />
             </View>
             {realLossStr ? (
-              <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>Real funds misdirected to secondary spoofs: {realLossStr}</Text>
+              <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>{ta.realFundsMisdirected(realLossStr)}</Text>
             ) : null}
             {spoofUnitsStr ? (
-              <Text style={{ fontSize: 7, color: amber, marginTop: 2 }}>Worthless spoof-token units routed to secondary spoofs: {spoofUnitsStr} — no market value (see Unicode Spoofing section).</Text>
+              <Text style={{ fontSize: 7, color: amber, marginTop: 2 }}>{ta.worthlessSpoofUnits(spoofUnitsStr)}</Text>
             ) : null}
             {unknownStr ? (
-              <Text style={{ fontSize: 6.5, color: slate400, marginTop: 2 }}>Unclassified token units routed: {unknownStr} (excluded from loss figures).</Text>
+              <Text style={{ fontSize: 6.5, color: slate400, marginTop: 2 }}>{ta.unclassifiedUnits(unknownStr)}</Text>
             ) : null}
             {campaign.hasFakePhishingTag && (
               <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>
-                {campaign.fakePhishingAddresses.length} address(es) in this cluster are officially tagged by Etherscan as Fake_Phishing.
+                {ta.fakePhishingTagged(campaign.fakePhishingAddresses.length)}
               </Text>
             )}
           </View>
 
           {/* Main collector */}
           <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fecaca' }}>
-            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 2 }}>Main Collector (Highest Volume)</Text>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 2 }}>{ta.mainCollectorTitle}</Text>
             <Text style={{ ...s.mono, fontSize: 6.5, color: slate900 }}>{mc.address}</Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>
-              Received {mcDesc} across {mc.transactionCount} transaction(s) — the primary scam wallet in this fraud network.
+              {ta.mainCollectorDesc(mcDesc, mc.transactionCount)}
             </Text>
             {mc.etherscanFakePhishingTag && (
-              <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>Etherscan: {mc.etherscanFakePhishingTag}</Text>
+              <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>{ta.etherscan(mc.etherscanFakePhishingTag)}</Text>
             )}
           </View>
 
           {/* Secondary spoofs */}
           {campaign.secondarySpoofs.length > 0 && (
             <View>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Secondary Spoofs (Address Poisoning Targets)</Text>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>{ta.secondarySpoofsTitle}</Text>
               <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 4 }}>
-                These addresses share the same visual pattern as the main collector but are separate wallets. Real funds the victim sent here indicate successful confusion induced by the poisoning attack; worthless spoof-token transfers are reported separately.
+                {ta.secondarySpoofsIntro}
               </Text>
               {campaign.secondarySpoofs.slice(0, 10).map((spoof, si) => {
                 const realSlices = spoof.tokenBreakdown.filter((b) => b.category === 'real' && b.value > 0);
@@ -1380,53 +1381,58 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
                     <Text style={{ ...s.mono, fontSize: 6, color: hasReal ? red : slate600 }}>✖ {spoof.address}</Text>
                     {hasReal && (
                       <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>
-                        MISDIRECTION CONFIRMED (real funds): {realSlices.map((b) => `${fmtEth(b.value)} ${b.symbol}`).join(', ')} across {spoof.transactionCount} tx
+                        {ta.misdirectionConfirmedReal(realSlices.map((b) => `${fmtEth(b.value)} ${b.symbol}`).join(', '), spoof.transactionCount)}
                       </Text>
                     )}
                     {spoofSlices.map((b, bi) => (
                       <Text key={`s${bi}`} style={{ fontSize: 6.5, color: amber, marginTop: 1 }}>
-                        Spoof-token routed: {fmtEth(b.value)} units of a fake &quot;{b.mimics}&quot; token{b.scriptCategory && b.codepoints ? ` (Unicode spoof — ${b.scriptCategory} Letters: ${b.codepoints})` : ' (Unicode spoof)'} — worthless, not real {b.mimics}.{b.contract ? ` Contract: ${b.contract}` : ''}
+                        {ta.spoofTokenRouted(fmtEth(b.value), b.mimics || '', b.scriptCategory ? ta.scriptName(b.scriptCategory) : undefined, b.codepoints, b.contract)}
                       </Text>
                     ))}
                     {unknownSlices.map((b, bi) => (
                       <Text key={`u${bi}`} style={{ fontSize: 6.5, color: slate600, marginTop: 1 }}>
-                        {fmtEth(b.value)} units of unclassified token &quot;{b.symbol}&quot; (excluded from loss figures).
+                        {ta.unclassifiedTokenUnits(fmtEth(b.value), b.symbol)}
                       </Text>
                     ))}
                     {!anyValue && (
                       <Text style={{ fontSize: 6.5, color: slate900, marginTop: 1 }}>
-                        No funds received (poisoning only){spoof.receivedDustFromCluster ? ' · dusted the victim' : ''}
+                        {ta.noFundsReceived(spoof.receivedDustFromCluster)}
                       </Text>
                     )}
-                    <Text style={{ fontSize: 6, color: slate400, marginTop: 0.5 }}>
-                      Differs from main collector at {firstDifferingChar(mc.address, spoof.address)}
-                    </Text>
+                    {(() => {
+                      const dp = firstDifferingCharParts(mc.address, spoof.address);
+                      return dp ? (
+                        <Text style={{ fontSize: 6, color: slate400, marginTop: 0.5 }}>
+                          {ta.differsFromMainCollector(dp.position, dp.a, dp.b)}
+                        </Text>
+                      ) : null;
+                    })()}
                     {spoof.etherscanFakePhishingTag && (
-                      <Text style={{ fontSize: 6, color: red }}>Etherscan: {spoof.etherscanFakePhishingTag}</Text>
+                      <Text style={{ fontSize: 6, color: red }}>{ta.etherscan(spoof.etherscanFakePhishingTag)}</Text>
                     )}
                   </View>
                 );
               })}
               {campaign.secondarySpoofs.length > 10 && (
-                <Text style={{ fontSize: 6, color: slate400 }}>+ {campaign.secondarySpoofs.length - 10} additional spoof addresses in cluster</Text>
+                <Text style={{ fontSize: 6, color: slate400 }}>{ta.additionalSpoofs(campaign.secondarySpoofs.length - 10)}</Text>
               )}
             </View>
           )}
 
           {/* Forensic interpretation */}
           <View style={{ ...s.card, padding: 8, marginTop: 6 }}>
-            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Forensic Interpretation</Text>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>{ta.forensicInterpretationTitle}</Text>
             <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-              The vanity pattern ({campaign.vanityPattern}) shared across {campaign.totalClusterAddresses} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by a multi-wallet fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.
+              {ta.forensicInterpretationBody(campaign.vanityPattern, campaign.totalClusterAddresses)}
             </Text>
             {/* Phase 2.6: methodology footnote so the ~1-in-4.3-billion figure
                 is defensible if challenged by opposing counsel. */}
             <Text style={{ fontSize: 6.5, color: slate400, fontStyle: 'italic', lineHeight: 1.4, marginTop: 4 }}>
-              Methodology: For an N-character hex match at fixed positions (case-insensitive), the probability that two independently generated addresses share those positions is (1/16)^N. With 8 fixed characters (4-character prefix + 4-character suffix), P ≈ 1 in 4.3 × 10^9. Real-world address generation involves additional patterns that reduce entropy further; this baseline is a conservative lower bound for the improbability of coincidental clustering.
+              {ta.methodologyFootnote}
             </Text>
             {spoofUnitsStr ? (
               <Text style={{ fontSize: 6.5, color: slate600, fontStyle: 'italic', lineHeight: 1.4, marginTop: 4 }}>
-                Forensic note: amounts shown as &quot;spoof-token units&quot; are worthless Unicode-impersonation tokens (e.g. a fake &quot;USDT&quot;), not real currency. They are reported separately and are NOT included in the real economic-loss figures above.
+                {ta.forensicNote}
               </Text>
             ) : null}
           </View>
@@ -1437,14 +1443,14 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
       {/* ─── Unicode Spoofing ─── */}
       {us && us.detected && (
         <View style={{ marginBottom: 10 }}>
-          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Unicode Spoofing Attack</Text>
+          <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>{ta.unicodeHeader}</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
-            Fake tokens use characters from non-Latin scripts (Lisu Letters, Cyrillic, Greek) that visually resemble legitimate ticker symbols. For example, &quot;<Text style={{ fontFamily: LISU_FONT_FAMILY }}>{'ꓴꓢꓓꓔ'}</Text>&quot; (Lisu Letters, U+A4F4 U+A4E2 U+A4D3 U+A4D4) appears identical to &quot;USDT&quot; but is a worthless contract. Attackers send these fake &quot;deposits&quot; to fabricate the appearance of returns or refunds in wallet history.
+            {ta.unicodeIntroPart1}<Text style={{ fontFamily: LISU_FONT_FAMILY }}>{'ꓴꓢꓓꓔ'}</Text>{ta.unicodeIntroPart2}
           </Text>
 
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-            <AttackStat label="UNIQUE FAKE TOKENS" value={String(us.uniqueSpoofSymbols)} highlight />
-            <AttackStat label="SPOOF TRANSFERS" value={String(us.totalSpoofTokenTransfers)} />
+            <AttackStat label={ta.statUniqueFakeTokens} value={String(us.uniqueSpoofSymbols)} highlight />
+            <AttackStat label={ta.statSpoofTransfers} value={String(us.totalSpoofTokenTransfers)} />
           </View>
 
           {us.evidence.slice(0, 6).map((e, i) => {
@@ -1454,24 +1460,24 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
               <View key={i} style={{ ...s.card, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: red }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                   <Text style={{ fontFamily: fontForScript(e.scriptCategory), fontSize: 11, color: slate900 }}>{display}</Text>
-                  <Text style={{ fontSize: 8, color: slate600, marginLeft: 6 }}>— masquerading as </Text>
+                  <Text style={{ fontSize: 8, color: slate600, marginLeft: 6 }}>{ta.masqueradingAs}</Text>
                   <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red }}>{e.mimicsLegitimate}</Text>
                 </View>
                 <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>
-                  {composed ? 'Original Unicode: ' : 'Unicode: '}{e.fakeSymbolCodepoints}
+                  {composed ? ta.originalUnicodeLabel : ta.unicodeLabel}{e.fakeSymbolCodepoints}
                 </Text>
                 {composed && (
-                  <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>Display (NFC): {e.fakeSymbolDisplayCodepoints}</Text>
+                  <Text style={{ ...s.mono, fontSize: 6.5, color: slate600 }}>{ta.displayNfcLabel}{e.fakeSymbolDisplayCodepoints}</Text>
                 )}
-                <Text style={{ fontSize: 6.5, color: slate600 }}>Script: {e.scriptCategory} {'·'} {e.occurrences} transfer{e.occurrences > 1 ? 's' : ''}{e.sourceAddresses.length ? ` from ${e.sourceAddresses.length} address(es)` : ''}</Text>
+                <Text style={{ fontSize: 6.5, color: slate600 }}>{ta.scriptLine(ta.scriptName(e.scriptCategory), e.occurrences, e.sourceAddresses.length)}</Text>
                 {composed && (
                   <Text style={{ fontSize: 6, color: slate400, marginTop: 1, fontStyle: 'italic' }}>
-                    Uses combining diacritical marks; display shows NFC-normalised form for readability — original byte sequence preserved above.
+                    {ta.combiningMarksNote}
                   </Text>
                 )}
                 {e.transactionExamples.length > 0 && (
                   <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>
-                    e.g. {(e.transactionExamples[0].timestamp || '').split('T')[0]} {'·'} from {shortAddr(e.transactionExamples[0].from)}
+                    {ta.exampleLine((e.transactionExamples[0].timestamp || '').split('T')[0], shortAddr(e.transactionExamples[0].from))}
                   </Text>
                 )}
               </View>
@@ -1482,7 +1488,7 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
 
       <View style={{ marginTop: 'auto', paddingTop: 8 }}>
         <Text style={{ fontSize: 6, color: slate400, lineHeight: 1.4 }}>
-          Methodology: Address poisoning detection matches counterparty addresses against actual recipients on a 4-character prefix + 4-character suffix basis (8 hex characters of visual overlap). Unicode spoofing detection normalises token symbols (NFKD decomposition + a curated confusable-character map across Lisu, Cyrillic, Greek and fullwidth Latin) and compares against legitimate tickers. Codepoints are shown in standard U+ notation so the evidence is verifiable independent of font rendering.
+          {ta.bottomMethodology}
         </Text>
       </View>
 
