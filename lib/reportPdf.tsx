@@ -2181,31 +2181,42 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
   const step1Body = step1Scenario === 'victim' ? st.step1BodyVictim : step1Scenario === 'exit' ? st.step1Body : st.step1BodyGeneric;
   const step1Closing = step1Scenario === 'victim' ? st.step1ClosingVictim : step1Scenario === 'exit' ? st.step1Closing : st.step1ClosingGeneric;
 
+  // Phase 3.1 Stage 5 (R1): scenario-aware top priority banner. Only the
+  // "exit" scenario (scammer KYC cash-out actually found) claims a recovery
+  // path; victim/generic use honest, non-overpromising headers. This also
+  // carries the victim funding-point framing (consolidated from the former
+  // inner STEP 1 banner to avoid duplicate text on the same page).
+  const bannerScenario: 'victim' | 'exit' | 'generic' | 'none' = !hasExchanges ? 'none' : step1Scenario;
+  const bannerHeader = bannerScenario === 'victim' ? st.step1BannerVictim
+    : bannerScenario === 'exit' ? st.recoveryPathIdentified
+      : bannerScenario === 'generic' ? st.recoveryPathGeneric
+        : st.recoveryRequiresInvestigation;
+  const bannerBody = bannerScenario === 'victim' ? st.recoveryPathVictimBody
+    : bannerScenario === 'exit' ? st.recoveryPathBody
+      : bannerScenario === 'generic' ? st.recoveryPathGenericBody
+        : st.recoveryRequiresBody;
+  const bannerColor = bannerScenario === 'exit' ? green : bannerScenario === 'none' ? red : amber;
+  const bannerBg = bannerScenario === 'exit' ? '#f0fdf4' : bannerScenario === 'none' ? '#fef2f2' : '#fffbeb';
+  const bannerBorder = bannerScenario === 'exit' ? '#bbf7d0' : bannerScenario === 'none' ? '#fecaca' : '#fde68a';
+
   return (
     <Page size="A4" style={s.page}>
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.actionableSteps}</Text>
 
-      {/* Priority banner */}
-      <View style={{ backgroundColor: hasExchanges ? '#f0fdf4' : '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: hasExchanges ? '#bbf7d0' : '#fecaca' }}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: hasExchanges ? green : red, marginBottom: 4 }}>
-          {hasExchanges ? st.recoveryPathIdentified : st.recoveryRequiresInvestigation}
+      {/* Priority banner — scenario-aware (Phase 3.1 Stage 5 R1) */}
+      <View style={{ backgroundColor: bannerBg, borderRadius: 6, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: bannerBorder }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: bannerColor, marginBottom: 4 }}>
+          {bannerHeader}
         </Text>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-          {hasExchanges ? st.recoveryPathBody : st.recoveryRequiresBody}
+          {bannerBody}
         </Text>
       </View>
 
       {/* Step 1: Exchange Compliance Contact */}
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
-          {/* Phase 3.1 Issue #5: legal-defensive banner — makes explicit that the
-              identified KYC point is the VICTIM's funding source, not a scammer exit. */}
-          {step1Scenario === 'victim' && (
-            <View style={{ backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 4, padding: 6, marginBottom: 6 }}>
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, textAlign: 'center' }}>{st.step1BannerVictim}</Text>
-            </View>
-          )}
           <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>{st.stepLabel(1)}: {step1Title}</Text>
           <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 6 }}>
             {step1Body}

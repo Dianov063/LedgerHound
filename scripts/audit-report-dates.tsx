@@ -131,10 +131,18 @@ ok(!counts.has('2028-05-22'), 'no 2028-05-22 anywhere (the audit-reported bug)')
 ok(genCount >= 2, `generation date ${GEN_DATE} rendered ${genCount}x (cover + per-page headers)`);
 ok(Array.from(counts.keys()).every((d) => d.startsWith('2026')), 'every rendered date is in 2026 (mock data year)');
 // Phase 3.1 Issue #5: victim/no-exit STEP 1 banner renders (legal-defensive framing).
-ok(joined.includes('PUNTO DE FINANCIAMIENTO KYC IDENTIFICADO (VÍCTIMA)'), 'victim KYC banner rendered in STEP 1 (es)');
+ok(joined.includes('PUNTO DE FINANCIAMIENTO KYC IDENTIFICADO (VÍCTIMA)'), 'victim KYC banner rendered (es)');
 ok(!joined.includes('congelamiento inmediato'), 'no unconditional "congelamiento inmediato" freeze wording');
+// Phase 3.1 Stage 5 (R1): top banner must NOT overpromise a recovery path for victim/no-exit.
+ok(!joined.includes('CAMINO DE RECUPERACIÓN IDENTIFICADO'), 'R1: no "CAMINO DE RECUPERACIÓN IDENTIFICADO" for victim/no-exit');
+// Phase 3.1 Stage 5 (R2): attack-technique forensic interpretation softened.
+ok(!joined.includes('operación de fraude multi-wallet'), 'R2: no "operación de fraude multi-wallet"');
+ok(joined.includes('operación coordinada multi-wallet'), 'R2: uses "operación coordinada multi-wallet"');
+// Phase 3.1 Stage 5 (R3): attack-technique intro aligned with "documentación de apoyo".
+ok(!joined.includes('evidencia crítica para las autoridades'), 'R3: no "evidencia crítica para las autoridades"');
+ok(joined.includes('documentación de apoyo importante'), 'R3: uses "documentación de apoyo importante"');
 
 console.log('\n' + '─'.repeat(70));
-console.log(`  ${fail === 0 ? 'PASS — date rendering is uniform, no future-date bug' : 'FAIL'}`);
+console.log(`  ${fail === 0 ? 'PASS — dates uniform + Stage 5 wording resolved' : 'FAIL'}`);
 console.log('─'.repeat(70));
 process.exit(fail === 0 ? 0 : 1);

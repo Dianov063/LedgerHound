@@ -326,6 +326,12 @@ export interface Steps {
   recoveryRequiresInvestigation: string;
   recoveryPathBody: string;
   recoveryRequiresBody: string;
+  // Phase 3.1 Stage 5 (R1): scenario-aware top banner. "Recovery path
+  // identified" only when a scammer KYC exit was actually found; the victim
+  // and generic variants avoid overpromising.
+  recoveryPathVictimBody: string;
+  recoveryPathGeneric: string;
+  recoveryPathGenericBody: string;
   // STEP 1 is role-aware (Phase 3.1 Issue #5/#6). The base step1Title/Body/
   // Closing cover the "scammer KYC exit confirmed" scenario; the *Victim and
   // *Generic variants prevent the page from implying a scammer exit was found
@@ -896,7 +902,7 @@ const en: ReportTranslations = {
     },
   },
   attackTechnique: {
-    intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute critical evidence for law enforcement and civil litigation.',
+    intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute important supporting documentation for legal and administrative proceedings.',
     poisoningHeader: 'Address Poisoning Campaign Detected',
     poisoningIntro: 'A coordinated address poisoning attack was identified. The attacker deployed a cluster of visually similar addresses (sharing prefix and suffix patterns) to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are attacker-controlled; the highest-volume address is the main collector, the rest are secondary spoofs.',
     vanityCluster: (pattern) => `Vanity Cluster: ${pattern}`,
@@ -932,7 +938,7 @@ const en: ReportTranslations = {
     differsFromMainCollector: (pos, a, b) => `Differs from main collector at position ${pos}: "${a}" vs "${b}"`,
     additionalSpoofs: (n) => `+ ${n} additional spoof addresses in cluster`,
     forensicInterpretationTitle: 'Forensic Interpretation',
-    forensicInterpretationBody: (pattern, count) => `The vanity pattern (${pattern}) shared across ${count} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by a multi-wallet fraud operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.`,
+    forensicInterpretationBody: (pattern, count) => `The vanity pattern (${pattern}) shared across ${count} addresses is statistically improbable by chance (~1 in 4.3 billion per pair for 8 matching characters). This is characteristic of a deliberate, coordinated address poisoning campaign by a multi-wallet coordinated operation, with three goals: (1) confusion — trick the victim into copying the wrong address from history; (2) risk distribution — spread inflows across wallets to evade blacklisting; (3) investigation obfuscation — fragment the destination to complicate tracing.`,
     methodologyFootnote: 'Methodology: For an N-character hex match at fixed positions (case-insensitive), the probability that two independently generated addresses share those positions is (1/16)^N. With 8 fixed characters (4-character prefix + 4-character suffix), P ≈ 1 in 4.3 × 10^9. Real-world address generation involves additional patterns that reduce entropy further; this baseline is a conservative lower bound for the improbability of coincidental clustering.',
     forensicNote: 'Forensic note: amounts shown as "spoof-token units" are worthless Unicode-impersonation tokens (e.g. a fake "USDT"), not real currency. They are reported separately and are NOT included in the real economic-loss figures above.',
     unicodeHeader: 'Unicode Spoofing Attack',
@@ -1172,6 +1178,9 @@ const en: ReportTranslations = {
     recoveryPathIdentified: 'RECOVERY PATH IDENTIFIED',
     recoveryRequiresInvestigation: 'RECOVERY REQUIRES INVESTIGATION',
     recoveryPathBody: 'Funds were traced to KYC-regulated exchange(s). The account holder identity may be obtainable through legal process (subject to exchange cooperation and data availability). Time-sensitive action is required to prevent fund withdrawal.',
+    recoveryPathVictimBody: 'The KYC entry point was identified (your funding exchange), which confirms your identity to the authorities. NOTE: NO scammer KYC cash-out point was identified in the direct trace of this wallet — an expanded counterparty trace (upgrade available) may identify one. Priority: preserve records now.',
+    recoveryPathGeneric: 'EVIDENCE PRESERVATION OPPORTUNITY',
+    recoveryPathGenericBody: 'Although no KYC cash-out point was identified in the direct trace, evidence preservation and an expanded counterparty trace can improve the chances of recovery.',
     recoveryRequiresBody: 'No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.',
     step1Title: 'Submit Preservation Request to Exchange Compliance',
     step1Body: 'The exchange(s) below received funds from this wallet and hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal systems. An early preservation request becomes part of the official record.',
@@ -1504,7 +1513,7 @@ const es: ReportTranslations = {
     },
   },
   attackTechnique: {
-    intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen evidencia crítica para las autoridades y los litigios civiles.',
+    intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen documentación de apoyo importante para procedimientos legales y administrativos.',
     poisoningHeader: 'Campaña de Envenenamiento de Direcciones Detectada',
     poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. El atacante desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando el bloqueo y la incautación. Todas las direcciones de este grupo están controladas por el atacante; la dirección de mayor volumen es el recolector principal, el resto son suplantaciones secundarias.',
     vanityCluster: (pattern) => `Grupo de Direcciones Vanity: ${pattern}`,
@@ -1540,7 +1549,7 @@ const es: ReportTranslations = {
     differsFromMainCollector: (pos, a, b) => `Difiere del recolector principal en la posición ${pos}: "${a}" vs "${b}"`,
     additionalSpoofs: (n) => `+ ${n} direcciones de suplantación adicionales en el grupo`,
     forensicInterpretationTitle: 'Interpretación Forense',
-    forensicInterpretationBody: (pattern, count) => `El patrón vanity (${pattern}) compartido entre ${count} direcciones es estadísticamente improbable por azar (~1 en 4.3 mil millones por par para 8 caracteres coincidentes). Esto es característico de una campaña de envenenamiento de direcciones deliberada y coordinada por una operación de fraude multi-wallet, con tres objetivos: (1) confusión — engañar a la víctima para que copie la dirección equivocada del historial; (2) distribución del riesgo — repartir las entradas entre wallets para evadir el bloqueo; (3) ofuscación de la investigación — fragmentar el destino para complicar el rastreo.`,
+    forensicInterpretationBody: (pattern, count) => `El patrón vanity (${pattern}) compartido entre ${count} direcciones es estadísticamente improbable por azar (~1 en 4.3 mil millones por par para 8 caracteres coincidentes). Esto es característico de una campaña de envenenamiento de direcciones deliberada y coordinada por una operación coordinada multi-wallet, con tres objetivos: (1) confusión — engañar a la víctima para que copie la dirección equivocada del historial; (2) distribución del riesgo — repartir las entradas entre wallets para evadir el bloqueo; (3) ofuscación de la investigación — fragmentar el destino para complicar el rastreo.`,
     methodologyFootnote: 'Metodología: Para una coincidencia hexadecimal de N caracteres en posiciones fijas (insensible a mayúsculas/minúsculas), la probabilidad de que dos direcciones generadas aleatoriamente de manera independiente compartan esas posiciones es (1/16)^N. Con 8 caracteres fijos (prefijo de 4 caracteres + sufijo de 4 caracteres), P ≈ 1 en 4.3 × 10^9. La generación de direcciones en el mundo real involucra patrones adicionales que reducen aún más la entropía; esta línea base sirve como un límite inferior conservador para la improbabilidad de agrupamiento por coincidencia.',
     forensicNote: 'Nota forense: los montos mostrados como "unidades de token falsificado" son tokens de suplantación Unicode sin valor (p. ej. un "USDT" falso), no moneda real. Se reportan por separado y NO se incluyen en las cifras de pérdida económica real anteriores.',
     unicodeHeader: 'Ataque de Suplantación Unicode',
@@ -1780,6 +1789,9 @@ const es: ReportTranslations = {
     recoveryPathIdentified: 'CAMINO DE RECUPERACIÓN IDENTIFICADO',
     recoveryRequiresInvestigation: 'LA RECUPERACIÓN REQUIERE INVESTIGACIÓN',
     recoveryPathBody: 'Los fondos fueron rastreados hasta exchange(s) regulado(s) con KYC. La identidad del titular de la cuenta puede obtenerse mediante un proceso legal (sujeto a la cooperación del exchange y la disponibilidad de datos). Se requiere acción urgente para evitar el retiro de los fondos.',
+    recoveryPathVictimBody: 'Se identificó el punto de entrada KYC (su exchange de financiamiento), lo que confirma su identidad ante las autoridades. NOTA: NO se identificó un punto de salida KYC del estafador en el rastreo directo de esta wallet — un rastreo ampliado de la contraparte (mejora disponible) puede identificarlo. Prioridad: preservar los registros ahora.',
+    recoveryPathGeneric: 'OPORTUNIDAD DE PRESERVACIÓN DE EVIDENCIA',
+    recoveryPathGenericBody: 'Aunque no se identificó un punto de salida KYC en el rastreo directo, la preservación de evidencia y el rastreo ampliado de la contraparte pueden mejorar las posibilidades de recuperación.',
     recoveryRequiresBody: 'No se identificaron salidas directas por exchange. La recuperación puede requerir rastreo avanzado, cooperación de las autoridades o análisis forense especializado.',
     step1Title: 'Enviar Solicitud de Preservación al Cumplimiento del Exchange',
     step1Body: 'El/los exchange(s) a continuación recibieron fondos de esta wallet y poseen los registros KYC relevantes Y la capacidad técnica de marcar las wallets receptoras en sus sistemas internos. Una solicitud de preservación temprana pasa a formar parte del registro oficial.',
