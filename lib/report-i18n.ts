@@ -161,6 +161,45 @@ export interface ReportTranslations {
   steps: Steps;
   /** Disclaimer & Legal Notice (Phase 3 Batch 2.6). */
   disclaimer: DisclaimerT;
+  /** Fund Flow Graph (Phase 3 Batch 2.7). */
+  fundFlow: FundFlow;
+  /** Transaction History (Phase 3 Batch 2.7). */
+  transactions: Transactions;
+}
+
+/** Fund Flow Graph (page 13) translations. */
+export interface FundFlow {
+  intro: string;
+  colNum: string;
+  colLabel: string;
+  colType: string;
+  colVolume: string;
+  colDirection: string;
+  nodeType: (type: string) => string;
+  legendYourWallet: string;
+  legendExchange: string;
+  legendMixer: string;
+  legendDefi: string;
+  legendScam: string;
+  legendScamDb: string;
+  legendUnknown: string;
+  legendIncoming: string;
+  legendOutgoing: string;
+  noGraph: string;
+  interactiveLine: string;
+}
+
+/** Transaction History (page 14) translations. */
+export interface Transactions {
+  titleSuffix: (n: number) => string;
+  colDate: string;
+  colDir: string;
+  colFrom: string;
+  colTo: string;
+  colValue: string;
+  colToken: string;
+  spoofFootnote: string;
+  spamFilteredNote: (n: number) => string;
 }
 
 /** Recovery Assessment + Legal Recommendations (pages 15-16). */
@@ -1048,6 +1087,40 @@ const en: ReportTranslations = {
     para6: 'By purchasing and using this report, you agree that USPROJECT LLC\'s liability is limited to the purchase price of the report.',
     tagline: 'Blockchain Forensics & Crypto Asset Tracing',
   },
+  fundFlow: {
+    intro: 'Visual representation of fund movements between the analyzed wallet and its top counterparties by transaction volume.',
+    colNum: '#',
+    colLabel: 'Label',
+    colType: 'Type',
+    colVolume: 'Volume',
+    colDirection: 'Direction',
+    nodeType: (type) => (({
+      source: 'SOURCE', exchange: 'EXCHANGE', mixer: 'MIXER', scam: 'SCAM',
+      scam_db: 'SCAM DB', defi: 'DEFI', bridge: 'BRIDGE', unknown: 'UNKNOWN',
+    } as Record<string, string>)[type.toLowerCase()] ?? type.toUpperCase()),
+    legendYourWallet: 'Your Wallet',
+    legendExchange: 'Exchange',
+    legendMixer: 'Mixer',
+    legendDefi: 'DeFi',
+    legendScam: 'Scam',
+    legendScamDb: 'Scam DB',
+    legendUnknown: 'Unknown',
+    legendIncoming: 'Incoming',
+    legendOutgoing: 'Outgoing',
+    noGraph: 'Fund flow graph could not be generated for this wallet. This may occur when the wallet has very few transactions or all counterparties are filtered as dust.',
+    interactiveLine: 'For an interactive fund flow visualization, visit www.ledgerhound.vip/graph-tracer',
+  },
+  transactions: {
+    titleSuffix: (n) => ` (Top ${n})`,
+    colDate: 'Date',
+    colDir: 'Dir',
+    colFrom: 'From',
+    colTo: 'To',
+    colValue: 'Value',
+    colToken: 'Token',
+    spoofFootnote: '⚠ Highlighted rows are Unicode-spoof tokens (fake symbols mimicking real currencies) — see Attack Technique Analysis.',
+    spamFilteredNote: (n) => `Showing legitimate transfers only. ${n} spam/airdrop token transfers were filtered from this analysis.`,
+  },
 };
 
 const es: ReportTranslations = {
@@ -1550,6 +1623,40 @@ const es: ReportTranslations = {
     para5: 'LedgerHound y USPROJECT LLC no son firmas de abogados y no brindan representación legal. Los usuarios deben consultar con un asesor legal calificado antes de emprender cualquier acción legal basada en el contenido de este informe.',
     para6: 'Al comprar y usar este informe, usted acepta que la responsabilidad de USPROJECT LLC se limita al precio de compra del informe.',
     tagline: 'Análisis Forense de Blockchain y Rastreo de Criptoactivos',
+  },
+  fundFlow: {
+    intro: 'Representación visual de los movimientos de fondos entre la wallet analizada y sus principales contrapartes por volumen de transacciones.',
+    colNum: '#',
+    colLabel: 'Etiqueta',
+    colType: 'Tipo',
+    colVolume: 'Volumen',
+    colDirection: 'Dirección',
+    nodeType: (type) => (({
+      source: 'ORIGEN', exchange: 'EXCHANGE', mixer: 'MEZCLADOR', scam: 'ESTAFA',
+      scam_db: 'BASE DE DATOS', defi: 'DEFI', bridge: 'PUENTE', unknown: 'DESCONOCIDA',
+    } as Record<string, string>)[type.toLowerCase()] ?? type.toUpperCase()),
+    legendYourWallet: 'Su Wallet',
+    legendExchange: 'Exchange',
+    legendMixer: 'Mezclador',
+    legendDefi: 'DeFi',
+    legendScam: 'Estafa',
+    legendScamDb: 'Base de Datos de Estafas',
+    legendUnknown: 'Desconocida',
+    legendIncoming: 'Entrante',
+    legendOutgoing: 'Saliente',
+    noGraph: 'No se pudo generar el gráfico de flujo de fondos para esta wallet. Esto puede ocurrir cuando la wallet tiene muy pocas transacciones o todas las contrapartes se filtran como dust.',
+    interactiveLine: 'Para una visualización interactiva del flujo de fondos, visite www.ledgerhound.vip/graph-tracer',
+  },
+  transactions: {
+    titleSuffix: (n) => ` (${n} principales)`,
+    colDate: 'Fecha',
+    colDir: 'Dir',
+    colFrom: 'De',
+    colTo: 'A',
+    colValue: 'Valor',
+    colToken: 'Token',
+    spoofFootnote: '⚠ Las filas resaltadas son tokens de suplantación Unicode (símbolos falsos que imitan monedas reales) — ver Análisis de Técnicas de Ataque.',
+    spamFilteredNote: (n) => `Mostrando solo transferencias legítimas. ${n} transferencias de tokens de spam/airdrop fueron filtradas de este análisis.`,
   },
 };
 

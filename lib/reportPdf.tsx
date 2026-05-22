@@ -1739,13 +1739,14 @@ const CrossChainPage = ({ data, t }: { data: ReportData; t: ReportTranslations }
    ═══════════════════════════════════════════════════════════════ */
 const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const graph = data.graphData;
+  const ff = t.fundFlow;
 
   return (
     <Page size="A4" style={s.page}>
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.fundFlow}</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
-        Visual representation of fund movements between the analyzed wallet and its top counterparties by transaction volume.
+        {ff.intro}
       </Text>
 
       {graph && graph.nodes.length > 1 ? (
@@ -1827,11 +1828,11 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
           {/* Node legend table */}
           <View style={{ ...s.table, marginBottom: 10 }}>
             <View style={s.tableHeader}>
-              <Text style={{ ...s.th, width: '6%' }}>#</Text>
-              <Text style={{ ...s.th, width: '30%' }}>Label</Text>
-              <Text style={{ ...s.th, width: '22%' }}>Type</Text>
-              <Text style={{ ...s.th, width: '22%' }}>Volume</Text>
-              <Text style={{ ...s.th, width: '20%' }}>Direction</Text>
+              <Text style={{ ...s.th, width: '6%' }}>{ff.colNum}</Text>
+              <Text style={{ ...s.th, width: '30%' }}>{ff.colLabel}</Text>
+              <Text style={{ ...s.th, width: '22%' }}>{ff.colType}</Text>
+              <Text style={{ ...s.th, width: '22%' }}>{ff.colVolume}</Text>
+              <Text style={{ ...s.th, width: '20%' }}>{ff.colDirection}</Text>
             </View>
             {graph.nodes.filter(n => n.type !== 'source').map((node, i) => {
               const edge = graph.edges.find(e => e.fromId === node.id || e.toId === node.id);
@@ -1839,7 +1840,7 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
                 <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                   <Text style={{ ...s.td, width: '6%' }}>{i + 1}</Text>
                   <Text style={{ ...s.td, width: '30%', fontFamily: 'Helvetica-Bold' }}>{node.label}</Text>
-                  <Text style={{ ...s.td, width: '22%', color: getNodeColor(node.type) }}>{node.type.toUpperCase()}</Text>
+                  <Text style={{ ...s.td, width: '22%', color: getNodeColor(node.type) }}>{ff.nodeType(node.type)}</Text>
                   <Text style={{ ...s.td, width: '22%' }}>{edge?.label || '—'}</Text>
                   <Text style={{ ...s.td, width: '20%', color: edge?.direction === 'IN' ? green : red }}>{edge?.direction || '—'}</Text>
                 </View>
@@ -1850,13 +1851,13 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
           {/* Legend */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
             {[
-              { label: 'Your Wallet', color: '#1a7de9' },
-              { label: 'Exchange', color: '#00c853' },
-              { label: 'Mixer', color: '#ff1744' },
-              { label: 'DeFi', color: '#7c3aed' },
-              { label: 'Scam', color: '#ff6d00' },
-              { label: 'Scam DB', color: '#8B0000' },
-              { label: 'Unknown', color: '#546e7a' },
+              { label: ff.legendYourWallet, color: '#1a7de9' },
+              { label: ff.legendExchange, color: '#00c853' },
+              { label: ff.legendMixer, color: '#ff1744' },
+              { label: ff.legendDefi, color: '#7c3aed' },
+              { label: ff.legendScam, color: '#ff6d00' },
+              { label: ff.legendScamDb, color: '#8B0000' },
+              { label: ff.legendUnknown, color: '#546e7a' },
             ].map((item, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
@@ -1865,21 +1866,21 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
             ))}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 12, height: 2, backgroundColor: green }} />
-              <Text style={{ fontSize: 7, color: slate600 }}>Incoming</Text>
+              <Text style={{ fontSize: 7, color: slate600 }}>{ff.legendIncoming}</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 12, height: 2, backgroundColor: red }} />
-              <Text style={{ fontSize: 7, color: slate600 }}>Outgoing</Text>
+              <Text style={{ fontSize: 7, color: slate600 }}>{ff.legendOutgoing}</Text>
             </View>
           </View>
         </View>
       ) : (
         <View style={s.card}>
           <Text style={s.p}>
-            Fund flow graph could not be generated for this wallet. This may occur when the wallet has very few transactions or all counterparties are filtered as dust.
+            {ff.noGraph}
           </Text>
           <Text style={{ fontSize: 9, color: blue, marginTop: 4 }}>
-            For an interactive fund flow visualization, visit www.ledgerhound.vip/graph-tracer
+            {ff.interactiveLine}
           </Text>
         </View>
       )}
@@ -1893,19 +1894,20 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
    PAGE 9/10: TRANSACTION HISTORY (filtered to real assets, top 30)
    ═══════════════════════════════════════════════════════════════ */
 const TransactionsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+  const tr = t.transactions;
   return (
   <Page size="A4" style={s.page} wrap>
     <Header data={data} t={t} />
-    <Text style={s.h2}>{t.sections.transactionHistory} (Top {data.transactions.length})</Text>
+    <Text style={s.h2}>{t.sections.transactionHistory}{tr.titleSuffix(data.transactions.length)}</Text>
 
     <View style={s.table}>
       <View style={s.tableHeader} fixed>
-        <Text style={{ ...s.th, width: '14%' }}>Date</Text>
-        <Text style={{ ...s.th, width: '8%' }}>Dir</Text>
-        <Text style={{ ...s.th, width: '26%' }}>From</Text>
-        <Text style={{ ...s.th, width: '26%' }}>To</Text>
-        <Text style={{ ...s.th, width: '14%' }}>Value</Text>
-        <Text style={{ ...s.th, width: '12%' }}>Token</Text>
+        <Text style={{ ...s.th, width: '14%' }}>{tr.colDate}</Text>
+        <Text style={{ ...s.th, width: '8%' }}>{tr.colDir}</Text>
+        <Text style={{ ...s.th, width: '26%' }}>{tr.colFrom}</Text>
+        <Text style={{ ...s.th, width: '26%' }}>{tr.colTo}</Text>
+        <Text style={{ ...s.th, width: '14%' }}>{tr.colValue}</Text>
+        <Text style={{ ...s.th, width: '12%' }}>{tr.colToken}</Text>
       </View>
       {data.transactions.map((tx, i) => {
         // 2026-05-21 (Phase 2.5 / Part 6): highlight Unicode-spoof token rows.
@@ -1932,13 +1934,13 @@ const TransactionsPage = ({ data, t }: { data: ReportData; t: ReportTranslations
 
     {data.transactions.some(tx => tx.isSpoof) && (
       <Text style={{ fontSize: 7, color: red, marginTop: 6 }}>
-        ⚠ Highlighted rows are Unicode-spoof tokens (fake symbols mimicking real currencies) — see Attack Technique Analysis.
+        {tr.spoofFootnote}
       </Text>
     )}
 
     {data.spamFiltered > 0 && (
       <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 6 }}>
-        Showing legitimate transfers only. {data.spamFiltered} spam/airdrop token transfers were filtered from this analysis.
+        {tr.spamFilteredNote(data.spamFiltered)}
       </Text>
     )}
 
