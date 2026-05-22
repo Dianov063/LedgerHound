@@ -143,6 +143,16 @@ const shortAddr = (addr: string) =>
 
 const truncToken = (t: string) => (t.length > 8 ? t.slice(0, 7) + '…' : t);
 
+/** Phase 2.7: format a {symbol: amount} record, e.g. "11,020.50 USDT, 0.50 ETH". */
+const fmtTokenRecord = (rec?: Record<string, number>): string => {
+  if (!rec) return '';
+  return Object.entries(rec)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([sym, v]) => `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sym}`)
+    .join(', ');
+};
+
 const riskColor = (score: number) => {
   if (score >= 85) return darkRed;
   if (score >= 70) return red;
@@ -1055,10 +1065,33 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
    PAGE 6: WALLET ANALYTICS
    ═══════════════════════════════════════════════════════════════ */
 const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+  // Phase 2.7 (Issue #2): surface the dominant stablecoin's volume alongside
+  // native ETH so the substantive money movement isn't hidden behind gas-dust.
+  const STABLE = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'PYUSD'];
+  const stable = (data.assetSummary?.realAssets || [])
+    .filter((a) => STABLE.includes(a.symbol) && (a.totalIn + a.totalOut) > 0)
+    .sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut))[0];
   return (
   <Page size="A4" style={s.page}>
     <Header data={data} t={t} />
     <Text style={s.h2}>{t.sections.walletAnalytics}</Text>
+
+    {stable && (
+      <View style={{ ...s.row, marginBottom: 12 }}>
+        <View style={{ ...s.card, ...s.col }}>
+          <Text style={s.label}>{stable.symbol} RECEIVED</Text>
+          <Text style={{ ...s.value, color: green }}>{fmtEth(stable.totalIn)} {stable.symbol}</Text>
+        </View>
+        <View style={{ ...s.card, ...s.col }}>
+          <Text style={s.label}>{stable.symbol} SENT</Text>
+          <Text style={{ ...s.value, color: red }}>{fmtEth(stable.totalOut)} {stable.symbol}</Text>
+        </View>
+        <View style={{ ...s.card, ...s.col }}>
+          <Text style={s.label}>{stable.symbol} NET FLOW</Text>
+          <Text style={s.value}>{fmtEth(stable.totalIn - stable.totalOut)} {stable.symbol}</Text>
+        </View>
+      </View>
+    )}
 
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
@@ -1265,7 +1298,17 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
       </Text>
 
       {/* ─── Address Poisoning Campaign (Phase 2.5 model) ─── */}
-      {ap && ap.detected && ap.campaigns.map((campaign, ci) => (
+      {ap && ap.detected && ap.campaigns.map((campaign, ci) => {
+        // Phase 2.7: present real economic loss separately from worthless
+        // spoof-token units so the figures are legally defensible.
+        const mc = campaign.mainCollector;
+        const realLossStr = fmtTokenRecord(campaign.totalMisdirectedReal);
+        const spoofUnitsStr = fmtTokenRecord(campaign.totalMisdirectedSpoof);
+        const unknownStr = fmtTokenRecord(campaign.totalMisdirectedUnknown);
+        const mcDesc = mc.tokenCategory === 'spoof'
+          ? `${fmtEth(mc.totalReceivedFromSubject)} units of a fake "${mc.spoofMimicsToken}" token (worthless spoof)`
+          : `${fmtEth(mc.totalReceivedFromSubject)} ${mc.totalReceivedToken}`;
+        return (
         <View key={ci} style={{ marginBottom: 14 }}>
           <Text style={{ ...s.h3, color: red, marginBottom: 4 }}>Address Poisoning Campaign Detected</Text>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>
@@ -1277,10 +1320,18 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>Vanity Cluster: {campaign.vanityPattern}</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <AttackStat label="CLUSTER ADDRESSES" value={String(campaign.totalClusterAddresses)} />
-              <AttackStat label="SUCCESSFUL SPOOFS" value={String(campaign.successfulMisdirections)} highlight={campaign.successfulMisdirections > 0} />
-              <AttackStat label={`TO CLUSTER (${campaign.primaryToken})`} value={fmtEth(campaign.totalSentByVictim)} highlight />
-              <AttackStat label={`TO SPOOFS (${campaign.primaryToken})`} value={fmtEth(campaign.totalToSecondarySpoofs)} highlight={campaign.totalToSecondarySpoofs > 0} />
+              <AttackStat label="REAL MISDIRECTIONS" value={String(campaign.successfulMisdirections)} highlight={campaign.successfulMisdirections > 0} />
+              <AttackStat label="SECONDARY SPOOFS" value={String(campaign.secondarySpoofs.length)} />
             </View>
+            {realLossStr ? (
+              <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>Real funds misdirected to secondary spoofs: {realLossStr}</Text>
+            ) : null}
+            {spoofUnitsStr ? (
+              <Text style={{ fontSize: 7, color: amber, marginTop: 2 }}>Worthless spoof-token units routed to secondary spoofs: {spoofUnitsStr} — no market value (see Unicode Spoofing section).</Text>
+            ) : null}
+            {unknownStr ? (
+              <Text style={{ fontSize: 6.5, color: slate400, marginTop: 2 }}>Unclassified token units routed: {unknownStr} (excluded from loss figures).</Text>
+            ) : null}
             {campaign.hasFakePhishingTag && (
               <Text style={{ fontSize: 7, color: red, marginTop: 4 }}>
                 {campaign.fakePhishingAddresses.length} address(es) in this cluster are officially tagged by Etherscan as Fake_Phishing.
@@ -1291,12 +1342,12 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
           {/* Main collector */}
           <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fecaca' }}>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 2 }}>Main Collector (Highest Volume)</Text>
-            <Text style={{ ...s.mono, fontSize: 6.5, color: slate900 }}>{campaign.mainCollector.address}</Text>
+            <Text style={{ ...s.mono, fontSize: 6.5, color: slate900 }}>{mc.address}</Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>
-              Received {campaign.mainCollector.totalReceivedFromSubject.toFixed(2)} {campaign.mainCollector.totalReceivedToken} across {campaign.mainCollector.transactionCount} transaction(s) — the primary scam wallet in this fraud network.
+              Received {mcDesc} across {mc.transactionCount} transaction(s) — the primary scam wallet in this fraud network.
             </Text>
-            {campaign.mainCollector.etherscanFakePhishingTag && (
-              <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>Etherscan: {campaign.mainCollector.etherscanFakePhishingTag}</Text>
+            {mc.etherscanFakePhishingTag && (
+              <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>Etherscan: {mc.etherscanFakePhishingTag}</Text>
             )}
           </View>
 
@@ -1305,21 +1356,40 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
             <View>
               <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>Secondary Spoofs (Address Poisoning Targets)</Text>
               <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 4 }}>
-                These addresses share the same visual pattern as the main collector but are separate wallets. Funds the victim sent here indicate successful confusion induced by the poisoning attack.
+                These addresses share the same visual pattern as the main collector but are separate wallets. Real funds the victim sent here indicate successful confusion induced by the poisoning attack; worthless spoof-token transfers are reported separately.
               </Text>
               {campaign.secondarySpoofs.slice(0, 10).map((spoof, si) => {
-                const misdirected = spoof.totalReceivedFromSubject > 0;
+                const realSlices = spoof.tokenBreakdown.filter((b) => b.category === 'real' && b.value > 0);
+                const spoofSlices = spoof.tokenBreakdown.filter((b) => b.category === 'spoof' && b.value > 0);
+                const unknownSlices = spoof.tokenBreakdown.filter((b) => b.category === 'unknown' && b.value > 0);
+                const hasReal = realSlices.length > 0;
+                const anyValue = spoof.tokenBreakdown.some((b) => b.value > 0);
+                const borderColor = hasReal ? red : (anyValue ? amber : slate400);
                 return (
-                  <View key={si} style={{ ...s.card, padding: 5, marginBottom: 4, borderLeftWidth: 2, borderLeftColor: misdirected ? red : slate400 }}>
-                    <Text style={{ ...s.mono, fontSize: 6, color: misdirected ? red : slate600 }}>✖ {spoof.address}</Text>
-                    <Text style={{ fontSize: 6.5, color: slate900, marginTop: 1 }}>
-                      {misdirected
-                        ? `MISDIRECTION CONFIRMED: ${spoof.totalReceivedFromSubject.toFixed(2)} ${spoof.totalReceivedToken} across ${spoof.transactionCount} tx`
-                        : 'No funds received (poisoning only)'}
-                      {spoof.receivedDustFromCluster ? ' · dusted the victim' : ''}
-                    </Text>
+                  <View key={si} style={{ ...s.card, padding: 5, marginBottom: 4, borderLeftWidth: 2, borderLeftColor: borderColor }}>
+                    <Text style={{ ...s.mono, fontSize: 6, color: hasReal ? red : slate600 }}>✖ {spoof.address}</Text>
+                    {hasReal && (
+                      <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>
+                        MISDIRECTION CONFIRMED (real funds): {realSlices.map((b) => `${fmtEth(b.value)} ${b.symbol}`).join(', ')} across {spoof.transactionCount} tx
+                      </Text>
+                    )}
+                    {spoofSlices.map((b, bi) => (
+                      <Text key={`s${bi}`} style={{ fontSize: 6.5, color: amber, marginTop: 1 }}>
+                        Spoof-token routed: {fmtEth(b.value)} units of a fake &quot;{b.mimics}&quot; token{b.scriptCategory && b.codepoints ? ` (Unicode spoof — ${b.scriptCategory} Letters: ${b.codepoints})` : ' (Unicode spoof)'} — worthless, not real {b.mimics}.{b.contract ? ` Contract: ${b.contract}` : ''}
+                      </Text>
+                    ))}
+                    {unknownSlices.map((b, bi) => (
+                      <Text key={`u${bi}`} style={{ fontSize: 6.5, color: slate600, marginTop: 1 }}>
+                        {fmtEth(b.value)} units of unclassified token &quot;{b.symbol}&quot; (excluded from loss figures).
+                      </Text>
+                    ))}
+                    {!anyValue && (
+                      <Text style={{ fontSize: 6.5, color: slate900, marginTop: 1 }}>
+                        No funds received (poisoning only){spoof.receivedDustFromCluster ? ' · dusted the victim' : ''}
+                      </Text>
+                    )}
                     <Text style={{ fontSize: 6, color: slate400, marginTop: 0.5 }}>
-                      Differs from main collector at {firstDifferingChar(campaign.mainCollector.address, spoof.address)}
+                      Differs from main collector at {firstDifferingChar(mc.address, spoof.address)}
                     </Text>
                     {spoof.etherscanFakePhishingTag && (
                       <Text style={{ fontSize: 6, color: red }}>Etherscan: {spoof.etherscanFakePhishingTag}</Text>
@@ -1344,9 +1414,15 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
             <Text style={{ fontSize: 6.5, color: slate400, fontStyle: 'italic', lineHeight: 1.4, marginTop: 4 }}>
               Methodology: For an N-character hex match at fixed positions (case-insensitive), the probability that two independently generated addresses share those positions is (1/16)^N. With 8 fixed characters (4-character prefix + 4-character suffix), P ≈ 1 in 4.3 × 10^9. Real-world address generation involves additional patterns that reduce entropy further; this baseline is a conservative lower bound for the improbability of coincidental clustering.
             </Text>
+            {spoofUnitsStr ? (
+              <Text style={{ fontSize: 6.5, color: slate600, fontStyle: 'italic', lineHeight: 1.4, marginTop: 4 }}>
+                Forensic note: amounts shown as &quot;spoof-token units&quot; are worthless Unicode-impersonation tokens (e.g. a fake &quot;USDT&quot;), not real currency. They are reported separately and are NOT included in the real economic-loss figures above.
+              </Text>
+            ) : null}
           </View>
         </View>
-      ))}
+        );
+      })}
 
       {/* ─── Unicode Spoofing ─── */}
       {us && us.detected && (

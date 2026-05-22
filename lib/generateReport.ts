@@ -1050,12 +1050,24 @@ export async function generateReport(
   // Unicode-named tokens are the very signals these detectors hunt for and
   // must NOT be stripped first. `assetRaw` carries the un-sanitized symbol.
   const rawAll = [...rawIncoming, ...rawOutgoing];
+  // Phase 2.7: normalize upstream category strings ('external' = Alchemy native)
+  // into the detector's enum so address-poisoning can tell native ETH from an
+  // ERC-20 token and never mislabels a null-symbol spoof token as 'ETH'.
+  const normalizeCategory = (c?: string): 'native' | 'erc20' | 'erc721' | 'unknown' => {
+    const v = (c || '').toLowerCase();
+    if (v === 'external' || v === 'native') return 'native';
+    if (v === 'erc20' || v === 'token') return 'erc20';
+    if (v === 'erc721' || v === 'erc1155') return 'erc721';
+    return 'unknown';
+  };
   const attackTxs = rawAll.map((tx) => ({
     from: tx.from || '',
     to: tx.to || '',
     value: safeValue(tx),
     asset: tx.asset ?? null,
     assetRaw: tx.assetRaw ?? tx.asset ?? null,
+    category: normalizeCategory(tx.category),
+    tokenContract: tx.rawContract?.address,
     hash: tx.hash,
     metadata: tx.metadata,
   }));
@@ -1454,7 +1466,33 @@ export async function generateReport(
       keyFindings.push(`Counterparty ${m.address.slice(0, 10)}... linked to "${m.platformNames.join(', ')}" in LedgerHound Scam Database (${m.reports} reports, $${m.totalLoss.toLocaleString()} total losses).`);
     }
   }
-  if (ethSent > 0) keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${outgoing.filter((t: any) => t.category === 'external').length} native transactions.`);
+  // Phase 2.7 (Issue #2): surface the substantive stablecoin movement first —
+  // it is the actual money in most pig-butchering cases. Native ETH is often
+  // just gas dust and must not be the only "amount" a reader sees.
+  const STABLE_SYMBOLS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'PYUSD'];
+  const stableAssets = assetSummary.realAssets.filter(
+    (a) => STABLE_SYMBOLS.includes(a.symbol) && (a.totalIn + a.totalOut) > 0,
+  );
+  for (const sa of stableAssets) {
+    const parts: string[] = [];
+    if (sa.totalOut > 0) {
+      const n = outgoing.filter((t: any) => (t.asset || '').toUpperCase() === sa.symbol).length;
+      parts.push(`sent ${sa.totalOut.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sa.symbol} across ${n} transfer(s)`);
+    }
+    if (sa.totalIn > 0) {
+      const n = incoming.filter((t: any) => (t.asset || '').toUpperCase() === sa.symbol).length;
+      parts.push(`received ${sa.totalIn.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sa.symbol} across ${n} transfer(s)`);
+    }
+    if (parts.length) keyFindings.push(`Wallet ${parts.join('; ')}.`);
+  }
+  const nativeSendCount = outgoing.filter((t: any) => t.category === 'external').length;
+  if (ethSent > 0) {
+    if (ethSent < 0.01 && stableAssets.length > 0) {
+      keyFindings.push(`Native ${nativeCurrency} movement: ${fmtEth(ethSent)} ${nativeCurrency} across ${nativeSendCount} transaction(s) — gas/dust, separate from the stablecoin volume above.`);
+    } else {
+      keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${nativeSendCount} native transactions.`);
+    }
+  }
   if (inactiveDays > 365) keyFindings.push(`Wallet inactive for ${inactiveDays} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`);
   if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
   // Add cross-chain findings
@@ -1861,10 +1899,15 @@ export async function generateReport(
     });
   }
   if (poisoningSuccessfulMisdirections > 0) {
-    const tokens = new Set(addressPoisoning.campaigns.map(c => c.primaryToken));
-    const tokenLabel = tokens.size === 1 ? ` ${Array.from(tokens)[0]}` : '';
+    // Phase 2.7: report REAL economic loss only (per-symbol), never mixed-unit
+    // sums that conflate worthless spoof-token face amounts with real money.
+    const realLoss = Object.entries(addressPoisoning.totalRealEconomicLoss)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([sym, v]) => `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sym}`)
+      .join(', ');
     evidenceFactors.push({
-      label: `CRITICAL: address poisoning succeeded ${poisoningSuccessfulMisdirections} time(s) — ${addressPoisoning.totalMisdirectedToSecondarySpoofs.toFixed(2)}${tokenLabel} sent to secondary spoof addresses`,
+      label: `CRITICAL: address poisoning succeeded ${poisoningSuccessfulMisdirections} time(s) — real funds misdirected to secondary spoof addresses${realLoss ? `: ${realLoss}` : ''}`,
       met: true,
       severity: 'critical',
     });
