@@ -47,6 +47,24 @@ ok(byFile['divindat-denuncia-es.md']?.includes('DIVINDAT'), 'DIVINDAT title pres
 ok(byFile['divindat-denuncia-es.md']?.includes('Art. 196'), 'DIVINDAT statute citation present');
 ok(EMAIL_TEMPLATES_ES.every((t) => t.content.includes('{caseId}')), 'all templates carry a {caseId} token');
 
+/* ── 2b. DIVINDAT legal hardening (Phase 3.1 Stage 2-3) ── */
+console.log('\n[2b] DIVINDAT legal hardening');
+const div = byFile['divindat-denuncia-es.md'] || '';
+// Softened wording present
+ok(div.includes('modalidad compatible con fraude de inversión'), 'pig-butchering framed as "compatible con" (not asserted)');
+ok(div.includes('operadores desconocidos asociados a la plataforma DZHLWK'), 'DZHLWK framed as "operadores asociados" (defamation-safe)');
+ok(div.includes('compatible con operación coordinada multi-wallet'), 'statistics softened (no exact probability)');
+// Risky language removed
+ok(!div.includes('Lavado de activos'), 'NO "Lavado de activos" overcharge');
+ok(!div.includes('1 en 4.3 mil millones'), 'NO "1 en 4.3 mil millones" probability claim');
+ok(!div.includes('operación fraudulenta DZHLWK'), 'NO "operación fraudulenta DZHLWK" (defamation risk) removed');
+// New sections present
+ok(div.includes('## II. PÉRDIDA ECONÓMICA'), 'PÉRDIDA ECONÓMICA section added');
+ok(div.includes('## VI. ANEXOS DIGITALES (CADENA DE CUSTODIA)') && div.includes('SHA256'), 'chain-of-custody section + SHA256 added');
+ok(div.includes('### 2. ORDEN DE PRESERVACIÓN INMEDIATA'), 'preservation order added to petitorio');
+// Sections renumbered consistently I→VI
+ok(['## I. HECHOS', '## II. PÉRDIDA', '## III. EVIDENCIA', '## IV. PETITORIO', '## V. ANEXOS', '## VI. ANEXOS DIGITALES'].every((h) => div.includes(h)), 'sections renumbered I→VI consistently');
+
 /* ── 3. caseId substitution leaves no residue ── */
 console.log('\n[3] {caseId} substitution');
 const caseId = 'LH-TEST123';

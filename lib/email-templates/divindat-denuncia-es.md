@@ -12,15 +12,24 @@
 
 ---
 
-Por la presente, yo, **[Su Nombre Completo]**, identificado(a) con DNI **[XXXXXXXX]**, domicilio en **[Su Dirección Completa]**, teléfono **[Su Teléfono]**, email **[Su Email]**, formulo **DENUNCIA POR DELITO DE ESTAFA AGRAVADA EN MODALIDAD DE FRAUDE CON CRIPTOMONEDAS** contra la operación fraudulenta DZHLWK Fintech y sus operadores desconocidos.
+Por la presente, yo, **[Su Nombre Completo]**, identificado(a) con DNI **[XXXXXXXX]**, domicilio en **[Su Dirección Completa]**, teléfono **[Su Teléfono]**, email **[Su Email]**, formulo **DENUNCIA POR DELITO DE ESTAFA AGRAVADA EN MODALIDAD DE FRAUDE CON CRIPTOMONEDAS** contra los operadores desconocidos asociados a la plataforma DZHLWK Fintech.
 
 ## I. HECHOS
 
-Entre **[mes]** y **[mes]** de **[año]**, fui víctima de una estafa orquestada mediante la modalidad conocida internacionalmente como "pig butchering" (engorde y matanza), en la cual los estafadores establecieron contacto inicial mediante redes sociales/aplicaciones de mensajería, ganaron mi confianza durante semanas, y posteriormente me convencieron de "invertir" en una plataforma fraudulenta de comercio de criptomonedas denominada **DZHLWK Fintech**.
+Entre **[mes]** y **[mes]** de **[año]**, fui víctima de una estafa orquestada mediante una modalidad compatible con fraude de inversión en criptomonedas, conocida internacionalmente como "pig butchering" (engorde y matanza), en la cual los estafadores establecieron contacto inicial mediante redes sociales/aplicaciones de mensajería, ganaron mi confianza durante semanas, y posteriormente me convencieron de "invertir" en una plataforma de comercio de criptomonedas denominada **DZHLWK Fintech**.
 
-La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[monto en letras]** dólares americanos), transferidos en forma de USDT (stablecoin) desde mi cuenta verificada de Binance hacia direcciones blockchain controladas por la operación fraudulenta.
+La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[monto en letras]** dólares americanos), transferidos en forma de USDT (stablecoin) desde mi cuenta verificada de Binance hacia direcciones blockchain controladas por los operadores del fraude.
 
-## II. EVIDENCIA TÉCNICA
+## II. PÉRDIDA ECONÓMICA
+
+- **USDT perdidos (fondos reales):** [monto] USDT
+- **Tokens de suplantación Unicode (sin valor económico):** 26,191.64 unidades (USDT falsificados)
+- **Comisiones de transacciones:** [monto aproximado] USDT
+- **Pérdida total estimada:** USD $[monto]
+
+Nota: Las unidades de tokens de suplantación Unicode son falsificaciones digitales sin valor de mercado, utilizadas por los estafadores como técnica de ocultamiento ("Address Poisoning"). Detalles en el informe forense adjunto.
+
+## III. EVIDENCIA TÉCNICA
 
 Adjunto a la presente denuncia un **INFORME FORENSE COMPLETO** emitido por LedgerHound (Caso ID: **[{caseId}]**), que contiene:
 
@@ -31,9 +40,9 @@ Adjunto a la presente denuncia un **INFORME FORENSE COMPLETO** emitido por Ledge
 3. Documentación de ataques de envenenamiento de direcciones
 4. Evidencia de tokens Unicode falsificados utilizados por los estafadores
 5. Etiquetado oficial de Etherscan como "Fake_Phishing[número]"
-6. Análisis estadístico que confirma operación coordinada (probabilidad de coincidencia ≈ 1 en 4.3 mil millones)
+6. Análisis estadístico compatible con operación coordinada multi-wallet (cálculo detallado en el informe forense adjunto)
 
-## III. PETITORIO
+## IV. PETITORIO
 
 Solicito a su Despacho:
 
@@ -43,9 +52,17 @@ Iniciar investigación del caso bajo los presuntos delitos de:
 
 - **Estafa agravada** (Art. 196° del Código Penal)
 - **Delito informático contra el patrimonio** (Ley N° 30096)
-- **Lavado de activos** (D. Leg. N° 1106), si corresponde
 
-### 2. COOPERACIÓN INTERNACIONAL
+### 2. ORDEN DE PRESERVACIÓN INMEDIATA
+
+DISPONER orden de preservación inmediata de registros digitales en posesión de:
+- Binance (cuenta de financiamiento de la víctima)
+- Tether Operations Limited (registros de transacciones USDT)
+- Cualquier exchange identificado posteriormente como punto de salida del estafador
+
+Esta medida es crucial para prevenir la destrucción o alteración de evidencia digital durante la investigación.
+
+### 3. COOPERACIÓN INTERNACIONAL
 
 OFICIAR a las siguientes entidades mediante los canales de cooperación judicial internacional pertinentes:
 
@@ -57,21 +74,35 @@ OFICIAR a las siguientes entidades mediante los canales de cooperación judicial
 **b) Tether Operations Limited (Hong Kong / British Virgin Islands):**
 - Evaluar posibilidad de acciones de cumplimiento sobre las direcciones receptoras del fraude (acción queda a discreción de Tether)
 
-### 3. RASTREO BLOCKCHAIN AMPLIADO
+### 4. RASTREO BLOCKCHAIN AMPLIADO
 
 PROCEDER con las diligencias y rastreo blockchain expandido más allá del wallet sujeto, que pudieran identificar puntos de salida KYC (exchanges con verificación de identidad) utilizados por los estafadores para retirar los fondos a moneda fiat.
 
-### 4. MEDIDAS CAUTELARES
+### 5. MEDIDAS CAUTELARES
 
 Disponer las medidas cautelares pertinentes para preservar la evidencia digital y prevenir el ocultamiento o destrucción de la misma.
 
-## IV. ANEXOS
+## V. ANEXOS
 
 - Informe forense LedgerHound (Caso [{caseId}]) — [N] páginas
 - Capturas de comunicaciones con los estafadores
 - Comprobantes de transferencias bancarias
-- Capturas de la plataforma fraudulenta DZHLWK Fintech
+- Capturas de la plataforma DZHLWK Fintech
 - Copia de mi DNI
+
+## VI. ANEXOS DIGITALES (CADENA DE CUSTODIA)
+
+Para garantizar la integridad de la evidencia digital:
+
+- **Informe forense LedgerHound (PDF):**
+  - Archivo: LedgerHound-Report-[{caseId}].pdf
+  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+
+- **Capturas de evidencia (archivo comprimido):**
+  - Archivo: capturas-evidencia.zip
+  - SHA256: [calcular antes de la entrega]
+
+Los hashes SHA256 permiten verificar que la evidencia digital no ha sido alterada desde su recolección.
 
 ---
 
@@ -98,7 +129,7 @@ Lima, **[Día]** de **[Mes]** de **[Año]**
    - Su DNI (ambos lados)
    - Comunicaciones con los estafadores (capturas de WhatsApp/Telegram)
    - Comprobantes de las transferencias bancarias a Binance
-   - Capturas de la plataforma fraudulenta DZHLWK Fintech
+   - Capturas de la plataforma DZHLWK Fintech
 5. Presente en persona en DIVINDAT (Av. España 323) o vía https://denuncias.mpfn.gob.pe/
 6. Solicite número de expediente y guárdelo
 7. Para casos transnacionales, mencione explícitamente la cooperación internacional necesaria

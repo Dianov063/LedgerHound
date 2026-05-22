@@ -2169,6 +2169,18 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
   const hasExchanges = exchangeBrands.length > 0;
   const st = t.steps;
 
+  // Phase 3.1 Issue #5/#6: role-aware STEP 1. The page must not imply a
+  // scammer KYC cash-out point was found when it was not (resolves the
+  // Page 5 "no exit detected" vs Page 17 STEP 1 contradiction).
+  const hasKycExit = data.exitPointAnalysis?.hasKycExit === true;
+  const step1Scenario: 'victim' | 'exit' | 'generic' =
+    data.narrative.walletType === 'victim' && !hasKycExit ? 'victim'
+      : hasKycExit ? 'exit'
+        : 'generic';
+  const step1Title = step1Scenario === 'victim' ? st.step1TitleVictim : step1Scenario === 'exit' ? st.step1Title : st.step1TitleGeneric;
+  const step1Body = step1Scenario === 'victim' ? st.step1BodyVictim : step1Scenario === 'exit' ? st.step1Body : st.step1BodyGeneric;
+  const step1Closing = step1Scenario === 'victim' ? st.step1ClosingVictim : step1Scenario === 'exit' ? st.step1Closing : st.step1ClosingGeneric;
+
   return (
     <Page size="A4" style={s.page}>
       <Header data={data} t={t} />
@@ -2187,9 +2199,16 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
       {/* Step 1: Exchange Compliance Contact */}
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>{st.stepLabel(1)}: {st.step1Title}</Text>
+          {/* Phase 3.1 Issue #5: legal-defensive banner — makes explicit that the
+              identified KYC point is the VICTIM's funding source, not a scammer exit. */}
+          {step1Scenario === 'victim' && (
+            <View style={{ backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 4, padding: 6, marginBottom: 6 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, textAlign: 'center' }}>{st.step1BannerVictim}</Text>
+            </View>
+          )}
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>{st.stepLabel(1)}: {step1Title}</Text>
           <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 6 }}>
-            {st.step1Body}
+            {step1Body}
           </Text>
           {exchangeBrands.slice(0, 3).map((b, i) => (
             <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
@@ -2212,7 +2231,7 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
             </View>
           ))}
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
-            {st.step1Closing(data.caseId)}
+            {step1Closing(data.caseId)}
           </Text>
         </View>
       )}

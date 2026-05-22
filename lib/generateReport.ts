@@ -904,7 +904,7 @@ function generateTimeline(
     events.push({
       date: last.metadata!.blockTimestamp!.split('T')[0],
       type: 'LAST_ACTIVITY',
-      description: 'Last recorded activity',
+      description: tl.lastActivity,
     });
   }
 
@@ -1281,68 +1281,64 @@ export async function generateReport(
 
   if (kycExchanges.length > 0) {
     recoveryScore += 10;
-    positiveFactors.push(`Funds routed through KYC exchange (${kycExchanges[0].label}) — subpoena possible`);
+    positiveFactors.push(tReport.recovery.factorKycExchange(kycExchanges[0].label));
   }
   if (scamDbMatches.length > 0) {
     recoveryScore += 5;
-    positiveFactors.push('Counterparty linked to identified fraud cluster — strengthens legal case');
+    positiveFactors.push(tReport.recovery.factorFraudCluster);
   }
   // Phishing-tag check on any counterparty
   const counterpartiesWithPhishingTag = Array.from(counterpartyMap.keys()).filter((a) => isKnownPhishing(a));
   if (counterpartiesWithPhishingTag.length > 0) {
     recoveryScore += 8;
-    positiveFactors.push(`${counterpartiesWithPhishingTag.length} counterparty wallet(s) officially tagged Fake_Phishing on Etherscan`);
+    positiveFactors.push(tReport.recovery.factorPhishingTag(counterpartiesWithPhishingTag.length));
   }
   // Inactivity gates (rough — final 'inactiveDays' is computed slightly later in the existing flow)
   const lastTs = timestamps.length > 0 ? timestamps[timestamps.length - 1] : 0;
   const daysSinceLast = lastTs ? Math.floor((Date.now() - lastTs) / 86400000) : 9999;
   if (daysSinceLast < 30) {
     recoveryScore += 5;
-    positiveFactors.push('Recent activity (<30 days) — funds may still be in early laundering stages');
+    positiveFactors.push(tReport.recovery.factorRecent30);
   }
   if (daysSinceLast < 7) {
     recoveryScore += 3;
-    positiveFactors.push('Very recent activity (<7 days) — improves the chance of an exchange/issuer compliance hold (at their discretion)');
+    positiveFactors.push(tReport.recovery.factorRecent7);
   }
 
   if (hasMixer) {
     recoveryScore -= 15;
-    negativeFactors.push('Mixer (Tornado Cash / Blender / Sinbad) usage detected — funds heavily obfuscated');
+    negativeFactors.push(tReport.recovery.factorMixer);
   }
   // ethSent here is in native units (ETH/BNB/etc.). For a rough USD-equivalent cutoff
   // we use a coarse "large flow" signal: >100 ETH or >$100k assumed average.
   if (ethSent > 100) {
     recoveryScore -= 3;
-    negativeFactors.push('Large outflow volume — scammers prioritize rapid cash-out for high-value cases');
+    negativeFactors.push(tReport.recovery.factorLargeOutflow);
   }
   if (daysSinceLast > 180) {
     recoveryScore -= 5;
-    negativeFactors.push('Stale activity (>6 months) — funds likely already cashed out');
+    negativeFactors.push(tReport.recovery.factorStale);
   }
 
   recoveryScore = Math.max(2, Math.min(35, recoveryScore));
 
   let recoveryTier: RecoveryAssessment['tier'];
-  let recoveryLabel: string;
   if (recoveryScore >= 25) {
     recoveryTier = 'HIGHER_THAN_AVERAGE';
-    recoveryLabel = 'Higher than average — multiple positive factors present, but recovery still requires sustained legal action';
   } else if (recoveryScore >= 15) {
     recoveryTier = 'MODERATE';
-    recoveryLabel = 'Moderate — some positive factors, recovery possible with proper legal action';
   } else if (recoveryScore >= 8) {
     recoveryTier = 'LOW';
-    recoveryLabel = 'Low — recovery requires sustained legal effort and may take 6-18 months';
   } else {
     recoveryTier = 'VERY_LOW';
-    recoveryLabel = 'Very low — recovery is unlikely but documentation enables legal/tax claims';
   }
+  const recoveryLabel = tReport.recovery.assessmentLabel[recoveryTier];
 
   const recoveryAssessment: RecoveryAssessment = {
     score: recoveryScore,
     label: recoveryLabel,
     tier: recoveryTier,
-    disclaimer: 'Statistical estimate based on case characteristics. Most cryptocurrency fraud cases do not result in full recovery. This metric is not a guarantee, prediction, or promise. Actual recovery depends on law enforcement action, exchange cooperation, and legal proceedings.',
+    disclaimer: tReport.recovery.assessmentDisclaimer,
     factors: {
       positive: positiveFactors,
       negative: negativeFactors,
@@ -1445,11 +1441,12 @@ export async function generateReport(
   }
 
   // Key findings
+  const tFind = tReport.findings;
   const keyFindings: string[] = [];
   if (ofacWarning) {
-    keyFindings.push(`CRITICAL: Wallet interacted with OFAC-sanctioned address(es): ${ofacEntities.map(e => e.label).join(', ')}. US persons are prohibited from transacting with these addresses.`);
+    keyFindings.push(tFind.ofacCritical(ofacEntities.map(e => e.label).join(', ')));
   }
-  if (hasMixer) keyFindings.push('Interactions with known mixer/tumbler services detected (Tornado Cash or similar). This is a significant risk indicator.');
+  if (hasMixer) keyFindings.push(tFind.mixerDetected);
   if (hasExchange) {
     // 2026-05-20 fix 1.2: dedupe by parentEntity so we don't print
     // "Binance Hot Wallet, Binance Hot Wallet, Binance 14 (Hot Wallet)…" —
@@ -1460,12 +1457,12 @@ export async function generateReport(
         .filter((e) => e.type === 'exchange')
         .map((e) => e.parentEntity || e.label)
     ));
-    keyFindings.push(`Funds interacted with identified exchanges: ${exchanges.join(', ')}. KYC data may be available via subpoena.`);
+    keyFindings.push(tFind.exchangesInteracted(exchanges.join(', ')));
   }
-  if (hasScam) keyFindings.push('Interactions with flagged/scam-associated addresses detected.');
+  if (hasScam) keyFindings.push(tFind.scamFlagged);
   if (scamDbMatches.length > 0) {
     for (const m of scamDbMatches) {
-      keyFindings.push(`Counterparty ${m.address.slice(0, 10)}... linked to "${m.platformNames.join(', ')}" in LedgerHound Scam Database (${m.reports} reports, $${m.totalLoss.toLocaleString()} total losses).`);
+      keyFindings.push(tFind.scamDbMatch(`${m.address.slice(0, 10)}...`, m.platformNames.join(', '), m.reports, m.totalLoss.toLocaleString()));
     }
   }
   // Phase 2.7 (Issue #2): surface the substantive stablecoin movement first —
@@ -1479,42 +1476,42 @@ export async function generateReport(
     const parts: string[] = [];
     if (sa.totalOut > 0) {
       const n = outgoing.filter((t: any) => (t.asset || '').toUpperCase() === sa.symbol).length;
-      parts.push(`sent ${sa.totalOut.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sa.symbol} across ${n} transfer(s)`);
+      parts.push(tFind.stableSent(sa.totalOut.toLocaleString('en-US', { maximumFractionDigits: 2 }), sa.symbol, n));
     }
     if (sa.totalIn > 0) {
       const n = incoming.filter((t: any) => (t.asset || '').toUpperCase() === sa.symbol).length;
-      parts.push(`received ${sa.totalIn.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sa.symbol} across ${n} transfer(s)`);
+      parts.push(tFind.stableReceived(sa.totalIn.toLocaleString('en-US', { maximumFractionDigits: 2 }), sa.symbol, n));
     }
-    if (parts.length) keyFindings.push(`Wallet ${parts.join('; ')}.`);
+    if (parts.length) keyFindings.push(tFind.stableWallet(parts.join('; ')));
   }
   const nativeSendCount = outgoing.filter((t: any) => t.category === 'external').length;
   if (ethSent > 0) {
     if (ethSent < 0.01 && stableAssets.length > 0) {
-      keyFindings.push(`Native ${nativeCurrency} movement: ${fmtEth(ethSent)} ${nativeCurrency} across ${nativeSendCount} transaction(s) — gas/dust, separate from the stablecoin volume above.`);
+      keyFindings.push(tFind.nativeDust(fmtEth(ethSent), nativeCurrency, nativeSendCount));
     } else {
-      keyFindings.push(`Wallet sent ${fmtEth(ethSent)} ${nativeCurrency} across ${nativeSendCount} native transactions.`);
+      keyFindings.push(tFind.nativeSent(fmtEth(ethSent), nativeCurrency, nativeSendCount));
     }
   }
-  if (inactiveDays > 365) keyFindings.push(`Wallet inactive for ${inactiveDays} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`);
-  if (spamFiltered > 0) keyFindings.push(`${spamFiltered} spam/airdrop token transfers were detected and filtered from this analysis.`);
+  if (inactiveDays > 365) keyFindings.push(tFind.inactive(inactiveDays, lastActivity));
+  if (spamFiltered > 0) keyFindings.push(tFind.spamFiltered(spamFiltered));
   // Add cross-chain findings
   if (crossChainTrace?.detected) {
     if (crossChainTrace.bridgeInteractions.length > 0) {
-      keyFindings.push(`CROSS-CHAIN: ${crossChainTrace.bridgeInteractions.length} bridge interaction(s) detected. ${crossChainTrace.escapePathSummary}`);
+      keyFindings.push(tFind.crossChainBridge(crossChainTrace.bridgeInteractions.length, crossChainTrace.escapePathSummary));
     } else if (crossChainTrace.activeChains.length > 0) {
-      keyFindings.push(`MULTI-CHAIN: Wallet active on ${crossChainTrace.activeChains.length + 1} chains: ${crossChainTrace.activeChains.map(c => c.chainLabel).join(', ')}.`);
+      keyFindings.push(tFind.multiChain(crossChainTrace.activeChains.length + 1, crossChainTrace.activeChains.map(c => c.chainLabel).join(', ')));
     }
     if (crossChainTrace.intent.label === 'LAUNDERING') {
-      keyFindings.push(`CRITICAL: Cross-chain intent analysis indicates likely laundering behavior (${crossChainTrace.intent.confidence}% confidence). ${crossChainTrace.intent.reason}`);
+      keyFindings.push(tFind.laundering(crossChainTrace.intent.confidence, crossChainTrace.intent.reason));
     }
   }
   // Add behavioral pattern findings
   for (const p of patternAnalysis.patterns) {
     if (p.severity === 'CRITICAL' || p.severity === 'HIGH') {
-      keyFindings.push(`BEHAVIORAL: ${p.name} detected (${p.confidence}% confidence). ${p.evidence[0]}`);
+      keyFindings.push(tFind.behavioral(p.name, p.confidence, p.evidence[0]));
     }
   }
-  if (keyFindings.length === 0) keyFindings.push('No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.');
+  if (keyFindings.length === 0) keyFindings.push(tFind.none);
 
   // Recommendations
   const recommendations: string[] = [];

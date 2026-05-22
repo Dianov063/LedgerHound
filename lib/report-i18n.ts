@@ -167,6 +167,33 @@ export interface ReportTranslations {
   transactions: Transactions;
   /** Country-specific recovery guidance (Phase 3 Part 3). */
   countryGuidance: CountryGuidance;
+  /** Executive Summary "Key Findings" generated prose (Phase 3.1 Issue #8). */
+  findings: Findings;
+}
+
+/**
+ * Key Findings (Executive Summary, page 2) generated prose. These were
+ * previously emitted as raw English in generateReport.ts; Phase 3.1 routes
+ * them through this table so the Spanish PDF carries no English leaks.
+ */
+export interface Findings {
+  ofacCritical: (labels: string) => string;
+  mixerDetected: string;
+  exchangesInteracted: (exchanges: string) => string;
+  scamFlagged: string;
+  scamDbMatch: (addrShort: string, platforms: string, reports: number, totalLoss: string) => string;
+  stableSent: (amount: string, symbol: string, n: number) => string;
+  stableReceived: (amount: string, symbol: string, n: number) => string;
+  stableWallet: (parts: string) => string;
+  nativeDust: (amount: string, currency: string, n: number) => string;
+  nativeSent: (amount: string, currency: string, n: number) => string;
+  inactive: (days: number, lastActivity: string) => string;
+  spamFiltered: (n: number) => string;
+  crossChainBridge: (n: number, summary: string) => string;
+  multiChain: (chains: number, chainList: string) => string;
+  laundering: (confidence: number, reason: string) => string;
+  behavioral: (name: string, confidence: number, evidence: string) => string;
+  none: string;
 }
 
 /** Country-specific recovery guidance (Phase 3 Part 3). */
@@ -278,6 +305,18 @@ export interface Recovery {
   tokenIssuerText: string;
   courtCertifiedBold: string;
   courtCertifiedText: string;
+  // Recovery assessment label/disclaimer/factors (Exec Summary + Recovery page).
+  // Generated in generateReport.ts; Phase 3.1 routes them through this table.
+  assessmentLabel: Record<'HIGHER_THAN_AVERAGE' | 'MODERATE' | 'LOW' | 'VERY_LOW', string>;
+  assessmentDisclaimer: string;
+  factorKycExchange: (label: string) => string;
+  factorFraudCluster: string;
+  factorPhishingTag: (n: number) => string;
+  factorRecent30: string;
+  factorRecent7: string;
+  factorMixer: string;
+  factorLargeOutflow: string;
+  factorStale: string;
 }
 
 /** Actionable Recovery Steps (page 17). */
@@ -287,12 +326,24 @@ export interface Steps {
   recoveryRequiresInvestigation: string;
   recoveryPathBody: string;
   recoveryRequiresBody: string;
+  // STEP 1 is role-aware (Phase 3.1 Issue #5/#6). The base step1Title/Body/
+  // Closing cover the "scammer KYC exit confirmed" scenario; the *Victim and
+  // *Generic variants prevent the page from implying a scammer exit was found
+  // when it was not (resolving the Page 5 vs Page 17 contradiction).
   step1Title: string;
   step1Body: string;
+  step1Closing: (caseId: string) => string;
+  /** Legal-defensive banner shown above STEP 1 cards for the victim scenario. */
+  step1BannerVictim: string;
+  step1TitleVictim: string;
+  step1BodyVictim: string;
+  step1ClosingVictim: (caseId: string) => string;
+  step1TitleGeneric: string;
+  step1BodyGeneric: string;
+  step1ClosingGeneric: (caseId: string) => string;
   step1Interactions: (interactions: number, addrCount: number) => string;
   step1MoreAddrs: (n: number) => string;
   step1NoContact: string;
-  step1Closing: (caseId: string) => string;
   lawEnforcementTitle: string;
   ic3Bullet: string;
   localPoliceBullet: string;
@@ -841,7 +892,7 @@ const en: ReportTranslations = {
       civilLitigation: 'Civil litigation support',
       insurance: 'Insurance claim documentation',
       regulatory: 'Regulatory complaint filing',
-      courtUpgrade: 'Court evidence (certified upgrade available)',
+      courtUpgrade: 'Supporting documentation for legal proceedings (certified version available)',
     },
   },
   attackTechnique: {
@@ -1081,6 +1132,40 @@ const en: ReportTranslations = {
     tokenIssuerText: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
     courtCertifiedBold: 'Court-Certified Forensic Investigation:',
     courtCertifiedText: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a full forensic engagement.',
+    assessmentLabel: {
+      HIGHER_THAN_AVERAGE: 'Higher than average — multiple positive factors present, but recovery still requires sustained legal action',
+      MODERATE: 'Moderate — some positive factors, recovery possible with proper legal action',
+      LOW: 'Low — recovery requires sustained legal effort and may take 6-18 months',
+      VERY_LOW: 'Very low — recovery is unlikely but documentation enables legal/tax claims',
+    },
+    assessmentDisclaimer: 'Statistical estimate based on case characteristics. Most cryptocurrency fraud cases do not result in full recovery. This metric is not a guarantee, prediction, or promise. Actual recovery depends on law enforcement action, exchange cooperation, and legal proceedings.',
+    factorKycExchange: (label) => `Funds routed through KYC exchange (${label}) — subpoena possible`,
+    factorFraudCluster: 'Counterparty linked to identified fraud cluster — strengthens legal case',
+    factorPhishingTag: (n) => `${n} counterparty wallet(s) officially tagged Fake_Phishing on Etherscan`,
+    factorRecent30: 'Recent activity (<30 days) — funds may still be in early laundering stages',
+    factorRecent7: 'Very recent activity (<7 days) — improves the chance of an exchange/issuer compliance hold (at their discretion)',
+    factorMixer: 'Mixer (Tornado Cash / Blender / Sinbad) usage detected — funds heavily obfuscated',
+    factorLargeOutflow: 'Large outflow volume — scammers prioritize rapid cash-out for high-value cases',
+    factorStale: 'Stale activity (>6 months) — funds likely already cashed out',
+  },
+  findings: {
+    ofacCritical: (labels) => `CRITICAL: Wallet interacted with OFAC-sanctioned address(es): ${labels}. US persons are prohibited from transacting with these addresses.`,
+    mixerDetected: 'Interactions with known mixer/tumbler services detected (Tornado Cash or similar). This is a significant risk indicator.',
+    exchangesInteracted: (exchanges) => `Funds interacted with identified exchanges: ${exchanges}. KYC data may be available via subpoena.`,
+    scamFlagged: 'Interactions with flagged/scam-associated addresses detected.',
+    scamDbMatch: (addrShort, platforms, reports, totalLoss) => `Counterparty ${addrShort} linked to "${platforms}" in LedgerHound Scam Database (${reports} reports, $${totalLoss} total losses).`,
+    stableSent: (amount, symbol, n) => `sent ${amount} ${symbol} across ${n} transfer${n === 1 ? '' : 's'}`,
+    stableReceived: (amount, symbol, n) => `received ${amount} ${symbol} across ${n} transfer${n === 1 ? '' : 's'}`,
+    stableWallet: (parts) => `Wallet ${parts}.`,
+    nativeDust: (amount, currency, n) => `Native ${currency} movement: ${amount} ${currency} across ${n} transaction${n === 1 ? '' : 's'} — gas/dust, separate from the stablecoin volume above.`,
+    nativeSent: (amount, currency, n) => `Wallet sent ${amount} ${currency} across ${n} native transaction${n === 1 ? '' : 's'}.`,
+    inactive: (days, lastActivity) => `Wallet inactive for ${days} days (last activity: ${lastActivity}). Funds may have been moved to other wallets.`,
+    spamFiltered: (n) => `${n} spam/airdrop token transfers were detected and filtered from this analysis.`,
+    crossChainBridge: (n, summary) => `CROSS-CHAIN: ${n} bridge interaction${n === 1 ? '' : 's'} detected. ${summary}`,
+    multiChain: (chains, chainList) => `MULTI-CHAIN: Wallet active on ${chains} chains: ${chainList}.`,
+    laundering: (confidence, reason) => `CRITICAL: Cross-chain intent analysis indicates likely laundering behavior (${confidence}% confidence). ${reason}`,
+    behavioral: (name, confidence, evidence) => `BEHAVIORAL: ${name} detected (${confidence}% confidence). ${evidence}`,
+    none: 'No high-risk indicators detected in automated analysis. Manual review recommended for comprehensive assessment.',
   },
   steps: {
     stepLabel: (n) => `STEP ${n}`,
@@ -1089,11 +1174,18 @@ const en: ReportTranslations = {
     recoveryPathBody: 'Funds were traced to KYC-regulated exchange(s). The account holder identity may be obtainable through legal process (subject to exchange cooperation and data availability). Time-sensitive action is required to prevent fund withdrawal.',
     recoveryRequiresBody: 'No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.',
     step1Title: 'Submit Preservation Request to Exchange Compliance',
-    step1Body: 'The exchange(s) below hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal blacklist. Even where the scammer did not cash out through this exchange directly, an early preservation request becomes part of the official record.',
+    step1Body: 'The exchange(s) below received funds from this wallet and hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal systems. An early preservation request becomes part of the official record.',
+    step1Closing: (caseId) => `Send a preservation request to the compliance department referencing your police report number and this case ID (${caseId}). Request preservation of records and subscriber-information disclosure. Where the exchange confirms suspicious activity, you may request a precautionary account hold (granted at the exchange's discretion).`,
+    step1BannerVictim: 'KYC FUNDING POINT IDENTIFIED (VICTIM)',
+    step1TitleVictim: 'Request Preservation of Your KYC Records (Funding Exchange)',
+    step1BodyVictim: 'Your wallet was funded through the exchange(s) below, which confirms your identity as the victim. These KYC records belong to you and should be preserved officially for legal proceedings. NOTE: direct tracing of this wallet did NOT identify a KYC cash-out point used by the scammer — an expanded counterparty trace (upgrade available) may identify one. An early preservation request still becomes part of the official record and can help flag the receiving wallets.',
+    step1ClosingVictim: (caseId) => `Send a preservation request to the compliance department referencing your police report number and this case ID (${caseId}). Request preservation of your KYC records and ask the exchange to flag the receiving wallets in their internal systems.`,
+    step1TitleGeneric: 'Submit Preservation Request to Exchange Compliance',
+    step1BodyGeneric: 'The exchange(s) below interacted with this wallet and may hold relevant records. An early preservation request becomes part of the official record, even where the scammer\'s cash-out point has not yet been confirmed.',
+    step1ClosingGeneric: (caseId) => `Send a preservation request to the compliance department referencing your police report number and this case ID (${caseId}). Request preservation of records and subscriber-information disclosure.`,
     step1Interactions: (interactions, addrCount) => `${interactions} interaction(s) · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
     step1MoreAddrs: (n) => ` (+${n} more)`,
     step1NoContact: 'No published law-enforcement contact recorded — consult attorney for proper service channel.',
-    step1Closing: (caseId) => `Send a preservation request to the compliance department referencing your police report number and this case ID (${caseId}). Request immediate account freeze and subscriber information disclosure.`,
     lawEnforcementTitle: 'File Law Enforcement Reports',
     ic3Bullet: 'FBI IC3 complaint — ic3.gov (reference this report)',
     localPoliceBullet: 'Local police report — needed for exchange compliance requests',
@@ -1408,7 +1500,7 @@ const es: ReportTranslations = {
       civilLitigation: 'Apoyo para litigios civiles',
       insurance: 'Documentación para reclamos de seguro',
       regulatory: 'Presentación de denuncia regulatoria',
-      courtUpgrade: 'Evidencia para tribunales (actualización certificada disponible)',
+      courtUpgrade: 'Documentación de Apoyo para Procedimientos Legales (versión certificada disponible)',
     },
   },
   attackTechnique: {
@@ -1648,6 +1740,40 @@ const es: ReportTranslations = {
     tokenIssuerText: 'Para transferencias en USDT a wallets marcadas, envíe un paquete de evidencia al equipo legal de Tether (legal@tether.to) para revisión de cumplimiento (las decisiones de aplicación quedan a discreción de Tether).',
     courtCertifiedBold: 'Investigación Forense Certificada para Tribunales:',
     courtCertifiedText: 'Para testimonio en tribunales, metodología certificada o un rastreo ampliado de la contraparte, contacte a LedgerHound en contact@ledgerhound.vip para un servicio forense completo.',
+    assessmentLabel: {
+      HIGHER_THAN_AVERAGE: 'Superior al promedio — múltiples factores positivos presentes, pero la recuperación aún requiere acción legal sostenida',
+      MODERATE: 'Moderada — algunos factores positivos, recuperación posible con acción legal apropiada',
+      LOW: 'Baja — la recuperación requiere un esfuerzo legal sostenido y puede tomar de 6 a 18 meses',
+      VERY_LOW: 'Muy baja — la recuperación es improbable, pero la documentación permite reclamos legales/tributarios',
+    },
+    assessmentDisclaimer: 'Estimación estadística basada en las características del caso. La mayoría de los casos de fraude con criptomonedas no resultan en recuperación total. Esta métrica no es una garantía, predicción ni promesa. La recuperación real depende de la acción de las autoridades, la cooperación de los exchanges y los procedimientos legales.',
+    factorKycExchange: (label) => `Fondos enrutados a través de un exchange con KYC (${label}) — citación judicial posible`,
+    factorFraudCluster: 'Contraparte vinculada a un grupo de fraude identificado — fortalece el caso legal',
+    factorPhishingTag: (n) => `${n} wallet(s) de contraparte etiquetada(s) oficialmente como Fake_Phishing en Etherscan`,
+    factorRecent30: 'Actividad reciente (<30 días) — los fondos pueden estar aún en etapas tempranas de lavado',
+    factorRecent7: 'Actividad muy reciente (<7 días) — mejora la posibilidad de una retención por cumplimiento del exchange/emisor (a su discreción)',
+    factorMixer: 'Uso de mezclador (Tornado Cash / Blender / Sinbad) detectado — fondos fuertemente ofuscados',
+    factorLargeOutflow: 'Alto volumen de salida — los estafadores priorizan el retiro rápido en casos de alto valor',
+    factorStale: 'Actividad inactiva (>6 meses) — los fondos probablemente ya fueron retirados',
+  },
+  findings: {
+    ofacCritical: (labels) => `CRÍTICO: La wallet interactuó con dirección(es) sancionada(s) por OFAC: ${labels}. Las personas estadounidenses tienen prohibido transar con estas direcciones.`,
+    mixerDetected: 'Se detectaron interacciones con servicios de mezcla/tumbler conocidos (Tornado Cash o similar). Este es un indicador de riesgo significativo.',
+    exchangesInteracted: (exchanges) => `Los fondos interactuaron con exchanges identificados: ${exchanges}. Los datos KYC pueden estar disponibles mediante citación judicial.`,
+    scamFlagged: 'Se detectaron interacciones con direcciones marcadas o asociadas a estafas.',
+    scamDbMatch: (addrShort, platforms, reports, totalLoss) => `Contraparte ${addrShort} vinculada a "${platforms}" en la Base de Datos de Estafas de LedgerHound (${reports} reportes, $${totalLoss} en pérdidas totales).`,
+    stableSent: (amount, symbol, n) => `envió ${amount} ${symbol} en ${n} transferencia${n === 1 ? '' : 's'}`,
+    stableReceived: (amount, symbol, n) => `recibió ${amount} ${symbol} en ${n} transferencia${n === 1 ? '' : 's'}`,
+    stableWallet: (parts) => `La wallet ${parts}.`,
+    nativeDust: (amount, currency, n) => `Movimiento de ${currency} nativo: ${amount} ${currency} en ${n} ${n === 1 ? 'transacción' : 'transacciones'} — gas/dust, separado del volumen de stablecoin anterior.`,
+    nativeSent: (amount, currency, n) => `La wallet envió ${amount} ${currency} en ${n} ${n === 1 ? 'transacción nativa' : 'transacciones nativas'}.`,
+    inactive: (days, lastActivity) => `Wallet inactiva durante ${days} días (última actividad: ${lastActivity}). Los fondos pueden haber sido movidos a otras wallets.`,
+    spamFiltered: (n) => `Se detectaron y filtraron ${n} transferencias de tokens de spam/airdrop de este análisis.`,
+    crossChainBridge: (n, summary) => `MULTICADENA: ${n} ${n === 1 ? 'interacción' : 'interacciones'} con puentes detectada${n === 1 ? '' : 's'}. ${summary}`,
+    multiChain: (chains, chainList) => `MULTICADENA: Wallet activa en ${chains} cadenas: ${chainList}.`,
+    laundering: (confidence, reason) => `CRÍTICO: El análisis de intención entre cadenas indica probable comportamiento de lavado (${confidence}% de confianza). ${reason}`,
+    behavioral: (name, confidence, evidence) => `CONDUCTUAL: ${name} detectado (${confidence}% de confianza). ${evidence}`,
+    none: 'No se detectaron indicadores de alto riesgo en el análisis automatizado. Se recomienda revisión manual para una evaluación integral.',
   },
   steps: {
     stepLabel: (n) => `PASO ${n}`,
@@ -1656,11 +1782,18 @@ const es: ReportTranslations = {
     recoveryPathBody: 'Los fondos fueron rastreados hasta exchange(s) regulado(s) con KYC. La identidad del titular de la cuenta puede obtenerse mediante un proceso legal (sujeto a la cooperación del exchange y la disponibilidad de datos). Se requiere acción urgente para evitar el retiro de los fondos.',
     recoveryRequiresBody: 'No se identificaron salidas directas por exchange. La recuperación puede requerir rastreo avanzado, cooperación de las autoridades o análisis forense especializado.',
     step1Title: 'Enviar Solicitud de Preservación al Cumplimiento del Exchange',
-    step1Body: 'El/los exchange(s) a continuación poseen los registros KYC relevantes Y la capacidad técnica de marcar las wallets receptoras en su lista negra interna. Incluso cuando el estafador no retiró fondos directamente a través de este exchange, una solicitud de preservación temprana pasa a formar parte del registro oficial.',
+    step1Body: 'El/los exchange(s) a continuación recibieron fondos de esta wallet y poseen los registros KYC relevantes Y la capacidad técnica de marcar las wallets receptoras en sus sistemas internos. Una solicitud de preservación temprana pasa a formar parte del registro oficial.',
+    step1Closing: (caseId) => `Envíe una solicitud de preservación al departamento de cumplimiento haciendo referencia al número de su denuncia policial y a este ID de caso (${caseId}). Solicite la preservación de registros y la divulgación de la información del suscriptor. Cuando el exchange confirme actividad sospechosa, puede solicitar una retención preventiva de la cuenta (otorgada a discreción del exchange).`,
+    step1BannerVictim: 'PUNTO DE FINANCIAMIENTO KYC IDENTIFICADO (VÍCTIMA)',
+    step1TitleVictim: 'Solicitar Preservación de sus Registros KYC (Exchange de Financiamiento)',
+    step1BodyVictim: 'Su wallet fue financiada a través del/los exchange(s) indicados a continuación, lo que confirma su identidad como víctima. Esos registros KYC le pertenecen a usted y deben preservarse oficialmente para los procedimientos legales. NOTA: el rastreo directo de esta wallet NO identificó un punto de retiro KYC utilizado por el estafador — un rastreo ampliado de la contraparte (mejora disponible) puede identificarlo. Una solicitud de preservación temprana igualmente pasa a formar parte del registro oficial y puede ayudar a marcar las wallets receptoras.',
+    step1ClosingVictim: (caseId) => `Envíe una solicitud de preservación al departamento de cumplimiento haciendo referencia al número de su denuncia policial y a este ID de caso (${caseId}). Solicite la preservación de sus registros KYC y pida al exchange marcar las wallets receptoras en sus sistemas internos.`,
+    step1TitleGeneric: 'Enviar Solicitud de Preservación al Cumplimiento del Exchange',
+    step1BodyGeneric: 'El/los exchange(s) a continuación interactuaron con esta wallet y pueden poseer registros relevantes. Una solicitud de preservación temprana pasa a formar parte del registro oficial, aun cuando el punto de retiro del estafador no se haya confirmado todavía.',
+    step1ClosingGeneric: (caseId) => `Envíe una solicitud de preservación al departamento de cumplimiento haciendo referencia al número de su denuncia policial y a este ID de caso (${caseId}). Solicite la preservación de registros y la divulgación de la información del suscriptor.`,
     step1Interactions: (interactions, addrCount) => `${interactions} interacci${interactions > 1 ? 'ones' : 'ón'} · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
     step1MoreAddrs: (n) => ` (+${n} más)`,
     step1NoContact: 'No hay contacto publicado para autoridades — consulte a un abogado para el canal de notificación adecuado.',
-    step1Closing: (caseId) => `Envíe una solicitud de preservación al departamento de cumplimiento haciendo referencia al número de su denuncia policial y a este ID de caso (${caseId}). Solicite el congelamiento inmediato de la cuenta y la divulgación de la información del suscriptor.`,
     lawEnforcementTitle: 'Presentar Denuncias ante las Autoridades',
     ic3Bullet: 'Denuncia ante FBI IC3 — ic3.gov (haga referencia a este informe)',
     localPoliceBullet: 'Denuncia ante la policía local — necesaria para las solicitudes de cumplimiento del exchange',
