@@ -3,6 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
+import { getReportTranslations } from './report-i18n';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
 import { fetchBtcTransfers } from './bitcoin-tracker';
@@ -1018,6 +1019,10 @@ export async function generateReport(
   const network = (options?.network || 'eth').toLowerCase();
   // Phase 3: report locale (en|es; others fall back to en in getReportTranslations).
   const reportLocale = options?.locale || 'en';
+  // Phase 3 Batch 2.1: locale-aware generated prose (role reasoning, narrative,
+  // evidence factors, legal weight). Same table the PDF renders with.
+  const tReport = getReportTranslations(reportLocale);
+  const tInv = tReport.investigation;
   const networkLabel = NETWORK_LABELS[network] || network.toUpperCase();
   const nativeCurrency = NATIVE_CURRENCY[network] || 'ETH';
   // Only lowercase for EVM addresses
@@ -1725,66 +1730,57 @@ export async function generateReport(
   if (subjectScamDbHit) {
     walletRole = 'aggregator';
     roleConfidence = 0.95;
-    roleReasoning.push(`Subject wallet is listed in LedgerHound Scam Database as part of "${(subjectScamDbHit.platformNames || []).join(', ')}"`);
-    if (subjectScamDbHit.totalLoss) roleReasoning.push(`Linked to documented losses of approximately $${subjectScamDbHit.totalLoss.toLocaleString()}`);
+    roleReasoning.push(tInv.roleReasoning.scamDbListed((subjectScamDbHit.platformNames || []).join(', ')));
+    if (subjectScamDbHit.totalLoss) roleReasoning.push(tInv.roleReasoning.documentedLosses(subjectScamDbHit.totalLoss.toLocaleString()));
   } else if (subjectKnownEntity?.type === 'exchange') {
     walletRole = 'exchange_deposit';
     roleConfidence = 1.0;
-    roleReasoning.push(`Subject wallet is a known ${subjectKnownEntity.label} address (KYC exchange)`);
+    roleReasoning.push(tInv.roleReasoning.knownExchange(subjectKnownEntity.label));
   } else if (subjectKnownEntity?.type === 'mixer' || subjectKnownEntity?.type === 'sanctioned') {
     walletRole = 'unknown';
     roleConfidence = 1.0;
-    roleReasoning.push(`Subject wallet is a known ${subjectKnownEntity.label} — analyzing as opaque infrastructure, not as victim/scammer`);
+    roleReasoning.push(tInv.roleReasoning.knownInfra(subjectKnownEntity.label));
   } else if (isVictim) {
     walletRole = 'victim';
     roleConfidence = 0.85;
-    roleReasoning.push(`Received funds from ${cexInboundCount} KYC exchange deposit(s) — characteristic of a victim funding their own wallet`);
-    roleReasoning.push(`Forwarded funds to ${uniqueReceivers} unknown address(es) — consistent with sending to scammer-controlled wallets`);
-    roleReasoning.push(`Limited transaction history (${totalTxCount} txs) — typical retail user profile`);
+    roleReasoning.push(tInv.roleReasoning.victimKycEntry(cexInboundCount));
+    roleReasoning.push(tInv.roleReasoning.victimForwarded(uniqueReceivers));
+    roleReasoning.push(tInv.roleReasoning.victimLimitedHistory(totalTxCount));
     if (forwardingPercent >= 80) {
-      roleReasoning.push(`${forwardingPercent}% of funds forwarded within 24h — rapid action under social engineering pressure`);
+      roleReasoning.push(tInv.roleReasoning.victimRapidForward(forwardingPercent));
     }
   } else if (isAggregator && cexOutboundCount > 0) {
     walletRole = 'aggregator';
     roleConfidence = 0.9;
-    roleReasoning.push(`${uniqueSenders} unique senders aggregated into ${uniqueReceivers} destination(s)`);
-    roleReasoning.push(`Funds consolidated and forwarded to KYC exchange (${primaryExitExchange}) — characteristic of a scam collection wallet`);
+    roleReasoning.push(tInv.roleReasoning.aggregatorSenders(uniqueSenders, uniqueReceivers));
+    roleReasoning.push(tInv.roleReasoning.aggregatorConsolidated(primaryExitExchange));
   } else if (isTransit) {
     walletRole = 'transit';
     roleConfidence = 0.75;
-    roleReasoning.push(`${forwardingPercent}% of funds forwarded within 24h`);
-    roleReasoning.push(`No CEX deposits in incoming flow — pure on-chain routing pattern`);
-    roleReasoning.push(`${uniqueSenders} unique senders feeding this wallet`);
+    roleReasoning.push(tInv.roleReasoning.transitForwarded(forwardingPercent));
+    roleReasoning.push(tInv.roleReasoning.transitNoCex);
+    roleReasoning.push(tInv.roleReasoning.transitSenders(uniqueSenders));
   } else if (isExchangeDeposit) {
     walletRole = 'exchange_deposit';
     roleConfidence = 0.7;
-    roleReasoning.push(`Single recipient identified — a KYC exchange (${primaryExitExchange})`);
-    roleReasoning.push(`${uniqueSenders} senders consolidated to one exit point — exchange deposit funnel pattern`);
+    roleReasoning.push(tInv.roleReasoning.exchangeSingleRecipient(primaryExitExchange));
+    roleReasoning.push(tInv.roleReasoning.exchangeConsolidated(uniqueSenders));
   } else if (uniqueSenders <= 3 && uniqueReceivers > 10) {
     walletRole = 'distributor';
     roleConfidence = 0.7;
-    roleReasoning.push(`${uniqueSenders} sender(s) distributing to ${uniqueReceivers} recipients`);
+    roleReasoning.push(tInv.roleReasoning.distributor(uniqueSenders, uniqueReceivers));
   } else if (totalTxCount < 20) {
     walletRole = 'personal';
     roleConfidence = 0.6;
-    roleReasoning.push(`Low transaction count (${totalTxCount}) and no fraud-network indicators — likely a personal/low-activity wallet`);
+    roleReasoning.push(tInv.roleReasoning.personalLowCount(totalTxCount));
   } else {
     walletRole = 'unknown';
     roleConfidence = 0.3;
-    roleReasoning.push(`Activity does not match any clear-cut pattern (${totalTxCount} transactions, ${uniqueSenders} senders, ${uniqueReceivers} receivers)`);
-    roleReasoning.push('Manual review recommended for confident classification');
+    roleReasoning.push(tInv.roleReasoning.unknownPattern(totalTxCount, uniqueSenders, uniqueReceivers));
+    roleReasoning.push(tInv.roleReasoning.manualReview);
   }
 
-  const walletTypeLabels: Record<WalletRole, string> = {
-    victim: 'Victim Wallet — Funds Sent to Identified Counterparty',
-    aggregator: 'Scam Aggregation Wallet — Multiple Victims Identified',
-    transit: 'Transit/Forwarding Wallet',
-    distributor: 'Distribution Wallet',
-    exchange_deposit: 'Exchange Deposit Funnel',
-    aggregation: 'Scam Aggregation Point',
-    personal: 'Personal/Low-Activity Wallet',
-    unknown: 'Unclassified Wallet',
-  };
+  const walletTypeLabels: Record<WalletRole, string> = tInv.walletTypes;
 
   // Auto-generate narrative.
   // Phase 2.7.1 (Issue #7): when a stablecoin dominates the flow, the narrative
@@ -1807,43 +1803,36 @@ export async function generateReport(
     : `${fmtEth(ethSent)} ${nativeCurrency}`;
   // Supplementary native-ETH note when ETH is mere gas dust beside the stablecoin volume.
   const nativeDustSuffix = useStableNarrative && ethSent < 0.01
-    ? ` Separately, ${fmtEth(ethSent)} ${nativeCurrency} in gas/dust was moved across native transactions.`
+    ? tInv.narrative.nativeDustSuffix(fmtEth(ethSent), nativeCurrency)
     : '';
   let narrativeSummary = '';
   let narrativeConclusion = '';
 
   if (walletRole === 'victim') {
-    narrativeSummary = `This wallet shows the behavioral profile of a victim wallet. It received ${totalInDisplay} from ${cexInboundCount} KYC exchange deposit(s), then forwarded ${forwardingPercent}% of those funds to ${uniqueReceivers} unknown counterparty address(es) within 24 hours. Total outflow: ${totalOutDisplay}.${nativeDustSuffix}`;
-    if (subjectKnownEntity || cexOutboundCount > 0) {
-      // (defensive — shouldn't hit for victim role)
-    }
-    narrativeConclusion = `Conclusion: This wallet was used by a victim to send funds to a coordinated counterparty cluster — not a scammer-controlled wallet.`;
+    narrativeSummary = tInv.narrative.summaryVictim(totalInDisplay, cexInboundCount, forwardingPercent, uniqueReceivers, totalOutDisplay, nativeDustSuffix);
+    narrativeConclusion = tInv.narrative.conclusionVictim;
   } else if (walletRole === 'aggregator') {
-    narrativeSummary = `This wallet functions as a scam aggregation point. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
-    if (primaryExitExchange) {
-      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity may be obtainable via legal subpoena (subject to exchange policy and data availability).`;
-    }
-    narrativeConclusion = `Conclusion: This is a scam aggregation point collecting victim funds, not a legitimate user account.`;
+    narrativeSummary = tInv.narrative.summaryAggregator(uniqueSenders, forwardingPercent, totalInDisplay, totalOutDisplay);
+    if (primaryExitExchange) narrativeSummary += tInv.narrative.cashoutDestination(primaryExitExchange);
+    narrativeConclusion = tInv.narrative.conclusionAggregator;
   } else if (walletRole === 'transit') {
-    narrativeSummary = `This wallet functions as a transit/forwarding wallet. It received funds from approximately ${uniqueSenders} unique sender addresses and forwarded ${forwardingPercent}% of incoming value within 24 hours. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
-    if (primaryExitExchange) {
-      narrativeSummary += ` The primary cash-out destination is ${primaryExitExchange}, a KYC-regulated exchange where account holder identity may be obtainable via legal subpoena (subject to exchange policy and data availability).`;
-    }
-    narrativeConclusion = `Conclusion: This is a transit wallet used in coordinated fund routing, not a legitimate user account.`;
+    narrativeSummary = tInv.narrative.summaryTransit(uniqueSenders, forwardingPercent, totalInDisplay, totalOutDisplay);
+    if (primaryExitExchange) narrativeSummary += tInv.narrative.cashoutDestination(primaryExitExchange);
+    narrativeConclusion = tInv.narrative.conclusionTransit;
   } else if (walletRole === 'exchange_deposit') {
-    narrativeSummary = `This wallet appears to funnel funds to ${primaryExitExchange}. It received from ${uniqueSenders} senders and consolidated to a single exchange destination. Total flow: ${totalInDisplay} in, ${totalOutDisplay} out.`;
-    narrativeConclusion = `Conclusion: Exchange deposit funnel — identity likely recoverable via ${primaryExitExchange} KYC records.`;
+    narrativeSummary = tInv.narrative.summaryExchangeDeposit(primaryExitExchange, uniqueSenders, totalInDisplay, totalOutDisplay);
+    narrativeConclusion = tInv.narrative.conclusionExchangeDeposit(primaryExitExchange);
   } else if (walletRole === 'distributor') {
-    narrativeSummary = `This wallet distributes funds to a large number of recipients. ${uniqueSenders} sender(s) deposited a total of ${totalInDisplay}, then funds flowed to ${uniqueReceivers} recipients (${totalOutDisplay} total outflow).`;
-    narrativeConclusion = `Conclusion: Distribution pattern — possible airdrop, payroll, or victim payout mechanism.`;
+    narrativeSummary = tInv.narrative.summaryDistributor(uniqueSenders, totalInDisplay, uniqueReceivers, totalOutDisplay);
+    narrativeConclusion = tInv.narrative.conclusionDistributor;
   } else {
-    narrativeSummary = `This wallet shows ${totalTxCount} total transactions across ${uniqueSenders} unique senders and ${uniqueReceivers} unique receivers. Total inflow: ${totalInDisplay}. Total outflow: ${totalOutDisplay}.`;
-    if (primaryExitExchange) narrativeSummary += ` Funds were routed through ${primaryExitExchange}.`;
+    narrativeSummary = tInv.narrative.summaryUnknown(totalTxCount, uniqueSenders, uniqueReceivers, totalInDisplay, totalOutDisplay);
+    if (primaryExitExchange) narrativeSummary += tInv.narrative.routedThrough(primaryExitExchange);
     narrativeConclusion = hasMixer
-      ? 'Conclusion: Mixer usage detected — funds were deliberately obfuscated.'
+      ? tInv.narrative.conclusionMixer
       : primaryExitExchange
-        ? `Conclusion: Funds traceable to ${primaryExitExchange} — recovery possible via legal channels.`
-        : 'Conclusion: Further investigation recommended to determine fund destination.';
+        ? tInv.narrative.conclusionTraceable(primaryExitExchange)
+        : tInv.narrative.conclusionFurther;
   }
 
   const narrative: NarrativeData = {
@@ -1874,9 +1863,9 @@ export async function generateReport(
   const isVictimRole = walletRole === 'victim';
 
   const evidenceFactors: EvidenceStrength['factors'] = [
-    { label: `${incoming.length + outgoing.length} transactions analyzed`, met: incoming.length + outgoing.length > 10 },
-    { label: `${uniqueSenders} unique sender addresses identified`, met: uniqueSenders >= 3 },
-    { label: `${forwardingPercent}% rapid forwarding pattern`, met: forwardingPercent >= 50 },
+    { label: tInv.evidence.txAnalyzed(incoming.length + outgoing.length), met: incoming.length + outgoing.length > 10 },
+    { label: tInv.evidence.uniqueSenders(uniqueSenders), met: uniqueSenders >= 3 },
+    { label: tInv.evidence.rapidForwarding(forwardingPercent), met: forwardingPercent >= 50 },
     // Phase 2.6: role-aware KYC exit. Previously this was unconditionally
     // "KYC exchange exit confirmed", which falsely triggered for a victim who
     // sent funds to her OWN exchange — contradicting the Investigation Summary
@@ -1884,28 +1873,28 @@ export async function generateReport(
     // cash-out exit only when the subject is NOT the victim. Mirrors
     // scammerCashOutDetected() in reportPdf.tsx so the pages agree.
     isVictimRole
-      ? { label: 'KYC entry point confirmed (victim funding source)', met: kycExchangesSorted.length > 0 }
-      : { label: 'Scammer KYC exit point confirmed', met: exitPointAnalysis.hasKycExit },
-    { label: `${criticalPatterns} critical behavioral pattern(s) detected`, met: criticalPatterns > 0 },
+      ? { label: tInv.evidence.kycEntryConfirmed, met: kycExchangesSorted.length > 0 }
+      : { label: tInv.evidence.scammerKycExit, met: exitPointAnalysis.hasKycExit },
+    { label: tInv.evidence.criticalPatterns(criticalPatterns), met: criticalPatterns > 0 },
     // Scam-DB / phishing — wording differs by role.
     isVictimRole
       ? {
           label: counterpartyScamDbMatches > 0
-            ? `Counterparty in LedgerHound Scam Database (${counterpartyScamDbMatches} match${counterpartyScamDbMatches > 1 ? 'es' : ''})`
-            : 'Counterparty in LedgerHound Scam Database',
+            ? tInv.evidence.counterpartyScamDb(counterpartyScamDbMatches)
+            : tInv.evidence.counterpartyScamDbGeneric,
           met: counterpartyScamDbMatches > 0,
         }
-      : { label: 'Scam database match found', met: scamDbMatches.length > 0 },
+      : { label: tInv.evidence.scamDbMatch, met: scamDbMatches.length > 0 },
     isVictimRole
       ? {
           label: counterpartyPhishingFlags > 0
-            ? `Counterparty phishing flag confirmed (${counterpartyPhishingFlags} wallet${counterpartyPhishingFlags > 1 ? 's' : ''})`
-            : 'Counterparty phishing flag confirmed (external sources)',
+            ? tInv.evidence.counterpartyPhishing(counterpartyPhishingFlags)
+            : tInv.evidence.counterpartyPhishingGeneric,
           met: counterpartyPhishingFlags > 0,
         }
-      : { label: 'Phishing-tagged counterparty (Etherscan)', met: counterpartyPhishingFlags > 0 },
-    { label: 'Timestamps verified on-chain', met: timestamps.length > 0 },
-    { label: 'Cross-chain activity traced', met: crossChainTrace?.detected === true },
+      : { label: tInv.evidence.phishingTagged, met: counterpartyPhishingFlags > 0 },
+    { label: tInv.evidence.timestampsVerified, met: timestamps.length > 0 },
+    { label: tInv.evidence.crossChainTraced, met: crossChainTrace?.detected === true },
   ];
 
   // 2026-05-21 (Phase 2.5): attack-technique evidence bullets, campaign model.
@@ -1913,7 +1902,7 @@ export async function generateReport(
   if (addressPoisoning.detected) {
     const totalLookalikes = addressPoisoning.totalSpoofsAcrossAllCampaigns + addressPoisoning.campaigns.length;
     evidenceFactors.push({
-      label: `Address poisoning campaign identified (${totalLookalikes} look-alike address${totalLookalikes > 1 ? 'es' : ''} in ${addressPoisoning.campaigns.length} cluster${addressPoisoning.campaigns.length > 1 ? 's' : ''})`,
+      label: tInv.evidence.poisoningIdentified(totalLookalikes, addressPoisoning.campaigns.length),
       met: true,
       severity: 'high',
     });
@@ -1927,14 +1916,14 @@ export async function generateReport(
       .map(([sym, v]) => `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${sym}`)
       .join(', ');
     evidenceFactors.push({
-      label: `CRITICAL: address poisoning succeeded ${poisoningSuccessfulMisdirections} time(s) — real funds misdirected to secondary spoof addresses${realLoss ? `: ${realLoss}` : ''}`,
+      label: tInv.evidence.poisoningSucceeded(poisoningSuccessfulMisdirections, realLoss),
       met: true,
       severity: 'critical',
     });
   }
   if (unicodeSpoofing.detected) {
     evidenceFactors.push({
-      label: `Unicode spoofing tokens detected (${unicodeSpoofing.uniqueSpoofSymbols} fake symbol${unicodeSpoofing.uniqueSpoofSymbols > 1 ? 's' : ''})`,
+      label: tInv.evidence.unicodeSpoofing(unicodeSpoofing.uniqueSpoofSymbols),
       met: true,
       severity: 'high',
     });
@@ -1946,7 +1935,7 @@ export async function generateReport(
   if (poisoningSuccessfulMisdirections > 0) {
     evidenceScore = Math.min(100, evidenceScore + 10);
   }
-  const evidenceLabel = evidenceScore >= 70 ? 'STRONG' : evidenceScore >= 40 ? 'MODERATE' : 'WEAK';
+  const evidenceLabel = evidenceScore >= 70 ? tInv.evidence.labelStrong : evidenceScore >= 40 ? tInv.evidence.labelModerate : tInv.evidence.labelWeak;
   const evidenceStrength: EvidenceStrength = { score: evidenceScore, label: evidenceLabel, factors: evidenceFactors };
 
   // ── Top Inflows (for Victim Flow section) ──
@@ -2013,12 +2002,12 @@ export async function generateReport(
 
   // ── Legal Weight Assessment ──
   const legalWeight = [
-    { label: 'Law enforcement submission (FBI IC3, local police)', suitable: true },
-    { label: `Exchange compliance review${hasExchange ? ` (${kycExchangesSorted.map(e => e.label).slice(0, 3).join(', ')})` : ''}`, suitable: true },
-    { label: 'Civil litigation support', suitable: true },
-    { label: 'Insurance claim documentation', suitable: true },
-    { label: 'Regulatory complaint filing', suitable: true },
-    { label: 'Court evidence (certified upgrade available)', suitable: false },
+    { label: tInv.legalWeight.lawEnforcement, suitable: true },
+    { label: tInv.legalWeight.exchangeReview(hasExchange ? kycExchangesSorted.map(e => e.label).slice(0, 3).join(', ') : ''), suitable: true },
+    { label: tInv.legalWeight.civilLitigation, suitable: true },
+    { label: tInv.legalWeight.insurance, suitable: true },
+    { label: tInv.legalWeight.regulatory, suitable: true },
+    { label: tInv.legalWeight.courtUpgrade, suitable: false },
   ];
 
   const reportData: ReportData = {

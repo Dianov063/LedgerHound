@@ -553,7 +553,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
           <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: isVictim ? amber : isDangerous ? red : n.walletType === 'exchange_deposit' ? amber : green }}>{n.walletTypeLabel}</Text>
         </View>
         {n.roleConfidence > 0 && (
-          <Text style={{ fontSize: 8, color: slate400 }}>Confidence: {Math.round(n.roleConfidence * 100)}%</Text>
+          <Text style={{ fontSize: 8, color: slate400 }}>{t.investigation.confidence(Math.round(n.roleConfidence * 100))}</Text>
         )}
       </View>
 
@@ -563,7 +563,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
           See lib/generateReport.ts for the rules. */}
       {n.roleReasoning && n.roleReasoning.length > 0 && (
         <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>HOW WE CLASSIFIED THIS WALLET</Text>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>{t.investigation.howWeClassified}</Text>
           {n.roleReasoning.slice(0, 5).map((r, i) => (
             <Text key={i} style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 4, marginBottom: 2 }}>{'•'} {r}</Text>
           ))}
@@ -574,19 +574,19 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
         <View style={{ flex: 1, backgroundColor: '#eff6ff', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' }}>
           <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: blue }}>{n.uniqueSenders}</Text>
-          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>UNIQUE SENDERS</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{t.investigation.uniqueSenders}</Text>
         </View>
         <View style={{ flex: 1, backgroundColor: '#f0fdf4', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' }}>
           <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: green }}>{flowIn}</Text>
-          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{flowSymbol} IN</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{t.investigation.assetIn(flowSymbol)}</Text>
         </View>
         <View style={{ flex: 1, backgroundColor: '#fef2f2', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
           <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: red }}>{flowOut}</Text>
-          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{flowSymbol} OUT</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{t.investigation.assetOut(flowSymbol)}</Text>
         </View>
         <View style={{ flex: 1, backgroundColor: n.forwardingPercent >= 70 ? '#fef2f2' : '#f8fafc', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: n.forwardingPercent >= 70 ? '#fecaca' : '#e2e8f0' }}>
           <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: n.forwardingPercent >= 70 ? red : slate900 }}>{n.forwardingPercent}%</Text>
-          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>FORWARDED {'<'}24H</Text>
+          <Text style={{ fontSize: 6, color: slate600, marginTop: 2 }}>{t.investigation.forwarded24h}</Text>
         </View>
       </View>
 
@@ -598,52 +598,52 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 
       {/* Simplified Fund Flow Diagram — 3 boxes, 1 line */}
       <View style={{ marginBottom: 10 }}>
-        <Text style={{ ...s.h3, marginBottom: 6 }}>Fund Flow</Text>
+        <Text style={{ ...s.h3, marginBottom: 6 }}>{t.investigation.fundFlow}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <View style={{ alignItems: 'center', backgroundColor: '#eff6ff', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: '#bfdbfe' }}>
             <Text style={{ fontSize: isVictim ? 10 : 14, fontFamily: 'Helvetica-Bold', color: blue, textAlign: 'center' }}>
-              {isVictim ? `~${n.uniqueSenders} Source Deposit(s)` : `${n.uniqueSenders} Victims`}
+              {isVictim ? t.investigation.sourceDeposits(n.uniqueSenders) : t.investigation.victimsCount(n.uniqueSenders)}
             </Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{flowIn} {flowSymbol}</Text>
             {isVictim && (
-              <Text style={{ fontSize: 6, color: slate400, marginTop: 1, textAlign: 'center' }}>(incl. CEX deposits)</Text>
+              <Text style={{ fontSize: 6, color: slate400, marginTop: 1, textAlign: 'center' }}>{t.investigation.inclCexDeposits}</Text>
             )}
           </View>
           <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
           <View style={{ alignItems: 'center', backgroundColor: isVictim ? '#fffbeb' : '#fef2f2', borderRadius: 6, padding: 8, flex: 1, borderWidth: 2, borderColor: isVictim ? amber : red }}>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: isVictim ? amber : red }}>
-              {isVictim ? 'VICTIM WALLET' : 'SCAM WALLET'}
+              {isVictim ? t.investigation.victimWalletBadge : t.investigation.scamWalletBadge}
             </Text>
             <Text style={{ fontFamily: 'Courier', fontSize: 6, color: slate600, marginTop: 1 }}>{shortAddr(data.walletAddress)}</Text>
           </View>
           <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
           <View style={{ alignItems: 'center', backgroundColor: isVictim ? '#fef2f2' : n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: isVictim ? '#fecaca' : n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
             <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: isVictim ? red : n.primaryExitExchange ? green : amber }}>
-              {isVictim ? `${n.uniqueReceivers} Counterparty Wallet(s)` : (n.primaryExitExchange || `${n.uniqueReceivers} Receivers`)}
+              {isVictim ? t.investigation.counterpartyWallets(n.uniqueReceivers) : (n.primaryExitExchange || t.investigation.receiversCount(n.uniqueReceivers))}
             </Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{flowOut} {flowSymbol}</Text>
-            {!isVictim && n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>KYC Exchange</Text>}
-            {isVictim && <Text style={{ fontSize: 6, color: red, marginTop: 1 }}>Suspected Scammer Cluster</Text>}
+            {!isVictim && n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>{t.investigation.kycExchange}</Text>}
+            {isVictim && <Text style={{ fontSize: 6, color: red, marginTop: 1 }}>{t.investigation.suspectedScammerCluster}</Text>}
           </View>
         </View>
         {/* Victim-context note: this wallet is one of N senders — see user spec on Elayne case */}
         {isVictim && (
           <Text style={{ fontSize: 7, color: slate600, marginTop: 6, paddingHorizontal: 8, lineHeight: 1.4 }}>
-            Note: This wallet is one of approximately {n.uniqueSenders > 0 ? n.uniqueSenders : 'several'} source(s) sending funds to the same recipient cluster. The pattern is consistent with the wallet owner being a victim, not a scam operator.
+            {t.investigation.oneOfManySources(n.uniqueSenders)}
           </Text>
         )}
       </View>
 
       {/* Victim Guidance Block */}
       <View style={{ backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#bfdbfe' }}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>If You Sent Funds to This Wallet:</Text>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>{t.investigation.ifYouSentFunds}</Text>
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 3 }}>
-          Your transaction likely followed this path: YOU {'\u2192'} This Wallet ({n.walletTypeLabel}) {n.primaryExitExchange ? `\u2192 ${n.primaryExitExchange} (Cash-out)` : ''}
+          {t.investigation.transactionPath(n.walletTypeLabel)}{n.primaryExitExchange ? t.investigation.cashOutSuffix(n.primaryExitExchange) : ''}
         </Text>
-        <Text style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>To locate your specific transaction:</Text>
-        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>1. Find your TXID in the Transaction History section of this report</Text>
-        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>2. Note the date, amount, and transaction hash</Text>
-        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>3. Include this information in your police report and exchange complaint</Text>
+        <Text style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>{t.investigation.toLocateTransaction}</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>1. {t.investigation.locateStep1}</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>2. {t.investigation.locateStep2}</Text>
+        <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>3. {t.investigation.locateStep3}</Text>
       </View>
 
       <View style={s.divider} />
@@ -652,7 +652,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {/* Evidence Strength */}
         <View style={{ flex: 1 }}>
-          <Text style={{ ...s.h3, marginBottom: 4 }}>Evidence Strength</Text>
+          <Text style={{ ...s.h3, marginBottom: 4 }}>{t.investigation.evidenceStrengthTitle}</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6, alignItems: 'center' }}>
             <View style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: evColor, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 16, fontFamily: 'Helvetica-Bold', color: evColor }}>{ev.score}%</Text>
@@ -682,7 +682,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 
         {/* Legal Weight */}
         <View style={{ flex: 1 }}>
-          <Text style={{ ...s.h3, marginBottom: 4 }}>Report Suitability</Text>
+          <Text style={{ ...s.h3, marginBottom: 4 }}>{t.investigation.reportSuitabilityTitle}</Text>
           <View style={{ ...s.card, padding: 6 }}>
             {data.legalWeight.map((lw, i) => (
               <View key={i} style={{ flexDirection: 'row', marginBottom: 3, alignItems: 'center' }}>
@@ -696,34 +696,34 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
               cash-out exchange. */}
           {data.exchangeAnalysis && (data.exchangeAnalysis.hasEntryKyc || data.exchangeAnalysis.hasExitKyc) && (
             <View style={{ ...s.card, padding: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>Exchange KYC — Entry vs Exit</Text>
+              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 3 }}>{t.investigation.exchangeKycEntryVsExit}</Text>
 
               {/* Entry */}
-              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: amber, marginTop: 2 }}>KYC ENTRY POINT (victim&apos;s funding source)</Text>
+              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: amber, marginTop: 2 }}>{t.investigation.kycEntryPointLabel}</Text>
               {data.exchangeAnalysis.entryPoints.length > 0 ? (
                 data.exchangeAnalysis.entryPoints.slice(0, 3).map((e, i) => (
                   <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
-                    {e.parentEntity}: {e.interactionCount} interaction(s){e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
                   </Text>
                 ))
               ) : (
-                <Text style={{ fontSize: 6.5, color: slate400 }}>None detected.</Text>
+                <Text style={{ fontSize: 6.5, color: slate400 }}>{t.investigation.noneDetected}</Text>
               )}
               <Text style={{ fontSize: 6, color: slate400, marginTop: 1, lineHeight: 1.3 }}>
-                Identifies the VICTIM&apos;S exchange account — useful to confirm victim identity for legal proceedings, not the scammer&apos;s.
+                {t.investigation.identifiesVictimAccount}
               </Text>
 
               {/* Exit */}
-              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: red, marginTop: 4 }}>KYC EXIT POINT (scammer cash-out)</Text>
+              <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: red, marginTop: 4 }}>{t.investigation.kycExitPointLabel}</Text>
               {data.exchangeAnalysis.exitPoints.length > 0 ? (
                 data.exchangeAnalysis.exitPoints.slice(0, 3).map((e, i) => (
                   <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
-                    {e.parentEntity}: {e.interactionCount} interaction(s){e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
                   </Text>
                 ))
               ) : (
                 <Text style={{ fontSize: 6.5, color: slate600, lineHeight: 1.3 }}>
-                  Not detected in subject wallet&apos;s direct history. The fraud cluster controls the funds; identifying a cash-out exchange requires an expanded counterparty trace (one or more hops beyond this wallet).
+                  {t.investigation.exitNotDetected}
                 </Text>
               )}
             </View>
