@@ -14,10 +14,10 @@ Soy víctima de fraude con criptomonedas que utilizó tokens USDT (stablecoin de
 
 - **Período del incidente:** [Mes-Año] - [Mes-Año]
 - **Pérdida confirmada en USDT real:** [monto] USDT
-- **Plataforma fraudulenta:** DZHLWK Fintech
+- **Plataforma involucrada:** DZHLWK Fintech
 - **ID del caso forense:** [{caseId}]
 
-### Direcciones receptoras controladas por la operación fraudulenta (USDT real):
+### Direcciones receptoras controladas por los operadores del fraude (USDT real):
 
 - **Recolector principal:** [dirección] — recibió [monto] USDT
 - **Suplantación que recibió fondos reales:** [dirección] — recibió [monto] USDT
@@ -50,10 +50,20 @@ Si Tether mantiene una lista de tokens fraudulentos que imitan el símbolo USDT 
 El informe forense LedgerHound incluye:
 
 - Análisis blockchain completo
-- Identificación de operación fraudulenta multi-wallet (DZHLWK)
+- Identificación de operación de fraude multi-wallet (DZHLWK)
 - Etiqueta oficial de Etherscan: Fake_Phishing[número]
 - Pruebas detalladas de los ataques de suplantación Unicode con codepoints
 - Separación clara entre pérdidas reales de USDT y unidades de tokens falsificados sin valor
+
+## CADENA DE CUSTODIA DIGITAL
+
+Para garantizar la integridad de la evidencia digital adjunta:
+
+- **Informe forense LedgerHound (PDF):**
+  - Archivo: LedgerHound-Report-[{caseId}].pdf
+  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+
+Los hashes SHA256 permiten verificar que la evidencia digital no ha sido alterada desde su recolección.
 
 Agradezco su atención a este caso y quedo a su disposición para cualquier información adicional.
 

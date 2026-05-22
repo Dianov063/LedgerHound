@@ -8,7 +8,7 @@
 
 Estimado equipo de cumplimiento de Binance,
 
-Le escribo para reportar un caso de fraude con criptomonedas que requiere su atención inmediata. Soy víctima de una estafa "pig butchering" que utilizó una plataforma fraudulenta llamada DZHLWK Fintech.
+Le escribo para reportar un caso de fraude con criptomonedas que requiere su atención inmediata. Soy víctima de una presunta modalidad de fraude de inversión en criptomonedas compatible con esquemas conocidos como "pig butchering", que utilizó la plataforma DZHLWK Fintech.
 
 ## DETALLES DEL CASO
 
@@ -18,7 +18,7 @@ Le escribo para reportar un caso de fraude con criptomonedas que requiere su ate
 - **Cantidad perdida:** Aproximadamente $[monto] USD en USDT
 - **ID del caso forense:** [{caseId}]
 
-### Direcciones de los estafadores (controladas por la operación fraudulenta):
+### Direcciones de los estafadores (controladas por los operadores del fraude):
 
 - **Recolector principal:** [dirección]
 - **Suplantaciones secundarias (envenenamiento de direcciones):**
@@ -39,9 +39,9 @@ Preservar todos los datos relacionados con mi cuenta Binance durante el período
 - Logs de inicio de sesión y direcciones IP
 - Comunicaciones de soporte al cliente
 
-### 2. LISTA NEGRA INTERNA
+### 2. REVISIÓN DE CUMPLIMIENTO Y MONITOREO DE RIESGO
 
-Marcar las direcciones de la operación fraudulenta (listadas arriba) en su sistema interno de cumplimiento. Esto puede prevenir que otras víctimas envíen fondos a estos destinatarios.
+Marcar las direcciones (listadas arriba) para revisión por su equipo de cumplimiento y monitoreo continuo de riesgo. Esto puede prevenir que otras víctimas envíen fondos a estos destinatarios.
 
 ### 3. COORDINACIÓN CON AUTORIDADES
 
@@ -52,10 +52,20 @@ Estoy preparando denuncia formal con las autoridades pertinentes (DIVINDAT en Pe
 Adjunto el informe forense LedgerHound del Caso [{caseId}], que contiene:
 
 - Análisis blockchain completo de mi wallet
-- Identificación de la operación fraudulenta multi-wallet (campaña de envenenamiento de direcciones)
+- Identificación de la operación de fraude multi-wallet (campaña de envenenamiento de direcciones)
 - Documentación de ataques de suplantación con tokens Unicode (USDT falsificados)
 - Etiquetado oficial de Etherscan: Fake_Phishing[número]
 - Trazado detallado de flujos de fondos
+
+## CADENA DE CUSTODIA DIGITAL
+
+Para garantizar la integridad de la evidencia digital adjunta:
+
+- **Informe forense LedgerHound (PDF):**
+  - Archivo: LedgerHound-Report-[{caseId}].pdf
+  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+
+Los hashes SHA256 permiten verificar que la evidencia digital no ha sido alterada desde su recolección.
 
 Quedo a su disposición para cualquier información adicional que requieran. Agradezco su pronta atención a este caso.
 

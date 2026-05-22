@@ -34,7 +34,7 @@ Nota: Las unidades de tokens de suplantación Unicode son falsificaciones digita
 Adjunto a la presente denuncia un **INFORME FORENSE COMPLETO** emitido por LedgerHound (Caso ID: **[{caseId}]**), que contiene:
 
 1. Análisis blockchain detallado de mi wallet de Ethereum
-2. Identificación de la operación fraudulenta multi-wallet, incluyendo:
+2. Identificación de la operación de fraude multi-wallet, incluyendo:
    - Wallet principal de la operación (recolector)
    - 7 o más direcciones secundarias coordinadas
 3. Documentación de ataques de envenenamiento de direcciones

@@ -43,6 +43,25 @@ ok('divindat-denuncia-es.md' in byFile, 'divindat-denuncia-es.md present');
 ok(byFile['binance-compliance-es.md']?.includes('ce@binance.com'), 'Binance compliance address present');
 ok(byFile['tether-legal-es.md']?.includes('legal@tether.to'), 'Tether legal address present');
 ok(byFile['tether-legal-es.md']?.includes('a discreción de Tether'), 'Tether softened-language (no freeze promise) intact');
+
+/* ── 2c. Stage 4: Binance + Tether legal hardening (consistency with DIVINDAT) ── */
+console.log('\n[2c] Binance + Tether legal hardening');
+const bin = byFile['binance-compliance-es.md'] || '';
+const teth = byFile['tether-legal-es.md'] || '';
+// Defamation: no template names DZHLWK as "fraudulenta"
+for (const [name, body] of [['binance', bin], ['tether', teth], ['divindat', byFile['divindat-denuncia-es.md'] || '']] as const) {
+  ok(!body.includes('plataforma fraudulenta'), `${name}: no "plataforma fraudulenta" (defamation-safe)`);
+  ok(!body.includes('Plataforma fraudulenta'), `${name}: no "Plataforma fraudulenta:" label`);
+  ok(!body.includes('operación fraudulenta'), `${name}: no generic "operación fraudulenta"`);
+}
+// Binance pig-butchering softened (no bare assertion)
+ok(!bin.includes('estafa "pig butchering"'), 'binance: no bare "estafa pig butchering" assertion');
+ok(bin.includes('compatible con esquemas conocidos como "pig butchering"'), 'binance: pig-butchering framed as "compatible con"');
+ok(bin.includes('REVISIÓN DE CUMPLIMIENTO Y MONITOREO DE RIESGO'), 'binance: blacklist reframed as compliance review');
+// Chain-of-custody present in all 3
+ok(bin.includes('CADENA DE CUSTODIA DIGITAL') && bin.includes('SHA256'), 'binance: chain-of-custody + SHA256 added');
+ok(teth.includes('CADENA DE CUSTODIA DIGITAL') && teth.includes('SHA256'), 'tether: chain-of-custody + SHA256 added');
+ok(teth.includes('Plataforma involucrada'), 'tether: "Plataforma involucrada" (neutral label)');
 ok(byFile['divindat-denuncia-es.md']?.includes('DIVINDAT'), 'DIVINDAT title present');
 ok(byFile['divindat-denuncia-es.md']?.includes('Art. 196'), 'DIVINDAT statute citation present');
 ok(EMAIL_TEMPLATES_ES.every((t) => t.content.includes('{caseId}')), 'all templates carry a {caseId} token');
