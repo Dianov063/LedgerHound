@@ -236,6 +236,9 @@ async function processCheckout(event: any): Promise<void> {
   const caseId = session.metadata?.caseId || '';
   // Phase 3: report language (en|es). Falls back to en if absent/unsupported.
   const reportLocale = session.metadata?.locale || 'en';
+  // Phase 3: victim's country (ISO-ish code, e.g. PE). Unlocks country-specific
+  // recovery guidance. Empty string → generic guidance.
+  const reportCountry = session.metadata?.country || '';
 
   logger.info({ product, walletAddress, email, eventId: event.id }, '[webhook] Processing checkout (background)');
 
@@ -281,6 +284,7 @@ async function processCheckout(event: any): Promise<void> {
             amount: session.amount_total || 7900,
             network: detectedNetwork,
             locale: reportLocale,
+            country: reportCountry,
           });
           logger.info({ caseId: reportResult.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
 
@@ -339,6 +343,7 @@ async function processCheckout(event: any): Promise<void> {
           amount: session.amount_total || 1900,
           network,
           locale: reportLocale,
+          country: reportCountry,
         });
         logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Summary Report generated');
       } else {
@@ -354,6 +359,7 @@ async function processCheckout(event: any): Promise<void> {
           amount: session.amount_total || 4900,
           network,
           locale: reportLocale,
+          country: reportCountry,
         });
         logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
       } else {

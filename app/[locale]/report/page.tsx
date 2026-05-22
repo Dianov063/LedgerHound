@@ -31,6 +31,21 @@ const NETWORKS: { id: Network; label: string; short: string }[] = [
   { id: 'op', label: 'Optimism', short: 'OP' },
 ];
 
+// Phase 3: victim's country. Used to unlock country-specific recovery
+// guidance in the report (police units, regulators, hotlines). The empty
+// value means "not specified" → report falls back to generic guidance.
+const COUNTRY_OPTIONS: { code: string; en: string; es: string }[] = [
+  { code: '', en: 'Not specified', es: 'Sin especificar' },
+  { code: 'PE', en: 'Peru', es: 'Perú' },
+  { code: 'MX', en: 'Mexico', es: 'México' },
+  { code: 'CO', en: 'Colombia', es: 'Colombia' },
+  { code: 'AR', en: 'Argentina', es: 'Argentina' },
+  { code: 'CL', en: 'Chile', es: 'Chile' },
+  { code: 'ES', en: 'Spain', es: 'España' },
+  { code: 'US', en: 'United States', es: 'Estados Unidos' },
+  { code: 'OTHER', en: 'Other', es: 'Otro' },
+];
+
 const VALIDATORS: Record<Network, RegExp> = {
   eth: /^0x[a-fA-F0-9]{40}$/,
   btc: /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/,
@@ -62,6 +77,9 @@ export default function ReportPage() {
   // Phase 3: report language. Defaults to the current UI locale where a
   // translated report exists (en/es today), otherwise English.
   const [reportLang, setReportLang] = useState<'en' | 'es'>(locale === 'es' ? 'es' : 'en');
+  // Phase 3: victim's country. Unlocks country-specific recovery guidance
+  // (e.g. Peru → DIVINDAT / Ministerio Público / SBS). Optional.
+  const [reportCountry, setReportCountry] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [walletInfo, setWalletInfo] = useState<{
@@ -128,7 +146,7 @@ export default function ReportPage() {
       const res = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: wallet, email, network, locale: reportLang }),
+        body: JSON.stringify({ walletAddress: wallet, email, network, locale: reportLang, country: reportCountry }),
       });
       const data = await res.json();
       if (data.error) {
@@ -348,6 +366,24 @@ export default function ReportPage() {
                     >
                       <option value="en">English</option>
                       <option value="es">Español (América Latina)</option>
+                    </select>
+                  </div>
+
+                  {/* Phase 3: victim's country. Unlocks country-specific recovery guidance. */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      {locale === 'es' ? 'País (para guía de recuperación)' : 'Country (for recovery guidance)'}
+                    </label>
+                    <select
+                      value={reportCountry}
+                      onChange={(e) => setReportCountry(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm outline-none focus:border-brand-500"
+                    >
+                      {COUNTRY_OPTIONS.map((c) => (
+                        <option key={c.code || 'none'} value={c.code}>
+                          {locale === 'es' ? c.es : c.en}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

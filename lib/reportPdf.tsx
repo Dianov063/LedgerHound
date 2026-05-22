@@ -2051,6 +2051,86 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
 };
 
 /* ═══════════════════════════════════════════════════════════════
+   COUNTRY GUIDANCE: PERU (Phase 3 Part 3)
+   Only rendered when locale === 'es' && country === 'PE' (see ReportDocument).
+   ═══════════════════════════════════════════════════════════════ */
+const PeruGuidancePage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+  const pg = t.countryGuidance.peru;
+
+  /** One institution card with a coloured left border. */
+  const OrgCard = ({
+    num, color, title, lines, description,
+  }: { num: number; color: string; title: string; lines: string[]; description: string }) => (
+    <View style={{ ...s.card, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: color }}>
+      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color, marginBottom: 3 }}>
+        {num}. {title}
+      </Text>
+      {lines.map((ln, i) => (
+        <Text key={i} style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>{ln}</Text>
+      ))}
+      <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, marginTop: 4 }}>{description}</Text>
+    </View>
+  );
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} t={t} />
+      <Text style={s.h2}>{pg.title}</Text>
+      <Text style={{ ...s.p, fontSize: 9 }}>{pg.intro}</Text>
+
+      <OrgCard
+        num={1}
+        color={blue}
+        title={pg.divindatTitle}
+        lines={[pg.divindatAddress, pg.divindatPhone, pg.divindatEmail, pg.divindatHours]}
+        description={pg.divindatDescription}
+      />
+      <OrgCard
+        num={2}
+        color={purple}
+        title={pg.ministerioPublicoTitle}
+        lines={[pg.ministerioPublicoUrl]}
+        description={pg.ministerioPublicoDescription}
+      />
+      <OrgCard
+        num={3}
+        color={green}
+        title={pg.sbsTitle}
+        lines={[pg.sbsPhone, pg.sbsEmail]}
+        description={pg.sbsDescription}
+      />
+      <OrgCard
+        num={4}
+        color={amber}
+        title={pg.indecopiTitle}
+        lines={[pg.indecopiPhone, pg.indecopiUrl]}
+        description={pg.indecopiDescription}
+      />
+      <OrgCard
+        num={5}
+        color={slate600}
+        title={pg.calTitle}
+        lines={[pg.calUrl]}
+        description={pg.calDescription}
+      />
+      <OrgCard
+        num={6}
+        color={blue}
+        title={pg.reniecTitle}
+        lines={[pg.reniecUrl]}
+        description={pg.reniecDescription}
+      />
+
+      <View style={{ ...s.card, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', marginTop: 2 }}>
+        <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5 }}>{pg.disclaimer}</Text>
+      </View>
+
+      <Footer data={data} t={t} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
    PAGE 11/12: ACTIONABLE NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
 const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
@@ -2251,7 +2331,7 @@ const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }
 /* ═══════════════════════════════════════════════════════════════
    DOCUMENT
    ═══════════════════════════════════════════════════════════════ */
-export const ReportDocument = ({ data, locale }: { data: ReportData; locale?: ReportLocale | string }) => {
+export const ReportDocument = ({ data, locale, country }: { data: ReportData; locale?: ReportLocale | string; country?: string }) => {
   const hasCrossChain = data.crossChainTrace?.detected === true;
   // 2026-05-20 Phase 1: only render the new federation page when at least
   // one counterparty was analyzed. Avoids a blank section on tiny wallets.
@@ -2261,6 +2341,14 @@ export const ReportDocument = ({ data, locale }: { data: ReportData; locale?: Re
   const hasAttackTechniques = !!at && (at.addressPoisoning?.detected || at.unicodeSpoofing?.detected);
   // Phase 3: resolve translations and provide via context (English default).
   const t = getReportTranslations(locale);
+  // Phase 3 Part 3: country-specific recovery guidance. Currently only Peru (PE)
+  // has a dedicated section, and only when the report is rendered in Spanish
+  // (the audience is Peruvian authorities — DIVINDAT, Ministerio Público, etc.).
+  // TODO: add MexicoGuidancePage (Policía Cibernética, CONDUSEF, etc.)
+  // TODO: add ColombiaGuidancePage (DIJIN, SIC, etc.)
+  // TODO: add ArgentinaGuidancePage / ChileGuidancePage
+  // TODO: add SpainGuidancePage (Policía Nacional, Banco de España, etc.)
+  const showPeruGuidance = locale === 'es' && country === 'PE';
 
   return (
     <Document>
@@ -2278,6 +2366,7 @@ export const ReportDocument = ({ data, locale }: { data: ReportData; locale?: Re
       <FundFlowPage data={data} t={t} />
       <TransactionsPage data={data} t={t} />
       <RecoveryLegalPage data={data} t={t} />
+      {showPeruGuidance && <PeruGuidancePage data={data} t={t} />}
       <ActionableStepsPage data={data} t={t} />
       <DisclaimerPage data={data} t={t} />
     </Document>

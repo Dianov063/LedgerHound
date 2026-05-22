@@ -112,6 +112,11 @@ async function main() {
   fs.writeFileSync(path.join(out, 'attack-page-render-test-es.pdf'), bufEs);
   console.log(`✓ ES ReportDocument rendered: ${bufEs.length} bytes`);
   console.log('  (Attack Technique Analysis page included; Lisu + NotoSansRpt embedded)');
+
+  // ES + PE (Phase 3 Part 3) — verify the Peru guidance page renders end-to-end.
+  const bufPe = await renderToBuffer(React.createElement(ReportDocument, { data: mock, locale: 'es', country: 'PE' }) as any);
+  fs.writeFileSync(path.join(out, 'attack-page-render-test-es-PE.pdf'), bufPe);
+  console.log(`✓ ES+PE ReportDocument rendered: ${bufPe.length} bytes (Peru guidance page included)`);
 }
 
 main().catch((e) => { console.error('RENDER FAILED:', e); process.exit(1); });

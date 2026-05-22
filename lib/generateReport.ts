@@ -1007,11 +1007,14 @@ function generateRecoveryScenarios(
 export async function generateReport(
   walletAddress: string,
   email: string,
-  options?: { stripePaymentId?: string; amount?: number; network?: string; locale?: string },
+  options?: { stripePaymentId?: string; amount?: number; network?: string; locale?: string; country?: string },
 ) {
   const network = (options?.network || 'eth').toLowerCase();
   // Phase 3: report locale (en|es; others fall back to en in getReportTranslations).
   const reportLocale = options?.locale || 'en';
+  // Phase 3 Part 3: victim's country (e.g. PE). Unlocks country-specific
+  // recovery guidance in the PDF. Empty → generic guidance only.
+  const reportCountry = options?.country || '';
   // Phase 3 Batch 2.1: locale-aware generated prose (role reasoning, narrative,
   // evidence factors, legal weight). Same table the PDF renders with.
   const tReport = getReportTranslations(reportLocale);
@@ -2075,7 +2078,7 @@ export async function generateReport(
   };
 
   // Generate PDF
-  const doc = React.createElement(ReportDocument, { data: reportData, locale: reportLocale }) as any;
+  const doc = React.createElement(ReportDocument, { data: reportData, locale: reportLocale, country: reportCountry }) as any;
   const pdfBuffer = await renderToBuffer(doc);
   const buf = Buffer.from(pdfBuffer);
 

@@ -49,11 +49,17 @@ export async function POST(req: NextRequest) {
       rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
     }
 
-    const { walletAddress, email, network = 'eth', locale } = await req.json();
+    const { walletAddress, email, network = 'eth', locale, country } = await req.json();
 
     // Phase 3: report language. Only en/es produce a fully-translated report
     // today; anything else falls back to English at render time.
     const reportLocale = (typeof locale === 'string' && ['en', 'es'].includes(locale)) ? locale : 'en';
+
+    // Phase 3: victim's country. Unlocks country-specific recovery guidance.
+    // Only a known allow-list is honoured; anything else (incl. empty) becomes
+    // '' → report falls back to generic guidance.
+    const ALLOWED_COUNTRIES = ['PE', 'MX', 'CO', 'AR', 'CL', 'ES', 'US', 'OTHER'];
+    const reportCountry = (typeof country === 'string' && ALLOWED_COUNTRIES.includes(country)) ? country : '';
 
     const net = (network || 'eth').toLowerCase();
     const validator = ADDRESS_VALIDATORS[net];
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest) {
         email,
         network: net,
         locale: reportLocale,
+        country: reportCountry,
       },
       customer_email: email,
       success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,

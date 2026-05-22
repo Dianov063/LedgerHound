@@ -165,6 +165,44 @@ export interface ReportTranslations {
   fundFlow: FundFlow;
   /** Transaction History (Phase 3 Batch 2.7). */
   transactions: Transactions;
+  /** Country-specific recovery guidance (Phase 3 Part 3). */
+  countryGuidance: CountryGuidance;
+}
+
+/** Country-specific recovery guidance (Phase 3 Part 3). */
+export interface CountryGuidance {
+  peru: PeruGuidance;
+  // TODO(Phase 3): mexico, colombia, argentina, chile, spain as content lands.
+}
+
+/** Peru-specific recovery resources page. */
+export interface PeruGuidance {
+  title: string;
+  intro: string;
+  divindatTitle: string;
+  divindatAddress: string;
+  divindatPhone: string;
+  divindatEmail: string;
+  divindatHours: string;
+  divindatDescription: string;
+  ministerioPublicoTitle: string;
+  ministerioPublicoUrl: string;
+  ministerioPublicoDescription: string;
+  sbsTitle: string;
+  sbsPhone: string;
+  sbsEmail: string;
+  sbsDescription: string;
+  indecopiTitle: string;
+  indecopiPhone: string;
+  indecopiUrl: string;
+  indecopiDescription: string;
+  calTitle: string;
+  calUrl: string;
+  calDescription: string;
+  reniecTitle: string;
+  reniecUrl: string;
+  reniecDescription: string;
+  disclaimer: string;
 }
 
 /** Fund Flow Graph (page 13) translations. */
@@ -1121,6 +1159,36 @@ const en: ReportTranslations = {
     spoofFootnote: '⚠ Highlighted rows are Unicode-spoof tokens (fake symbols mimicking real currencies) — see Attack Technique Analysis.',
     spamFilteredNote: (n) => `Showing legitimate transfers only. ${n} spam/airdrop token transfers were filtered from this analysis.`,
   },
+  countryGuidance: {
+    peru: {
+      title: 'Peru-Specific Recovery Resources',
+      intro: 'The following Peruvian authorities and organizations can help advance this case. Submit this forensic report as supporting documentation for access to their respective legal channels.',
+      divindatTitle: 'DIVINDAT — Division of High Technology Crime Investigation',
+      divindatAddress: 'Av. España 323, Cercado de Lima',
+      divindatPhone: 'Phone: (01) 431-8898',
+      divindatEmail: 'Email: divindat.pnp@gmail.com',
+      divindatHours: 'Hours: Monday-Friday, 8:00-17:00',
+      divindatDescription: 'DIVINDAT investigates cybercrime including cryptocurrency fraud. Submit a personal complaint together with this forensic report.',
+      ministerioPublicoTitle: 'Ministerio Público — Online Complaints',
+      ministerioPublicoUrl: 'https://denuncias.mpfn.gob.pe/',
+      ministerioPublicoDescription: 'Official system for filing formal complaints. Keep the case number assigned to you.',
+      sbsTitle: 'SBS — Superintendency of Banking, Insurance and AFP',
+      sbsPhone: 'Toll-free: 0-800-10840',
+      sbsEmail: 'Email: solucion@sbs.gob.pe',
+      sbsDescription: 'For cases involving local financial entities. SBS can issue alerts on suspicious accounts.',
+      indecopiTitle: 'INDECOPI — Consumer Defense',
+      indecopiPhone: 'Phone: 224-7777',
+      indecopiUrl: 'https://www.consumidor.gob.pe/',
+      indecopiDescription: 'If the scam involved local investment services with deceptive advertising, INDECOPI can initiate administrative proceedings against the offender.',
+      calTitle: 'Colegio de Abogados de Lima (CAL)',
+      calUrl: 'https://www.cal.org.pe/',
+      calDescription: 'Before hiring a lawyer, verify active membership at CAL or the corresponding regional bar association. For crypto fraud cases, seek lawyers with experience in economic crimes.',
+      reniecTitle: 'RENIEC — Identity Protection',
+      reniecUrl: 'https://www.reniec.gob.pe/',
+      reniecDescription: 'If you provided your DNI (national ID) to scammers during a fake KYC process, consider an identity alert at RENIEC and credit monitoring through Equifax Perú or Sentinel.',
+      disclaimer: 'This forensic report may be presented as supporting documentation to any of the authorities listed above.',
+    },
+  },
 };
 
 const es: ReportTranslations = {
@@ -1657,6 +1725,36 @@ const es: ReportTranslations = {
     colToken: 'Token',
     spoofFootnote: '⚠ Las filas resaltadas son tokens de suplantación Unicode (símbolos falsos que imitan monedas reales) — ver Análisis de Técnicas de Ataque.',
     spamFilteredNote: (n) => `Mostrando solo transferencias legítimas. ${n} transferencias de tokens de spam/airdrop fueron filtradas de este análisis.`,
+  },
+  countryGuidance: {
+    peru: {
+      title: 'Recursos Específicos para Perú',
+      intro: 'Las siguientes autoridades y organismos peruanos pueden ayudarle a avanzar este caso. Para acceder a sus respectivos canales legales, presente este informe forense como documentación de apoyo.',
+      divindatTitle: 'DIVINDAT — División de Investigación de Delitos de Alta Tecnología',
+      divindatAddress: 'Av. España 323, Cercado de Lima',
+      divindatPhone: 'Teléfono: (01) 431-8898',
+      divindatEmail: 'Email: divindat.pnp@gmail.com',
+      divindatHours: 'Horario: Lunes a viernes, 8:00-17:00',
+      divindatDescription: 'DIVINDAT investiga delitos cibernéticos, incluyendo el fraude con criptomonedas. Presente una denuncia personal junto con este informe forense.',
+      ministerioPublicoTitle: 'Ministerio Público — Denuncias en Línea',
+      ministerioPublicoUrl: 'https://denuncias.mpfn.gob.pe/',
+      ministerioPublicoDescription: 'Sistema oficial para presentar denuncias formales. Conserve el número de expediente que se le asigne.',
+      sbsTitle: 'SBS — Superintendencia de Banca, Seguros y AFP',
+      sbsPhone: 'Teléfono gratuito: 0-800-10840',
+      sbsEmail: 'Email: solucion@sbs.gob.pe',
+      sbsDescription: 'Para casos donde están involucradas entidades financieras locales. La SBS puede emitir alertas sobre cuentas sospechosas.',
+      indecopiTitle: 'INDECOPI — Defensa del Consumidor',
+      indecopiPhone: 'Teléfono: 224-7777',
+      indecopiUrl: 'https://www.consumidor.gob.pe/',
+      indecopiDescription: 'Si la estafa involucró servicios de inversión locales con publicidad engañosa, INDECOPI puede iniciar un procedimiento administrativo contra el infractor.',
+      calTitle: 'Colegio de Abogados de Lima (CAL)',
+      calUrl: 'https://www.cal.org.pe/',
+      calDescription: 'Antes de contratar un abogado, verifique la colegiatura activa en el CAL o el colegio correspondiente de su región. Para casos de fraude cripto, busque abogados con experiencia en delitos económicos.',
+      reniecTitle: 'RENIEC — Protección de Identidad',
+      reniecUrl: 'https://www.reniec.gob.pe/',
+      reniecDescription: 'Si proporcionó su DNI a los estafadores durante un proceso de KYC falso, considere una alerta de identidad en RENIEC y monitoreo crediticio a través de Equifax Perú o Sentinel.',
+      disclaimer: 'Este informe forense puede ser presentado como documentación de apoyo ante cualquiera de las autoridades arriba mencionadas.',
+    },
   },
 };
 
