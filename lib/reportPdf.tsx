@@ -816,14 +816,24 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
       )}
 
       {/* 2026-05-21 (Phase 2.5 / Part 4): footnote — apparent net balance
-          understates the true loss when funds went to poisoning spoofs. */}
-      {data.attackTechniques?.addressPoisoning?.totalMisdirectedToSecondarySpoofs > 0 && (
-        <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 8, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: amber }}>
-          <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-            Note: The apparent net balance understates the true economic loss. {data.attackTechniques.addressPoisoning.totalMisdirectedToSecondarySpoofs.toFixed(2)} {data.attackTechniques.addressPoisoning.campaigns[0]?.primaryToken || ''} was sent to address-poisoning spoof addresses (see Attack Technique Analysis). These funds were lost to visual address confusion, not legitimately transferred — the full loss to this victim exceeds the on-chain net figure.
-          </Text>
-        </View>
-      )}
+          understates the true loss when funds went to poisoning spoofs.
+          2026-05-22 (Phase 2.7.1 / Issue #6): report REAL economic loss
+          separately from worthless spoof-token units so this footnote agrees
+          with the Attack Technique Analysis page (was a mixed-unit total). */}
+      {(() => {
+        const apz = data.attackTechniques?.addressPoisoning;
+        if (!apz) return null;
+        const realStr = fmtTokenRecord(apz.totalRealEconomicLoss);
+        const spoofStr = fmtTokenRecord(apz.totalSpoofUnitsRouted);
+        if (!realStr && !spoofStr) return null;
+        return (
+          <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 8, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: amber }}>
+            <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
+              Note: The apparent net balance understates the true economic loss.{realStr ? ` Real funds misdirected to address-poisoning spoof addresses: ${realStr}.` : ''}{spoofStr ? ` Separately, ${spoofStr} of worthless spoof-token units (no market value) were routed to attacker-controlled addresses.` : ''} See Attack Technique Analysis. Real funds were lost to visual address confusion, not legitimately transferred; spoof-token units carry no value and are reported separately.
+            </Text>
+          </View>
+        );
+      })()}
 
       <View style={s.sectionDivider} />
 

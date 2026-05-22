@@ -1786,14 +1786,34 @@ export async function generateReport(
     unknown: 'Unclassified Wallet',
   };
 
-  // Auto-generate narrative
-  const totalInDisplay = `${fmtEth(ethReceived)} ${nativeCurrency}`;
-  const totalOutDisplay = `${fmtEth(ethSent)} ${nativeCurrency}`;
+  // Auto-generate narrative.
+  // Phase 2.7.1 (Issue #7): when a stablecoin dominates the flow, the narrative
+  // must lead with stablecoin volume — native ETH is usually just gas dust.
+  // Mirrors the Key Findings logic so Page 4 prose can't contradict Page 2
+  // (which previously read "Total outflow: 0.000243 ETH" while the real money
+  // was tens of thousands of USDT).
+  const NARRATIVE_STABLES = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'PYUSD'];
+  const primaryStableAsset = assetSummary.realAssets
+    .filter((a) => NARRATIVE_STABLES.includes(a.symbol) && (a.totalIn + a.totalOut) > 0)
+    .sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut))[0];
+  const useStableNarrative = !!primaryStableAsset
+    && (primaryStableAsset.totalIn + primaryStableAsset.totalOut) > (ethReceived + ethSent);
+  const fmtAmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const totalInDisplay = useStableNarrative
+    ? `${fmtAmt(primaryStableAsset.totalIn)} ${primaryStableAsset.symbol}`
+    : `${fmtEth(ethReceived)} ${nativeCurrency}`;
+  const totalOutDisplay = useStableNarrative
+    ? `${fmtAmt(primaryStableAsset.totalOut)} ${primaryStableAsset.symbol}`
+    : `${fmtEth(ethSent)} ${nativeCurrency}`;
+  // Supplementary native-ETH note when ETH is mere gas dust beside the stablecoin volume.
+  const nativeDustSuffix = useStableNarrative && ethSent < 0.01
+    ? ` Separately, ${fmtEth(ethSent)} ${nativeCurrency} in gas/dust was moved across native transactions.`
+    : '';
   let narrativeSummary = '';
   let narrativeConclusion = '';
 
   if (walletRole === 'victim') {
-    narrativeSummary = `This wallet shows the behavioral profile of a victim wallet. It received ${totalInDisplay} from ${cexInboundCount} KYC exchange deposit(s), then forwarded ${forwardingPercent}% of those funds to ${uniqueReceivers} unknown counterparty address(es) within 24 hours. Total outflow: ${totalOutDisplay}.`;
+    narrativeSummary = `This wallet shows the behavioral profile of a victim wallet. It received ${totalInDisplay} from ${cexInboundCount} KYC exchange deposit(s), then forwarded ${forwardingPercent}% of those funds to ${uniqueReceivers} unknown counterparty address(es) within 24 hours. Total outflow: ${totalOutDisplay}.${nativeDustSuffix}`;
     if (subjectKnownEntity || cexOutboundCount > 0) {
       // (defensive — shouldn't hit for victim role)
     }
