@@ -5,6 +5,8 @@
  * Used by generateReport.ts to add a "Behavioral Pattern Analysis" section to the PDF.
  */
 
+import { getReportTranslations, type Behavioral } from './report-i18n';
+
 export interface ScamPattern {
   name: string;
   confidence: number; // 0-100
@@ -38,7 +40,7 @@ interface EntityInput {
    Pattern 1: Rapid Forwarding (Scam Funnel)
    Funds arrive and leave within 24h — classic transit wallet
    ────────────────────────────────────────────── */
-function detectRapidForwarding(transactions: TxInput[]): ScamPattern | null {
+function detectRapidForwarding(transactions: TxInput[], bt: Behavioral): ScamPattern | null {
   const inTxs = transactions.filter(tx => tx.direction === 'IN' && tx.date && tx.date !== 'N/A');
   const outTxs = transactions.filter(tx => tx.direction === 'OUT' && tx.date && tx.date !== 'N/A');
 
@@ -63,13 +65,9 @@ function detectRapidForwarding(transactions: TxInput[]): ScamPattern | null {
 
   if (rapidForwardPercent > 60) {
     return {
-      name: 'Rapid Forwarding (Scam Funnel)',
+      name: bt.rapidForwardingName,
       confidence: Math.min(Math.round(rapidForwardPercent), 95),
-      evidence: [
-        `${Math.round(rapidForwardPercent)}% of incoming funds forwarded within 24 hours`,
-        `${rapidForwardCount} of ${inTxs.length} deposits show pass-through behavior`,
-        'Wallet acts as transit point, not final destination',
-      ],
+      evidence: bt.rapidForwardingEv(Math.round(rapidForwardPercent), rapidForwardCount, inTxs.length),
       severity: rapidForwardPercent > 85 ? 'CRITICAL' : 'HIGH',
     };
   }
@@ -80,7 +78,7 @@ function detectRapidForwarding(transactions: TxInput[]): ScamPattern | null {
    Pattern 2: Aggregation Wallet (Victim Collector)
    Many different senders, few outgoing destinations
    ────────────────────────────────────────────── */
-function detectAggregation(transactions: TxInput[]): ScamPattern | null {
+function detectAggregation(transactions: TxInput[], bt: Behavioral): ScamPattern | null {
   const inTxs = transactions.filter(tx => tx.direction === 'IN');
   const outTxs = transactions.filter(tx => tx.direction === 'OUT');
   const uniqueSenders = new Set(inTxs.map(tx => tx.from.toLowerCase())).size;
@@ -88,13 +86,9 @@ function detectAggregation(transactions: TxInput[]): ScamPattern | null {
 
   if (uniqueSenders >= 5 && inTxs.length >= 8 && uniqueRecipients <= 3) {
     return {
-      name: 'Aggregation Wallet (Victim Collector)',
+      name: bt.aggregationName,
       confidence: Math.min(65 + uniqueSenders * 2, 95),
-      evidence: [
-        `${uniqueSenders} unique senders (potential victims)`,
-        `${inTxs.length} incoming vs ${outTxs.length} outgoing transactions`,
-        `Funds consolidated to only ${uniqueRecipients} destination(s)`,
-      ],
+      evidence: bt.aggregationEv(uniqueSenders, inTxs.length, outTxs.length, uniqueRecipients),
       severity: uniqueSenders > 15 ? 'CRITICAL' : 'HIGH',
     };
   }
@@ -105,7 +99,7 @@ function detectAggregation(transactions: TxInput[]): ScamPattern | null {
    Pattern 3: Pig Butchering / Romance Scam
    Gradual deposits over time, then large single withdrawal
    ────────────────────────────────────────────── */
-function detectPigButchering(transactions: TxInput[]): ScamPattern | null {
+function detectPigButchering(transactions: TxInput[], bt: Behavioral): ScamPattern | null {
   const inTxs = transactions
     .filter(tx => tx.direction === 'IN' && tx.date && tx.date !== 'N/A')
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -127,13 +121,9 @@ function detectPigButchering(transactions: TxInput[]): ScamPattern | null {
     // Large withdrawal is 60%+ of total deposits
     if (totalIn > 0 && largestOut >= totalIn * 0.6) {
       return {
-        name: 'Pig Butchering Pattern',
+        name: bt.pigButcheringName,
         confidence: Math.min(70 + Math.round(daysBetween / 5), 90),
-        evidence: [
-          `${inTxs.length} deposits over ${Math.round(daysBetween)} days (gradual "investment")`,
-          `Largest outflow = ${Math.round((largestOut / totalIn) * 100)}% of total deposited funds`,
-          'Pattern consistent with romance or investment scam',
-        ],
+        evidence: bt.pigButcheringEv(inTxs.length, Math.round(daysBetween), Math.round((largestOut / totalIn) * 100)),
         severity: 'HIGH',
       };
     }
@@ -145,19 +135,15 @@ function detectPigButchering(transactions: TxInput[]): ScamPattern | null {
    Pattern 4: Dusting & Spam Activity
    Many micro-transactions or spam tokens
    ────────────────────────────────────────────── */
-function detectDusting(transactions: TxInput[], spamTokenCount: number): ScamPattern | null {
+function detectDusting(transactions: TxInput[], spamTokenCount: number, bt: Behavioral): ScamPattern | null {
   const microTxs = transactions.filter(tx => tx.value < 0.001);
   const microPercent = transactions.length > 0 ? (microTxs.length / transactions.length) * 100 : 0;
 
   if (spamTokenCount > 15 || microPercent > 50) {
     return {
-      name: 'Dusting / Spam Activity',
+      name: bt.dustingName,
       confidence: Math.min(45 + spamTokenCount, 85),
-      evidence: [
-        `${spamTokenCount} spam/airdrop tokens detected`,
-        `${Math.round(microPercent)}% micro-transactions (dust)`,
-        'May indicate phishing targets or address poisoning attempts',
-      ],
+      evidence: bt.dustingEv(spamTokenCount, Math.round(microPercent)),
       severity: spamTokenCount > 30 ? 'MEDIUM' : 'LOW',
     };
   }
@@ -168,17 +154,17 @@ function detectDusting(transactions: TxInput[], spamTokenCount: number): ScamPat
    Pattern 5: Mixer / Tumbler Usage
    Already detected via entity identification
    ────────────────────────────────────────────── */
-function detectMixerUsage(entities: EntityInput[]): ScamPattern | null {
+function detectMixerUsage(entities: EntityInput[], bt: Behavioral): ScamPattern | null {
   const mixers = entities.filter(e => e.type === 'mixer');
 
   if (mixers.length > 0) {
     return {
-      name: 'Mixer / Tumbler Usage',
+      name: bt.mixerName,
       confidence: 95,
       evidence: [
-        `Interaction with ${mixers.length} known mixer(s)`,
-        ...mixers.map(m => `${m.label} (${m.interactions} interaction${m.interactions > 1 ? 's' : ''})`),
-        'Mixers are commonly used to launder stolen funds',
+        bt.mixerEvHeader(mixers.length),
+        ...mixers.map(m => bt.mixerEvItem(m.label, m.interactions)),
+        bt.mixerEvFooter,
       ],
       severity: 'CRITICAL',
     };
@@ -190,7 +176,7 @@ function detectMixerUsage(entities: EntityInput[]): ScamPattern | null {
    Pattern 6: Round-Number Transfers
    Many transfers in round amounts (exactly 1000, 5000, etc.)
    ────────────────────────────────────────────── */
-function detectRoundNumberTransfers(transactions: TxInput[]): ScamPattern | null {
+function detectRoundNumberTransfers(transactions: TxInput[], bt: Behavioral): ScamPattern | null {
   const significantTxs = transactions.filter(tx => tx.value >= 1);
   if (significantTxs.length < 3) return null;
 
@@ -203,13 +189,9 @@ function detectRoundNumberTransfers(transactions: TxInput[]): ScamPattern | null
 
   if (roundPercent > 60 && roundCount >= 3) {
     return {
-      name: 'Round-Number Transfers',
+      name: bt.roundNumbersName,
       confidence: Math.min(50 + Math.round(roundPercent / 2), 80),
-      evidence: [
-        `${roundCount} of ${significantTxs.length} transfers are exact round numbers`,
-        `${Math.round(roundPercent)}% round-number rate (typical scams use round amounts)`,
-        'Organic transfers rarely consist of exact round numbers',
-      ],
+      evidence: bt.roundNumbersEv(roundCount, significantTxs.length, Math.round(roundPercent)),
       severity: 'MEDIUM',
     };
   }
@@ -223,25 +205,26 @@ export function analyzeScamPatterns(
   transactions: TxInput[],
   entities: EntityInput[],
   spamTokenCount: number,
+  bt: Behavioral = getReportTranslations('en').behavioral,
 ): PatternAnalysis {
   const patterns: ScamPattern[] = [];
 
-  const rapidForward = detectRapidForwarding(transactions);
+  const rapidForward = detectRapidForwarding(transactions, bt);
   if (rapidForward) patterns.push(rapidForward);
 
-  const aggregation = detectAggregation(transactions);
+  const aggregation = detectAggregation(transactions, bt);
   if (aggregation) patterns.push(aggregation);
 
-  const pigButchering = detectPigButchering(transactions);
+  const pigButchering = detectPigButchering(transactions, bt);
   if (pigButchering) patterns.push(pigButchering);
 
-  const dusting = detectDusting(transactions, spamTokenCount);
+  const dusting = detectDusting(transactions, spamTokenCount, bt);
   if (dusting) patterns.push(dusting);
 
-  const mixer = detectMixerUsage(entities);
+  const mixer = detectMixerUsage(entities, bt);
   if (mixer) patterns.push(mixer);
 
-  const roundNumbers = detectRoundNumberTransfers(transactions);
+  const roundNumbers = detectRoundNumberTransfers(transactions, bt);
   if (roundNumbers) patterns.push(roundNumbers);
 
   // Sort by severity: CRITICAL > HIGH > MEDIUM > LOW
@@ -257,20 +240,7 @@ export function analyzeScamPatterns(
   else if (highCount >= 2) overallRisk = 'LIKELY_SCAM';
   else if (highCount === 1 || patterns.length >= 2) overallRisk = 'SUSPICIOUS';
 
-  let interpretation: string;
-  switch (overallRisk) {
-    case 'CONFIRMED_SCAM':
-      interpretation = 'Critical scam indicators present. This wallet exhibits behavior strongly associated with fraud or money laundering. Immediate legal action recommended.';
-      break;
-    case 'LIKELY_SCAM':
-      interpretation = 'Multiple high-risk patterns detected. Wallet behavior is consistent with scam operations. Full forensic investigation strongly recommended.';
-      break;
-    case 'SUSPICIOUS':
-      interpretation = 'Some behavioral patterns warrant further investigation. Not conclusive, but monitoring and deeper analysis recommended.';
-      break;
-    default:
-      interpretation = 'No suspicious behavioral patterns detected in automated analysis. Wallet activity appears normal. Note: this does not guarantee legitimacy — manual review may still be warranted.';
-  }
+  const interpretation = bt.interpretation[overallRisk];
 
   return { patterns, overallRisk, interpretation };
 }

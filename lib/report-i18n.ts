@@ -147,6 +147,59 @@ export interface ReportTranslations {
   assetSummary: AssetSummaryT;
   /** Activity Timeline section (Phase 3 Batch 2.3). */
   timeline: TimelineT;
+  /** Behavioral Pattern Analysis page (Phase 3 Batch 2.4). */
+  behavioral: Behavioral;
+  /** Wallet Analytics page (Phase 3 Batch 2.4). */
+  analytics: Analytics;
+}
+
+/** Behavioral Pattern Analysis (page 7) — chrome + generated pattern strings. */
+export interface Behavioral {
+  introVictim: string;
+  introNonVictim: string;
+  overallAssessment: string;
+  victimPatternBadge: string;
+  riskLabel: Record<'CONFIRMED_SCAM' | 'LIKELY_SCAM' | 'SUSPICIOUS' | 'CLEAN', string>;
+  victimAssessmentText: string;
+  detectedPatterns: (n: number) => string;
+  confidence: (pct: number) => string;
+  severity: Record<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW', string>;
+  noPatternsTitle: string;
+  noPatternsBody: string;
+  methodologyFootnote: string;
+  // Pattern detector generated strings
+  rapidForwardingName: string;
+  rapidForwardingEv: (pct: number, count: number, total: number) => string[];
+  aggregationName: string;
+  aggregationEv: (senders: number, inCount: number, outCount: number, recipients: number) => string[];
+  pigButcheringName: string;
+  pigButcheringEv: (deposits: number, days: number, pct: number) => string[];
+  dustingName: string;
+  dustingEv: (spamCount: number, microPct: number) => string[];
+  mixerName: string;
+  mixerEvHeader: (count: number) => string;
+  mixerEvItem: (label: string, n: number) => string;
+  mixerEvFooter: string;
+  roundNumbersName: string;
+  roundNumbersEv: (roundCount: number, total: number, pct: number) => string[];
+  interpretation: Record<'CONFIRMED_SCAM' | 'LIKELY_SCAM' | 'SUSPICIOUS' | 'CLEAN', string>;
+}
+
+/** Wallet Analytics (page 8) translations. */
+export interface Analytics {
+  received: (sym: string) => string;
+  sent: (sym: string) => string;
+  netFlow: (sym: string) => string;
+  transactions: string;
+  activePeriod: string;
+  uniqueTokens: string;
+  topCounterparties: string;
+  colAddress: string;
+  colEntity: string;
+  colInteractions: string;
+  colVolume: (sym: string) => string;
+  inactiveTitle: (n: number) => string;
+  inactiveBody: (lastActivity: string) => string;
 }
 
 /** Asset Summary section (page 6) translations. */
@@ -661,6 +714,75 @@ const en: ReportTranslations = {
     inactiveSuffix: (n) => ` (inactive for ${n} days)`,
     noTimeline: 'No timestamped transactions available for timeline construction.',
   },
+  behavioral: {
+    introVictim: 'The subject wallet was classified as a victim wallet. The patterns below describe characteristics of the counterparty cluster that received funds, not allegations against the subject wallet.',
+    introNonVictim: 'Automated detection of scam-associated behavioral patterns based on transaction timing, flow structure, and counterparty analysis.',
+    overallAssessment: 'OVERALL BEHAVIORAL ASSESSMENT',
+    victimPatternBadge: 'VICTIM PATTERN DETECTED',
+    riskLabel: { CONFIRMED_SCAM: 'CONFIRMED SCAM', LIKELY_SCAM: 'LIKELY SCAM', SUSPICIOUS: 'SUSPICIOUS', CLEAN: 'CLEAN' },
+    victimAssessmentText: 'The subject wallet shows the behavioral fingerprint of a victim wallet (CEX-funded, low-history, rapid forwarding to a small unknown counterparty set). Detected patterns characterise the counterparty cluster — not the subject.',
+    detectedPatterns: (n) => `Detected Patterns (${n})`,
+    confidence: (pct) => `Confidence: ${pct}%`,
+    severity: { CRITICAL: 'CRITICAL', HIGH: 'HIGH', MEDIUM: 'MEDIUM', LOW: 'LOW' },
+    noPatternsTitle: 'No Suspicious Patterns Detected',
+    noPatternsBody: 'Automated behavioral analysis did not detect scam-associated patterns. This does not guarantee legitimacy — manual review may still be warranted for comprehensive assessment.',
+    methodologyFootnote: 'Methodology: Patterns are detected by analyzing transaction timing, flow direction, counterparty diversity, asset types, and known entity interactions. Confidence scores reflect the strength of evidence. This is automated analysis — professional forensic review may identify additional patterns.',
+    rapidForwardingName: 'Rapid Forwarding (Scam Funnel)',
+    rapidForwardingEv: (pct, count, total) => [
+      `${pct}% of incoming funds forwarded within 24 hours`,
+      `${count} of ${total} deposits show pass-through behavior`,
+      'Wallet acts as transit point, not final destination',
+    ],
+    aggregationName: 'Aggregation Wallet (Victim Collector)',
+    aggregationEv: (senders, inCount, outCount, recipients) => [
+      `${senders} unique senders (potential victims)`,
+      `${inCount} incoming vs ${outCount} outgoing transactions`,
+      `Funds consolidated to only ${recipients} destination(s)`,
+    ],
+    pigButcheringName: 'Pig Butchering Pattern',
+    pigButcheringEv: (deposits, days, pct) => [
+      `${deposits} deposits over ${days} days (gradual "investment")`,
+      `Largest outflow = ${pct}% of total deposited funds`,
+      'Pattern consistent with romance or investment scam',
+    ],
+    dustingName: 'Dusting / Spam Activity',
+    dustingEv: (spamCount, microPct) => [
+      `${spamCount} spam/airdrop tokens detected`,
+      `${microPct}% micro-transactions (dust)`,
+      'May indicate phishing targets or address poisoning attempts',
+    ],
+    mixerName: 'Mixer / Tumbler Usage',
+    mixerEvHeader: (count) => `Interaction with ${count} known mixer(s)`,
+    mixerEvItem: (label, n) => `${label} (${n} interaction${n > 1 ? 's' : ''})`,
+    mixerEvFooter: 'Mixers are commonly used to launder stolen funds',
+    roundNumbersName: 'Round-Number Transfers',
+    roundNumbersEv: (roundCount, total, pct) => [
+      `${roundCount} of ${total} transfers are exact round numbers`,
+      `${pct}% round-number rate (typical scams use round amounts)`,
+      'Organic transfers rarely consist of exact round numbers',
+    ],
+    interpretation: {
+      CONFIRMED_SCAM: 'Critical scam indicators present. This wallet exhibits behavior strongly associated with fraud or money laundering. Immediate legal action recommended.',
+      LIKELY_SCAM: 'Multiple high-risk patterns detected. Wallet behavior is consistent with scam operations. Full forensic investigation strongly recommended.',
+      SUSPICIOUS: 'Some behavioral patterns warrant further investigation. Not conclusive, but monitoring and deeper analysis recommended.',
+      CLEAN: 'No suspicious behavioral patterns detected in automated analysis. Wallet activity appears normal. Note: this does not guarantee legitimacy — manual review may still be warranted.',
+    },
+  },
+  analytics: {
+    received: (sym) => `${sym} RECEIVED`,
+    sent: (sym) => `${sym} SENT`,
+    netFlow: (sym) => `${sym} NET FLOW`,
+    transactions: 'TRANSACTIONS',
+    activePeriod: 'ACTIVE PERIOD',
+    uniqueTokens: 'UNIQUE TOKENS',
+    topCounterparties: 'Top 5 Counterparty Addresses',
+    colAddress: 'Address',
+    colEntity: 'Entity',
+    colInteractions: 'Interactions',
+    colVolume: (sym) => `Volume (${sym})`,
+    inactiveTitle: (n) => `Wallet Inactive — ${n} Days`,
+    inactiveBody: (lastActivity) => `Last activity: ${lastActivity}. Possible: key loss, cooling-off, or fund redistribution.`,
+  },
 };
 
 const es: ReportTranslations = {
@@ -967,6 +1089,75 @@ const es: ReportTranslations = {
     totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
     inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
     noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',
+  },
+  behavioral: {
+    introVictim: 'La wallet analizada fue clasificada como wallet de víctima. Los patrones a continuación describen características del grupo de contraparte que recibió los fondos, no acusaciones contra la wallet analizada.',
+    introNonVictim: 'Detección automatizada de patrones de comportamiento asociados a estafas, basada en la sincronización de transacciones, la estructura del flujo y el análisis de contrapartes.',
+    overallAssessment: 'EVALUACIÓN GENERAL DE COMPORTAMIENTO',
+    victimPatternBadge: 'PATRÓN DE VÍCTIMA DETECTADO',
+    riskLabel: { CONFIRMED_SCAM: 'ESTAFA CONFIRMADA', LIKELY_SCAM: 'PROBABLE ESTAFA', SUSPICIOUS: 'SOSPECHOSO', CLEAN: 'LIMPIO' },
+    victimAssessmentText: 'La wallet analizada muestra la huella conductual de una wallet de víctima (financiada por exchange, historial corto, reenvío rápido a un pequeño conjunto de contrapartes desconocidas). Los patrones detectados caracterizan al grupo de contraparte — no a la wallet analizada.',
+    detectedPatterns: (n) => `Patrones Detectados (${n})`,
+    confidence: (pct) => `Confianza: ${pct}%`,
+    severity: { CRITICAL: 'CRÍTICA', HIGH: 'ALTA', MEDIUM: 'MEDIA', LOW: 'BAJA' },
+    noPatternsTitle: 'No se Detectaron Patrones Sospechosos',
+    noPatternsBody: 'El análisis conductual automatizado no detectó patrones asociados a estafas. Esto no garantiza la legitimidad — puede ser necesaria una revisión manual para una evaluación integral.',
+    methodologyFootnote: 'Metodología: Los patrones se detectan analizando la sincronización de las transacciones, la dirección del flujo, la diversidad de contrapartes, los tipos de activos y las interacciones con entidades conocidas. Las puntuaciones de confianza reflejan la solidez de la evidencia. Este es un análisis automatizado — una revisión forense profesional puede identificar patrones adicionales.',
+    rapidForwardingName: 'Reenvío Rápido (Embudo de Estafa)',
+    rapidForwardingEv: (pct, count, total) => [
+      `${pct}% de los fondos entrantes reenviados en 24 horas`,
+      `${count} de ${total} depósitos muestran comportamiento de paso`,
+      'La wallet actúa como punto de tránsito, no como destino final',
+    ],
+    aggregationName: 'Wallet Agregadora (Recolector de Víctimas)',
+    aggregationEv: (senders, inCount, outCount, recipients) => [
+      `${senders} remitentes únicos (posibles víctimas)`,
+      `${inCount} transacciones entrantes vs ${outCount} salientes`,
+      `Fondos consolidados en solo ${recipients} destino(s)`,
+    ],
+    pigButcheringName: 'Patrón de Pig Butchering',
+    pigButcheringEv: (deposits, days, pct) => [
+      `${deposits} depósitos durante ${days} días ("inversión" gradual)`,
+      `Mayor salida = ${pct}% del total de fondos depositados`,
+      'Patrón consistente con estafa romántica o de inversión',
+    ],
+    dustingName: 'Actividad de Dusting / Spam',
+    dustingEv: (spamCount, microPct) => [
+      `${spamCount} tokens de spam/airdrop detectados`,
+      `${microPct}% de micro-transacciones (dust)`,
+      'Puede indicar objetivos de phishing o intentos de envenenamiento de direcciones',
+    ],
+    mixerName: 'Uso de Mezclador / Tumbler',
+    mixerEvHeader: (count) => `Interacción con ${count} mezclador(es) conocido(s)`,
+    mixerEvItem: (label, n) => `${label} (${n} interacci${n > 1 ? 'ones' : 'ón'})`,
+    mixerEvFooter: 'Los mezcladores se usan comúnmente para lavar fondos robados',
+    roundNumbersName: 'Transferencias en Números Redondos',
+    roundNumbersEv: (roundCount, total, pct) => [
+      `${roundCount} de ${total} transferencias son números redondos exactos`,
+      `${pct}% de tasa de números redondos (las estafas suelen usar montos redondos)`,
+      'Las transferencias orgánicas rara vez consisten en números redondos exactos',
+    ],
+    interpretation: {
+      CONFIRMED_SCAM: 'Indicadores críticos de estafa presentes. Esta wallet exhibe comportamiento fuertemente asociado con fraude o lavado de dinero. Se recomienda acción legal inmediata.',
+      LIKELY_SCAM: 'Múltiples patrones de alto riesgo detectados. El comportamiento de la wallet es consistente con operaciones de estafa. Se recomienda encarecidamente una investigación forense completa.',
+      SUSPICIOUS: 'Algunos patrones de comportamiento ameritan una investigación adicional. No es concluyente, pero se recomienda monitoreo y un análisis más profundo.',
+      CLEAN: 'No se detectaron patrones de comportamiento sospechosos en el análisis automatizado. La actividad de la wallet parece normal. Nota: esto no garantiza la legitimidad — aún puede ser necesaria una revisión manual.',
+    },
+  },
+  analytics: {
+    received: (sym) => `${sym} RECIBIDO`,
+    sent: (sym) => `${sym} ENVIADO`,
+    netFlow: (sym) => `FLUJO NETO ${sym}`,
+    transactions: 'TRANSACCIONES',
+    activePeriod: 'PERÍODO ACTIVO',
+    uniqueTokens: 'TOKENS ÚNICOS',
+    topCounterparties: 'Top 5 Direcciones de Contraparte',
+    colAddress: 'Dirección',
+    colEntity: 'Entidad',
+    colInteractions: 'Interacciones',
+    colVolume: (sym) => `Volumen (${sym})`,
+    inactiveTitle: (n) => `Wallet Inactiva — ${n} Días`,
+    inactiveBody: (lastActivity) => `Última actividad: ${lastActivity}. Posible: pérdida de claves, período de espera o redistribución de fondos.`,
   },
 };
 

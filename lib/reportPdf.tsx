@@ -958,9 +958,10 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
   // label this wallet as "LIKELY SCAM" / "CONFIRMED SCAM" — the detected
   // patterns describe the counterparty cluster's behaviour, not the subject.
   // Show "VICTIM PATTERN DETECTED" with the subject framed as the harmed party.
+  const bh = t.behavioral;
   const isVictim = data.narrative.walletType === 'victim';
   const effectiveRisk = isVictim ? 'VICTIM_PATTERN' : (pa?.overallRisk || 'CLEAN');
-  const effectiveLabel = isVictim ? 'VICTIM PATTERN DETECTED' : overallRiskLabel(pa?.overallRisk || 'CLEAN');
+  const effectiveLabel = isVictim ? bh.victimPatternBadge : bh.riskLabel[pa?.overallRisk || 'CLEAN'];
   const effectiveColor = isVictim ? amber : overallRiskColor(pa?.overallRisk || 'CLEAN');
   const bannerBg = isVictim ? '#fffbeb' : pa?.overallRisk === 'CLEAN' ? '#f0fdf4' : pa?.overallRisk === 'SUSPICIOUS' ? '#fffbeb' : '#fef2f2';
   const bannerBorder = isVictim ? '#fde68a' : pa?.overallRisk === 'CLEAN' ? '#bbf7d0' : pa?.overallRisk === 'SUSPICIOUS' ? '#fde68a' : '#fecaca';
@@ -970,9 +971,7 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
       <Header data={data} t={t} />
       <Text style={s.h2}>{t.sections.behavioralPatterns}</Text>
       <Text style={{ ...s.p, marginBottom: 12 }}>
-        {isVictim
-          ? 'The subject wallet was classified as a victim wallet. The patterns below describe characteristics of the counterparty cluster that received funds, not allegations against the subject wallet.'
-          : 'Automated detection of scam-associated behavioral patterns based on transaction timing, flow structure, and counterparty analysis.'}
+        {isVictim ? bh.introVictim : bh.introNonVictim}
       </Text>
 
       {/* Overall Assessment */}
@@ -986,7 +985,7 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
           borderColor: bannerBorder,
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>OVERALL BEHAVIORAL ASSESSMENT</Text>
+          <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>{bh.overallAssessment}</Text>
           <Text style={{
             ...s.badge,
             fontSize: 12,
@@ -998,9 +997,7 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
             {effectiveLabel}
           </Text>
           <Text style={{ fontSize: 8, color: slate600, marginTop: 8, textAlign: 'center', maxWidth: 400, lineHeight: 1.4 }}>
-            {isVictim
-              ? 'The subject wallet shows the behavioral fingerprint of a victim wallet (CEX-funded, low-history, rapid forwarding to a small unknown counterparty set). Detected patterns characterise the counterparty cluster — not the subject.'
-              : pa.interpretation}
+            {isVictim ? bh.victimAssessmentText : pa.interpretation}
           </Text>
         </View>
       )}
@@ -1008,7 +1005,7 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
       {/* Detected Patterns */}
       {pa && pa.patterns.length > 0 ? (
         <View>
-          <Text style={{ ...s.h3, marginBottom: 8 }}>Detected Patterns ({pa.patterns.length})</Text>
+          <Text style={{ ...s.h3, marginBottom: 8 }}>{bh.detectedPatterns(pa.patterns.length)}</Text>
           {pa.patterns.map((pattern, i) => (
             <View key={i} style={{
               ...s.card,
@@ -1028,9 +1025,9 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
                     paddingVertical: 2,
                     borderRadius: 3,
                   }}>
-                    <Text style={{ fontSize: 7, color: 'white', fontFamily: 'Helvetica-Bold' }}>{pattern.severity}</Text>
+                    <Text style={{ fontSize: 7, color: 'white', fontFamily: 'Helvetica-Bold' }}>{bh.severity[pattern.severity] ?? pattern.severity}</Text>
                   </View>
-                  <Text style={{ fontSize: 8, color: slate600 }}>Confidence: {pattern.confidence}%</Text>
+                  <Text style={{ fontSize: 8, color: slate600 }}>{bh.confidence(pattern.confidence)}</Text>
                 </View>
               </View>
 
@@ -1055,9 +1052,9 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
         </View>
       ) : (
         <View style={{ ...s.card, alignItems: 'center', paddingVertical: 20 }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 6 }}>No Suspicious Patterns Detected</Text>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 6 }}>{bh.noPatternsTitle}</Text>
           <Text style={{ fontSize: 9, color: slate600, textAlign: 'center', maxWidth: 350, lineHeight: 1.4 }}>
-            Automated behavioral analysis did not detect scam-associated patterns. This does not guarantee legitimacy — manual review may still be warranted for comprehensive assessment.
+            {bh.noPatternsBody}
           </Text>
         </View>
       )}
@@ -1065,7 +1062,7 @@ const PatternPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
       {/* Methodology note */}
       <View style={{ marginTop: 'auto', paddingTop: 12 }}>
         <Text style={{ fontSize: 7, color: slate400, lineHeight: 1.4 }}>
-          Methodology: Patterns are detected by analyzing transaction timing, flow direction, counterparty diversity, asset types, and known entity interactions. Confidence scores reflect the strength of evidence. This is automated analysis — professional forensic review may identify additional patterns.
+          {bh.methodologyFootnote}
         </Text>
       </View>
 
@@ -1084,6 +1081,8 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
   const stable = (data.assetSummary?.realAssets || [])
     .filter((a) => STABLE.includes(a.symbol) && (a.totalIn + a.totalOut) > 0)
     .sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut))[0];
+  const an = t.analytics;
+  const nativeSym = data.nativeCurrency || 'ETH';
   return (
   <Page size="A4" style={s.page}>
     <Header data={data} t={t} />
@@ -1092,15 +1091,15 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
     {stable && (
       <View style={{ ...s.row, marginBottom: 12 }}>
         <View style={{ ...s.card, ...s.col }}>
-          <Text style={s.label}>{stable.symbol} RECEIVED</Text>
+          <Text style={s.label}>{an.received(stable.symbol)}</Text>
           <Text style={{ ...s.value, color: green }}>{fmtEth(stable.totalIn)} {stable.symbol}</Text>
         </View>
         <View style={{ ...s.card, ...s.col }}>
-          <Text style={s.label}>{stable.symbol} SENT</Text>
+          <Text style={s.label}>{an.sent(stable.symbol)}</Text>
           <Text style={{ ...s.value, color: red }}>{fmtEth(stable.totalOut)} {stable.symbol}</Text>
         </View>
         <View style={{ ...s.card, ...s.col }}>
-          <Text style={s.label}>{stable.symbol} NET FLOW</Text>
+          <Text style={s.label}>{an.netFlow(stable.symbol)}</Text>
           <Text style={s.value}>{fmtEth(stable.totalIn - stable.totalOut)} {stable.symbol}</Text>
         </View>
       </View>
@@ -1108,16 +1107,16 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} RECEIVED</Text>
-        <Text style={{ ...s.value, color: green }}>{fmtEth(data.ethReceived)} {data.nativeCurrency || 'ETH'}</Text>
+        <Text style={s.label}>{an.received(nativeSym)}</Text>
+        <Text style={{ ...s.value, color: green }}>{fmtEth(data.ethReceived)} {nativeSym}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} SENT</Text>
-        <Text style={{ ...s.value, color: red }}>{fmtEth(data.ethSent)} {data.nativeCurrency || 'ETH'}</Text>
+        <Text style={s.label}>{an.sent(nativeSym)}</Text>
+        <Text style={{ ...s.value, color: red }}>{fmtEth(data.ethSent)} {nativeSym}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>{(data.nativeCurrency || 'ETH')} NET FLOW</Text>
-        <Text style={s.value}>{fmtEth(data.ethReceived - data.ethSent)} {data.nativeCurrency || 'ETH'}</Text>
+        <Text style={s.label}>{an.netFlow(nativeSym)}</Text>
+        <Text style={s.value}>{fmtEth(data.ethReceived - data.ethSent)} {nativeSym}</Text>
       </View>
     </View>
 
@@ -1125,35 +1124,35 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 
     <View style={{ ...s.row, marginBottom: 12 }}>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>TRANSACTIONS</Text>
+        <Text style={s.label}>{an.transactions}</Text>
         <Text style={s.value}>{data.transactionCount.toLocaleString('en-US')}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>ACTIVE PERIOD</Text>
+        <Text style={s.label}>{an.activePeriod}</Text>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold' }}>{data.firstActivity} — {data.lastActivity}</Text>
       </View>
       <View style={{ ...s.card, ...s.col }}>
-        <Text style={s.label}>UNIQUE TOKENS</Text>
+        <Text style={s.label}>{an.uniqueTokens}</Text>
         <Text style={s.value}>{data.uniqueTokens.length}</Text>
       </View>
     </View>
 
     {data.inactiveDays > 365 && (
       <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#fde68a' }}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>Wallet Inactive — {data.inactiveDays} Days</Text>
-        <Text style={{ fontSize: 8, color: slate600 }}>Last activity: {data.lastActivity}. Possible: key loss, cooling-off, or fund redistribution.</Text>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>{an.inactiveTitle(data.inactiveDays)}</Text>
+        <Text style={{ fontSize: 8, color: slate600 }}>{an.inactiveBody(data.lastActivity)}</Text>
       </View>
     )}
 
     <View style={s.sectionDivider} />
 
-    <Text style={s.h3}>Top 5 Counterparty Addresses</Text>
+    <Text style={s.h3}>{an.topCounterparties}</Text>
     <View style={s.table}>
       <View style={s.tableHeader}>
-        <Text style={{ ...s.th, width: '40%' }}>Address</Text>
-        <Text style={{ ...s.th, width: '20%' }}>Entity</Text>
-        <Text style={{ ...s.th, width: '20%' }}>Interactions</Text>
-        <Text style={{ ...s.th, width: '20%' }}>Volume ({data.nativeCurrency || 'ETH'})</Text>
+        <Text style={{ ...s.th, width: '40%' }}>{an.colAddress}</Text>
+        <Text style={{ ...s.th, width: '20%' }}>{an.colEntity}</Text>
+        <Text style={{ ...s.th, width: '20%' }}>{an.colInteractions}</Text>
+        <Text style={{ ...s.th, width: '20%' }}>{an.colVolume(nativeSym)}</Text>
       </View>
       {data.topCounterparties.map((cp, i) => (
         <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>

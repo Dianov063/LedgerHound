@@ -1395,6 +1395,7 @@ export async function generateReport(
     ],
     identifiedEntities,
     assetSummary.spamCount,
+    tReport.behavioral,
   );
 
   logger.info({ patterns: patternAnalysis.patterns.length, risk: patternAnalysis.overallRisk }, '[generateReport] Pattern analysis done');
