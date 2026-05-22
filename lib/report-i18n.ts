@@ -143,6 +143,46 @@ export interface ReportTranslations {
   investigation: Investigation;
   /** Attack Technique Analysis page (Phase 3 Batch 2.2). */
   attackTechnique: AttackTechnique;
+  /** Asset Summary section (Phase 3 Batch 2.3). */
+  assetSummary: AssetSummaryT;
+  /** Activity Timeline section (Phase 3 Batch 2.3). */
+  timeline: TimelineT;
+}
+
+/** Asset Summary section (page 6) translations. */
+export interface AssetSummaryT {
+  realAssetsHeader: string;
+  colToken: string;
+  colTotalIn: string;
+  colTotalOut: string;
+  colNet: string;
+  spamFiltered: (n: number) => string;
+  spamNote: string;
+  unicodeEvidenceHeader: (n: number) => string;
+  mimickingSuffix: (mimics: string, script: string, count: number) => string;
+  originalLabel: string;
+  codepointsLabel: string;
+  displayLabel: string;
+  spoofTokensNote: string;
+  // Phase 2.7.1 footnote (real loss vs worthless spoof units)
+  footnoteNote: string;
+  footnoteRealMisdirected: (breakdown: string) => string;
+  footnoteSpoofUnits: (breakdown: string) => string;
+  footnoteTail: string;
+}
+
+/** Activity Timeline section (page 6) translations. */
+export interface TimelineT {
+  walletFirstActive: string;
+  received: (amount: string, token: string, from: string) => string;
+  sent: (amount: string, token: string, to: string) => string;
+  lastActivity: string;
+  keyEventBadge: string;
+  misdirectionBadge: string;
+  sentToSpoofNote: string;
+  totalActivePeriod: (first: string, last: string) => string;
+  inactiveSuffix: (n: number) => string;
+  noTimeline: string;
 }
 
 /** Attack Technique Analysis (pages 11-12) translations. */
@@ -590,6 +630,37 @@ const en: ReportTranslations = {
     exampleLine: (date, addr) => `e.g. ${date} · from ${addr}`,
     bottomMethodology: 'Methodology: Address poisoning detection matches counterparty addresses against actual recipients on a 4-character prefix + 4-character suffix basis (8 hex characters of visual overlap). Unicode spoofing detection normalises token symbols (NFKD decomposition + a curated confusable-character map across Lisu, Cyrillic, Greek and fullwidth Latin) and compares against legitimate tickers. Codepoints are shown in standard U+ notation so the evidence is verifiable independent of font rendering.',
   },
+  assetSummary: {
+    realAssetsHeader: 'Real Assets',
+    colToken: 'Token',
+    colTotalIn: 'Total In',
+    colTotalOut: 'Total Out',
+    colNet: 'Net',
+    spamFiltered: (n) => `Spam/Airdrop Tokens Filtered: ${n}`,
+    spamNote: 'Spam tokens are common on active wallets and typically have no real value.',
+    unicodeEvidenceHeader: (n) => `Unicode Spoofing Evidence: ${n} fake token${n > 1 ? 's' : ''} detected`,
+    mimickingSuffix: (mimics, script, count) => ` — mimicking ${mimics} (${script}, ${count} transfer${count > 1 ? 's' : ''})`,
+    originalLabel: 'Original: ',
+    codepointsLabel: 'Codepoints: ',
+    displayLabel: 'Display: ',
+    spoofTokensNote: 'These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.',
+    footnoteNote: 'Note: The apparent net balance understates the true economic loss.',
+    footnoteRealMisdirected: (breakdown) => ` Real funds misdirected to address-poisoning spoof addresses: ${breakdown}.`,
+    footnoteSpoofUnits: (breakdown) => ` Separately, ${breakdown} of worthless spoof-token units (no market value) were routed to attacker-controlled addresses.`,
+    footnoteTail: ' See Attack Technique Analysis. Real funds were lost to visual address confusion, not legitimately transferred; spoof-token units carry no value and are reported separately.',
+  },
+  timeline: {
+    walletFirstActive: 'Wallet first active',
+    received: (amount, token, from) => `Received ${amount} ${token} from ${from}...`,
+    sent: (amount, token, to) => `Sent ${amount} ${token} to ${to}`,
+    lastActivity: 'Last recorded activity',
+    keyEventBadge: 'KEY EVENT',
+    misdirectionBadge: '⚠ MISDIRECTION',
+    sentToSpoofNote: 'Sent to an address-poisoning spoof — not the intended recipient.',
+    totalActivePeriod: (first, last) => `Total Active Period: ${first} to ${last}`,
+    inactiveSuffix: (n) => ` (inactive for ${n} days)`,
+    noTimeline: 'No timestamped transactions available for timeline construction.',
+  },
 };
 
 const es: ReportTranslations = {
@@ -865,6 +936,37 @@ const es: ReportTranslations = {
     combiningMarksNote: 'Usa marcas diacríticas combinantes; la visualización muestra la forma normalizada NFC para legibilidad — la secuencia original de bytes se preserva arriba.',
     exampleLine: (date, addr) => `ej. ${date} · de ${addr}`,
     bottomMethodology: 'Metodología: La detección de envenenamiento de direcciones compara las direcciones de contraparte con los receptores reales sobre una base de prefijo de 4 caracteres + sufijo de 4 caracteres (8 caracteres hexadecimales de superposición visual). La detección de suplantación Unicode normaliza los símbolos de los tokens (descomposición NFKD + un mapa curado de caracteres confundibles entre Lisu, cirílico, griego y latín de ancho completo) y los compara con tickers legítimos. Los puntos de código se muestran en notación U+ estándar para que la evidencia sea verificable independientemente de la representación de la fuente.',
+  },
+  assetSummary: {
+    realAssetsHeader: 'Activos Reales',
+    colToken: 'Token',
+    colTotalIn: 'Total Entrada',
+    colTotalOut: 'Total Salida',
+    colNet: 'Neto',
+    spamFiltered: (n) => `Tokens de Spam/Airdrop Filtrados: ${n}`,
+    spamNote: 'Los tokens de spam son comunes en wallets activas y normalmente no tienen valor real.',
+    unicodeEvidenceHeader: (n) => `Evidencia de Suplantación Unicode: ${n} token${n > 1 ? 's' : ''} falso${n > 1 ? 's' : ''} detectado${n > 1 ? 's' : ''}`,
+    mimickingSuffix: (mimics, script, count) => ` — imitando a ${mimics} (${script}, ${count} transferencia${count > 1 ? 's' : ''})`,
+    originalLabel: 'Original: ',
+    codepointsLabel: 'Puntos de código: ',
+    displayLabel: 'Visualización: ',
+    spoofTokensNote: 'Estos tokens usan caracteres no latinos para hacerse pasar por monedas reales. Ver Análisis de Técnicas de Ataque para el detalle completo.',
+    footnoteNote: 'Nota: El saldo neto aparente subestima la pérdida económica real.',
+    footnoteRealMisdirected: (breakdown) => ` Fondos reales desviados a direcciones de envenenamiento: ${breakdown}.`,
+    footnoteSpoofUnits: (breakdown) => ` Por separado, ${breakdown} de unidades de tokens falsificados sin valor de mercado fueron enviados a direcciones controladas por el atacante.`,
+    footnoteTail: ' Ver Análisis de Técnicas de Ataque. Los fondos reales se perdieron por confusión visual de direcciones, no fueron transferidos legítimamente; las unidades de tokens falsificados no tienen valor y se reportan por separado.',
+  },
+  timeline: {
+    walletFirstActive: 'Wallet activada por primera vez',
+    received: (amount, token, from) => `Recibido ${amount} ${token} de ${from}...`,
+    sent: (amount, token, to) => `Enviado ${amount} ${token} a ${to}`,
+    lastActivity: 'Última actividad registrada',
+    keyEventBadge: 'EVENTO CLAVE',
+    misdirectionBadge: '⚠ DESVÍO',
+    sentToSpoofNote: 'Enviado a una suplantación de envenenamiento de direcciones — no es el destinatario previsto.',
+    totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
+    inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
+    noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',
   },
 };
 

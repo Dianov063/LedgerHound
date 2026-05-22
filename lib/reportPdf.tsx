@@ -742,6 +742,9 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const assets = data.assetSummary;
   const timeline = data.timeline;
+  const as = t.assetSummary;
+  const tl = t.timeline;
+  const sname = t.attackTechnique.scriptName;
 
   return (
     <Page size="A4" style={s.page}>
@@ -751,12 +754,12 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
       <Text style={s.h2}>{t.sections.assetSummary}</Text>
       {assets && assets.realAssets.length > 0 && (
         <View style={{ ...s.card, marginBottom: 12 }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 6 }}>Real Assets</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: green, marginBottom: 6 }}>{as.realAssetsHeader}</Text>
           <View style={s.tableHeader}>
-            <Text style={{ ...s.th, width: '25%' }}>Token</Text>
-            <Text style={{ ...s.th, width: '25%' }}>Total In</Text>
-            <Text style={{ ...s.th, width: '25%' }}>Total Out</Text>
-            <Text style={{ ...s.th, width: '25%' }}>Net</Text>
+            <Text style={{ ...s.th, width: '25%' }}>{as.colToken}</Text>
+            <Text style={{ ...s.th, width: '25%' }}>{as.colTotalIn}</Text>
+            <Text style={{ ...s.th, width: '25%' }}>{as.colTotalOut}</Text>
+            <Text style={{ ...s.th, width: '25%' }}>{as.colNet}</Text>
           </View>
           {assets.realAssets.slice(0, 10).map((a, i) => (
             <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
@@ -772,13 +775,13 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
       {assets && assets.spamCount > 0 && (
         <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fde68a' }}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 4 }}>
-            Spam/Airdrop Tokens Filtered: {assets.spamCount}
+            {as.spamFiltered(assets.spamCount)}
           </Text>
           <Text style={{ fontSize: 7, color: slate600 }}>
-            {assets.spamTokens.slice(0, 8).map(t => t.symbol).join(', ')}{assets.spamCount > 8 ? '...' : ''}
+            {assets.spamTokens.slice(0, 8).map(st => st.symbol).join(', ')}{assets.spamCount > 8 ? '...' : ''}
           </Text>
           <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
-            Spam tokens are common on active wallets and typically have no real value.
+            {as.spamNote}
           </Text>
         </View>
       )}
@@ -789,28 +792,28 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
       {assets && assets.spoofTokens && assets.spoofTokens.length > 0 && (
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: red, marginBottom: 4 }}>
-            Unicode Spoofing Evidence: {assets.spoofTokens.length} fake token{assets.spoofTokens.length > 1 ? 's' : ''} detected
+            {as.unicodeEvidenceHeader(assets.spoofTokens.length)}
           </Text>
-          {assets.spoofTokens.slice(0, 6).map((t, i) => {
-            const display = t.symbolDisplay || t.symbol;
-            const composed = display !== t.symbol;
+          {assets.spoofTokens.slice(0, 6).map((tok, i) => {
+            const display = tok.symbolDisplay || tok.symbol;
+            const composed = display !== tok.symbol;
             return (
               <View key={i} style={{ marginBottom: 3 }}>
                 <Text style={{ fontSize: 7, color: slate900 }}>
-                  <Text style={{ fontFamily: fontForScript(t.scriptCategory) }}>{display}</Text>
-                  {' '}— mimicking {t.mimicsLegitimate} ({t.scriptCategory}, {t.count} transfer{t.count > 1 ? 's' : ''})
+                  <Text style={{ fontFamily: fontForScript(tok.scriptCategory) }}>{display}</Text>
+                  {as.mimickingSuffix(tok.mimicsLegitimate, sname(tok.scriptCategory), tok.count)}
                 </Text>
                 <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>
-                  {composed ? 'Original: ' : 'Codepoints: '}{getCodepoints(t.symbol)}
+                  {composed ? as.originalLabel : as.codepointsLabel}{getCodepoints(tok.symbol)}
                 </Text>
                 {composed && (
-                  <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>Display: {getCodepoints(display)}</Text>
+                  <Text style={{ ...s.mono, fontSize: 6, color: slate600 }}>{as.displayLabel}{getCodepoints(display)}</Text>
                 )}
               </View>
             );
           })}
           <Text style={{ fontSize: 7, color: slate400, marginTop: 3 }}>
-            These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.
+            {as.spoofTokensNote}
           </Text>
         </View>
       )}
@@ -829,7 +832,7 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
         return (
           <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 8, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: amber }}>
             <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-              Note: The apparent net balance understates the true economic loss.{realStr ? ` Real funds misdirected to address-poisoning spoof addresses: ${realStr}.` : ''}{spoofStr ? ` Separately, ${spoofStr} of worthless spoof-token units (no market value) were routed to attacker-controlled addresses.` : ''} See Attack Technique Analysis. Real funds were lost to visual address confusion, not legitimately transferred; spoof-token units carry no value and are reported separately.
+              {as.footnoteNote}{realStr ? as.footnoteRealMisdirected(realStr) : ''}{spoofStr ? as.footnoteSpoofUnits(spoofStr) : ''}{as.footnoteTail}
             </Text>
           </View>
         );
@@ -881,15 +884,15 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900 }}>{event.date}</Text>
                       {isMisdirection ? (
-                        <Text style={{ fontSize: 6, color: 'white', fontFamily: 'Helvetica-Bold', backgroundColor: amber, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>⚠ MISDIRECTION</Text>
+                        <Text style={{ fontSize: 6, color: 'white', fontFamily: 'Helvetica-Bold', backgroundColor: amber, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>{tl.misdirectionBadge}</Text>
                       ) : isHighlight && (
-                        <Text style={{ fontSize: 6, color: red, fontFamily: 'Helvetica-Bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>KEY EVENT</Text>
+                        <Text style={{ fontSize: 6, color: red, fontFamily: 'Helvetica-Bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>{tl.keyEventBadge}</Text>
                       )}
                     </View>
                     <Text style={{ fontSize: 8, color: slate600, marginTop: 1 }}>{event.description}</Text>
                     {isMisdirection && (
                       <Text style={{ fontSize: 6.5, color: amber, marginTop: 0.5, fontStyle: 'italic' }}>
-                        Sent to an address-poisoning spoof — not the intended recipient.
+                        {tl.sentToSpoofNote}
                       </Text>
                     )}
                   </View>
@@ -902,15 +905,15 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
           {data.firstActivity !== 'N/A' && data.lastActivity !== 'N/A' && (
             <View style={{ backgroundColor: '#f1f5f9', borderRadius: 4, padding: 8, marginTop: 8 }}>
               <Text style={{ fontSize: 8, color: slate600 }}>
-                Total Active Period: {data.firstActivity} to {data.lastActivity}
-                {data.inactiveDays > 0 ? ` (inactive for ${data.inactiveDays} days)` : ''}
+                {tl.totalActivePeriod(data.firstActivity, data.lastActivity)}
+                {data.inactiveDays > 0 ? tl.inactiveSuffix(data.inactiveDays) : ''}
               </Text>
             </View>
           )}
         </View>
       ) : (
         <View style={s.card}>
-          <Text style={s.p}>No timestamped transactions available for timeline construction.</Text>
+          <Text style={s.p}>{tl.noTimeline}</Text>
         </View>
       )}
 

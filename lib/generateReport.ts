@@ -3,7 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
-import { getReportTranslations } from './report-i18n';
+import { getReportTranslations, type TimelineT } from './report-i18n';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
 import { fetchBtcTransfers } from './bitcoin-tracker';
@@ -842,6 +842,7 @@ function generateTimeline(
   outgoing: (Transfer | UnifiedTransfer)[],
   identifiedEntities: { address: string; type: string; label: string }[],
   nativeCurrency: string = 'ETH',
+  tl: TimelineT = getReportTranslations('en').timeline,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   const all = [
@@ -859,7 +860,7 @@ function generateTimeline(
   events.push({
     date: all[0].metadata!.blockTimestamp!.split('T')[0],
     type: 'ACTIVATION',
-    description: 'Wallet first active',
+    description: tl.walletFirstActive,
   });
 
   // Major real-asset inflows (top 3)
@@ -874,7 +875,7 @@ function generateTimeline(
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: 'MAJOR_INFLOW',
-      description: `Received ${fmtEth(val)} ${tx.asset || nativeCurrency} from ${(tx.from || '').slice(0, 10)}...`,
+      description: tl.received(fmtEth(val), tx.asset || nativeCurrency, (tx.from || '').slice(0, 10)),
     });
   }
 
@@ -891,7 +892,7 @@ function generateTimeline(
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
-      description: `Sent ${fmtEth(val)} ${tx.asset || nativeCurrency} to ${entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'}`,
+      description: tl.sent(fmtEth(val), tx.asset || nativeCurrency, entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'),
       highlight: true,
       counterparty: (tx.to || '').toLowerCase(),
     });
@@ -1365,7 +1366,7 @@ export async function generateReport(
 
   const assetSummary = classifyAssets(incoming, outgoing, nativeCurrency);
 
-  const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency);
+  const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline);
 
   const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency);
 
