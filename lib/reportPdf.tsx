@@ -1954,6 +1954,7 @@ const probColor = (p: string) => p === 'HIGH' ? red : p === 'LOW' ? green : ambe
 
 const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
   const scenarios = data.recoveryScenarios;
+  const rc = t.recovery;
 
   return (
     <Page size="A4" style={s.page}>
@@ -1968,12 +1969,12 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
               <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>{sc.name}</Text>
               <View style={{ flexDirection: 'row', gap: 16, marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 7, color: slate400 }}>Probability:</Text>
-                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: probColor(sc.probability) }}>{sc.probability}</Text>
+                  <Text style={{ fontSize: 7, color: slate400 }}>{rc.probabilityLabel}</Text>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: probColor(sc.probability) }}>{rc.chance[sc.probability] ?? sc.probability}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 7, color: slate400 }}>Recovery if confirmed:</Text>
-                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: sc.recoveryChance === 'HIGH' ? green : sc.recoveryChance === 'MEDIUM' ? amber : red }}>{sc.recoveryChance}</Text>
+                  <Text style={{ fontSize: 7, color: slate400 }}>{rc.recoveryIfConfirmedLabel}</Text>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: sc.recoveryChance === 'HIGH' ? green : sc.recoveryChance === 'MEDIUM' ? amber : red }}>{rc.chance[sc.recoveryChance] ?? sc.recoveryChance}</Text>
                 </View>
               </View>
               <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, marginBottom: 3 }}>{sc.description}</Text>
@@ -1986,7 +1987,7 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
       {/* Overall recovery — uses structured recoveryAssessment.
           2026-05-20: Score hard-capped at 35%; disclaimer is mandatory. */}
       <View style={{ backgroundColor: '#f1f5f9', borderRadius: 6, padding: 12, marginBottom: 14, alignItems: 'center' }}>
-        <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>OVERALL RECOVERY PROBABILITY</Text>
+        <Text style={{ fontSize: 8, color: slate400, letterSpacing: 1, marginBottom: 6 }}>{rc.overallRecoveryProbability}</Text>
         <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: recoveryColor(data.recoveryAssessment.score) }}>{data.recoveryAssessment.score}%</Text>
         <Text style={{ fontSize: 8, color: slate600, textAlign: 'center', marginTop: 4 }}>{data.recoveryAssessment.label}</Text>
         <Text style={{ fontSize: 7, color: slate400, textAlign: 'center', marginTop: 8, maxWidth: 420, lineHeight: 1.4, fontStyle: 'italic' }}>
@@ -2001,8 +2002,8 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
 
       {data.ofacWarning && (
         <View style={{ backgroundColor: darkRed, borderRadius: 6, padding: 10, marginBottom: 10 }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 3 }}>OFAC COMPLIANCE NOTICE</Text>
-          <Text style={{ fontSize: 8, color: '#fecaca', lineHeight: 1.4 }}>Interaction with SDN addresses triggers blocking obligations. Consult OFAC compliance counsel.</Text>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 3 }}>{rc.ofacNoticeTitle}</Text>
+          <Text style={{ fontSize: 8, color: '#fecaca', lineHeight: 1.4 }}>{rc.ofacNoticeBody}</Text>
         </View>
       )}
 
@@ -2011,7 +2012,7 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
           said "Binance = victim entry" (p.4) and "Subpoena Binance to
           identify the account holder" (here) — which could mislead counsel
           into thinking a Binance subpoena yields the scammer's identity. */}
-      <Text style={s.h3}>Recommended Actions</Text>
+      <Text style={s.h3}>{rc.recommendedActions}</Text>
       {(() => {
         const ea = data.exchangeAnalysis;
         const entryBrand = ea?.entryPoints?.[0]?.parentEntity;
@@ -2021,40 +2022,19 @@ const RecoveryLegalPage = ({ data, t }: { data: ReportData; t: ReportTranslation
         const items: { bold: string; text: string }[] = [];
 
         if (ea?.hasEntryKyc && entryBrand) {
-          items.push({
-            bold: `${entryBrand} Entry Point (Victim Funding):`,
-            text: `The victim funded this wallet via ${entryBrand}. A subpoena to ${entryBrand} compliance can confirm victim identity for case-file completeness, but does NOT identify the scammer. Use this primarily for (a) victim identity verification in legal proceedings, and (b) detecting whether the scammer ever transferred funds back to a ${entryBrand} account.`,
-          });
+          items.push({ bold: rc.entryPointBold(entryBrand), text: rc.entryPointText(entryBrand) });
         }
         if (!ea?.hasExitKyc) {
-          items.push({
-            bold: 'Counterparty Exit Trace (required for scammer identification):',
-            text: 'The fraud cluster controls the funds within this wallet’s transaction history. Identifying the scammer’s cash-out exchange requires tracing one or more hops beyond the cluster — this expanded analysis is the recommended next investigative step.',
-          });
+          items.push({ bold: rc.counterpartyExitBold, text: rc.counterpartyExitText });
         } else {
-          items.push({
-            bold: 'KYC Exit Point Identified:',
-            text: `Funds reached ${ea.exitPoints[0]?.parentEntity || 'a KYC exchange'}. File an urgent preservation/discovery request with that exchange’s compliance team to pursue the account holder behind the cash-out.`,
-          });
+          items.push({ bold: rc.kycExitBold, text: rc.kycExitText(ea.exitPoints[0]?.parentEntity || 'a KYC exchange') });
         }
-        items.push({
-          bold: 'File FBI IC3 / Local Police Report:',
-          text: 'Report at ic3.gov (if US-based) or via your local cybercrime unit. Reference this Case ID and attach this report as supporting documentation.',
-        });
-        items.push({
-          bold: 'Exchange Compliance Notification:',
-          text: 'Submit a preservation request to the compliance teams of the identified exchanges. Even absent a scammer KYC exit, this creates an official record and may trigger internal blacklisting.',
-        });
+        items.push({ bold: rc.ic3Bold, text: rc.ic3Text });
+        items.push({ bold: rc.exchangeComplianceBold, text: rc.exchangeComplianceText });
         if (usesUsdt) {
-          items.push({
-            bold: 'Token Issuer Coordination:',
-            text: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
-          });
+          items.push({ bold: rc.tokenIssuerBold, text: rc.tokenIssuerText });
         }
-        items.push({
-          bold: 'Court-Certified Forensic Investigation:',
-          text: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a full forensic engagement.',
-        });
+        items.push({ bold: rc.courtCertifiedBold, text: rc.courtCertifiedText });
 
         return items.map((it, i) => (
           <Text key={i} style={{ ...s.bullet, marginBottom: 5 }}>
@@ -2105,6 +2085,7 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
   const exchangeBrands: ExchangeBrandView[] = Array.from(brandMap.values())
     .sort((a, b) => b.interactions - a.interactions);
   const hasExchanges = exchangeBrands.length > 0;
+  const st = t.steps;
 
   return (
     <Page size="A4" style={s.page}>
@@ -2114,44 +2095,42 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
       {/* Priority banner */}
       <View style={{ backgroundColor: hasExchanges ? '#f0fdf4' : '#fef2f2', borderRadius: 6, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: hasExchanges ? '#bbf7d0' : '#fecaca' }}>
         <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: hasExchanges ? green : red, marginBottom: 4 }}>
-          {hasExchanges ? 'RECOVERY PATH IDENTIFIED' : 'RECOVERY REQUIRES INVESTIGATION'}
+          {hasExchanges ? st.recoveryPathIdentified : st.recoveryRequiresInvestigation}
         </Text>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-          {hasExchanges
-            ? `Funds were traced to KYC-regulated exchange(s). The account holder identity may be obtainable through legal process (subject to exchange cooperation and data availability). Time-sensitive action is required to prevent fund withdrawal.`
-            : `No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.`}
+          {hasExchanges ? st.recoveryPathBody : st.recoveryRequiresBody}
         </Text>
       </View>
 
       {/* Step 1: Exchange Compliance Contact */}
       {hasExchanges && (
         <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: blue }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>STEP 1: Submit Preservation Request to Exchange Compliance</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 2 }}>{st.stepLabel(1)}: {st.step1Title}</Text>
           <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4, marginBottom: 6 }}>
-            The exchange(s) below hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal blacklist. Even where the scammer did not cash out through this exchange directly, an early preservation request becomes part of the official record.
+            {st.step1Body}
           </Text>
           {exchangeBrands.slice(0, 3).map((b, i) => (
             <View key={i} style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
                 <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{b.brand}</Text>
                 <Text style={{ fontSize: 8, color: slate600 }}>
-                  {b.interactions} interaction(s) · {b.addresses.length} hot wallet{b.addresses.length > 1 ? 's' : ''}
+                  {st.step1Interactions(b.interactions, b.addresses.length)}
                 </Text>
               </View>
               <Text style={{ ...s.mono, fontSize: 7, color: slate600, marginBottom: 3 }}>
-                {b.addresses.slice(0, 3).map(a => shortAddr(a)).join(', ')}{b.addresses.length > 3 ? ` (+${b.addresses.length - 3} more)` : ''}
+                {b.addresses.slice(0, 3).map(a => shortAddr(a)).join(', ')}{b.addresses.length > 3 ? st.step1MoreAddrs(b.addresses.length - 3) : ''}
               </Text>
               {b.email ? (
                 <Text style={{ fontSize: 8, color: blue }}>{b.email}</Text>
               ) : (
                 <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>
-                  No published law-enforcement contact recorded — consult attorney for proper service channel.
+                  {st.step1NoContact}
                 </Text>
               )}
             </View>
           ))}
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
-            Send a preservation request to the compliance department referencing your police report number and this case ID ({data.caseId}). Request immediate account freeze and subscriber information disclosure.
+            {st.step1Closing(data.caseId)}
           </Text>
         </View>
       )}
@@ -2159,36 +2138,36 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
       {/* Step 2: Law Enforcement */}
       <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: amber }}>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 6 }}>
-          {hasExchanges ? 'STEP 2' : 'STEP 1'}: File Law Enforcement Reports
+          {st.stepLabel(hasExchanges ? 2 : 1)}: {st.lawEnforcementTitle}
         </Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} FBI IC3 complaint — ic3.gov (reference this report)</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Local police report — needed for exchange compliance requests</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} FTC report — reportfraud.ftc.gov</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.ic3Bullet}</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.localPoliceBullet}</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.ftcBullet}</Text>
         {data.narrative.walletType === 'transit' && (
-          <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request SAR filing — transit wallet pattern indicates a coordinated fraud pattern</Text>
+          <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.sarBullet}</Text>
         )}
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginTop: 4 }}>
-          Include Case ID {data.caseId}, wallet address, and attach this forensic report as evidence.
+          {st.lawEnforcementClosing(data.caseId)}
         </Text>
       </View>
 
       {/* Step 3: Legal Action */}
       <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: purple }}>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: purple, marginBottom: 6 }}>
-          {hasExchanges ? 'STEP 3' : 'STEP 2'}: Legal Proceedings
+          {st.stepLabel(hasExchanges ? 3 : 2)}: {st.legalProceedingsTitle}
         </Text>
         {hasExchanges ? (
           <>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Retain attorney for emergency subpoena to {exchangeBrands[0].brand}</Text>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Request account holder identity: name, address, government ID, bank info</Text>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} File civil asset recovery proceedings once identity obtained</Text>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Send Preservation Letter to freeze suspect accounts</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalSubpoena(exchangeBrands[0].brand)}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalIdentityRequest}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalCivilRecovery}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalPreservationLetter}</Text>
           </>
         ) : (
           <>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Consult attorney experienced in cryptocurrency fraud recovery</Text>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Explore advanced blockchain tracing and cross-chain analysis</Text>
-            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Consider international cooperation if funds crossed jurisdictions</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalConsultAttorney}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalAdvancedTracing}</Text>
+            <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.legalInternational}</Text>
           </>
         )}
       </View>
@@ -2196,19 +2175,19 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
       {/* Step 4: Evidence Preservation */}
       <View style={{ ...s.card, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: slate400 }}>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: slate600, marginBottom: 6 }}>
-          {hasExchanges ? 'STEP 4' : 'STEP 3'}: Preserve Evidence
+          {st.stepLabel(hasExchanges ? 4 : 3)}: {st.preserveEvidenceTitle}
         </Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Save all communications with the scammer (screenshots, emails, messages)</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Preserve this forensic report as supporting documentation for legal proceedings</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} Document the timeline of events in writing</Text>
-        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>{'\u2022'} Do not communicate with the scammer further</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.preserve1}</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.preserve2}</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8, marginBottom: 3 }}>{'\u2022'} {st.preserve3}</Text>
+        <Text style={{ fontSize: 8, color: slate900, paddingLeft: 8 }}>{'\u2022'} {st.preserve4}</Text>
       </View>
 
       {/* CTA */}
       <View style={{ ...s.card, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' }}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>Need Help Executing These Steps?</Text>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 6 }}>{st.ctaTitle}</Text>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5 }}>
-          LedgerHound offers certified forensic investigations with expert testimony, full chain-of-custody documentation, and direct coordination with law enforcement and exchanges.
+          {st.ctaBody}
         </Text>
         <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: blue, marginTop: 8 }}>
           contact@ledgerhound.vip {'\u00B7'} +1 (833) 559-1334
@@ -2227,35 +2206,36 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
    PAGE 12/13: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
 const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+  const d = t.disclaimer;
   return (
   <Page size="A4" style={s.page}>
     <Header data={data} t={t} />
     <Text style={s.h2}>{t.sections.disclaimer}</Text>
 
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      This report was generated automatically by LedgerHound, a service of USPROJECT LLC. It is provided for informational purposes only and does not constitute legal, financial, or investment advice.
+      {d.para1}
     </Text>
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      The analysis contained herein is based on publicly available blockchain data retrieved at the time of report generation. Blockchain data is permanent and immutable; however, the attribution of wallet addresses to known entities is based on proprietary and open-source intelligence databases that may not be comprehensive.
+      {d.para2}
     </Text>
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      This automated report is not a substitute for a certified forensic investigation conducted by a qualified blockchain forensic analyst. For matters requiring court testimony, certified methodology, or regulatory compliance, a full forensic engagement is recommended.
+      {d.para3}
     </Text>
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      Risk scores are generated algorithmically and should be interpreted as preliminary indicators only. A low risk score does not guarantee legitimacy, and a high risk score does not definitively indicate criminal activity.
+      {d.para4}
     </Text>
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      LedgerHound and USPROJECT LLC are not law firms and do not provide legal representation. Users should consult with qualified legal counsel before taking any legal action based on the contents of this report.
+      {d.para5}
     </Text>
     <Text style={{ ...s.p, lineHeight: 1.6 }}>
-      By purchasing and using this report, you agree that USPROJECT LLC's liability is limited to the purchase price of the report.
+      {d.para6}
     </Text>
 
     <View style={s.sectionDivider} />
 
     <View style={{ alignItems: 'center', marginTop: 20 }}>
       <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 8 }}>LedgerHound</Text>
-      <Text style={{ fontSize: 9, color: slate600 }}>Blockchain Forensics & Crypto Asset Tracing</Text>
+      <Text style={{ fontSize: 9, color: slate600 }}>{d.tagline}</Text>
       <Text style={{ fontSize: 9, color: slate600, marginTop: 4 }}>USPROJECT LLC</Text>
       <Text style={{ fontSize: 9, color: slate400, marginTop: 8 }}>contact@ledgerhound.vip · www.ledgerhound.vip</Text>
       <Text style={{ fontSize: 9, color: slate400 }}>+1 (833) 559-1334</Text>

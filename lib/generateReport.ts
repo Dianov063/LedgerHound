@@ -3,7 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
-import { getReportTranslations, type TimelineT, type EntityId } from './report-i18n';
+import { getReportTranslations, type TimelineT, type EntityId, type Recovery } from './report-i18n';
 import { uploadReport, getReportDownloadUrl } from './s3-storage';
 import { logReport } from './reports-log';
 import { fetchBtcTransfers } from './bitcoin-tracker';
@@ -970,39 +970,35 @@ function analyzeExitPoints(
   };
 }
 
-function generateRecoveryScenarios(exitAnalysis: ExitPointAnalysis, recoveryScore: number): RecoveryScenario[] {
+function generateRecoveryScenarios(
+  exitAnalysis: ExitPointAnalysis,
+  recoveryScore: number,
+  rec: Recovery = getReportTranslations('en').recovery,
+): RecoveryScenario[] {
   const scenarios: RecoveryScenario[] = [];
 
   scenarios.push({
-    name: 'Scenario A: Funds reached KYC exchange',
+    name: rec.scenarioAName,
     probability: exitAnalysis.hasKycExit ? 'HIGH' : 'LOW',
     recoveryChance: 'HIGH',
-    description: exitAnalysis.hasKycExit
-      ? 'Exchange detected. Subpoena can reveal account holder identity.'
-      : 'No exchange exit detected yet. Deeper trace may reveal exchange endpoint.',
-    action: exitAnalysis.hasKycExit
-      ? 'File subpoena to exchange compliance department'
-      : 'Commission deep trace to find exchange endpoint',
+    description: exitAnalysis.hasKycExit ? rec.scenarioADescKyc : rec.scenarioADescNoKyc,
+    action: exitAnalysis.hasKycExit ? rec.scenarioAActionKyc : rec.scenarioAActionNoKyc,
   });
 
   scenarios.push({
-    name: 'Scenario B: Funds in unknown wallets',
+    name: rec.scenarioBName,
     probability: exitAnalysis.exitPoints.some(e => e.entityType === 'unknown') ? 'HIGH' : 'LOW',
     recoveryChance: 'MEDIUM',
-    description: 'Funds held in unidentified wallets. May be intermediary or final destination.',
-    action: 'Continue monitoring for movement to exchange',
+    description: rec.scenarioBDesc,
+    action: rec.scenarioBAction,
   });
 
   scenarios.push({
-    name: 'Scenario C: Funds mixed or bridged',
+    name: rec.scenarioCName,
     probability: exitAnalysis.hasMixerUsage ? 'HIGH' : 'LOW',
     recoveryChance: 'LOW',
-    description: exitAnalysis.hasMixerUsage
-      ? 'Mixer usage detected. Professional demixing analysis required.'
-      : 'No mixer detected. Cross-chain bridge may have been used.',
-    action: exitAnalysis.hasMixerUsage
-      ? 'Engage specialized demixing service'
-      : 'Check destination chains for continued activity',
+    description: exitAnalysis.hasMixerUsage ? rec.scenarioCDescMixer : rec.scenarioCDescNoMixer,
+    action: exitAnalysis.hasMixerUsage ? rec.scenarioCActionMixer : rec.scenarioCActionNoMixer,
   });
 
   return scenarios;
@@ -1366,7 +1362,7 @@ export async function generateReport(
 
   const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
 
-  const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore);
+  const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore, tReport.recovery);
 
   // ── Behavioral pattern analysis ──
   const patternAnalysis = analyzeScamPatterns(

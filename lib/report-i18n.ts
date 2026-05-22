@@ -155,6 +155,99 @@ export interface ReportTranslations {
   entityId: EntityId;
   /** Address Verification & External Intelligence (Phase 3 Batch 2.5). */
   addressVerification: AddressVerification;
+  /** Recovery Assessment + Legal Recommendations (Phase 3 Batch 2.6). */
+  recovery: Recovery;
+  /** Actionable Recovery Steps (Phase 3 Batch 2.6). */
+  steps: Steps;
+  /** Disclaimer & Legal Notice (Phase 3 Batch 2.6). */
+  disclaimer: DisclaimerT;
+}
+
+/** Recovery Assessment + Legal Recommendations (pages 15-16). */
+export interface Recovery {
+  probabilityLabel: string;
+  recoveryIfConfirmedLabel: string;
+  overallRecoveryProbability: string;
+  chance: Record<'HIGH' | 'MEDIUM' | 'LOW', string>;
+  ofacNoticeTitle: string;
+  ofacNoticeBody: string;
+  recommendedActions: string;
+  // Recovery scenarios (generated in generateReport)
+  scenarioAName: string;
+  scenarioADescKyc: string;
+  scenarioADescNoKyc: string;
+  scenarioAActionKyc: string;
+  scenarioAActionNoKyc: string;
+  scenarioBName: string;
+  scenarioBDesc: string;
+  scenarioBAction: string;
+  scenarioCName: string;
+  scenarioCDescMixer: string;
+  scenarioCDescNoMixer: string;
+  scenarioCActionMixer: string;
+  scenarioCActionNoMixer: string;
+  // Legal recommendation items (bold + text)
+  entryPointBold: (brand: string) => string;
+  entryPointText: (brand: string) => string;
+  counterpartyExitBold: string;
+  counterpartyExitText: string;
+  kycExitBold: string;
+  kycExitText: (brand: string) => string;
+  ic3Bold: string;
+  ic3Text: string;
+  exchangeComplianceBold: string;
+  exchangeComplianceText: string;
+  tokenIssuerBold: string;
+  tokenIssuerText: string;
+  courtCertifiedBold: string;
+  courtCertifiedText: string;
+}
+
+/** Actionable Recovery Steps (page 17). */
+export interface Steps {
+  stepLabel: (n: number) => string;
+  recoveryPathIdentified: string;
+  recoveryRequiresInvestigation: string;
+  recoveryPathBody: string;
+  recoveryRequiresBody: string;
+  step1Title: string;
+  step1Body: string;
+  step1Interactions: (interactions: number, addrCount: number) => string;
+  step1MoreAddrs: (n: number) => string;
+  step1NoContact: string;
+  step1Closing: (caseId: string) => string;
+  lawEnforcementTitle: string;
+  ic3Bullet: string;
+  localPoliceBullet: string;
+  ftcBullet: string;
+  sarBullet: string;
+  lawEnforcementClosing: (caseId: string) => string;
+  legalProceedingsTitle: string;
+  legalSubpoena: (brand: string) => string;
+  legalIdentityRequest: string;
+  legalCivilRecovery: string;
+  legalPreservationLetter: string;
+  legalConsultAttorney: string;
+  legalAdvancedTracing: string;
+  legalInternational: string;
+  preserveEvidenceTitle: string;
+  preserve1: string;
+  preserve2: string;
+  preserve3: string;
+  preserve4: string;
+  ctaTitle: string;
+  ctaBody: string;
+}
+
+/** Disclaimer & Legal Notice (page 18). */
+export interface DisclaimerT {
+  para1: string;
+  para2: string;
+  para3: string;
+  para4: string;
+  para5: string;
+  para6: string;
+  tagline: string;
 }
 
 /** Entity Identification + Exit Point Analysis (page 9) translations. */
@@ -876,6 +969,85 @@ const en: ReportTranslations = {
       known_phishing: 'ETHERSCAN',
     } as Record<string, string>)[source] ?? source),
   },
+  recovery: {
+    probabilityLabel: 'Probability:',
+    recoveryIfConfirmedLabel: 'Recovery if confirmed:',
+    overallRecoveryProbability: 'OVERALL RECOVERY PROBABILITY',
+    chance: { HIGH: 'HIGH', MEDIUM: 'MEDIUM', LOW: 'LOW' },
+    ofacNoticeTitle: 'OFAC COMPLIANCE NOTICE',
+    ofacNoticeBody: 'Interaction with SDN addresses triggers blocking obligations. Consult OFAC compliance counsel.',
+    recommendedActions: 'Recommended Actions',
+    scenarioAName: 'Scenario A: Funds reached KYC exchange',
+    scenarioADescKyc: 'Exchange detected. Subpoena can reveal account holder identity.',
+    scenarioADescNoKyc: 'No exchange exit detected yet. Deeper trace may reveal exchange endpoint.',
+    scenarioAActionKyc: 'File subpoena to exchange compliance department',
+    scenarioAActionNoKyc: 'Commission deep trace to find exchange endpoint',
+    scenarioBName: 'Scenario B: Funds in unknown wallets',
+    scenarioBDesc: 'Funds held in unidentified wallets. May be intermediary or final destination.',
+    scenarioBAction: 'Continue monitoring for movement to exchange',
+    scenarioCName: 'Scenario C: Funds mixed or bridged',
+    scenarioCDescMixer: 'Mixer usage detected. Professional demixing analysis required.',
+    scenarioCDescNoMixer: 'No mixer detected. Cross-chain bridge may have been used.',
+    scenarioCActionMixer: 'Engage specialized demixing service',
+    scenarioCActionNoMixer: 'Check destination chains for continued activity',
+    entryPointBold: (brand) => `${brand} Entry Point (Victim Funding):`,
+    entryPointText: (brand) => `The victim funded this wallet via ${brand}. A subpoena to ${brand} compliance can confirm victim identity for case-file completeness, but does NOT identify the scammer. Use this primarily for (a) victim identity verification in legal proceedings, and (b) detecting whether the scammer ever transferred funds back to a ${brand} account.`,
+    counterpartyExitBold: 'Counterparty Exit Trace (required for scammer identification):',
+    counterpartyExitText: 'The fraud cluster controls the funds within this wallet’s transaction history. Identifying the scammer’s cash-out exchange requires tracing one or more hops beyond the cluster — this expanded analysis is the recommended next investigative step.',
+    kycExitBold: 'KYC Exit Point Identified:',
+    kycExitText: (brand) => `Funds reached ${brand}. File an urgent preservation/discovery request with that exchange’s compliance team to pursue the account holder behind the cash-out.`,
+    ic3Bold: 'File FBI IC3 / Local Police Report:',
+    ic3Text: 'Report at ic3.gov (if US-based) or via your local cybercrime unit. Reference this Case ID and attach this report as supporting documentation.',
+    exchangeComplianceBold: 'Exchange Compliance Notification:',
+    exchangeComplianceText: 'Submit a preservation request to the compliance teams of the identified exchanges. Even absent a scammer KYC exit, this creates an official record and may trigger internal blacklisting.',
+    tokenIssuerBold: 'Token Issuer Coordination:',
+    tokenIssuerText: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
+    courtCertifiedBold: 'Court-Certified Forensic Investigation:',
+    courtCertifiedText: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a full forensic engagement.',
+  },
+  steps: {
+    stepLabel: (n) => `STEP ${n}`,
+    recoveryPathIdentified: 'RECOVERY PATH IDENTIFIED',
+    recoveryRequiresInvestigation: 'RECOVERY REQUIRES INVESTIGATION',
+    recoveryPathBody: 'Funds were traced to KYC-regulated exchange(s). The account holder identity may be obtainable through legal process (subject to exchange cooperation and data availability). Time-sensitive action is required to prevent fund withdrawal.',
+    recoveryRequiresBody: 'No direct exchange exits identified. Recovery may require advanced tracing, law enforcement cooperation, or specialized forensic analysis.',
+    step1Title: 'Submit Preservation Request to Exchange Compliance',
+    step1Body: 'The exchange(s) below hold the relevant KYC records AND the technical ability to flag the receiving wallets in their internal blacklist. Even where the scammer did not cash out through this exchange directly, an early preservation request becomes part of the official record.',
+    step1Interactions: (interactions, addrCount) => `${interactions} interaction(s) · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
+    step1MoreAddrs: (n) => ` (+${n} more)`,
+    step1NoContact: 'No published law-enforcement contact recorded — consult attorney for proper service channel.',
+    step1Closing: (caseId) => `Send a preservation request to the compliance department referencing your police report number and this case ID (${caseId}). Request immediate account freeze and subscriber information disclosure.`,
+    lawEnforcementTitle: 'File Law Enforcement Reports',
+    ic3Bullet: 'FBI IC3 complaint — ic3.gov (reference this report)',
+    localPoliceBullet: 'Local police report — needed for exchange compliance requests',
+    ftcBullet: 'FTC report — reportfraud.ftc.gov',
+    sarBullet: 'Request SAR filing — transit wallet pattern indicates a coordinated fraud pattern',
+    lawEnforcementClosing: (caseId) => `Include Case ID ${caseId}, wallet address, and attach this forensic report as evidence.`,
+    legalProceedingsTitle: 'Legal Proceedings',
+    legalSubpoena: (brand) => `Retain attorney for emergency subpoena to ${brand}`,
+    legalIdentityRequest: 'Request account holder identity: name, address, government ID, bank info',
+    legalCivilRecovery: 'File civil asset recovery proceedings once identity obtained',
+    legalPreservationLetter: 'Send Preservation Letter to freeze suspect accounts',
+    legalConsultAttorney: 'Consult attorney experienced in cryptocurrency fraud recovery',
+    legalAdvancedTracing: 'Explore advanced blockchain tracing and cross-chain analysis',
+    legalInternational: 'Consider international cooperation if funds crossed jurisdictions',
+    preserveEvidenceTitle: 'Preserve Evidence',
+    preserve1: 'Save all communications with the scammer (screenshots, emails, messages)',
+    preserve2: 'Preserve this forensic report as supporting documentation for legal proceedings',
+    preserve3: 'Document the timeline of events in writing',
+    preserve4: 'Do not communicate with the scammer further',
+    ctaTitle: 'Need Help Executing These Steps?',
+    ctaBody: 'LedgerHound offers certified forensic investigations with expert testimony, full chain-of-custody documentation, and direct coordination with law enforcement and exchanges.',
+  },
+  disclaimer: {
+    para1: 'This report was generated automatically by LedgerHound, a service of USPROJECT LLC. It is provided for informational purposes only and does not constitute legal, financial, or investment advice.',
+    para2: 'The analysis contained herein is based on publicly available blockchain data retrieved at the time of report generation. Blockchain data is permanent and immutable; however, the attribution of wallet addresses to known entities is based on proprietary and open-source intelligence databases that may not be comprehensive.',
+    para3: 'This automated report is not a substitute for a certified forensic investigation conducted by a qualified blockchain forensic analyst. For matters requiring court testimony, certified methodology, or regulatory compliance, a full forensic engagement is recommended.',
+    para4: 'Risk scores are generated algorithmically and should be interpreted as preliminary indicators only. A low risk score does not guarantee legitimacy, and a high risk score does not definitively indicate criminal activity.',
+    para5: 'LedgerHound and USPROJECT LLC are not law firms and do not provide legal representation. Users should consult with qualified legal counsel before taking any legal action based on the contents of this report.',
+    para6: 'By purchasing and using this report, you agree that USPROJECT LLC\'s liability is limited to the purchase price of the report.',
+    tagline: 'Blockchain Forensics & Crypto Asset Tracing',
+  },
 };
 
 const es: ReportTranslations = {
@@ -1299,6 +1471,85 @@ const es: ReportTranslations = {
       ledgerhound_scam_db: 'LEDGERHOUND DB', cex_whitelist: 'EXCHANGE KYC', known_entity: 'ENTIDAD CONOCIDA',
       known_phishing: 'ETHERSCAN',
     } as Record<string, string>)[source] ?? source),
+  },
+  recovery: {
+    probabilityLabel: 'Probabilidad:',
+    recoveryIfConfirmedLabel: 'Recuperación si se confirma:',
+    overallRecoveryProbability: 'PROBABILIDAD GENERAL DE RECUPERACIÓN',
+    chance: { HIGH: 'ALTA', MEDIUM: 'MEDIA', LOW: 'BAJA' },
+    ofacNoticeTitle: 'AVISO DE CUMPLIMIENTO OFAC',
+    ofacNoticeBody: 'La interacción con direcciones SDN activa obligaciones de bloqueo. Consulte a un asesor de cumplimiento OFAC.',
+    recommendedActions: 'Acciones Recomendadas',
+    scenarioAName: 'Escenario A: Los fondos llegaron a un exchange KYC',
+    scenarioADescKyc: 'Exchange detectado. Una citación judicial puede revelar la identidad del titular de la cuenta.',
+    scenarioADescNoKyc: 'Aún no se detectó salida por exchange. Un rastreo más profundo puede revelar el punto final del exchange.',
+    scenarioAActionKyc: 'Presentar una citación judicial al departamento de cumplimiento del exchange',
+    scenarioAActionNoKyc: 'Encargar un rastreo profundo para encontrar el punto final del exchange',
+    scenarioBName: 'Escenario B: Fondos en wallets desconocidas',
+    scenarioBDesc: 'Los fondos se mantienen en wallets no identificadas. Pueden ser intermediarias o el destino final.',
+    scenarioBAction: 'Continuar el monitoreo para detectar movimiento hacia un exchange',
+    scenarioCName: 'Escenario C: Fondos mezclados o puenteados',
+    scenarioCDescMixer: 'Uso de mezclador detectado. Se requiere un análisis profesional de desmezclado.',
+    scenarioCDescNoMixer: 'No se detectó mezclador. Es posible que se haya usado un puente entre cadenas.',
+    scenarioCActionMixer: 'Contratar un servicio especializado de desmezclado',
+    scenarioCActionNoMixer: 'Revisar las cadenas de destino para detectar actividad continua',
+    entryPointBold: (brand) => `Punto de Entrada de ${brand} (Financiamiento de la Víctima):`,
+    entryPointText: (brand) => `La víctima financió esta wallet a través de ${brand}. Una citación judicial al cumplimiento de ${brand} puede confirmar la identidad de la víctima para completar el expediente, pero NO identifica al estafador. Úsela principalmente para (a) la verificación de identidad de la víctima en procedimientos legales, y (b) detectar si el estafador alguna vez transfirió fondos de vuelta a una cuenta de ${brand}.`,
+    counterpartyExitBold: 'Rastreo de Salida de la Contraparte (requerido para identificar al estafador):',
+    counterpartyExitText: 'El grupo de fraude controla los fondos dentro del historial de transacciones de esta wallet. Identificar el exchange de retiro del estafador requiere rastrear uno o más saltos más allá del grupo — este análisis ampliado es el siguiente paso de investigación recomendado.',
+    kycExitBold: 'Punto de Salida KYC Identificado:',
+    kycExitText: (brand) => `Los fondos llegaron a ${brand}. Presente una solicitud urgente de preservación/descubrimiento ante el equipo de cumplimiento de ese exchange para perseguir al titular de la cuenta detrás del retiro.`,
+    ic3Bold: 'Presentar Denuncia ante FBI IC3 / Policía Local:',
+    ic3Text: 'Denuncie en ic3.gov (si está en EE. UU.) o a través de su unidad local de cibercrimen. Haga referencia a este ID de Caso y adjunte este informe como documentación de apoyo.',
+    exchangeComplianceBold: 'Notificación al Cumplimiento del Exchange:',
+    exchangeComplianceText: 'Envíe una solicitud de preservación a los equipos de cumplimiento de los exchanges identificados. Incluso sin una salida KYC del estafador, esto crea un registro oficial y puede activar el bloqueo interno.',
+    tokenIssuerBold: 'Coordinación con el Emisor del Token:',
+    tokenIssuerText: 'Para transferencias en USDT a wallets marcadas, envíe un paquete de evidencia al equipo legal de Tether (legal@tether.to) para revisión de cumplimiento (las decisiones de aplicación quedan a discreción de Tether).',
+    courtCertifiedBold: 'Investigación Forense Certificada para Tribunales:',
+    courtCertifiedText: 'Para testimonio en tribunales, metodología certificada o un rastreo ampliado de la contraparte, contacte a LedgerHound en contact@ledgerhound.vip para un servicio forense completo.',
+  },
+  steps: {
+    stepLabel: (n) => `PASO ${n}`,
+    recoveryPathIdentified: 'CAMINO DE RECUPERACIÓN IDENTIFICADO',
+    recoveryRequiresInvestigation: 'LA RECUPERACIÓN REQUIERE INVESTIGACIÓN',
+    recoveryPathBody: 'Los fondos fueron rastreados hasta exchange(s) regulado(s) con KYC. La identidad del titular de la cuenta puede obtenerse mediante un proceso legal (sujeto a la cooperación del exchange y la disponibilidad de datos). Se requiere acción urgente para evitar el retiro de los fondos.',
+    recoveryRequiresBody: 'No se identificaron salidas directas por exchange. La recuperación puede requerir rastreo avanzado, cooperación de las autoridades o análisis forense especializado.',
+    step1Title: 'Enviar Solicitud de Preservación al Cumplimiento del Exchange',
+    step1Body: 'El/los exchange(s) a continuación poseen los registros KYC relevantes Y la capacidad técnica de marcar las wallets receptoras en su lista negra interna. Incluso cuando el estafador no retiró fondos directamente a través de este exchange, una solicitud de preservación temprana pasa a formar parte del registro oficial.',
+    step1Interactions: (interactions, addrCount) => `${interactions} interacci${interactions > 1 ? 'ones' : 'ón'} · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
+    step1MoreAddrs: (n) => ` (+${n} más)`,
+    step1NoContact: 'No hay contacto publicado para autoridades — consulte a un abogado para el canal de notificación adecuado.',
+    step1Closing: (caseId) => `Envíe una solicitud de preservación al departamento de cumplimiento haciendo referencia al número de su denuncia policial y a este ID de caso (${caseId}). Solicite el congelamiento inmediato de la cuenta y la divulgación de la información del suscriptor.`,
+    lawEnforcementTitle: 'Presentar Denuncias ante las Autoridades',
+    ic3Bullet: 'Denuncia ante FBI IC3 — ic3.gov (haga referencia a este informe)',
+    localPoliceBullet: 'Denuncia ante la policía local — necesaria para las solicitudes de cumplimiento del exchange',
+    ftcBullet: 'Denuncia ante la FTC — reportfraud.ftc.gov',
+    sarBullet: 'Solicitar la presentación de un SAR — el patrón de wallet de tránsito indica un patrón de fraude coordinado',
+    lawEnforcementClosing: (caseId) => `Incluya el ID de Caso ${caseId}, la dirección de la wallet, y adjunte este informe forense como evidencia.`,
+    legalProceedingsTitle: 'Procedimientos Legales',
+    legalSubpoena: (brand) => `Contratar un abogado para una citación judicial de emergencia a ${brand}`,
+    legalIdentityRequest: 'Solicitar la identidad del titular de la cuenta: nombre, dirección, documento de identidad oficial, datos bancarios',
+    legalCivilRecovery: 'Iniciar procedimientos civiles de recuperación de activos una vez obtenida la identidad',
+    legalPreservationLetter: 'Enviar una Carta de Preservación para congelar las cuentas sospechosas',
+    legalConsultAttorney: 'Consultar a un abogado con experiencia en recuperación de fraude con criptomonedas',
+    legalAdvancedTracing: 'Explorar el rastreo avanzado de blockchain y el análisis entre cadenas',
+    legalInternational: 'Considerar la cooperación internacional si los fondos cruzaron jurisdicciones',
+    preserveEvidenceTitle: 'Preservar la Evidencia',
+    preserve1: 'Guarde todas las comunicaciones con el estafador (capturas de pantalla, correos, mensajes)',
+    preserve2: 'Conserve este informe forense como documentación de apoyo para procedimientos legales',
+    preserve3: 'Documente la cronología de los eventos por escrito',
+    preserve4: 'No se comunique más con el estafador',
+    ctaTitle: '¿Necesita Ayuda para Ejecutar Estos Pasos?',
+    ctaBody: 'LedgerHound ofrece investigaciones forenses certificadas con testimonio de expertos, documentación completa de cadena de custodia y coordinación directa con las autoridades y los exchanges.',
+  },
+  disclaimer: {
+    para1: 'Este informe fue generado automáticamente por LedgerHound, un servicio de USPROJECT LLC. Se proporciona únicamente con fines informativos y no constituye asesoramiento legal, financiero ni de inversión.',
+    para2: 'El análisis aquí contenido se basa en datos de blockchain disponibles públicamente, obtenidos al momento de la generación del informe. Los datos de blockchain son permanentes e inmutables; sin embargo, la atribución de direcciones de wallet a entidades conocidas se basa en bases de datos de inteligencia propietarias y de código abierto que pueden no ser exhaustivas.',
+    para3: 'Este informe automatizado no sustituye una investigación forense certificada realizada por un analista forense de blockchain calificado. Para asuntos que requieran testimonio en tribunales, metodología certificada o cumplimiento regulatorio, se recomienda un servicio forense completo.',
+    para4: 'Las puntuaciones de riesgo se generan algorítmicamente y deben interpretarse únicamente como indicadores preliminares. Una puntuación de riesgo baja no garantiza la legitimidad, y una puntuación alta no indica de manera definitiva actividad delictiva.',
+    para5: 'LedgerHound y USPROJECT LLC no son firmas de abogados y no brindan representación legal. Los usuarios deben consultar con un asesor legal calificado antes de emprender cualquier acción legal basada en el contenido de este informe.',
+    para6: 'Al comprar y usar este informe, usted acepta que la responsabilidad de USPROJECT LLC se limita al precio de compra del informe.',
+    tagline: 'Análisis Forense de Blockchain y Rastreo de Criptoactivos',
   },
 };
 
