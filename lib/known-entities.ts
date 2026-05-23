@@ -63,15 +63,15 @@ const CATEGORY_MAP: Record<EntityType, ScamCheckView['category']> = {
  */
 export const KNOWN_ENTITIES: Record<string, KnownEntity> = {
   // ─── BINANCE — ETH hot wallets ───
-  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance 14 (Hot Wallet)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0xdfd5293d8e347dfe59e90efd55b2956a1343963d': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0x56eddb7aa87536c09ccc2793473599fd21a8b17f': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0x21a31ee1afc51d94c2efccaa2092ad1028285549': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0x9696f59e4d72e237be84ffd425dcad154bf96976': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 8 (Cold)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 7 (Cold)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0x564286362092d8e7936f0549571a803b203aaced': { label: 'Binance Cold Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance BSC Hot Wallet', type: 'exchange', network: 'bnb', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  '0x28c6c06298d514db089934071355e5743bf21d60': { label: 'Binance 14 (Hot Wallet)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0xdfd5293d8e347dfe59e90efd55b2956a1343963d': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0x56eddb7aa87536c09ccc2793473599fd21a8b17f': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0x21a31ee1afc51d94c2efccaa2092ad1028285549': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0x9696f59e4d72e237be84ffd425dcad154bf96976': { label: 'Binance Hot Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0xf977814e90da44bfa03b6295a0616a897441acec': { label: 'Binance 8 (Cold)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0xbe0eb53f46cd790cd13851d5eff43d12404d33e8': { label: 'Binance 7 (Cold)', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0x564286362092d8e7936f0549571a803b203aaced': { label: 'Binance Cold Wallet', type: 'exchange', network: 'eth', parentEntity: 'Binance', complianceEmail: '' },
+  '0x8894e0a0c962cb723c1976a4421c95949be2d4e3': { label: 'Binance BSC Hot Wallet', type: 'exchange', network: 'bnb', parentEntity: 'Binance', complianceEmail: '' },
 
   // ─── COINBASE ───
   '0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43': { label: 'Coinbase 10', type: 'exchange', network: 'eth', parentEntity: 'Coinbase', complianceEmail: 'lawenforcement@coinbase.com' },
@@ -143,11 +143,11 @@ export const KNOWN_ENTITIES: Record<string, KnownEntity> = {
   '0x1111111254eeb25477b68fb85ed929f73a960582': { label: '1inch BSC', type: 'defi' },
 
   // ─── TRON CEX (kept original case in key — TRON addresses ARE case-sensitive) ───
-  'TN5C4p6n8jBHEBEFVCEFkEzakAVAoHjE68': { label: 'Binance TRON', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  'TN5C4p6n8jBHEBEFVCEFkEzakAVAoHjE68': { label: 'Binance TRON', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: '' },
   'TFTWqeM8TErPWxitPUAH9rMuREjMCGEFSe': { label: 'Huobi TRON', type: 'exchange', network: 'trx', parentEntity: 'HTX', complianceEmail: 'compliance@htx.com' },
   'TYASr5UV6HEcXatwdFQfmLVUqQQQMUxHLS': { label: 'OKX TRON', type: 'exchange', network: 'trx', parentEntity: 'OKX', complianceEmail: 'lawenforcement@okx.com' },
-  'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
-  'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  'TLkFJCDkg9n8VkiGtBH3UphMPQkvJQ4hNx': { label: 'Binance TRON 2', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: '' },
+  'TQn9Y2khEECQhwqTRpfnDx1KHbqmfG3Kck': { label: 'Binance Cold TRON', type: 'exchange', network: 'trx', parentEntity: 'Binance', complianceEmail: '' },
   'TCYSmggLNfJm8KXKDVL9HF93gHqJbGcTH3': { label: 'KuCoin TRON', type: 'exchange', network: 'trx', parentEntity: 'KuCoin', complianceEmail: 'legalcompliance@kucoin.com' },
   'TKbQQJigNqXXe3Fx1EMseSJaJD3UJSg5FG': { label: 'Gate.io TRON', type: 'exchange', network: 'trx', parentEntity: 'Gate.io' },
   'TVGDpEqR1GbK2mhpBECQuJCz3SWJzHaXvz': { label: 'Bybit TRON', type: 'exchange', network: 'trx', parentEntity: 'Bybit', complianceEmail: 'compliance@bybit.com' },
@@ -158,12 +158,12 @@ export const KNOWN_ENTITIES: Record<string, KnownEntity> = {
   '0x55d398326f99059ff775485246999027b3197955': { label: 'USDT BSC Contract', type: 'defi' },
 
   // ─── BITCOIN exchanges (case-sensitive — kept as-is) ───
-  '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo': { label: 'Binance BTC', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo': { label: 'Binance BTC', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: '' },
   '3FHNBLobJnbCPujupTVaaeeMLDPFJRCXsX': { label: 'Coinbase BTC', type: 'exchange', network: 'btc', parentEntity: 'Coinbase', complianceEmail: 'lawenforcement@coinbase.com' },
   '3AfP9N8mHkNQWx3FfKMJg9RFhJhRGJkFBv': { label: 'Kraken BTC', type: 'exchange', network: 'btc', parentEntity: 'Kraken', complianceEmail: 'lawenforcement@kraken.com' },
-  'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97': { label: 'Binance Cold BTC', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97': { label: 'Binance Cold BTC', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: '' },
   '3Cbq7aT1tY8kMxWLbitaG7yT6bPbKChq64': { label: 'Bitfinex BTC', type: 'exchange', network: 'btc', parentEntity: 'Bitfinex' },
-  '385cR5DM96n1HvBDMzLHPYcw89fZAXULJP': { label: 'Binance BTC 2', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  '385cR5DM96n1HvBDMzLHPYcw89fZAXULJP': { label: 'Binance BTC 2', type: 'exchange', network: 'btc', parentEntity: 'Binance', complianceEmail: '' },
   // ─── BITCOIN mixers / ransomware / sanctioned ───
   '1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF': { label: 'Bitcoin Fog (Mixer)', type: 'mixer' },
   '1FRmxkMPh5U7qHZKtYhYQfScDGBHbdBGpj': { label: 'Helix Mixer', type: 'mixer' },
@@ -172,9 +172,9 @@ export const KNOWN_ENTITIES: Record<string, KnownEntity> = {
   '1NDyJtNTjmwk5xPNhjgAMu4HDHigtobu1s': { label: 'BTC-e Exchange (Seized)', type: 'sanctioned' },
 
   // ─── SOLANA exchanges (case-sensitive) ───
-  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM': { label: 'Binance SOL', type: 'exchange', network: 'sol', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM': { label: 'Binance SOL', type: 'exchange', network: 'sol', parentEntity: 'Binance', complianceEmail: '' },
   '5tzFkiKscXHK5ZXCGbClgAGNBRDSBHGBfmfgUpBhFDqJ': { label: 'Coinbase SOL', type: 'exchange', network: 'sol', parentEntity: 'Coinbase', complianceEmail: 'lawenforcement@coinbase.com' },
-  'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': { label: 'Binance SOL 2', type: 'exchange', network: 'sol', parentEntity: 'Binance', complianceEmail: 'ce@binance.com' },
+  'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': { label: 'Binance SOL 2', type: 'exchange', network: 'sol', parentEntity: 'Binance', complianceEmail: '' },
   '2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S': { label: 'Kraken SOL', type: 'exchange', network: 'sol', parentEntity: 'Kraken', complianceEmail: 'lawenforcement@kraken.com' },
   // ─── SOLANA DeFi ───
   'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4': { label: 'Jupiter Aggregator', type: 'defi' },

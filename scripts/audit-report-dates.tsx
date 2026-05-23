@@ -42,7 +42,7 @@ const mock: ReportData = {
   transactionCount: 27, uniqueTokens: ['USDT', 'ETH'], spamFiltered: 1,
   firstActivity: '2026-02-01', lastActivity: '2026-04-05', inactiveDays: 46,
   topCounterparties: [{ address: REAL, label: 'Unknown', count: 2, volume: 27187 }],
-  identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: 'ce@binance.com' }],
+  identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: '' }],
   riskScore: 55, riskLabel: 'MODERATE',
   recoveryAssessment: { score: 20, label: 'Low', tier: 'LOW', disclaimer: 'Estimate.', factors: { positive: ['KYC exit'], negative: ['Rapid forward'] } } as any,
   recoveryScore: 20, recoveryLabel: 'Low', ofacWarning: false, scamDbMatches: [],
@@ -66,13 +66,13 @@ const mock: ReportData = {
   narrative: { walletType: 'victim', walletTypeLabel: 'Victim', roleConfidence: 0.85, roleReasoning: ['CEX-funded'], uniqueSenders: 5, uniqueReceivers: 4, forwardingPercent: 80, primaryExitExchange: '', primaryExitExchangeEmail: '', summary: 'Victim.', conclusion: 'Conclusion.' } as any,
   evidenceStrength: { score: 70, label: 'STRONG', factors: [{ label: 'Poisoning identified', met: true, severity: 'high' }] } as any,
   topInflows: [{ from: REAL, value: 22187.44, token: 'USDT', date: '2026-04-01' }],
-  exchangeComplianceEmails: [{ name: 'Binance', email: 'ce@binance.com' }],
+  exchangeComplianceEmails: [{ name: 'Binance', email: '' }],
   legalWeight: [{ label: 'Law enforcement submission', suitable: true }],
   primaryAsset: { symbol: 'USDT', totalIn: 22187, totalOut: 11020 },
   counterpartyPhishingFlags: 1, counterpartyScamDbMatches: 0, addressLabels: [],
   externalIntelligenceDegraded: false,
   attackTechniques: { addressPoisoning, unicodeSpoofing },
-  exchangeAnalysis: { entryPoints: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance 14', parentEntity: 'Binance', type: 'entry', interactionCount: 9, totalValue: 30, token: 'ETH', complianceEmail: 'ce@binance.com' }], exitPoints: [], hasEntryKyc: true, hasExitKyc: false } as any,
+  exchangeAnalysis: { entryPoints: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance 14', parentEntity: 'Binance', type: 'entry', interactionCount: 9, totalValue: 30, token: 'ETH', complianceEmail: '' }], exitPoints: [], hasEntryKyc: true, hasExitKyc: false } as any,
 };
 
 // @react-pdf primitive component names — recurse into children, do NOT execute.
@@ -171,6 +171,11 @@ const es6 = getReportTranslations('es');
 }
 ok(es6.timeline.roleMisdirection.includes('desvío'), 'A3: timeline misdirection role label (es)');
 ok(es6.timeline.roleMainCollector === 'recolector principal', 'A3: timeline collector role label (es)');
+// ── Phase 3.1 Stage 8: PDF/template channel consistency ──
+ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
+ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');
+ok(!joined.includes('bloqueo interno'), 'S8 #3: no "bloqueo interno" wording');
+ok(es6.recovery.exchangeComplianceText.includes('revisión interna de riesgo'), 'S8 #3: softened to "revisión interna de riesgo"');
 ok(es6.investigation.narrative.summaryVictim('x', 1, 98, 4, 'y', '').includes('(por volumen)'), 'T2: narrative pct labeled "(por volumen)"');
 ok(es6.behavioral.rapidForwardingEv(70, 7, 10)[0].includes('(por número de depósitos)'), 'T2: behavioral pct labeled "(por número de depósitos)"');
 ok(es6.recovery.factorPhishingTag(1).includes('evidencia independiente'), 'T4: phishing-tag factor has cluster-evidence context');

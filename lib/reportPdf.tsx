@@ -725,7 +725,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
               {data.exchangeAnalysis.entryPoints.length > 0 ? (
                 data.exchangeAnalysis.entryPoints.slice(0, 3).map((e, i) => (
                   <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
-                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : (e.parentEntity && e.parentEntity.includes('Binance') ? ` · ${t.investigation.binanceComplianceChannel}` : '')}
                   </Text>
                 ))
               ) : (
@@ -740,7 +740,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
               {data.exchangeAnalysis.exitPoints.length > 0 ? (
                 data.exchangeAnalysis.exitPoints.slice(0, 3).map((e, i) => (
                   <Text key={i} style={{ fontSize: 6.5, color: slate900 }}>
-                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : ''}
+                    {e.parentEntity}: {t.investigation.interactions(e.interactionCount)}{e.complianceEmail ? ` · ${e.complianceEmail}` : (e.parentEntity && e.parentEntity.includes('Binance') ? ` · ${t.investigation.binanceComplianceChannel}` : '')}
                   </Text>
                 ))
               ) : (
@@ -2262,6 +2262,10 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
               </Text>
               {b.email ? (
                 <Text style={{ fontSize: 8, color: blue }}>{b.email}</Text>
+              ) : b.brand.includes('Binance') ? (
+                <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.3 }}>
+                  {st.step1BinanceChannel}
+                </Text>
               ) : (
                 <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>
                   {st.step1NoContact}

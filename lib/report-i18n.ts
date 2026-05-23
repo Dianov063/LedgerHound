@@ -350,6 +350,8 @@ export interface Steps {
   step1Interactions: (interactions: number, addrCount: number) => string;
   step1MoreAddrs: (n: number) => string;
   step1NoContact: string;
+  /** Phase 3.1 Stage 8: Binance has no direct victim compliance email. */
+  step1BinanceChannel: string;
   lawEnforcementTitle: string;
   ic3Bullet: string;
   localPoliceBullet: string;
@@ -607,6 +609,8 @@ export interface Investigation {
   reportSuitabilityTitle: string;
   exchangeKycEntryVsExit: string;
   kycEntryPointLabel: string;
+  /** Phase 3.1 Stage 8: Binance compliance channel (no direct victim email). */
+  binanceComplianceChannel: string;
   interactions: (n: number) => string;
   noneDetected: string;
   identifiesVictimAccount: string;
@@ -834,6 +838,7 @@ const en: ReportTranslations = {
     reportSuitabilityTitle: 'Report Suitability',
     exchangeKycEntryVsExit: 'Exchange KYC — Entry vs Exit',
     kycEntryPointLabel: "KYC ENTRY POINT (victim's funding source)",
+    binanceComplianceChannel: "compliance channel — victims: support ticket 'Report fraud/scam'",
     interactions: (n) => `${n} interaction(s)`,
     noneDetected: 'None detected.',
     identifiesVictimAccount: "Identifies the VICTIM'S exchange account — useful to confirm victim identity for legal proceedings, not the scammer's.",
@@ -1156,7 +1161,7 @@ const en: ReportTranslations = {
     ic3Bold: 'File FBI IC3 / Local Police Report:',
     ic3Text: 'Report at ic3.gov (if US-based) or via your local cybercrime unit. Reference this Case ID and attach this report as supporting documentation.',
     exchangeComplianceBold: 'Exchange Compliance Notification:',
-    exchangeComplianceText: 'Submit a preservation request to the compliance teams of the identified exchanges. Even absent a scammer KYC exit, this creates an official record and may trigger internal blacklisting.',
+    exchangeComplianceText: "Submit a preservation request to the compliance teams of the identified exchanges. Even absent a scammer KYC exit, this creates an official record and may assist the exchange's internal risk review.",
     tokenIssuerBold: 'Token Issuer Coordination:',
     tokenIssuerText: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
     courtCertifiedBold: 'Court-Certified Forensic Investigation:',
@@ -1218,6 +1223,7 @@ const en: ReportTranslations = {
     step1Interactions: (interactions, addrCount) => `${interactions} interaction(s) · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
     step1MoreAddrs: (n) => ` (+${n} more)`,
     step1NoContact: 'No published law-enforcement contact recorded — consult attorney for proper service channel.',
+    step1BinanceChannel: "Access your Binance account -> Support -> 'Report fraud/scam' category. The Law Enforcement portal (lawenforcement.binance.com) is for authorities only.",
     lawEnforcementTitle: 'File Law Enforcement Reports',
     ic3Bullet: 'FBI IC3 complaint — ic3.gov (reference this report)',
     localPoliceBullet: 'Local police report — needed for exchange compliance requests',
@@ -1456,6 +1462,7 @@ const es: ReportTranslations = {
     reportSuitabilityTitle: 'Usos del Informe',
     exchangeKycEntryVsExit: 'KYC del Exchange — Entrada vs Salida',
     kycEntryPointLabel: 'PUNTO DE ENTRADA KYC (fuente de financiamiento de la víctima)',
+    binanceComplianceChannel: "canal de cumplimiento — víctimas: ticket de soporte 'Report fraud/scam'",
     interactions: (n) => `${n} interacción(es)`,
     noneDetected: 'Ninguno detectado.',
     identifiesVictimAccount: 'Identifica la cuenta de exchange de la VÍCTIMA — útil para confirmar la identidad de la víctima en procedimientos legales, no la del estafador.',
@@ -1778,7 +1785,7 @@ const es: ReportTranslations = {
     ic3Bold: 'Presentar Denuncia ante FBI IC3 / Policía Local:',
     ic3Text: 'Denuncie en ic3.gov (si está en EE. UU.) o a través de su unidad local de cibercrimen. Haga referencia a este ID de Caso y adjunte este informe como documentación de apoyo.',
     exchangeComplianceBold: 'Notificación al Cumplimiento del Exchange:',
-    exchangeComplianceText: 'Envíe una solicitud de preservación a los equipos de cumplimiento de los exchanges identificados. Incluso sin una salida KYC del estafador, esto crea un registro oficial y puede activar el bloqueo interno.',
+    exchangeComplianceText: 'Envíe una solicitud de preservación a los equipos de cumplimiento de los exchanges identificados. Incluso sin una salida KYC del estafador, esto crea un registro oficial y puede asistir en la revisión interna de riesgo del exchange.',
     tokenIssuerBold: 'Coordinación con el Emisor del Token:',
     tokenIssuerText: 'Para transferencias en USDT a wallets marcadas, envíe un paquete de evidencia al equipo legal de Tether (legal@tether.to) para revisión de cumplimiento (las decisiones de aplicación quedan a discreción de Tether).',
     courtCertifiedBold: 'Investigación Forense Certificada para Tribunales:',
@@ -1840,6 +1847,7 @@ const es: ReportTranslations = {
     step1Interactions: (interactions, addrCount) => `${interactions} interacci${interactions > 1 ? 'ones' : 'ón'} · ${addrCount} hot wallet${addrCount > 1 ? 's' : ''}`,
     step1MoreAddrs: (n) => ` (+${n} más)`,
     step1NoContact: 'No hay contacto publicado para autoridades — consulte a un abogado para el canal de notificación adecuado.',
+    step1BinanceChannel: "Acceda a su cuenta Binance -> Soporte -> categoría 'Report fraud/scam'. El Portal de Autoridades (lawenforcement.binance.com) es solo para autoridades.",
     lawEnforcementTitle: 'Presentar Denuncias ante las Autoridades',
     ic3Bullet: 'Denuncia ante FBI IC3 — ic3.gov (haga referencia a este informe)',
     localPoliceBullet: 'Denuncia ante la policía local — necesaria para las solicitudes de cumplimiento del exchange',
