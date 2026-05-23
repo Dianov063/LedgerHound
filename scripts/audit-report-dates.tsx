@@ -51,7 +51,20 @@ const mock: ReportData = {
     { date: '2026-03-07', direction: 'OUT', from: SUBJECT, to: SPOOF_MIS, value: 11020.5, token: 'USDT' },
     { date: '2026-04-01', direction: 'IN', from: REAL, to: SUBJECT, value: 22187.44, token: 'USDT' },
   ],
-  graphData: null,
+  // Phase 3.1 Stage 10: graph with one REAL edge + one SPOOF edge to exercise
+  // the de-emphasized (grey/dashed) spoof rendering + "no value" label/legend.
+  graphData: {
+    width: 500, height: 300,
+    nodes: [
+      { id: 'src', label: 'Su Wallet', type: 'source', x: 250, y: 150, radius: 12, volume: 0 },
+      { id: 'real', label: '0x073a4abb...', type: 'unknown', x: 410, y: 100, radius: 8, volume: 22187 },
+      { id: 'spoof', label: '0x073a4e18...', type: 'scam', x: 410, y: 220, radius: 8, volume: 26191 },
+    ],
+    edges: [
+      { fromId: 'src', toId: 'real', x1: 262, y1: 150, x2: 400, y2: 105, direction: 'OUT', label: '22.2K USDT', labelX: 331, labelY: 127, isSpoof: false },
+      { fromId: 'src', toId: 'spoof', x1: 262, y1: 150, x2: 400, y2: 215, direction: 'OUT', label: '26.2K USDT ⚠', labelX: 331, labelY: 182, isSpoof: true },
+    ],
+  } as any,
   riskBreakdown: { unknownWalletInteraction: 20, mixerInteraction: 0, exchangeInteraction: -10, multiHopTransfers: 0, stablecoinUsage: 5, sanctionedAddress: 0, scamDbMatch: 0 } as any,
   timeline: [
     { date: '2026-02-25', type: 'FIRST_ACTIVITY', description: 'First activity', highlight: false } as any,
@@ -180,6 +193,12 @@ ok(es6.investigation.binanceComplianceChannel.includes('NO use un email de cumpl
 // P5: KYC recovery factor softened.
 ok(!es6.recovery.factorKycExchange('Binance').includes('citación judicial'), 'P5: no "citación judicial posible"');
 ok(es6.recovery.factorKycExchange('Binance').includes('proceso legal'), 'P5: uses "proceso legal"');
+// ── Phase 3.1 Stage 10: Fund Flow Graph real vs spoof visual separation ──
+ok(joined.includes('Flujo de fondos reales'), 'S10: real-flow legend entry rendered');
+ok(joined.includes('Token falsificado (sin valor de mercado)'), 'S10: spoof-flow legend entry rendered');
+ok(joined.includes('26.2K USDT ⚠ sin valor'), 'S10: spoof edge label carries "sin valor" warning');
+ok(es6.fundFlow.fakeNoValueWarning === 'sin valor', 'S10: fakeNoValueWarning (es)');
+ok(getReportTranslations('en').fundFlow.spoofFlowLegend === 'Fake token (no market value)', 'S10: spoof-flow legend (en)');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

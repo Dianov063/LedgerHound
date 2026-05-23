@@ -1788,8 +1788,11 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
 
               {/* Edges with arrows */}
               {graph.edges.map((edge, i) => {
-                // 2026-05-21 (Phase 2.5 / Part 5): spoof edges drawn amber + ⚠.
-                const color = edge.isSpoof ? amber : edge.direction === 'OUT' ? red : green;
+                // Phase 3.1 Stage 10: spoof (worthless) flows are visually
+                // de-emphasized — grey, dashed, faded — so they can never be
+                // mistaken for real economic flow (visual mixed-unit guard).
+                const color = edge.isSpoof ? slate400 : edge.direction === 'OUT' ? red : green;
+                const edgeLabel = edge.isSpoof ? `${edge.label} ${ff.fakeNoValueWarning}` : edge.label;
                 const dx = edge.x2 - edge.x1;
                 const dy = edge.y2 - edge.y1;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1809,16 +1812,18 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
                     <Line
                       x1={edge.x1} y1={edge.y1}
                       x2={edge.x2 - ux * 5} y2={edge.y2 - uy * 5}
-                      style={{ stroke: color, strokeWidth: 1.5 }}
+                      strokeDasharray={edge.isSpoof ? '4 2' : undefined}
+                      strokeOpacity={edge.isSpoof ? 0.55 : 1}
+                      style={{ stroke: color, strokeWidth: edge.isSpoof ? 1 : 1.5 }}
                     />
-                    <Path d={triPath} style={{ fill: color }} />
+                    <Path d={triPath} fillOpacity={edge.isSpoof ? 0.55 : 1} style={{ fill: color }} />
                     {/* Edge value label */}
                     <Text
                       x={edge.labelX + px * 8}
                       y={edge.labelY + py * 8}
                       style={{ fontSize: 5.5, fill: color, fontFamily: 'Helvetica' }}
                     >
-                      {edge.label}
+                      {edgeLabel}
                     </Text>
                   </G>
                 );
@@ -1869,7 +1874,7 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
                   <Text style={{ ...s.td, width: '6%' }}>{i + 1}</Text>
                   <Text style={{ ...s.td, width: '30%', fontFamily: 'Helvetica-Bold' }}>{node.label}</Text>
                   <Text style={{ ...s.td, width: '22%', color: getNodeColor(node.type) }}>{ff.nodeType(node.type)}</Text>
-                  <Text style={{ ...s.td, width: '22%' }}>{edge?.label || '—'}</Text>
+                  <Text style={{ ...s.td, width: '22%', color: edge?.isSpoof ? slate400 : slate900 }}>{edge ? (edge.isSpoof ? `${edge.label} ${ff.fakeNoValueWarning}` : edge.label) : '—'}</Text>
                   <Text style={{ ...s.td, width: '20%', color: edge?.direction === 'IN' ? green : red }}>{edge?.direction || '—'}</Text>
                 </View>
               );
@@ -1899,6 +1904,15 @@ const FundFlowPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 12, height: 2, backgroundColor: red }} />
               <Text style={{ fontSize: 7, color: slate600 }}>{ff.legendOutgoing}</Text>
+            </View>
+            {/* Phase 3.1 Stage 10: real (solid) vs spoof (dashed grey) flow. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 12, height: 2, backgroundColor: slate900 }} />
+              <Text style={{ fontSize: 7, color: slate600 }}>{ff.realFlowLegend}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 12, height: 0, borderTopWidth: 1.5, borderTopColor: slate400, borderStyle: 'dashed' }} />
+              <Text style={{ fontSize: 7, color: slate600 }}>{ff.spoofFlowLegend}</Text>
             </View>
           </View>
         </View>

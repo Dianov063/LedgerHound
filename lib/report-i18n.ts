@@ -252,6 +252,10 @@ export interface FundFlow {
   legendOutgoing: string;
   noGraph: string;
   interactiveLine: string;
+  /** Phase 3.1 Stage 10: real vs spoof flow legend + spoof "no value" warning. */
+  realFlowLegend: string;
+  spoofFlowLegend: string;
+  fakeNoValueWarning: string;
 }
 
 /** Transaction History (page 14) translations. */
@@ -1280,6 +1284,9 @@ const en: ReportTranslations = {
     legendOutgoing: 'Outgoing',
     noGraph: 'Fund flow graph could not be generated for this wallet. This may occur when the wallet has very few transactions or all counterparties are filtered as dust.',
     interactiveLine: 'For an interactive fund flow visualization, visit www.ledgerhound.vip/graph-tracer',
+    realFlowLegend: 'Real funds flow',
+    spoofFlowLegend: 'Fake token (no market value)',
+    fakeNoValueWarning: 'no value',
   },
   transactions: {
     titleSuffix: (n) => ` (Top ${n})`,
@@ -1905,6 +1912,9 @@ const es: ReportTranslations = {
     legendOutgoing: 'Saliente',
     noGraph: 'No se pudo generar el gráfico de flujo de fondos para esta wallet. Esto puede ocurrir cuando la wallet tiene muy pocas transacciones o todas las contrapartes se filtran como dust.',
     interactiveLine: 'Para una visualización interactiva del flujo de fondos, visite www.ledgerhound.vip/graph-tracer',
+    realFlowLegend: 'Flujo de fondos reales',
+    spoofFlowLegend: 'Token falsificado (sin valor de mercado)',
+    fakeNoValueWarning: 'sin valor',
   },
   transactions: {
     titleSuffix: (n) => ` (${n} principales)`,

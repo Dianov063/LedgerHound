@@ -90,6 +90,11 @@ ok(teth.includes('NO sume con la pérdida real'), 'tether: "NO sume" guard-rail 
 ok(bin.includes('Pérdida económica confirmada'), 'binance: references "Pérdida económica confirmada" section');
 ok(teth.includes('Pérdida económica confirmada'), 'tether: references "Pérdida económica confirmada" section');
 ok(!bin.includes('Aproximadamente $[monto] USD en USDT'), 'binance: old ambiguous loss field replaced');
+// Phase 3.1 Stage 10 P-bonus: "controladas por" qualified with "presuntamente".
+for (const [name, body] of [['binance', bin], ['tether', teth], ['divindat', byFile['divindat-denuncia-es.md'] || '']] as const) {
+  ok(!/(?<!presuntamente )controladas por los operadores del fraude/.test(body), `${name}: no unqualified "controladas por"`);
+  ok(body.includes('presuntamente controladas por los operadores del fraude'), `${name}: uses "presuntamente controladas"`);
+}
 ok(byFile['divindat-denuncia-es.md']?.includes('DIVINDAT'), 'DIVINDAT title present');
 ok(byFile['divindat-denuncia-es.md']?.includes('Art. 196'), 'DIVINDAT statute citation present');
 ok(EMAIL_TEMPLATES_ES.every((t) => t.content.includes('{caseId}')), 'all templates carry a {caseId} token');

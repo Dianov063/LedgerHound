@@ -24,7 +24,7 @@ Le escribo para reportar un caso de fraude con criptomonedas que requiere su ate
 
 > Importante: Binance solicita el **UID de la cuenta** (no solo el email) para tramitar solicitudes. Encuentre su UID en: Perfil → Información de la cuenta → User ID (UID).
 
-### Direcciones de los estafadores (controladas por los operadores del fraude):
+### Direcciones de los estafadores (presuntamente controladas por los operadores del fraude):
 
 - **Recolector principal:** [dirección]
 - **Suplantaciones secundarias (envenenamiento de direcciones):**

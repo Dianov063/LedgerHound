@@ -21,7 +21,7 @@ Por la presente, yo, **[Su Nombre Completo]**, identificado(a) con DNI **[XXXXXX
 
 Entre **[mes]** y **[mes]** de **[año]**, fui víctima de una estafa orquestada mediante una modalidad compatible con fraude de inversión en criptomonedas, conocida internacionalmente como "pig butchering" (engorde y matanza), en la cual los estafadores establecieron contacto inicial mediante redes sociales/aplicaciones de mensajería, ganaron mi confianza durante semanas, y posteriormente me convencieron de "invertir" en una plataforma de comercio de criptomonedas denominada **DZHLWK Fintech**.
 
-La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[monto en letras]** dólares americanos), transferidos en forma de USDT (stablecoin) desde mi cuenta verificada de Binance hacia direcciones blockchain controladas por los operadores del fraude.
+La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[monto en letras]** dólares americanos), transferidos en forma de USDT (stablecoin) desde mi cuenta verificada de Binance hacia direcciones blockchain presuntamente controladas por los operadores del fraude.
 
 ## II. PÉRDIDA ECONÓMICA
 

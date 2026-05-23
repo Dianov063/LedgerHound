@@ -20,7 +20,7 @@ Soy víctima de fraude con criptomonedas que utilizó tokens USDT (stablecoin de
 - **Plataforma involucrada:** DZHLWK Fintech
 - **ID del caso forense:** [{caseId}]
 
-### Direcciones receptoras controladas por los operadores del fraude (USDT real):
+### Direcciones receptoras presuntamente controladas por los operadores del fraude (USDT real):
 
 - **Recolector principal:** [dirección] — recibió [monto] USDT
 - **Suplantación que recibió fondos reales:** [dirección] — recibió [monto] USDT
