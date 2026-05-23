@@ -230,6 +230,13 @@ export interface PeruGuidance {
   reniecUrl: string;
   reniecDescription: string;
   disclaimer: string;
+  /** Phase 3.1 Stage 11 (B2): "documents in this package" checklist (Exec Summary). */
+  documentsTitle: string;
+  documentsIntro: string;
+  documentsDivindat: string;
+  documentsBinance: string;
+  documentsTether: string;
+  documentsOrder: string;
 }
 
 /** Fund Flow Graph (page 13) translations. */
@@ -489,6 +496,8 @@ export interface AssetSummaryT {
   colTotalIn: string;
   colTotalOut: string;
   colNet: string;
+  /** Phase 3.1 Stage 11 (A1): clarifies net flow != economic loss. */
+  netFlowClarification: string;
   spamFiltered: (n: number) => string;
   spamNote: string;
   unicodeEvidenceHeader: (n: number) => string;
@@ -849,7 +858,7 @@ const en: ReportTranslations = {
     noneDetected: 'None detected.',
     identifiesVictimAccount: "Identifies the VICTIM'S exchange account — useful to confirm victim identity for legal proceedings, not the scammer's.",
     kycExitPointLabel: 'KYC EXIT POINT (scammer cash-out)',
-    exitNotDetected: "Not detected in subject wallet's direct history. The fraud cluster controls the funds; identifying a cash-out exchange requires an expanded counterparty trace (one or more hops beyond this wallet).",
+    exitNotDetected: "Not detected in subject wallet's direct history. The observed pattern is consistent with coordinated control of the funds by the fraud operators; identifying a cash-out exchange requires an expanded counterparty trace (one or more hops beyond this wallet).",
     walletTypes: {
       victim: 'Victim Wallet — Funds Sent to Identified Counterparty',
       aggregator: 'Scam Aggregation Wallet — Multiple Victims Identified',
@@ -866,7 +875,7 @@ const en: ReportTranslations = {
       knownExchange: (label) => `Subject wallet is a known ${label} address (KYC exchange)`,
       knownInfra: (label) => `Subject wallet is a known ${label} — analyzing as opaque infrastructure, not as victim/scammer`,
       victimKycEntry: (n) => `Received funds from ${n} KYC exchange deposit(s) — characteristic of a victim funding their own wallet`,
-      victimForwarded: (n) => `Forwarded funds to ${n} unknown address(es) — consistent with sending to scammer-controlled wallets`,
+      victimForwarded: (n) => `Forwarded funds to ${n} unknown address(es) — consistent with sending to wallets presumably controlled by the fraud operators`,
       victimLimitedHistory: (n) => `Limited transaction history (${n} txs) — typical retail user profile`,
       victimRapidForward: (pct) => `${pct}% of funds forwarded within 24h — rapid action under social engineering pressure`,
       aggregatorSenders: (senders, receivers) => `${senders} unique senders aggregated into ${receivers} destination(s)`,
@@ -934,7 +943,7 @@ const en: ReportTranslations = {
   attackTechnique: {
     intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute important supporting documentation for legal and administrative proceedings.',
     poisoningHeader: 'Address Poisoning Campaign Detected',
-    poisoningIntro: 'A coordinated address poisoning attack was identified. A cluster of visually similar addresses (sharing prefix and suffix patterns) was deployed to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are consistent with coordinated control; the highest-volume address functions as the main collector, while the rest operate as secondary spoofs.',
+    poisoningIntro: 'A coordinated address poisoning attack was identified. A cluster of visually similar addresses (sharing prefix and suffix patterns) was deployed to confuse the victim and distribute fraudulent inflows across multiple wallets — hindering compliance and investigative actions. All addresses in this cluster are consistent with coordinated control; the highest-volume address functions as the main collector, while the rest operate as secondary spoofs.',
     vanityCluster: (pattern) => `Vanity Cluster: ${pattern}`,
     statClusterAddresses: 'CLUSTER ADDRESSES',
     statRealMisdirections: 'REAL MISDIRECTIONS',
@@ -991,7 +1000,8 @@ const en: ReportTranslations = {
     colToken: 'Token',
     colTotalIn: 'Total In',
     colTotalOut: 'Total Out',
-    colNet: 'Net',
+    colNet: 'Net account flow',
+    netFlowClarification: "Note: \"Net account flow\" is the period's accounting balance, NOT the economic loss. Incoming funds are mostly the victim's own deposits (e.g. from their exchange), not recovery. The confirmed economic loss is stated in the Executive Summary.",
     spamFiltered: (n) => `Spam/Airdrop Tokens Filtered: ${n}`,
     spamNote: 'Spam tokens are common on active wallets and typically have no real value.',
     unicodeEvidenceHeader: (n) => `Unicode Spoofing Evidence: ${n} fake token${n > 1 ? 's' : ''} detected`,
@@ -1162,7 +1172,7 @@ const en: ReportTranslations = {
     entryPointBold: (brand) => `${brand} Entry Point (Victim Funding):`,
     entryPointText: (brand) => `The victim funded this wallet via ${brand}. A subpoena to ${brand} compliance can confirm victim identity for case-file completeness, but does NOT identify the scammer. Use this primarily for (a) victim identity verification in legal proceedings, and (b) detecting whether the scammer ever transferred funds back to a ${brand} account.`,
     counterpartyExitBold: 'Counterparty Exit Trace (required for scammer identification):',
-    counterpartyExitText: 'The fraud cluster controls the funds within this wallet’s transaction history. Identifying the scammer’s cash-out exchange requires tracing one or more hops beyond the cluster — this expanded analysis is the recommended next investigative step.',
+    counterpartyExitText: 'The observed pattern is consistent with coordinated control of the funds within this wallet’s transaction history. Identifying the cash-out exchange requires tracing one or more hops beyond the cluster — this expanded analysis is the recommended next investigative step.',
     kycExitBold: 'KYC Exit Point Identified:',
     kycExitText: (brand) => `Funds reached ${brand}. File an urgent preservation/discovery request with that exchange’s compliance team to pursue the account holder behind the cash-out.`,
     ic3Bold: 'File FBI IC3 / Local Police Report:',
@@ -1172,7 +1182,7 @@ const en: ReportTranslations = {
     tokenIssuerBold: 'Token Issuer Coordination:',
     tokenIssuerText: 'For USDT-denominated transfers to flagged wallets, submit an evidence package to Tether legal (legal@tether.to) for compliance review (enforcement decisions are at Tether\'s discretion).',
     courtCertifiedBold: 'Court-Certified Forensic Investigation:',
-    courtCertifiedText: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a full forensic engagement.',
+    courtCertifiedText: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a certified expanded forensic investigation.',
     assessmentLabel: {
       HIGHER_THAN_AVERAGE: 'Higher than average — multiple positive factors present, but recovery still requires sustained legal action',
       MODERATE: 'Moderate — some positive factors, recovery possible with proper legal action',
@@ -1256,7 +1266,7 @@ const en: ReportTranslations = {
   disclaimer: {
     para1: 'This report was generated automatically by LedgerHound, a service of USPROJECT LLC. It is provided for informational purposes only and does not constitute legal, financial, or investment advice.',
     para2: 'The analysis contained herein is based on publicly available blockchain data retrieved at the time of report generation. Blockchain data is permanent and immutable; however, the attribution of wallet addresses to known entities is based on proprietary and open-source intelligence databases that may not be comprehensive.',
-    para3: 'This automated report is not a substitute for a certified forensic investigation conducted by a qualified blockchain forensic analyst. For matters requiring court testimony, certified methodology, or regulatory compliance, a full forensic engagement is recommended.',
+    para3: 'This automated report is not a substitute for a certified forensic investigation conducted by a qualified blockchain forensic analyst. For matters requiring court testimony, certified methodology, or regulatory compliance, a certified expanded forensic investigation is recommended.',
     para4: 'Risk scores are generated algorithmically and should be interpreted as preliminary indicators only. A low risk score does not guarantee legitimacy, and a high risk score does not definitively indicate criminal activity.',
     para5: 'LedgerHound and USPROJECT LLC are not law firms and do not provide legal representation. Users should consult with qualified legal counsel before taking any legal action based on the contents of this report.',
     para6: 'By purchasing and using this report, you agree that USPROJECT LLC\'s liability is limited to the purchase price of the report.',
@@ -1327,6 +1337,12 @@ const en: ReportTranslations = {
       reniecUrl: 'https://www.reniec.gob.pe/',
       reniecDescription: 'If you provided your DNI (national ID) to scammers during a fake KYC process, consider an identity alert at RENIEC and credit monitoring through Equifax Perú or Sentinel.',
       disclaimer: 'This forensic report may be presented as supporting documentation to any of the authorities listed above.',
+      documentsTitle: 'Documents in this package',
+      documentsIntro: 'This report is accompanied by 3 recovery templates (.md), to be used in this order:',
+      documentsDivindat: 'divindat-denuncia-es.md — Formal complaint for DIVINDAT Lima (file first, this week).',
+      documentsBinance: "binance-compliance-es.md — Report to Binance support, category 'Report fraud/scam' (within 7 days after the complaint).",
+      documentsTether: 'tether-legal-es.md — Email to Tether Legal (send after you have the police case number).',
+      documentsOrder: 'Each template references this forensic report as supporting evidence.',
     },
   },
 };
@@ -1477,7 +1493,7 @@ const es: ReportTranslations = {
     noneDetected: 'Ninguno detectado.',
     identifiesVictimAccount: 'Identifica la cuenta de exchange de la VÍCTIMA — útil para confirmar la identidad de la víctima en procedimientos legales, no la del estafador.',
     kycExitPointLabel: 'PUNTO DE SALIDA KYC (retiro del estafador)',
-    exitNotDetected: 'No detectado en el historial directo de la wallet analizada. El grupo de fraude controla los fondos; identificar un exchange de retiro requiere un rastreo ampliado de la contraparte (uno o más saltos más allá de esta wallet).',
+    exitNotDetected: 'No detectado en el historial directo de la wallet analizada. El patrón observado es consistente con control coordinado de los fondos por los operadores del fraude; identificar un exchange de retiro requiere un rastreo ampliado de la contraparte (uno o más saltos más allá de esta wallet).',
     walletTypes: {
       victim: 'Wallet de Víctima — Fondos Enviados a Contraparte Identificada',
       aggregator: 'Wallet Agregadora de Estafa — Múltiples Víctimas Identificadas',
@@ -1494,7 +1510,7 @@ const es: ReportTranslations = {
       knownExchange: (label) => `La wallet analizada es una dirección conocida de ${label} (exchange KYC)`,
       knownInfra: (label) => `La wallet analizada es un(a) ${label} conocido(a) — analizada como infraestructura opaca, no como víctima/estafador`,
       victimKycEntry: (n) => `Recibió fondos de ${n} depósito(s) de exchange KYC — característico de una víctima financiando su propia wallet`,
-      victimForwarded: (n) => `Reenvió fondos a ${n} dirección(es) desconocida(s) — consistente con envíos a wallets controladas por el estafador`,
+      victimForwarded: (n) => `Reenvió fondos a ${n} dirección(es) desconocida(s) — consistente con envíos a wallets presuntamente controladas por los operadores del fraude`,
       victimLimitedHistory: (n) => `Historial de transacciones limitado (${n} txs) — perfil típico de usuario minorista`,
       victimRapidForward: (pct) => `${pct}% de los fondos reenviados en 24h — acción rápida bajo presión de ingeniería social`,
       aggregatorSenders: (senders, receivers) => `${senders} remitentes únicos agregados en ${receivers} destino(s)`,
@@ -1562,7 +1578,7 @@ const es: ReportTranslations = {
   attackTechnique: {
     intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen documentación de apoyo importante para procedimientos legales y administrativos.',
     poisoningHeader: 'Campaña de Envenenamiento de Direcciones Detectada',
-    poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. Se desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando el bloqueo y la incautación. Todas las direcciones de este grupo son consistentes con control coordinado; la dirección de mayor volumen funciona como recolector principal, mientras que el resto operan como suplantaciones secundarias.',
+    poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. Se desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando las acciones de cumplimiento e investigación. Todas las direcciones de este grupo son consistentes con control coordinado; la dirección de mayor volumen funciona como recolector principal, mientras que el resto operan como suplantaciones secundarias.',
     vanityCluster: (pattern) => `Grupo de Direcciones Vanity: ${pattern}`,
     statClusterAddresses: 'DIRECCIONES DEL GRUPO',
     statRealMisdirections: 'DESVÍOS REALES',
@@ -1619,7 +1635,8 @@ const es: ReportTranslations = {
     colToken: 'Token',
     colTotalIn: 'Total Entrada',
     colTotalOut: 'Total Salida',
-    colNet: 'Neto',
+    colNet: 'Flujo neto en cuenta',
+    netFlowClarification: 'Nota: el "Flujo neto en cuenta" es el balance contable del período, NO la pérdida económica. Los fondos entrantes corresponden en su mayoría a depósitos propios de la víctima (p. ej. desde su exchange), no a recuperación. La pérdida económica confirmada se indica en el Resumen Ejecutivo.',
     spamFiltered: (n) => `Tokens de Spam/Airdrop Filtrados: ${n}`,
     spamNote: 'Los tokens de spam son comunes en wallets activas y normalmente no tienen valor real.',
     unicodeEvidenceHeader: (n) => `Evidencia de Suplantación Unicode: ${n} token${n > 1 ? 's' : ''} falso${n > 1 ? 's' : ''} detectado${n > 1 ? 's' : ''}`,
@@ -1790,7 +1807,7 @@ const es: ReportTranslations = {
     entryPointBold: (brand) => `Punto de Entrada de ${brand} (Financiamiento de la Víctima):`,
     entryPointText: (brand) => `La víctima financió esta wallet a través de ${brand}. Una citación judicial al cumplimiento de ${brand} puede confirmar la identidad de la víctima para completar el expediente, pero NO identifica al estafador. Úsela principalmente para (a) la verificación de identidad de la víctima en procedimientos legales, y (b) detectar si el estafador alguna vez transfirió fondos de vuelta a una cuenta de ${brand}.`,
     counterpartyExitBold: 'Rastreo de Salida de la Contraparte (requerido para identificar al estafador):',
-    counterpartyExitText: 'El grupo de fraude controla los fondos dentro del historial de transacciones de esta wallet. Identificar el exchange de retiro del estafador requiere rastrear uno o más saltos más allá del grupo — este análisis ampliado es el siguiente paso de investigación recomendado.',
+    counterpartyExitText: 'El patrón observado es consistente con control coordinado de los fondos dentro del historial de transacciones de esta wallet. Identificar el exchange de retiro requiere rastrear uno o más saltos más allá del grupo — este análisis ampliado es el siguiente paso de investigación recomendado.',
     kycExitBold: 'Punto de Salida KYC Identificado:',
     kycExitText: (brand) => `Los fondos llegaron a ${brand}. Presente una solicitud urgente de preservación/descubrimiento ante el equipo de cumplimiento de ese exchange para perseguir al titular de la cuenta detrás del retiro.`,
     ic3Bold: 'Presentar Denuncia ante FBI IC3 / Policía Local:',
@@ -1800,7 +1817,7 @@ const es: ReportTranslations = {
     tokenIssuerBold: 'Coordinación con el Emisor del Token:',
     tokenIssuerText: 'Para transferencias en USDT a wallets marcadas, envíe un paquete de evidencia al equipo legal de Tether (legal@tether.to) para revisión de cumplimiento (las decisiones de aplicación quedan a discreción de Tether).',
     courtCertifiedBold: 'Investigación Forense Certificada para Tribunales:',
-    courtCertifiedText: 'Para testimonio en tribunales, metodología certificada o un rastreo ampliado de la contraparte, contacte a LedgerHound en contact@ledgerhound.vip para un servicio forense completo.',
+    courtCertifiedText: 'Para testimonio en tribunales, metodología certificada o un rastreo ampliado de la contraparte, contacte a LedgerHound en contact@ledgerhound.vip para una investigación forense ampliada certificada.',
     assessmentLabel: {
       HIGHER_THAN_AVERAGE: 'Superior al promedio — múltiples factores positivos presentes, pero la recuperación aún requiere acción legal sostenida',
       MODERATE: 'Moderada — algunos factores positivos, recuperación posible con acción legal apropiada',
@@ -1884,7 +1901,7 @@ const es: ReportTranslations = {
   disclaimer: {
     para1: 'Este informe fue generado automáticamente por LedgerHound, un servicio de USPROJECT LLC. Se proporciona únicamente con fines informativos y no constituye asesoramiento legal, financiero ni de inversión.',
     para2: 'El análisis aquí contenido se basa en datos de blockchain disponibles públicamente, obtenidos al momento de la generación del informe. Los datos de blockchain son permanentes e inmutables; sin embargo, la atribución de direcciones de wallet a entidades conocidas se basa en bases de datos de inteligencia propietarias y de código abierto que pueden no ser exhaustivas.',
-    para3: 'Este informe automatizado no sustituye una investigación forense certificada realizada por un analista forense de blockchain calificado. Para asuntos que requieran testimonio en tribunales, metodología certificada o cumplimiento regulatorio, se recomienda un servicio forense completo.',
+    para3: 'Este informe automatizado no sustituye una investigación forense certificada realizada por un analista forense de blockchain calificado. Para asuntos que requieran testimonio en tribunales, metodología certificada o cumplimiento regulatorio, se recomienda una investigación forense ampliada certificada.',
     para4: 'Las puntuaciones de riesgo se generan algorítmicamente y deben interpretarse únicamente como indicadores preliminares. Una puntuación de riesgo baja no garantiza la legitimidad, y una puntuación alta no indica de manera definitiva actividad delictiva.',
     para5: 'LedgerHound y USPROJECT LLC no son firmas de abogados y no brindan representación legal. Los usuarios deben consultar con un asesor legal calificado antes de emprender cualquier acción legal basada en el contenido de este informe.',
     para6: 'Al comprar y usar este informe, usted acepta que la responsabilidad de USPROJECT LLC se limita al precio de compra del informe.',
@@ -1955,6 +1972,12 @@ const es: ReportTranslations = {
       reniecUrl: 'https://www.reniec.gob.pe/',
       reniecDescription: 'Si proporcionó su DNI a los estafadores durante un proceso de KYC falso, considere una alerta de identidad en RENIEC y monitoreo crediticio a través de Equifax Perú o Sentinel.',
       disclaimer: 'Este informe forense puede ser presentado como documentación de apoyo ante cualquiera de las autoridades arriba mencionadas.',
+      documentsTitle: 'Documentos en este paquete',
+      documentsIntro: 'Este informe se acompaña de 3 plantillas de recuperación (.md), para usar en este orden:',
+      documentsDivindat: 'divindat-denuncia-es.md — Denuncia formal para DIVINDAT Lima (presentar primero, esta semana).',
+      documentsBinance: "binance-compliance-es.md — Reporte a soporte de Binance, categoría 'Report fraud/scam' (dentro de 7 días después de la denuncia).",
+      documentsTether: 'tether-legal-es.md — Email a Tether Legal (enviar después de tener el número de expediente policial).',
+      documentsOrder: 'Cada plantilla referencia este informe forense como evidencia de apoyo.',
     },
   },
 };

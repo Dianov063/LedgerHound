@@ -527,6 +527,8 @@ export interface ReportData {
   lastActivity: string;
   inactiveDays: number;
   topCounterparties: { address: string; label: string; count: number; volume: number }[];
+  /** Phase 3.1 Stage 11 (A4): asset symbol the counterparty volume is measured in. */
+  counterpartyVolumeSymbol: string;
   /**
    * Known counterparties. `parentEntity` (added 2026-05-20) groups multiple
    * hot wallets under the same brand (e.g. 5 Binance hot wallets → one
@@ -1115,6 +1117,22 @@ export async function generateReport(
     (tx.asset || '').toUpperCase() === nativeUpper ||
     (nativeUpper === 'ETH' && (tx.asset || '').toUpperCase() === 'WETH');
 
+  // Phase 3.1 Stage 11 (A4): pick the counterparty-volume asset = the dominant
+  // legitimate value carrier (native or top stablecoin by flow). USDT-only cases
+  // must not sort/display by an all-zero native column.
+  const STABLE_VOL = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'PYUSD']);
+  const volTotals = new Map<string, number>();
+  for (const tx of incoming.concat(outgoing)) {
+    const sym = (tx.asset || nativeUpper).toUpperCase();
+    if (sym === nativeUpper || STABLE_VOL.has(sym)) volTotals.set(sym, (volTotals.get(sym) || 0) + safeValue(tx));
+  }
+  let counterpartyVolumeSymbol = nativeUpper;
+  let bestVolTotal = -1;
+  for (const [sym, tot] of Array.from(volTotals.entries())) {
+    if (tot > bestVolTotal) { bestVolTotal = tot; counterpartyVolumeSymbol = sym; }
+  }
+  const cpVolume = (tx: any) => ((tx.asset || nativeUpper).toUpperCase() === counterpartyVolumeSymbol ? safeValue(tx) : 0);
+
   const processCounterparty = (addr: string, value: number) => {
     const lower = addr.toLowerCase();
     const existing = counterpartyMap.get(lower) || { count: 0, volume: 0 };
@@ -1141,7 +1159,7 @@ export async function generateReport(
     const val = safeValue(tx);
     if (isNativeLike(tx)) ethReceived += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.from) processCounterparty(tx.from, isNativeLike(tx) ? val : 0);
+    if (tx.from) processCounterparty(tx.from, cpVolume(tx));
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -1149,7 +1167,7 @@ export async function generateReport(
     const val = safeValue(tx);
     if (isNativeLike(tx)) ethSent += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.to) processCounterparty(tx.to, isNativeLike(tx) ? val : 0);
+    if (tx.to) processCounterparty(tx.to, cpVolume(tx));
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -2045,6 +2063,7 @@ export async function generateReport(
     lastActivity,
     inactiveDays,
     topCounterparties,
+    counterpartyVolumeSymbol,
     identifiedEntities,
     riskScore,
     riskLabel,

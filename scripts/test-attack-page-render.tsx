@@ -48,6 +48,7 @@ const mock: ReportData = {
   spamFiltered: 1,
   firstActivity: '2026-02-01', lastActivity: '2026-04-05', inactiveDays: 46,
   topCounterparties: [{ address: REAL, label: 'Unknown', count: 2, volume: 27187 }],
+  counterpartyVolumeSymbol: 'USDT',
   identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: 'ce@binance.com' }],
   riskScore: 55, riskLabel: 'MODERATE',
   recoveryAssessment: { score: 20, label: 'Low — recovery requires sustained legal effort', tier: 'LOW', disclaimer: 'Statistical estimate. Not a guarantee.', factors: { positive: ['KYC exchange exit'], negative: ['Funds forwarded rapidly'] } },

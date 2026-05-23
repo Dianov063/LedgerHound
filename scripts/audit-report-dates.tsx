@@ -42,6 +42,7 @@ const mock: ReportData = {
   transactionCount: 27, uniqueTokens: ['USDT', 'ETH'], spamFiltered: 1,
   firstActivity: '2026-02-01', lastActivity: '2026-04-05', inactiveDays: 46,
   topCounterparties: [{ address: REAL, label: 'Unknown', count: 2, volume: 27187 }],
+  counterpartyVolumeSymbol: 'USDT',
   identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: '' }],
   riskScore: 55, riskLabel: 'MODERATE',
   recoveryAssessment: { score: 20, label: 'Low', tier: 'LOW', disclaimer: 'Estimate.', factors: { positive: ['KYC exit'], negative: ['Rapid forward'] } } as any,
@@ -199,6 +200,23 @@ ok(joined.includes('Token falsificado (sin valor de mercado)'), 'S10: spoof-flow
 ok(joined.includes('26.2K USDT ⚠ sin valor'), 'S10: spoof edge label carries "sin valor" warning');
 ok(es6.fundFlow.fakeNoValueWarning === 'sin valor', 'S10: fakeNoValueWarning (es)');
 ok(getReportTranslations('en').fundFlow.spoofFlowLegend === 'Fake token (no market value)', 'S10: spoof-flow legend (en)');
+
+// ── Phase 3.1 Stage 11 ──
+// A1: Asset Summary net-flow disambiguation.
+ok(joined.includes('Flujo neto en cuenta'), 'A1: net column renamed "Flujo neto en cuenta"');
+ok(joined.includes('NO la pérdida económica'), 'A1: clarification note (net flow != economic loss) rendered');
+// A3: inside-report softening (no hard attribution / no marketing-heavy / no seizure).
+ok(!joined.includes('grupo de fraude controla los fondos'), 'A3: no "grupo de fraude controla los fondos"');
+ok(!joined.includes('bloqueo y la incautación'), 'A3: no "bloqueo y la incautación"');
+ok(!joined.includes('servicio forense completo'), 'A3: no "servicio forense completo"');
+ok(es6.investigation.exitNotDetected.includes('consistente con control coordinado'), 'A3: exit-not-detected softened');
+ok(!es6.investigation.roleReasoning.victimForwarded(4).includes('controladas por el estafador'), 'A3: victimForwarded no "controladas por el estafador"');
+ok(es6.recovery.courtCertifiedText.includes('investigación forense ampliada certificada'), 'A3: court-certified wording softened');
+// A4: counterparty volume column uses the dominant asset (USDT here), not ETH.
+ok(joined.includes('Volumen (USDT)'), 'A4: counterparty volume column labeled USDT');
+// B2: documents-in-package checklist (es + PE).
+ok(joined.includes('Documentos en este paquete'), 'B2: documents checklist rendered (es+PE)');
+ok(joined.includes('divindat-denuncia-es.md') && joined.includes('binance-compliance-es.md') && joined.includes('tether-legal-es.md'), 'B2: all 3 templates listed in order');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

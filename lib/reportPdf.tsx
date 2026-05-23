@@ -224,7 +224,7 @@ const RiskBreakdownRow = ({ label, score }: { label: string; score: number }) =>
   );
 };
 
-const SummaryPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+const SummaryPage = ({ data, t, country }: { data: ReportData; t: ReportTranslations; country?: string }) => {
   const bd = data.riskBreakdown;
   // Map the data-driven risk enum to its localized label.
   const riskLabelL = t.riskLabels[data.riskLabel as keyof typeof t.riskLabels] ?? data.riskLabel;
@@ -375,6 +375,21 @@ const SummaryPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
       {data.keyFindings.map((f, i) => (
         <Text key={i} style={s.bullet}>{'\u2022'} {f}</Text>
       ))}
+
+      {/* Phase 3.1 Stage 11 (B2): documents-in-package checklist (Peru ES only). */}
+      {t.locale === 'es' && country === 'PE' && (() => {
+        const pg = t.countryGuidance.peru;
+        return (
+          <View style={{ ...s.card, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', marginTop: 10 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 3 }}>{pg.documentsTitle}</Text>
+            <Text style={{ fontSize: 7.5, color: slate600, marginBottom: 4 }}>{pg.documentsIntro}</Text>
+            <Text style={{ fontSize: 7.5, color: slate900, marginBottom: 2 }}>1. {pg.documentsDivindat}</Text>
+            <Text style={{ fontSize: 7.5, color: slate900, marginBottom: 2 }}>2. {pg.documentsBinance}</Text>
+            <Text style={{ fontSize: 7.5, color: slate900, marginBottom: 4 }}>3. {pg.documentsTether}</Text>
+            <Text style={{ fontSize: 7, color: slate600, fontStyle: 'italic' }}>{pg.documentsOrder}</Text>
+          </View>
+        );
+      })()}
 
       <Footer data={data} t={t} />
     </Page>
@@ -791,6 +806,10 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
               <Text style={{ ...s.td, width: '25%' }}>{fmtEth(a.totalIn - a.totalOut)}</Text>
             </View>
           ))}
+          {/* Phase 3.1 Stage 11 (A1): net flow != economic loss disambiguation. */}
+          <Text style={{ fontSize: 6.5, color: slate600, fontStyle: 'italic', marginTop: 5, lineHeight: 1.4 }}>
+            {as.netFlowClarification}
+          </Text>
         </View>
       )}
 
@@ -1174,7 +1193,7 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
         <Text style={{ ...s.th, width: '40%' }}>{an.colAddress}</Text>
         <Text style={{ ...s.th, width: '20%' }}>{an.colEntity}</Text>
         <Text style={{ ...s.th, width: '20%' }}>{an.colInteractions}</Text>
-        <Text style={{ ...s.th, width: '20%' }}>{an.colVolume(nativeSym)}</Text>
+        <Text style={{ ...s.th, width: '20%' }}>{an.colVolume(data.counterpartyVolumeSymbol || nativeSym)}</Text>
       </View>
       {data.topCounterparties.map((cp, i) => (
         <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
@@ -2429,7 +2448,7 @@ export const ReportDocument = ({ data, locale, country }: { data: ReportData; lo
   return (
     <Document>
       <CoverPage data={data} t={t} />
-      <SummaryPage data={data} t={t} />
+      <SummaryPage data={data} t={t} country={country} />
       <RecoveryReadinessPage data={data} t={t} />
       <NarrativePage data={data} t={t} />
       <AssetTimelinePage data={data} t={t} />
