@@ -126,6 +126,14 @@ export interface AddressPoisoningCampaign {
   /** Unclassified tokens routed to secondary spoofs. */
   totalMisdirectedUnknown: Record<string, number>;
 
+  /* ── Phase 3.1 Stage 7: clean, unit-separated victim totals to the WHOLE
+     cluster (main collector + spoofs). Use these for any economic claim —
+     never `totalSentByVictim` (mixed-unit). ── */
+  /** Real-currency the subject sent to ALL cluster members, by symbol. */
+  totalRealByVictim: Record<string, number>;
+  /** Worthless spoof-token units the subject sent to ALL cluster members. */
+  totalSpoofByVictim: Record<string, number>;
+
   /** Count of secondary spoofs that received REAL value above threshold. */
   successfulMisdirections: number;
   hasFakePhishingTag: boolean;
@@ -537,6 +545,16 @@ export function detectAddressPoisoning(input: {
       }
     }
 
+    // ── Phase 3.1 Stage 7: unit-separated victim totals to the WHOLE cluster ──
+    const totalRealByVictim: Record<string, number> = {};
+    const totalSpoofByVictim: Record<string, number> = {};
+    for (const e of [mainCollector, ...secondarySpoofs]) {
+      for (const b of e.tokenBreakdown) {
+        if (b.category === 'real') addToBucket(totalRealByVictim, b.symbol, b.value);
+        else if (b.category === 'spoof') addToBucket(totalSpoofByVictim, `${b.mimics ?? '?'}-spoof`, b.value);
+      }
+    }
+
     // "Successful misdirection" = a secondary spoof that received REAL value
     // above threshold (a worthless spoof token reaching it is NOT a real loss).
     const successfulMisdirections = secondarySpoofs.filter((e) =>
@@ -576,6 +594,8 @@ export function detectAddressPoisoning(input: {
       totalMisdirectedReal,
       totalMisdirectedSpoof,
       totalMisdirectedUnknown,
+      totalRealByVictim,
+      totalSpoofByVictim,
       successfulMisdirections,
       hasFakePhishingTag: fakePhishingAddresses.length > 0,
       fakePhishingAddresses,

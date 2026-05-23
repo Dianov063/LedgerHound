@@ -153,12 +153,24 @@ ok(joined.includes('wallet receptora principal observada'), 'F2: uses "wallet re
 ok(!joined.includes('controladas por el atacante'), 'F3: no "controladas por el atacante" anywhere');
 ok(!joined.includes('El atacante desplegó'), 'F3: no "El atacante desplegó" (passive instead)');
 ok(joined.includes('consistentes con control coordinado'), 'F3: uses "consistentes con control coordinado"');
-// Phase 3.1 Stage 6 (T1): unambiguous economic-loss line renders in Exec Summary.
-ok(joined.includes('Pérdida económica total de la víctima'), 'T1: economic-loss line rendered in Exec Summary');
+// Phase 3.1 Stage 6/7 (T1/A1): unit-separated economic-loss line renders.
+ok(joined.includes('Pérdida económica confirmada de la víctima'), 'T1/A1: economic-loss line rendered in Exec Summary');
+ok(!joined.includes('90,439'), 'A1: no mixed-unit 90,439.x total (regression guard)');
+// A4: senders-vs-transactions footnote renders on the Attack Technique page.
+ok(joined.includes('puede diferir del número total de remitentes'), 'A4: senders/transactions footnote present');
 
 // ── Direct i18n checks for generated prose not exercised by the mock render ──
 const es6 = getReportTranslations('es');
-ok(es6.investigation.totalEconomicLossLine('64,248.31 USDT', '11,020.50 USDT').includes('de los cuales 11,020.50 USDT'), 'T1: loss-line function interpolates misdirected');
+{
+  // A1: real currency and worthless spoof units must be SEPARATE, never summed.
+  const line = es6.investigation.totalEconomicLossLine('64,248.31 USDT', '11,020.50 USDT', '26,191.64');
+  ok(line.includes('64,248.31 USDT'), 'A1: loss line shows real currency total');
+  ok(line.includes('11,020.50 USDT'), 'A1: loss line shows misdirected portion');
+  ok(line.includes('26,191.64') && line.includes('sin valor económico'), 'A1: spoof units shown SEPARATELY (no economic value)');
+  ok(!line.includes('90,439'), 'A1: loss line never sums real + spoof units');
+}
+ok(es6.timeline.roleMisdirection.includes('desvío'), 'A3: timeline misdirection role label (es)');
+ok(es6.timeline.roleMainCollector === 'recolector principal', 'A3: timeline collector role label (es)');
 ok(es6.investigation.narrative.summaryVictim('x', 1, 98, 4, 'y', '').includes('(por volumen)'), 'T2: narrative pct labeled "(por volumen)"');
 ok(es6.behavioral.rapidForwardingEv(70, 7, 10)[0].includes('(por número de depósitos)'), 'T2: behavioral pct labeled "(por número de depósitos)"');
 ok(es6.recovery.factorPhishingTag(1).includes('evidencia independiente'), 'T4: phishing-tag factor has cluster-evidence context');

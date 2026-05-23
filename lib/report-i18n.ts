@@ -507,6 +507,9 @@ export interface TimelineT {
   keyEventBadge: string;
   misdirectionBadge: string;
   sentToSpoofNote: string;
+  /** Phase 3.1 Stage 7 (A3): recipient role markers for timeline sends. */
+  roleMainCollector: string;
+  roleMisdirection: string;
   totalActivePeriod: (first: string, last: string) => string;
   inactiveSuffix: (n: number) => string;
   noTimeline: string;
@@ -530,6 +533,8 @@ export interface AttackTechnique {
   mainCollectorRealAmount: (amount: string, token: string) => string;
   mainCollectorSpoofAmount: (amount: string, mimics: string) => string;
   mainCollectorDesc: (desc: string, txCount: number) => string;
+  /** Phase 3.1 Stage 7 (A4): clarifies senders-vs-transactions mismatch. */
+  mainCollectorSendersNote: string;
   etherscan: (tag: string) => string;
   secondarySpoofsTitle: string;
   secondarySpoofsIntro: string;
@@ -575,8 +580,11 @@ export interface Investigation {
   assetIn: (sym: string) => string;
   assetOut: (sym: string) => string;
   forwarded24h: string;
-  /** Phase 3.1 Stage 6 (T1): one unambiguous total-loss line for the Exec Summary. */
-  totalEconomicLossLine: (amount: string, misdirected: string) => string;
+  /** Phase 3.1 Stage 6/7 (T1/A1): unit-separated economic-loss line for the
+   *  Exec Summary. `real` = real-currency sent to the cluster; `misdirected` =
+   *  real-currency to a spoof; `spoofUnits` = worthless spoof-token units
+   *  (kept SEPARATE — never summed with real currency). */
+  totalEconomicLossLine: (real: string, misdirected: string, spoofUnits: string) => string;
   fundFlow: string;
   sourceDeposits: (n: number) => string;
   victimsCount: (n: number) => string;
@@ -797,9 +805,13 @@ const en: ReportTranslations = {
     assetIn: (sym) => `${sym} IN`,
     assetOut: (sym) => `${sym} OUT`,
     forwarded24h: 'FORWARDED <24H',
-    totalEconomicLossLine: (amount, misdirected) => misdirected
-      ? `Total victim economic loss: ${amount} sent to the fraud group, of which ${misdirected} was misdirected to a secondary spoof address.`
-      : `Total victim economic loss: ${amount} sent to the fraud group.`,
+    totalEconomicLossLine: (real, misdirected, spoofUnits) => {
+      let s = `Victim's confirmed economic loss: ${real} sent to fraud-group addresses`;
+      if (misdirected) s += ` (of which ${misdirected} was misdirected to an address-poisoning spoof address)`;
+      s += '.';
+      if (spoofUnits) s += ` Additionally, ${spoofUnits} units of worthless spoof tokens were sent to the same group as an obfuscation technique — see Attack Technique Analysis (no economic value).`;
+      return s;
+    },
     fundFlow: 'Fund Flow',
     sourceDeposits: (n) => `~${n} Source Deposit(s)`,
     victimsCount: (n) => `${n} Victims`,
@@ -924,6 +936,7 @@ const en: ReportTranslations = {
     mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
     mainCollectorSpoofAmount: (amount, mimics) => `${amount} units of a fake "${mimics}" token (worthless spoof)`,
     mainCollectorDesc: (desc, txCount) => `Received ${desc} across ${txCount} transaction(s) — main receiving wallet observed in this coordinated pattern.`,
+    mainCollectorSendersNote: 'Note: the number of transactions to the main collector may differ from the total unique senders to this wallet, as some senders correspond to address-poisoning attempts from the same fraud group rather than victim deposits.',
     etherscan: (tag) => `Etherscan: ${tag}`,
     secondarySpoofsTitle: 'Secondary Spoofs (Address Poisoning Targets)',
     secondarySpoofsIntro: 'These addresses share the same visual pattern as the main collector but are separate wallets. Real funds the victim sent here indicate successful confusion induced by the poisoning attack; worthless spoof-token transfers are reported separately.',
@@ -989,6 +1002,8 @@ const en: ReportTranslations = {
     keyEventBadge: 'KEY EVENT',
     misdirectionBadge: '⚠ MISDIRECTION',
     sentToSpoofNote: 'Sent to an address-poisoning spoof — not the intended recipient.',
+    roleMainCollector: 'main collector',
+    roleMisdirection: 'address-poisoning misdirection',
     totalActivePeriod: (first, last) => `Total Active Period: ${first} to ${last}`,
     inactiveSuffix: (n) => ` (inactive for ${n} days)`,
     noTimeline: 'No timestamped transactions available for timeline construction.',
@@ -1412,9 +1427,13 @@ const es: ReportTranslations = {
     assetIn: (sym) => `${sym} ENTRANTE`,
     assetOut: (sym) => `${sym} SALIENTE`,
     forwarded24h: 'REENVIADO <24H',
-    totalEconomicLossLine: (amount, misdirected) => misdirected
-      ? `Pérdida económica total de la víctima: ${amount} enviados al grupo de fraude, de los cuales ${misdirected} fueron desviados a una dirección de suplantación secundaria.`
-      : `Pérdida económica total de la víctima: ${amount} enviados al grupo de fraude.`,
+    totalEconomicLossLine: (real, misdirected, spoofUnits) => {
+      let s = `Pérdida económica confirmada de la víctima: ${real} enviados a direcciones del grupo de fraude`;
+      if (misdirected) s += ` (de los cuales ${misdirected} fueron desviados a una dirección de suplantación por envenenamiento)`;
+      s += '.';
+      if (spoofUnits) s += ` Adicionalmente, ${spoofUnits} unidades de tokens falsificados sin valor económico fueron enviadas al mismo grupo como técnica de ocultamiento — ver Análisis de Técnicas de Ataque.`;
+      return s;
+    },
     fundFlow: 'Flujo de Fondos',
     sourceDeposits: (n) => `~${n} Depósito(s) de Origen`,
     victimsCount: (n) => `${n} Víctimas`,
@@ -1539,6 +1558,7 @@ const es: ReportTranslations = {
     mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
     mainCollectorSpoofAmount: (amount, mimics) => `${amount} unidades de un token falsificado de "${mimics}" (suplantación sin valor)`,
     mainCollectorDesc: (desc, txCount) => `Recibió ${desc} en ${txCount} transacción(es) — wallet receptora principal observada en este patrón coordinado.`,
+    mainCollectorSendersNote: 'Nota: el número de transacciones al recolector principal puede diferir del número total de remitentes únicos a esta wallet, ya que algunos remitentes corresponden a intentos de envenenamiento de direcciones del mismo grupo de fraude, no a depósitos de la víctima.',
     etherscan: (tag) => `Etherscan: ${tag}`,
     secondarySpoofsTitle: 'Suplantaciones Secundarias (Objetivos de Envenenamiento)',
     secondarySpoofsIntro: 'Estas direcciones comparten el mismo patrón visual que el recolector principal pero son wallets separadas. Los fondos reales que la víctima envió aquí indican una confusión exitosa inducida por el ataque de envenenamiento; las transferencias de tokens falsificados sin valor se reportan por separado.',
@@ -1604,6 +1624,8 @@ const es: ReportTranslations = {
     keyEventBadge: 'EVENTO CLAVE',
     misdirectionBadge: '⚠ DESVÍO',
     sentToSpoofNote: 'Enviado a una suplantación de envenenamiento de direcciones — no es el destinatario previsto.',
+    roleMainCollector: 'recolector principal',
+    roleMisdirection: 'desvío por envenenamiento de direcciones',
     totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
     inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
     noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',

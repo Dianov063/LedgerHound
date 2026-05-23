@@ -349,19 +349,23 @@ const SummaryPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
 
       <View style={s.sectionDivider} />
 
-      {/* Phase 3.1 Stage 6 (T1): single unambiguous economic-loss line. Total
-          sent to the fraud cluster + the portion misdirected to a secondary
-          spoof. Replaces reliance on the ambiguous "net flow" figure. */}
+      {/* Phase 3.1 Stage 6/7 (T1/A1): unit-separated economic-loss line.
+          Real currency to the cluster + the misdirected portion, with worthless
+          spoof-token units reported SEPARATELY (never summed — that mixed-unit
+          sum was the 90,439.94 regression). */}
       {(() => {
         const apz = data.attackTechniques?.addressPoisoning;
         const lc = apz?.detected ? apz.campaigns[0] : null;
-        if (!lc || !(lc.totalSentByVictim > 0)) return null;
-        const amount = `${lc.totalSentByVictim.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${lc.primaryToken}`;
-        const misdirected = fmtTokenRecord(lc.totalMisdirectedReal);
+        if (!lc) return null;
+        const realStr = fmtTokenRecord(lc.totalRealByVictim);
+        if (!realStr) return null; // only show when there is real-currency loss
+        const misStr = fmtTokenRecord(lc.totalMisdirectedReal);
+        const spoofTotal = Object.values(lc.totalSpoofByVictim || {}).reduce((s, v) => s + v, 0);
+        const spoofStr = spoofTotal > 0 ? spoofTotal.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '';
         return (
           <View style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 6, padding: 10, marginBottom: 10 }}>
             <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: darkRed, lineHeight: 1.5 }}>
-              {t.investigation.totalEconomicLossLine(amount, misdirected)}
+              {t.investigation.totalEconomicLossLine(realStr, misStr, spoofStr)}
             </Text>
           </View>
         );
@@ -1381,6 +1385,8 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
             {mc.etherscanFakePhishingTag && (
               <Text style={{ fontSize: 6.5, color: red, marginTop: 1 }}>{ta.etherscan(mc.etherscanFakePhishingTag)}</Text>
             )}
+            {/* Phase 3.1 Stage 7 (A4): clarify senders-vs-transactions mismatch. */}
+            <Text style={{ fontSize: 6, color: slate400, fontStyle: 'italic', marginTop: 3 }}>{ta.mainCollectorSendersNote}</Text>
           </View>
 
           {/* Secondary spoofs */}

@@ -25,10 +25,10 @@ La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[mont
 
 ## II. PÉRDIDA ECONÓMICA
 
-- **USDT perdidos (fondos reales):** [monto] USDT
-- **Tokens de suplantación Unicode (sin valor económico):** 26,191.64 unidades (USDT falsificados)
-- **Comisiones de transacciones:** [monto aproximado] USDT
-- **Pérdida total estimada:** USD $[monto]
+- **USDT perdidos (fondos reales):** [monto en USDT — tómelo de la sección "Pérdida económica confirmada" en el Resumen Ejecutivo del informe] USDT
+- **Tokens de suplantación Unicode (sin valor económico):** [unidades de tokens falsificados — ver la misma sección del informe] unidades (NO representan pérdida monetaria)
+- **Comisiones de transacciones:** [monto aproximado, si lo conoce] USDT
+- **Pérdida total estimada:** USD $[use el monto de USDT reales perdidos arriba — NO sume los tokens falsificados]
 
 Nota: Las unidades de tokens de suplantación Unicode son falsificaciones digitales sin valor de mercado, utilizadas por los estafadores como técnica de ocultamiento ("Address Poisoning"). Detalles en el informe forense adjunto.
 

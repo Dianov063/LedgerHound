@@ -101,6 +101,9 @@ ok(!div.includes('operación fraudulenta DZHLWK'), 'NO "operación fraudulenta D
 ok(div.includes('## II. PÉRDIDA ECONÓMICA'), 'PÉRDIDA ECONÓMICA section added');
 ok(div.includes('## VI. ANEXOS DIGITALES (CADENA DE CUSTODIA)') && div.includes('SHA256'), 'chain-of-custody section + SHA256 added');
 ok(div.includes('### 2. ORDEN DE PRESERVACIÓN INMEDIATA'), 'preservation order added to petitorio');
+// Phase 3.1 Stage 7 (A2): [monto] fields reference the report section + warn against summing spoof tokens.
+ok(div.includes('Pérdida económica confirmada'), 'A2: PÉRDIDA fields reference the report "Pérdida económica confirmada" section');
+ok(div.includes('NO sume los tokens falsificados'), 'A2: explicit warning not to sum worthless spoof tokens');
 // Sections renumbered consistently I→VI
 ok(['## I. HECHOS', '## II. PÉRDIDA', '## III. EVIDENCIA', '## IV. PETITORIO', '## V. ANEXOS', '## VI. ANEXOS DIGITALES'].every((h) => div.includes(h)), 'sections renumbered I→VI consistently');
 

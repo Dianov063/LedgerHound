@@ -843,6 +843,9 @@ function generateTimeline(
   identifiedEntities: { address: string; type: string; label: string }[],
   nativeCurrency: string = 'ETH',
   tl: TimelineT = getReportTranslations('en').timeline,
+  // Phase 3.1 Stage 7 (A3): address → fraud-cluster role, so same-amount sends
+  // to the collector vs. a poisoning spoof are textually distinguishable.
+  clusterRoles: Map<string, 'collector' | 'spoof'> = new Map(),
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   const all = [
@@ -889,12 +892,20 @@ function generateTimeline(
     const val = safeValue(tx);
     if (val <= 0) continue;
     const entityMatch = identifiedEntities.find(e => e.address === (tx.to || '').toLowerCase());
+    const toLower = (tx.to || '').toLowerCase();
+    const baseRecipient = entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...';
+    const role = clusterRoles.get(toLower);
+    const recipient = role === 'collector'
+      ? `${baseRecipient} (${tl.roleMainCollector})`
+      : role === 'spoof'
+        ? `${baseRecipient} (${tl.roleMisdirection})`
+        : baseRecipient;
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
-      description: tl.sent(fmtEth(val), tx.asset || nativeCurrency, entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...'),
+      description: tl.sent(fmtEth(val), tx.asset || nativeCurrency, recipient),
       highlight: true,
-      counterparty: (tx.to || '').toLowerCase(),
+      counterparty: toLower,
     });
   }
 
@@ -1357,7 +1368,14 @@ export async function generateReport(
 
   const assetSummary = classifyAssets(incoming, outgoing, nativeCurrency);
 
-  const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline);
+  // Phase 3.1 Stage 7 (A3): map cluster addresses to their role so the timeline
+  // can label same-amount sends to the collector vs. a poisoning spoof.
+  const clusterRoles = new Map<string, 'collector' | 'spoof'>();
+  for (const camp of addressPoisoning.campaigns) {
+    if (camp.mainCollector?.address) clusterRoles.set(camp.mainCollector.address.toLowerCase(), 'collector');
+    for (const sp of camp.secondarySpoofs) clusterRoles.set(sp.address.toLowerCase(), 'spoof');
+  }
+  const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline, clusterRoles);
 
   const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
 
