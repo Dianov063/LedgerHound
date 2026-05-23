@@ -894,16 +894,20 @@ function generateTimeline(
     const entityMatch = identifiedEntities.find(e => e.address === (tx.to || '').toLowerCase());
     const toLower = (tx.to || '').toLowerCase();
     const baseRecipient = entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...';
+    const shortTo = (tx.to || '').slice(0, 10) + '...';
     const role = clusterRoles.get(toLower);
-    const recipient = role === 'collector'
-      ? `${baseRecipient} (${tl.roleMainCollector})`
+    const token = tx.asset || nativeCurrency;
+    // Phase 3.1 Stage 9 (P2): role becomes prominent body text ("...al RECOLECTOR
+    // PRINCIPAL -> 0x..."), not a trailing parenthetical, for visual scanning.
+    const description = role === 'collector'
+      ? `${tl.sentToRole(fmtEth(val), token, tl.roleMainCollector)} → ${shortTo}`
       : role === 'spoof'
-        ? `${baseRecipient} (${tl.roleMisdirection})`
-        : baseRecipient;
+        ? `${tl.sentToRole(fmtEth(val), token, tl.roleSpoofAddress)} → ${shortTo}`
+        : tl.sent(fmtEth(val), token, baseRecipient);
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
       type: entityMatch?.type === 'exchange' ? 'EXCHANGE_INTERACTION' : entityMatch?.type === 'mixer' ? 'MIXER_INTERACTION' : 'MAJOR_OUTFLOW',
-      description: tl.sent(fmtEth(val), tx.asset || nativeCurrency, recipient),
+      description,
       highlight: true,
       counterparty: toLower,
     });

@@ -169,8 +169,17 @@ const es6 = getReportTranslations('es');
   ok(line.includes('26,191.64') && line.includes('sin valor económico'), 'A1: spoof units shown SEPARATELY (no economic value)');
   ok(!line.includes('90,439'), 'A1: loss line never sums real + spoof units');
 }
-ok(es6.timeline.roleMisdirection.includes('desvío'), 'A3: timeline misdirection role label (es)');
-ok(es6.timeline.roleMainCollector === 'recolector principal', 'A3: timeline collector role label (es)');
+// P2: timeline role markers — prominent body text with correct prepositions.
+ok(es6.timeline.roleMainCollector === 'al RECOLECTOR PRINCIPAL', 'P2: collector role label (uppercase + preposition)');
+ok(es6.timeline.roleSpoofAddress === 'a una DIRECCIÓN DE SUPLANTACIÓN', 'P2: spoof role label');
+ok(es6.timeline.sentToRole('11,020.50', 'USDT', es6.timeline.roleMainCollector) === 'Enviado 11,020.50 USDT al RECOLECTOR PRINCIPAL', 'P2: sentToRole grammar (collector)');
+ok(es6.timeline.sentToRole('11,020.50', 'USDT', es6.timeline.roleSpoofAddress) === 'Enviado 11,020.50 USDT a una DIRECCIÓN DE SUPLANTACIÓN', 'P2: sentToRole grammar (spoof)');
+ok(es6.timeline.misdirectionBadge.includes('DESVÍO POR ENVENENAMIENTO'), 'P2: misdirection badge renamed');
+// P4: Page 5 Binance channel explicit "no direct email" warning.
+ok(es6.investigation.binanceComplianceChannel.includes('NO use un email de cumplimiento directo'), 'P4: Page 5 Binance "no direct email" warning');
+// P5: KYC recovery factor softened.
+ok(!es6.recovery.factorKycExchange('Binance').includes('citación judicial'), 'P5: no "citación judicial posible"');
+ok(es6.recovery.factorKycExchange('Binance').includes('proceso legal'), 'P5: uses "proceso legal"');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

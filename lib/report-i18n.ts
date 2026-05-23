@@ -509,9 +509,11 @@ export interface TimelineT {
   keyEventBadge: string;
   misdirectionBadge: string;
   sentToSpoofNote: string;
-  /** Phase 3.1 Stage 7 (A3): recipient role markers for timeline sends. */
+  /** Phase 3.1 Stage 7/9 (A3/P2): timeline send role markers. Role strings
+   *  include their preposition ("al ..." / "a una ...") so grammar is correct. */
+  sentToRole: (amount: string, token: string, role: string) => string;
   roleMainCollector: string;
-  roleMisdirection: string;
+  roleSpoofAddress: string;
   totalActivePeriod: (first: string, last: string) => string;
   inactiveSuffix: (n: number) => string;
   noTimeline: string;
@@ -838,7 +840,7 @@ const en: ReportTranslations = {
     reportSuitabilityTitle: 'Report Suitability',
     exchangeKycEntryVsExit: 'Exchange KYC — Entry vs Exit',
     kycEntryPointLabel: "KYC ENTRY POINT (victim's funding source)",
-    binanceComplianceChannel: "compliance channel — victims: support ticket 'Report fraud/scam'",
+    binanceComplianceChannel: "compliance channel — victims: support ticket category 'Report fraud/scam' (DO NOT use a compliance email directly)",
     interactions: (n) => `${n} interaction(s)`,
     noneDetected: 'None detected.',
     identifiesVictimAccount: "Identifies the VICTIM'S exchange account — useful to confirm victim identity for legal proceedings, not the scammer's.",
@@ -1005,10 +1007,11 @@ const en: ReportTranslations = {
     sent: (amount, token, to) => `Sent ${amount} ${token} to ${to}`,
     lastActivity: 'Last recorded activity',
     keyEventBadge: 'KEY EVENT',
-    misdirectionBadge: '⚠ MISDIRECTION',
+    misdirectionBadge: '⚠ POISONING MISDIRECTION',
     sentToSpoofNote: 'Sent to an address-poisoning spoof — not the intended recipient.',
-    roleMainCollector: 'main collector',
-    roleMisdirection: 'address-poisoning misdirection',
+    sentToRole: (amount, token, role) => `Sent ${amount} ${token} ${role}`,
+    roleMainCollector: 'to the MAIN COLLECTOR',
+    roleSpoofAddress: 'to a SPOOF ADDRESS',
     totalActivePeriod: (first, last) => `Total Active Period: ${first} to ${last}`,
     inactiveSuffix: (n) => ` (inactive for ${n} days)`,
     noTimeline: 'No timestamped transactions available for timeline construction.',
@@ -1173,7 +1176,7 @@ const en: ReportTranslations = {
       VERY_LOW: 'Very low — recovery is unlikely but documentation enables legal/tax claims',
     },
     assessmentDisclaimer: 'Statistical estimate based on case characteristics. Most cryptocurrency fraud cases do not result in full recovery. This metric is not a guarantee, prediction, or promise. Actual recovery depends on law enforcement action, exchange cooperation, and legal proceedings.',
-    factorKycExchange: (label) => `Funds routed through KYC exchange (${label}) — subpoena possible`,
+    factorKycExchange: (label) => `Funds routed through KYC exchange (${label}) — records may be obtainable through legal process`,
     factorFraudCluster: 'Counterparty linked to identified fraud cluster — strengthens legal case',
     factorPhishingTag: (n) => `${n} address(es) in the poisoning cluster officially tagged Fake_Phishing by Etherscan — independent evidence the vanity cluster belongs to a known phishing operation`,
     factorRecent30: 'Recent activity (<30 days) — funds may still be in early laundering stages',
@@ -1462,7 +1465,7 @@ const es: ReportTranslations = {
     reportSuitabilityTitle: 'Usos del Informe',
     exchangeKycEntryVsExit: 'KYC del Exchange — Entrada vs Salida',
     kycEntryPointLabel: 'PUNTO DE ENTRADA KYC (fuente de financiamiento de la víctima)',
-    binanceComplianceChannel: "canal de cumplimiento — víctimas: ticket de soporte 'Report fraud/scam'",
+    binanceComplianceChannel: "canal de cumplimiento — víctimas: ticket de soporte categoría 'Report fraud/scam' (NO use un email de cumplimiento directo)",
     interactions: (n) => `${n} interacción(es)`,
     noneDetected: 'Ninguno detectado.',
     identifiesVictimAccount: 'Identifica la cuenta de exchange de la VÍCTIMA — útil para confirmar la identidad de la víctima en procedimientos legales, no la del estafador.',
@@ -1629,10 +1632,11 @@ const es: ReportTranslations = {
     sent: (amount, token, to) => `Enviado ${amount} ${token} a ${to}`,
     lastActivity: 'Última actividad registrada',
     keyEventBadge: 'EVENTO CLAVE',
-    misdirectionBadge: '⚠ DESVÍO',
+    misdirectionBadge: '⚠ DESVÍO POR ENVENENAMIENTO',
     sentToSpoofNote: 'Enviado a una suplantación de envenenamiento de direcciones — no es el destinatario previsto.',
-    roleMainCollector: 'recolector principal',
-    roleMisdirection: 'desvío por envenenamiento de direcciones',
+    sentToRole: (amount, token, role) => `Enviado ${amount} ${token} ${role}`,
+    roleMainCollector: 'al RECOLECTOR PRINCIPAL',
+    roleSpoofAddress: 'a una DIRECCIÓN DE SUPLANTACIÓN',
     totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
     inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
     noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',
@@ -1797,7 +1801,7 @@ const es: ReportTranslations = {
       VERY_LOW: 'Muy baja — la recuperación es improbable, pero la documentación permite reclamos legales/tributarios',
     },
     assessmentDisclaimer: 'Estimación estadística basada en las características del caso. La mayoría de los casos de fraude con criptomonedas no resultan en recuperación total. Esta métrica no es una garantía, predicción ni promesa. La recuperación real depende de la acción de las autoridades, la cooperación de los exchanges y los procedimientos legales.',
-    factorKycExchange: (label) => `Fondos enrutados a través de un exchange con KYC (${label}) — citación judicial posible`,
+    factorKycExchange: (label) => `Fondos enrutados a través de un exchange con KYC (${label}) — los registros pueden obtenerse mediante proceso legal`,
     factorFraudCluster: 'Contraparte vinculada a un grupo de fraude identificado — fortalece el caso legal',
     factorPhishingTag: (n) => `${n} dirección(es) del grupo de envenenamiento etiquetada(s) oficialmente como Fake_Phishing por Etherscan — evidencia independiente de que el grupo vanity pertenece a una operación de phishing conocida`,
     factorRecent30: 'Actividad reciente (<30 días) — los fondos pueden estar aún en etapas tempranas de lavado',

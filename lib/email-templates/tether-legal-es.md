@@ -15,7 +15,8 @@ Soy víctima de fraude con criptomonedas que utilizó tokens USDT (stablecoin de
 ## INFORMACIÓN DEL CASO
 
 - **Período del incidente:** [Mes-Año] - [Mes-Año]
-- **Pérdida confirmada en USDT real:** [monto] USDT
+- **Pérdida confirmada en USDT real:** [monto en USDT real — tómelo de la sección "Pérdida económica confirmada" en el Resumen Ejecutivo del informe forense] USDT
+- **Tokens falsificados (sin valor económico):** [unidades — ver la misma sección del informe] unidades (NO sume con la pérdida real)
 - **Plataforma involucrada:** DZHLWK Fintech
 - **ID del caso forense:** [{caseId}]
 

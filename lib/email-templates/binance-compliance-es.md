@@ -18,7 +18,8 @@ Le escribo para reportar un caso de fraude con criptomonedas que requiere su ate
 - **Mi cuenta Binance (email):** [tu email registrado en Binance]
 - **Mi UID de Binance (identificador interno de cuenta):** [su UID]
 - **Fecha del incidente:** [Mes-Año] - [Mes-Año]
-- **Cantidad perdida:** Aproximadamente $[monto] USD en USDT
+- **Cantidad perdida (fondos reales):** [monto en USDT real — tómelo de la sección "Pérdida económica confirmada" en el Resumen Ejecutivo del informe forense] USDT
+- **Tokens falsificados (sin valor económico):** [unidades — ver la misma sección del informe] unidades (NO sume con la cantidad real)
 - **ID del caso forense:** [{caseId}]
 
 > Importante: Binance solicita el **UID de la cuenta** (no solo el email) para tramitar solicitudes. Encuentre su UID en: Perfil → Información de la cuenta → User ID (UID).

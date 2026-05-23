@@ -82,6 +82,14 @@ ok(!divv.includes('20 UIT'), 'divindat: no incorrect "20 UIT" basis');
 ok(divv.includes('(01) 431-8898') && divv.includes('divindat.pnp@gmail.com'), 'divindat: contact block (phone + email)');
 // SHA256 references point to the email integrity section
 ok([bin, teth, divv].every((b) => b.includes('Verificación de Integridad')), 'all 3: SHA256 references the email integrity section');
+
+/* ── 2e. Stage 9 P3: anti-bait guard-rails (real vs spoof) in Binance + Tether ── */
+console.log('\n[2e] Stage 9 P3 — anti-bait guard-rails');
+ok(bin.includes('NO sume con la cantidad real'), 'binance: "NO sume" guard-rail present');
+ok(teth.includes('NO sume con la pérdida real'), 'tether: "NO sume" guard-rail present');
+ok(bin.includes('Pérdida económica confirmada'), 'binance: references "Pérdida económica confirmada" section');
+ok(teth.includes('Pérdida económica confirmada'), 'tether: references "Pérdida económica confirmada" section');
+ok(!bin.includes('Aproximadamente $[monto] USD en USDT'), 'binance: old ambiguous loss field replaced');
 ok(byFile['divindat-denuncia-es.md']?.includes('DIVINDAT'), 'DIVINDAT title present');
 ok(byFile['divindat-denuncia-es.md']?.includes('Art. 196'), 'DIVINDAT statute citation present');
 ok(EMAIL_TEMPLATES_ES.every((t) => t.content.includes('{caseId}')), 'all templates carry a {caseId} token');
