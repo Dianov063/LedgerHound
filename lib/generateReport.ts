@@ -1296,6 +1296,14 @@ export async function generateReport(
     // Federation scam-only hits (no phishing) — moderate boost.
     if (federationScamHits > 0) riskScore += Math.min(15, federationScamHits * 5);
 
+    // Phase 3.1 Stage 11.1: confirmed attack techniques are strong severity
+    // signals that previously did not feed the risk score (undersold rich
+    // evidence). The Etherscan Fake_Phishing bonus STACKS with the +10 phishing
+    // hit above for a +15 total — it is NOT a second full +15 (no double-count).
+    if (addressPoisoning.detected) riskScore += 10;
+    if (unicodeSpoofing.detected) riskScore += 5;
+    if (addressPoisoning.campaigns.some((c) => c.hasFakePhishingTag)) riskScore += 5;
+
     // Sanctions hits NOT covered by ofacWarning (e.g. GoPlus 'sanctioned' flag
     // on an address not in our KNOWN_ENTITIES). Hard-bump to CRITICAL.
     if (federationSanctionsHits > 0) riskScore = Math.max(riskScore, 85);
@@ -1400,6 +1408,17 @@ export async function generateReport(
   const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline, clusterRoles);
 
   const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
+
+  // Phase 3.1 Stage 11.1: the baseline applies −10 for any exchange interaction,
+  // but a VICTIM's own KYC entry exchange (no scammer KYC exit detected) does not
+  // reduce case risk — only a scammer cash-out exit would. Undo the −10 in that
+  // case (net 0). Guarded on scam evidence so clean wallets keep the tie-breaker.
+  // Applied BEFORE the behavioral floor so it can't push a victim past the band.
+  // Skipped under OFAC (no −10 was applied there).
+  const caseHasScamEvidence = addressPoisoning.detected || unicodeSpoofing.detected || hasScam || scamDbMatches.length > 0;
+  if (!(ofacWarning || externalOfacFound) && hasExchange && !exitPointAnalysis.hasKycExit && caseHasScamEvidence) {
+    riskScore = Math.min(100, riskScore + 10);
+  }
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore, tReport.recovery);
 
