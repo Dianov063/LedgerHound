@@ -2079,6 +2079,13 @@ export async function generateReport(
   const pdfBuffer = await renderToBuffer(doc);
   const buf = Buffer.from(pdfBuffer);
 
+  // Phase 3.1 Stage 6 (T7): tamper-evidence hash of the final PDF, surfaced in
+  // the delivery email so it can be cited as chain-of-custody (a self-embedded
+  // hash is impossible — embedding it would change the bytes it hashes).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfSha256 = require('crypto').createHash('sha256').update(buf).digest('hex');
+  logger.info({ caseId, pdfSha256 }, '[generateReport] PDF SHA256 computed');
+
   // Upload to S3 and get presigned download URL
   let downloadUrl = '';
   let s3Key = '';
@@ -2094,7 +2101,7 @@ export async function generateReport(
 
   // Send email with download link
   try {
-    await sendReport(email, address, buf, caseId, downloadUrl, reportLocale, reportCountry);
+    await sendReport(email, address, buf, caseId, downloadUrl, reportLocale, reportCountry, pdfSha256);
     logger.info({ email, caseId }, '[generateReport] Email sent');
   } catch (emailErr: unknown) {
     logger.error({ err: emailErr, email }, '[generateReport] Email send failed (report still saved to S3)');

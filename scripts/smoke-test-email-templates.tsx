@@ -40,7 +40,7 @@ ok('binance-compliance-es.md' in byFile, 'binance-compliance-es.md present');
 ok('tether-legal-es.md' in byFile, 'tether-legal-es.md present');
 ok('divindat-denuncia-es.md' in byFile, 'divindat-denuncia-es.md present');
 
-ok(byFile['binance-compliance-es.md']?.includes('ce@binance.com'), 'Binance compliance address present');
+ok(byFile['binance-compliance-es.md']?.includes('binance.com/en/support'), 'Binance correct support channel present');
 ok(byFile['tether-legal-es.md']?.includes('legal@tether.to'), 'Tether legal address present');
 ok(byFile['tether-legal-es.md']?.includes('a discreción de Tether'), 'Tether softened-language (no freeze promise) intact');
 
@@ -62,6 +62,26 @@ ok(bin.includes('REVISIÓN DE CUMPLIMIENTO Y MONITOREO DE RIESGO'), 'binance: bl
 ok(bin.includes('CADENA DE CUSTODIA DIGITAL') && bin.includes('SHA256'), 'binance: chain-of-custody + SHA256 added');
 ok(teth.includes('CADENA DE CUSTODIA DIGITAL') && teth.includes('SHA256'), 'tether: chain-of-custody + SHA256 added');
 ok(teth.includes('Plataforma involucrada'), 'tether: "Plataforma involucrada" (neutral label)');
+
+/* ── 2d. Stage 6 T6: template channel corrections ── */
+console.log('\n[2d] Stage 6 T6 — channel corrections');
+const divv = byFile['divindat-denuncia-es.md'] || '';
+// Binance: correct victim channel + UID requirement
+ok(bin.includes('Report fraud/scam'), 'binance: routes victims to "Report fraud/scam" ticket');
+ok(bin.includes('UID'), 'binance: UID requirement present');
+ok(bin.includes('law-enforcement'), 'binance: LE portal noted as authorities-only');
+ok(!bin.includes('ce@binance.com'), 'binance: no longer points victims at ce@binance.com');
+// Tether: direct-victim limitation + full contract
+ok(teth.includes('DESPUÉS de presentar'), 'tether: direct-victim limitation note present');
+ok(teth.includes('0x9a0c5ce706b1b7242158065e4aef90750775cee5'), 'tether: full spoof contract address (not truncated)');
+ok(!teth.includes('0x9a0C...Cee5'), 'tether: truncated contract removed');
+// DIVINDAT: accurate Art. 196 / 196-A + contact block
+ok(divv.includes('Art. 196-A'), 'divindat: references Art. 196-A (estafa agravada)');
+ok(divv.includes('participación de dos o más personas'), 'divindat: accurate 196-A aggravator (2+ persons, NOT 20-UIT)');
+ok(!divv.includes('20 UIT'), 'divindat: no incorrect "20 UIT" basis');
+ok(divv.includes('(01) 431-8898') && divv.includes('divindat.pnp@gmail.com'), 'divindat: contact block (phone + email)');
+// SHA256 references point to the email integrity section
+ok([bin, teth, divv].every((b) => b.includes('Verificación de Integridad')), 'all 3: SHA256 references the email integrity section');
 ok(byFile['divindat-denuncia-es.md']?.includes('DIVINDAT'), 'DIVINDAT title present');
 ok(byFile['divindat-denuncia-es.md']?.includes('Art. 196'), 'DIVINDAT statute citation present');
 ok(EMAIL_TEMPLATES_ES.every((t) => t.content.includes('{caseId}')), 'all templates carry a {caseId} token');

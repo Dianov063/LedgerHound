@@ -349,6 +349,24 @@ const SummaryPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) =
 
       <View style={s.sectionDivider} />
 
+      {/* Phase 3.1 Stage 6 (T1): single unambiguous economic-loss line. Total
+          sent to the fraud cluster + the portion misdirected to a secondary
+          spoof. Replaces reliance on the ambiguous "net flow" figure. */}
+      {(() => {
+        const apz = data.attackTechniques?.addressPoisoning;
+        const lc = apz?.detected ? apz.campaigns[0] : null;
+        if (!lc || !(lc.totalSentByVictim > 0)) return null;
+        const amount = `${lc.totalSentByVictim.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${lc.primaryToken}`;
+        const misdirected = fmtTokenRecord(lc.totalMisdirectedReal);
+        return (
+          <View style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: darkRed, lineHeight: 1.5 }}>
+              {t.investigation.totalEconomicLossLine(amount, misdirected)}
+            </Text>
+          </View>
+        );
+      })()}
+
       <Text style={s.h3}>{t.exec.keyFindings}</Text>
       {data.keyFindings.map((f, i) => (
         <Text key={i} style={s.bullet}>{'\u2022'} {f}</Text>
@@ -1570,6 +1588,10 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
               </View>
             ))}
           </View>
+          {/* Phase 3.1 Stage 6 (T3): truncation footnote when >6 destinations. */}
+          {exits.exitPoints.length > 6 && (
+            <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 4 }}>{ei.exitTruncatedNote}</Text>
+          )}
 
           {/* Assessment box */}
           <View style={{ ...s.card, marginTop: 10, borderLeftWidth: 3, borderLeftColor: exits.hasKycExit ? green : exits.hasMixerUsage ? red : amber }}>

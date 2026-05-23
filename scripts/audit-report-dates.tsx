@@ -11,6 +11,7 @@
  */
 import React from 'react';
 import { ReportDocument } from '../lib/reportPdf';
+import { getReportTranslations } from '../lib/report-i18n';
 import type { ReportData } from '../lib/generateReport';
 import { detectAddressPoisoning } from '../lib/address-poisoning';
 import { detectUnicodeSpoofing } from '../lib/unicode-spoofing';
@@ -141,6 +142,31 @@ ok(joined.includes('operación coordinada multi-wallet'), 'R2: uses "operación 
 // Phase 3.1 Stage 5 (R3): attack-technique intro aligned with "documentación de apoyo".
 ok(!joined.includes('evidencia crítica para las autoridades'), 'R3: no "evidencia crítica para las autoridades"');
 ok(joined.includes('documentación de apoyo importante'), 'R3: uses "documentación de apoyo importante"');
+// Phase 3.1 Stage 6 (F1): no aggressive freeze in STEP 3 preservation letter.
+ok(!joined.includes('congelar las cuentas sospechosas'), 'F1: no "congelar las cuentas sospechosas"');
+ok(joined.includes('preservación y revisión de cumplimiento de las cuentas relacionadas'), 'F1: uses preservation/compliance-review wording');
+// Phase 3.1 Stage 6 (F2): main collector described observationally, not as "scam wallet".
+ok(!joined.includes('wallet principal de la estafa'), 'F2: no "wallet principal de la estafa"');
+ok(!joined.includes('en esta red de fraude'), 'F2: no "en esta red de fraude"');
+ok(joined.includes('wallet receptora principal observada'), 'F2: uses "wallet receptora principal observada"');
+// Phase 3.1 Stage 6 (F3): address-control attribution softened (incl. footnote).
+ok(!joined.includes('controladas por el atacante'), 'F3: no "controladas por el atacante" anywhere');
+ok(!joined.includes('El atacante desplegó'), 'F3: no "El atacante desplegó" (passive instead)');
+ok(joined.includes('consistentes con control coordinado'), 'F3: uses "consistentes con control coordinado"');
+// Phase 3.1 Stage 6 (T1): unambiguous economic-loss line renders in Exec Summary.
+ok(joined.includes('Pérdida económica total de la víctima'), 'T1: economic-loss line rendered in Exec Summary');
+
+// ── Direct i18n checks for generated prose not exercised by the mock render ──
+const es6 = getReportTranslations('es');
+ok(es6.investigation.totalEconomicLossLine('64,248.31 USDT', '11,020.50 USDT').includes('de los cuales 11,020.50 USDT'), 'T1: loss-line function interpolates misdirected');
+ok(es6.investigation.narrative.summaryVictim('x', 1, 98, 4, 'y', '').includes('(por volumen)'), 'T2: narrative pct labeled "(por volumen)"');
+ok(es6.behavioral.rapidForwardingEv(70, 7, 10)[0].includes('(por número de depósitos)'), 'T2: behavioral pct labeled "(por número de depósitos)"');
+ok(es6.recovery.factorPhishingTag(1).includes('evidencia independiente'), 'T4: phishing-tag factor has cluster-evidence context');
+ok(es6.steps.legalPreservationLetter.includes('preservación y revisión de cumplimiento'), 'F1: preservation-letter wording (es)');
+ok(!es6.steps.legalPreservationLetter.includes('congelar'), 'F1: no "congelar" in preservation letter');
+ok(es6.entityId.exitTruncatedNote.includes('Historial Completo'), 'T3: exit-points truncation footnote exists');
+ok(es6.attackTechnique.combiningMarksNote.includes('Normalization Form Canonical Composition'), 'T7: NFC acronym expanded');
+ok(es6.addressVerification.remaining(17).includes('más'), 'T7: "+N más" (not "more") in Spanish');
 
 console.log('\n' + '─'.repeat(70));
 console.log(`  ${fail === 0 ? 'PASS — dates uniform + Stage 5 wording resolved' : 'FAIL'}`);

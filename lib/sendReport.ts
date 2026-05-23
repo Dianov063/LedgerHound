@@ -12,6 +12,7 @@ export async function sendReport(
   downloadUrl?: string,
   locale?: string,
   country?: string,
+  pdfSha256?: string,
 ) {
   const shortAddr = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
   const isEs = locale === 'es';
@@ -108,6 +109,27 @@ export async function sendReport(
           </a>
           <p style="color: #6b7280; font-size: 11px; margin: 10px 0 0 0;">
             Link valid for 7 days
+          </p>
+        </div>
+        ` : ''}
+
+        ${pdfSha256 ? `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 24px 0;">
+          <p style="color: #0f172a; font-weight: 600; margin: 0 0 6px 0; font-size: 13px;">
+            ${isEs ? 'Verificación de Integridad (cadena de custodia)' : 'Integrity Verification (chain of custody)'}
+          </p>
+          <p style="color: #475569; font-size: 12px; line-height: 1.5; margin: 0 0 6px 0;">
+            ${isEs
+              ? 'El hash SHA-256 del informe forense PDF adjunto es:'
+              : 'The SHA-256 hash of the attached forensic PDF report is:'}
+          </p>
+          <p style="color: #0f172a; font-family: monospace; font-size: 11px; word-break: break-all; margin: 0 0 6px 0;">
+            ${pdfSha256}
+          </p>
+          <p style="color: #6b7280; font-size: 11px; line-height: 1.5; margin: 0;">
+            ${isEs
+              ? 'Conserve este valor: permite verificar que el PDF no ha sido alterado desde su emisión. Es el mismo hash referenciado en las plantillas de denuncia.'
+              : 'Keep this value: it lets anyone verify the PDF has not been altered since issuance. It is the same hash referenced in the complaint templates.'}
           </p>
         </div>
         ` : ''}

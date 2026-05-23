@@ -407,6 +407,8 @@ export interface EntityId {
   exitMixerBody: string;
   exitNoneTitle: string;
   exitNoneBody: string;
+  /** Phase 3.1 Stage 6 (T3): footnote when the exit-points table is truncated. */
+  exitTruncatedNote: string;
   noOutflows: string;
   recoveryDiff: (entityType: string) => string;
 }
@@ -573,6 +575,8 @@ export interface Investigation {
   assetIn: (sym: string) => string;
   assetOut: (sym: string) => string;
   forwarded24h: string;
+  /** Phase 3.1 Stage 6 (T1): one unambiguous total-loss line for the Exec Summary. */
+  totalEconomicLossLine: (amount: string, misdirected: string) => string;
   fundFlow: string;
   sourceDeposits: (n: number) => string;
   victimsCount: (n: number) => string;
@@ -793,6 +797,9 @@ const en: ReportTranslations = {
     assetIn: (sym) => `${sym} IN`,
     assetOut: (sym) => `${sym} OUT`,
     forwarded24h: 'FORWARDED <24H',
+    totalEconomicLossLine: (amount, misdirected) => misdirected
+      ? `Total victim economic loss: ${amount} sent to the fraud group, of which ${misdirected} was misdirected to a secondary spoof address.`
+      : `Total victim economic loss: ${amount} sent to the fraud group.`,
     fundFlow: 'Fund Flow',
     sourceDeposits: (n) => `~${n} Source Deposit(s)`,
     victimsCount: (n) => `${n} Victims`,
@@ -852,7 +859,7 @@ const en: ReportTranslations = {
       manualReview: 'Manual review recommended for confident classification',
     },
     narrative: {
-      summaryVictim: (inDisp, kycDeposits, pct, receivers, outDisp, nativeSuffix) => `This wallet shows the behavioral profile of a victim wallet. It received ${inDisp} from ${kycDeposits} KYC exchange deposit(s), then forwarded ${pct}% of those funds to ${receivers} unknown counterparty address(es) within 24 hours. Total outflow: ${outDisp}.${nativeSuffix}`,
+      summaryVictim: (inDisp, kycDeposits, pct, receivers, outDisp, nativeSuffix) => `This wallet shows the behavioral profile of a victim wallet. It received ${inDisp} from ${kycDeposits} KYC exchange deposit(s), then forwarded ${pct}% of those funds (by volume) to ${receivers} unknown counterparty address(es) within 24 hours. Total outflow: ${outDisp}.${nativeSuffix}`,
       summaryAggregator: (senders, pct, inDisp, outDisp) => `This wallet functions as a scam aggregation point. It received funds from approximately ${senders} unique sender addresses and forwarded ${pct}% of incoming value within 24 hours. Total inflow: ${inDisp}. Total outflow: ${outDisp}.`,
       summaryTransit: (senders, pct, inDisp, outDisp) => `This wallet functions as a transit/forwarding wallet. It received funds from approximately ${senders} unique sender addresses and forwarded ${pct}% of incoming value within 24 hours. Total inflow: ${inDisp}. Total outflow: ${outDisp}.`,
       summaryExchangeDeposit: (exchange, senders, inDisp, outDisp) => `This wallet appears to funnel funds to ${exchange}. It received from ${senders} senders and consolidated to a single exchange destination. Total flow: ${inDisp} in, ${outDisp} out.`,
@@ -904,7 +911,7 @@ const en: ReportTranslations = {
   attackTechnique: {
     intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute important supporting documentation for legal and administrative proceedings.',
     poisoningHeader: 'Address Poisoning Campaign Detected',
-    poisoningIntro: 'A coordinated address poisoning attack was identified. The attacker deployed a cluster of visually similar addresses (sharing prefix and suffix patterns) to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are attacker-controlled; the highest-volume address is the main collector, the rest are secondary spoofs.',
+    poisoningIntro: 'A coordinated address poisoning attack was identified. A cluster of visually similar addresses (sharing prefix and suffix patterns) was deployed to confuse the victim and distribute fraudulent inflows across multiple wallets — making blacklisting and seizure more difficult. All addresses in this cluster are consistent with coordinated control; the highest-volume address functions as the main collector, while the rest operate as secondary spoofs.',
     vanityCluster: (pattern) => `Vanity Cluster: ${pattern}`,
     statClusterAddresses: 'CLUSTER ADDRESSES',
     statRealMisdirections: 'REAL MISDIRECTIONS',
@@ -916,7 +923,7 @@ const en: ReportTranslations = {
     mainCollectorTitle: 'Main Collector (Highest Volume)',
     mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
     mainCollectorSpoofAmount: (amount, mimics) => `${amount} units of a fake "${mimics}" token (worthless spoof)`,
-    mainCollectorDesc: (desc, txCount) => `Received ${desc} across ${txCount} transaction(s) — the primary scam wallet in this fraud network.`,
+    mainCollectorDesc: (desc, txCount) => `Received ${desc} across ${txCount} transaction(s) — main receiving wallet observed in this coordinated pattern.`,
     etherscan: (tag) => `Etherscan: ${tag}`,
     secondarySpoofsTitle: 'Secondary Spoofs (Address Poisoning Targets)',
     secondarySpoofsIntro: 'These addresses share the same visual pattern as the main collector but are separate wallets. Real funds the victim sent here indicate successful confusion induced by the poisoning attack; worthless spoof-token transfers are reported separately.',
@@ -951,7 +958,7 @@ const en: ReportTranslations = {
     unicodeLabel: 'Unicode: ',
     displayNfcLabel: 'Display (NFC): ',
     scriptLine: (script, occurrences, addrCount) => `Script: ${script} · ${occurrences} transfer${occurrences > 1 ? 's' : ''}${addrCount ? ` from ${addrCount} address(es)` : ''}`,
-    combiningMarksNote: 'Uses combining diacritical marks; display shows NFC-normalised form for readability — original byte sequence preserved above.',
+    combiningMarksNote: 'Uses combining diacritical marks; display shows NFC-normalised form for readability — original byte sequence preserved above. (NFC = Normalization Form Canonical Composition, a Unicode standard for consistent representation of combining characters.)',
     exampleLine: (date, addr) => `e.g. ${date} · from ${addr}`,
     bottomMethodology: 'Methodology: Address poisoning detection matches counterparty addresses against actual recipients on a 4-character prefix + 4-character suffix basis (8 hex characters of visual overlap). Unicode spoofing detection normalises token symbols (NFKD decomposition + a curated confusable-character map across Lisu, Cyrillic, Greek and fullwidth Latin) and compares against legitimate tickers. Codepoints are shown in standard U+ notation so the evidence is verifiable independent of font rendering.',
   },
@@ -971,7 +978,7 @@ const en: ReportTranslations = {
     spoofTokensNote: 'These tokens use non-Latin characters to impersonate real currencies. See Attack Technique Analysis for full detail.',
     footnoteNote: 'Note: The apparent net balance understates the true economic loss.',
     footnoteRealMisdirected: (breakdown) => ` Real funds misdirected to address-poisoning spoof addresses: ${breakdown}.`,
-    footnoteSpoofUnits: (breakdown) => ` Separately, ${breakdown} of worthless spoof-token units (no market value) were routed to attacker-controlled addresses.`,
+    footnoteSpoofUnits: (breakdown) => ` Separately, ${breakdown} of worthless spoof-token units (no market value) were routed to addresses associated with the coordinated pattern.`,
     footnoteTail: ' See Attack Technique Analysis. Real funds were lost to visual address confusion, not legitimately transferred; spoof-token units carry no value and are reported separately.',
   },
   timeline: {
@@ -1001,7 +1008,7 @@ const en: ReportTranslations = {
     methodologyFootnote: 'Methodology: Patterns are detected by analyzing transaction timing, flow direction, counterparty diversity, asset types, and known entity interactions. Confidence scores reflect the strength of evidence. This is automated analysis — professional forensic review may identify additional patterns.',
     rapidForwardingName: 'Rapid Forwarding (Scam Funnel)',
     rapidForwardingEv: (pct, count, total) => [
-      `${pct}% of incoming funds forwarded within 24 hours`,
+      `${pct}% of incoming deposits forwarded within 24 hours (by deposit count)`,
       `${count} of ${total} deposits show pass-through behavior`,
       'Wallet acts as transit point, not final destination',
     ],
@@ -1080,6 +1087,7 @@ const en: ReportTranslations = {
     exitMixerBody: 'Funds passed through mixing services. Professional demixing analysis recommended.',
     exitNoneTitle: 'No KYC Exchange Exit Detected',
     exitNoneBody: 'Without exchange interaction, recovery requires deeper investigation. The largest outflow destination should be traced further.',
+    exitTruncatedNote: 'Showing primary destinations by volume. See the Complete Transaction History for all transfers.',
     noOutflows: 'No significant outflows detected for exit point analysis.',
     recoveryDiff: (entityType) => (({
       exchange: 'LOW - Subpoena possible',
@@ -1147,7 +1155,7 @@ const en: ReportTranslations = {
     assessmentDisclaimer: 'Statistical estimate based on case characteristics. Most cryptocurrency fraud cases do not result in full recovery. This metric is not a guarantee, prediction, or promise. Actual recovery depends on law enforcement action, exchange cooperation, and legal proceedings.',
     factorKycExchange: (label) => `Funds routed through KYC exchange (${label}) — subpoena possible`,
     factorFraudCluster: 'Counterparty linked to identified fraud cluster — strengthens legal case',
-    factorPhishingTag: (n) => `${n} counterparty wallet(s) officially tagged Fake_Phishing on Etherscan`,
+    factorPhishingTag: (n) => `${n} address(es) in the poisoning cluster officially tagged Fake_Phishing by Etherscan — independent evidence the vanity cluster belongs to a known phishing operation`,
     factorRecent30: 'Recent activity (<30 days) — funds may still be in early laundering stages',
     factorRecent7: 'Very recent activity (<7 days) — improves the chance of an exchange/issuer compliance hold (at their discretion)',
     factorMixer: 'Mixer (Tornado Cash / Blender / Sinbad) usage detected — funds heavily obfuscated',
@@ -1205,7 +1213,7 @@ const en: ReportTranslations = {
     legalSubpoena: (brand) => `Retain attorney for emergency subpoena to ${brand}`,
     legalIdentityRequest: 'Request account holder identity: name, address, government ID, bank info',
     legalCivilRecovery: 'File civil asset recovery proceedings once identity obtained',
-    legalPreservationLetter: 'Send Preservation Letter to freeze suspect accounts',
+    legalPreservationLetter: 'Send Preservation Letter to request preservation and compliance review of related accounts',
     legalConsultAttorney: 'Consult attorney experienced in cryptocurrency fraud recovery',
     legalAdvancedTracing: 'Explore advanced blockchain tracing and cross-chain analysis',
     legalInternational: 'Consider international cooperation if funds crossed jurisdictions',
@@ -1404,6 +1412,9 @@ const es: ReportTranslations = {
     assetIn: (sym) => `${sym} ENTRANTE`,
     assetOut: (sym) => `${sym} SALIENTE`,
     forwarded24h: 'REENVIADO <24H',
+    totalEconomicLossLine: (amount, misdirected) => misdirected
+      ? `Pérdida económica total de la víctima: ${amount} enviados al grupo de fraude, de los cuales ${misdirected} fueron desviados a una dirección de suplantación secundaria.`
+      : `Pérdida económica total de la víctima: ${amount} enviados al grupo de fraude.`,
     fundFlow: 'Flujo de Fondos',
     sourceDeposits: (n) => `~${n} Depósito(s) de Origen`,
     victimsCount: (n) => `${n} Víctimas`,
@@ -1463,7 +1474,7 @@ const es: ReportTranslations = {
       manualReview: 'Se recomienda revisión manual para una clasificación con confianza',
     },
     narrative: {
-      summaryVictim: (inDisp, kycDeposits, pct, receivers, outDisp, nativeSuffix) => `Esta wallet muestra el perfil conductual de una wallet de víctima. Recibió ${inDisp} de ${kycDeposits} depósito(s) de exchange KYC, luego reenvió ${pct}% de esos fondos a ${receivers} dirección(es) de contraparte desconocida(s) en 24 horas. Salida total: ${outDisp}.${nativeSuffix}`,
+      summaryVictim: (inDisp, kycDeposits, pct, receivers, outDisp, nativeSuffix) => `Esta wallet muestra el perfil conductual de una wallet de víctima. Recibió ${inDisp} de ${kycDeposits} depósito(s) de exchange KYC, luego reenvió ${pct}% de esos fondos (por volumen) a ${receivers} dirección(es) de contraparte desconocida(s) en 24 horas. Salida total: ${outDisp}.${nativeSuffix}`,
       summaryAggregator: (senders, pct, inDisp, outDisp) => `Esta wallet funciona como un punto de agregación de estafa. Recibió fondos de aproximadamente ${senders} direcciones remitentes únicas y reenvió ${pct}% del valor entrante en 24 horas. Entrada total: ${inDisp}. Salida total: ${outDisp}.`,
       summaryTransit: (senders, pct, inDisp, outDisp) => `Esta wallet funciona como una wallet de tránsito/reenvío. Recibió fondos de aproximadamente ${senders} direcciones remitentes únicas y reenvió ${pct}% del valor entrante en 24 horas. Entrada total: ${inDisp}. Salida total: ${outDisp}.`,
       summaryExchangeDeposit: (exchange, senders, inDisp, outDisp) => `Esta wallet parece canalizar fondos hacia ${exchange}. Recibió de ${senders} remitentes y los consolidó en un único destino de exchange. Flujo total: ${inDisp} entrante, ${outDisp} saliente.`,
@@ -1515,7 +1526,7 @@ const es: ReportTranslations = {
   attackTechnique: {
     intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen documentación de apoyo importante para procedimientos legales y administrativos.',
     poisoningHeader: 'Campaña de Envenenamiento de Direcciones Detectada',
-    poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. El atacante desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando el bloqueo y la incautación. Todas las direcciones de este grupo están controladas por el atacante; la dirección de mayor volumen es el recolector principal, el resto son suplantaciones secundarias.',
+    poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. Se desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando el bloqueo y la incautación. Todas las direcciones de este grupo son consistentes con control coordinado; la dirección de mayor volumen funciona como recolector principal, mientras que el resto operan como suplantaciones secundarias.',
     vanityCluster: (pattern) => `Grupo de Direcciones Vanity: ${pattern}`,
     statClusterAddresses: 'DIRECCIONES DEL GRUPO',
     statRealMisdirections: 'DESVÍOS REALES',
@@ -1527,7 +1538,7 @@ const es: ReportTranslations = {
     mainCollectorTitle: 'Recolector Principal (Mayor Volumen)',
     mainCollectorRealAmount: (amount, token) => `${amount} ${token}`,
     mainCollectorSpoofAmount: (amount, mimics) => `${amount} unidades de un token falsificado de "${mimics}" (suplantación sin valor)`,
-    mainCollectorDesc: (desc, txCount) => `Recibió ${desc} en ${txCount} transacción(es) — la wallet principal de la estafa en esta red de fraude.`,
+    mainCollectorDesc: (desc, txCount) => `Recibió ${desc} en ${txCount} transacción(es) — wallet receptora principal observada en este patrón coordinado.`,
     etherscan: (tag) => `Etherscan: ${tag}`,
     secondarySpoofsTitle: 'Suplantaciones Secundarias (Objetivos de Envenenamiento)',
     secondarySpoofsIntro: 'Estas direcciones comparten el mismo patrón visual que el recolector principal pero son wallets separadas. Los fondos reales que la víctima envió aquí indican una confusión exitosa inducida por el ataque de envenenamiento; las transferencias de tokens falsificados sin valor se reportan por separado.',
@@ -1562,7 +1573,7 @@ const es: ReportTranslations = {
     unicodeLabel: 'Unicode: ',
     displayNfcLabel: 'Visualización (NFC): ',
     scriptLine: (script, occurrences, addrCount) => `Escritura: ${script} · ${occurrences} transferencia(s)${addrCount ? ` de ${addrCount} dirección(es)` : ''}`,
-    combiningMarksNote: 'Usa marcas diacríticas combinantes; la visualización muestra la forma normalizada NFC para legibilidad — la secuencia original de bytes se preserva arriba.',
+    combiningMarksNote: 'Usa marcas diacríticas combinantes; la visualización muestra la forma normalizada NFC para legibilidad — la secuencia original de bytes se preserva arriba. (NFC = Normalization Form Canonical Composition, estándar Unicode para la representación consistente de caracteres combinantes.)',
     exampleLine: (date, addr) => `ej. ${date} · de ${addr}`,
     bottomMethodology: 'Metodología: La detección de envenenamiento de direcciones compara las direcciones de contraparte con los receptores reales sobre una base de prefijo de 4 caracteres + sufijo de 4 caracteres (8 caracteres hexadecimales de superposición visual). La detección de suplantación Unicode normaliza los símbolos de los tokens (descomposición NFKD + un mapa curado de caracteres confundibles entre Lisu, cirílico, griego y latín de ancho completo) y los compara con tickers legítimos. Los puntos de código se muestran en notación U+ estándar para que la evidencia sea verificable independientemente de la representación de la fuente.',
   },
@@ -1612,7 +1623,7 @@ const es: ReportTranslations = {
     methodologyFootnote: 'Metodología: Los patrones se detectan analizando la sincronización de las transacciones, la dirección del flujo, la diversidad de contrapartes, los tipos de activos y las interacciones con entidades conocidas. Las puntuaciones de confianza reflejan la solidez de la evidencia. Este es un análisis automatizado — una revisión forense profesional puede identificar patrones adicionales.',
     rapidForwardingName: 'Reenvío Rápido (Embudo de Estafa)',
     rapidForwardingEv: (pct, count, total) => [
-      `${pct}% de los fondos entrantes reenviados en 24 horas`,
+      `${pct}% de los depósitos entrantes reenviados en 24 horas (por número de depósitos)`,
       `${count} de ${total} depósitos muestran comportamiento de paso`,
       'La wallet actúa como punto de tránsito, no como destino final',
     ],
@@ -1691,6 +1702,7 @@ const es: ReportTranslations = {
     exitMixerBody: 'Los fondos pasaron por servicios de mezcla. Se recomienda un análisis profesional de desmezclado.',
     exitNoneTitle: 'No se Detectó Salida por Exchange KYC',
     exitNoneBody: 'Sin interacción con un exchange, la recuperación requiere una investigación más profunda. El mayor destino de salida debe rastrearse más a fondo.',
+    exitTruncatedNote: 'Mostrando destinos principales por volumen. Ver el Historial Completo de Transacciones para todas las transferencias.',
     noOutflows: 'No se detectaron salidas significativas para el análisis de puntos de salida.',
     recoveryDiff: (entityType) => (({
       exchange: 'BAJA - Citación judicial posible',
@@ -1758,7 +1770,7 @@ const es: ReportTranslations = {
     assessmentDisclaimer: 'Estimación estadística basada en las características del caso. La mayoría de los casos de fraude con criptomonedas no resultan en recuperación total. Esta métrica no es una garantía, predicción ni promesa. La recuperación real depende de la acción de las autoridades, la cooperación de los exchanges y los procedimientos legales.',
     factorKycExchange: (label) => `Fondos enrutados a través de un exchange con KYC (${label}) — citación judicial posible`,
     factorFraudCluster: 'Contraparte vinculada a un grupo de fraude identificado — fortalece el caso legal',
-    factorPhishingTag: (n) => `${n} wallet(s) de contraparte etiquetada(s) oficialmente como Fake_Phishing en Etherscan`,
+    factorPhishingTag: (n) => `${n} dirección(es) del grupo de envenenamiento etiquetada(s) oficialmente como Fake_Phishing por Etherscan — evidencia independiente de que el grupo vanity pertenece a una operación de phishing conocida`,
     factorRecent30: 'Actividad reciente (<30 días) — los fondos pueden estar aún en etapas tempranas de lavado',
     factorRecent7: 'Actividad muy reciente (<7 días) — mejora la posibilidad de una retención por cumplimiento del exchange/emisor (a su discreción)',
     factorMixer: 'Uso de mezclador (Tornado Cash / Blender / Sinbad) detectado — fondos fuertemente ofuscados',
@@ -1816,7 +1828,7 @@ const es: ReportTranslations = {
     legalSubpoena: (brand) => `Contratar un abogado para una citación judicial de emergencia a ${brand}`,
     legalIdentityRequest: 'Solicitar la identidad del titular de la cuenta: nombre, dirección, documento de identidad oficial, datos bancarios',
     legalCivilRecovery: 'Iniciar procedimientos civiles de recuperación de activos una vez obtenida la identidad',
-    legalPreservationLetter: 'Enviar una Carta de Preservación para congelar las cuentas sospechosas',
+    legalPreservationLetter: 'Enviar una Carta de Preservación para solicitar la preservación y revisión de cumplimiento de las cuentas relacionadas',
     legalConsultAttorney: 'Consultar a un abogado con experiencia en recuperación de fraude con criptomonedas',
     legalAdvancedTracing: 'Explorar el rastreo avanzado de blockchain y el análisis entre cadenas',
     legalInternational: 'Considerar la cooperación internacional si los fondos cruzaron jurisdicciones',

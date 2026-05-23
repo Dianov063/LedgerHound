@@ -8,7 +8,10 @@
 
 **División de Investigación de Delitos de Alta Tecnología (DIVINDAT)**
 **Policía Nacional del Perú**
-**Av. España 323, Cercado de Lima**
+Av. España 323, Cercado de Lima
+Teléfono: (01) 431-8898 · Email: divindat.pnp@gmail.com
+Horario: Lunes a viernes, 8:00–17:00
+(También puede presentarse vía el portal del Ministerio Público: https://denuncias.mpfn.gob.pe/)
 
 ---
 
@@ -50,7 +53,7 @@ Solicito a su Despacho:
 
 Iniciar investigación del caso bajo los presuntos delitos de:
 
-- **Estafa agravada** (Art. 196° del Código Penal)
+- **Estafa** (Art. 196° del Código Penal), que podría calificar como **estafa agravada** (Art. 196-A° del Código Penal) si concurre alguna circunstancia agravante prevista por la ley — entre ellas, la **participación de dos o más personas** o el **aprovechamiento de la situación de vulnerabilidad de la víctima**. Dada la modalidad coordinada multi-wallet del presente caso, corresponde al Fiscal la calificación final.
 - **Delito informático contra el patrimonio** (Ley N° 30096)
 
 ### 2. ORDEN DE PRESERVACIÓN INMEDIATA
@@ -96,7 +99,7 @@ Para garantizar la integridad de la evidencia digital:
 
 - **Informe forense LedgerHound (PDF):**
   - Archivo: LedgerHound-Report-[{caseId}].pdf
-  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+  - SHA256: [ver la sección "Verificación de Integridad" en el email de entrega del informe LedgerHound]
 
 - **Capturas de evidencia (archivo comprimido):**
   - Archivo: capturas-evidencia.zip

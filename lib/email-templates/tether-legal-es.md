@@ -1,5 +1,7 @@
 # Plantilla de Email — Equipo Legal de Tether
 
+> **LIMITACIÓN IMPORTANTE:** Tether procesa congelamientos principalmente a solicitud de **autoridades policiales/fiscales o de OFAC**. Las solicitudes directas de víctimas suelen recibir una respuesta indicando que la solicitud debe presentarla la autoridad competente. Por ello, se recomienda enviar este email **DESPUÉS de presentar su denuncia policial**, citando el número de expediente, y solicitar a las autoridades que ellas también remitan la solicitud. Este envío sirve como notificación temprana y registro de evidencia.
+
 **To:** legal@tether.to
 **From:** [Tu Email]
 **Subject:** Evidence Submission - USDT Fraud Case [{caseId}]
@@ -26,7 +28,7 @@ Soy víctima de fraude con criptomonedas que utilizó tokens USDT (stablecoin de
 ### Tokens USDT-falsificados utilizados por los estafadores:
 
 - **Token con caracteres Lisu (escritura Lisu):** Contrato 0xD248eCDb340403aC7AcbA97b1e8997d15596Fc79
-- **Token Unicode mixto/cirílico:** Contrato 0x9a0C...Cee5
+- **Token Unicode mixto/cirílico:** Contrato 0x9a0c5ce706b1b7242158065e4aef90750775cee5
 - **Nota forense:** Estos tokens son falsificaciones Unicode sin valor que imitan visualmente el símbolo "USDT" para confundir a la víctima.
 
 ## SOLICITUD
@@ -61,7 +63,7 @@ Para garantizar la integridad de la evidencia digital adjunta:
 
 - **Informe forense LedgerHound (PDF):**
   - Archivo: LedgerHound-Report-[{caseId}].pdf
-  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+  - SHA256: [ver la sección "Verificación de Integridad" en el email de entrega del informe LedgerHound]
 
 Los hashes SHA256 permiten verificar que la evidencia digital no ha sido alterada desde su recolección.
 

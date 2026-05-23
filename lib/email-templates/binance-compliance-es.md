@@ -1,22 +1,27 @@
-# Plantilla de Email — Cumplimiento de Binance
+# Plantilla de Email — Reporte de Fraude a Binance
 
-**To:** ce@binance.com
-**From:** [Tu Email]
-**Subject:** URGENT: Preservation Request - Crypto Fraud Case [{caseId}]
+> **NOTA IMPORTANTE — CANAL CORRECTO:** Como víctima, presente este reporte a través del **sistema de tickets de soporte de Binance** seleccionando la categoría **"Report fraud/scam"** (Reportar fraude/estafa) en https://www.binance.com/en/support. El **Portal de Autoridades** (Law Enforcement Request System — https://www.binance.com/en/support/law-enforcement) es **exclusivo para autoridades policiales/fiscales**; las solicitudes de preservación formales debe presentarlas la autoridad que tramite su denuncia. Use el texto siguiente como cuerpo de su ticket de soporte y, además, entréguelo a las autoridades para que ellas eleven la solicitud de preservación por el portal oficial.
+
+**Para:** Soporte de Binance — categoría "Report fraud/scam"
+**De:** [Tu Email registrado en Binance]
+**Asunto:** URGENT: Fraud Report & Record Preservation - Case [{caseId}]
 
 ---
 
-Estimado equipo de cumplimiento de Binance,
+Estimado equipo de Binance,
 
-Le escribo para reportar un caso de fraude con criptomonedas que requiere su atención inmediata. Soy víctima de una presunta modalidad de fraude de inversión en criptomonedas compatible con esquemas conocidos como "pig butchering", que utilizó la plataforma DZHLWK Fintech.
+Le escribo para reportar un caso de fraude con criptomonedas que requiere su atención. Soy víctima de una presunta modalidad de fraude de inversión en criptomonedas compatible con esquemas conocidos como "pig butchering", que utilizó la plataforma DZHLWK Fintech.
 
 ## DETALLES DEL CASO
 
 - **Mi wallet (financiada vía Binance):** [tu dirección de wallet]
 - **Mi cuenta Binance (email):** [tu email registrado en Binance]
+- **Mi UID de Binance (identificador interno de cuenta):** [su UID]
 - **Fecha del incidente:** [Mes-Año] - [Mes-Año]
 - **Cantidad perdida:** Aproximadamente $[monto] USD en USDT
 - **ID del caso forense:** [{caseId}]
+
+> Importante: Binance solicita el **UID de la cuenta** (no solo el email) para tramitar solicitudes. Encuentre su UID en: Perfil → Información de la cuenta → User ID (UID).
 
 ### Direcciones de los estafadores (controladas por los operadores del fraude):
 
@@ -63,7 +68,7 @@ Para garantizar la integridad de la evidencia digital adjunta:
 
 - **Informe forense LedgerHound (PDF):**
   - Archivo: LedgerHound-Report-[{caseId}].pdf
-  - SHA256: [solicitar al equipo LedgerHound al momento de la entrega]
+  - SHA256: [ver la sección "Verificación de Integridad" en el email de entrega del informe LedgerHound]
 
 Los hashes SHA256 permiten verificar que la evidencia digital no ha sido alterada desde su recolección.
 
@@ -81,8 +86,10 @@ Atentamente,
 
 **INSTRUCCIONES PARA USAR ESTA PLANTILLA:**
 
-1. Reemplace todos los campos entre [corchetes] con su información real
-2. Mantenga el subject line en inglés (más reconocible por equipos de cumplimiento internacionales)
-3. Adjunte el PDF del informe forense LedgerHound a este email
-4. Envíe desde el email registrado en su cuenta Binance
-5. Conserve copia del email enviado + respuestas para sus registros
+1. Reemplace todos los campos entre [corchetes] con su información real (incluido su **UID de Binance**)
+2. Preséntelo a través del **sistema de tickets de soporte de Binance**, categoría "Report fraud/scam" (no por correo directo a cuentas de cumplimiento, que se atienden como soporte general)
+3. Mantenga el asunto (subject) en inglés (más reconocible internacionalmente)
+4. Adjunte el PDF del informe forense LedgerHound al ticket
+5. Use el email registrado en su cuenta Binance
+6. Entregue también este reporte a las autoridades de su denuncia, para que ellas presenten la solicitud formal de preservación por el Portal de Autoridades de Binance (https://www.binance.com/en/support/law-enforcement)
+7. Conserve copia del ticket enviado + respuestas para sus registros
