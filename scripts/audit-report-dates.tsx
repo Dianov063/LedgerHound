@@ -304,6 +304,16 @@ ok(joined.includes('transacciones de valor cero') || joined.includes('valor cero
 // P2-3: evidence-strength score methodology footnote.
 ok(joined.includes('proporción de los factores evidenciarios'), 'S16 P2-3: evidence-strength methodology note rendered (es)');
 ok(getReportTranslations('en').investigation.evidenceMethodologyNote.includes('proportion of the evidentiary factors'), 'S16 P2-3: EN evidence methodology note available');
+// ── Phase 3.1 Stage 17 ──
+// P1-1: evidence methodology note no longer contains an unrenderable symbol /
+// empty parentheses (was "(✔)" -> "()" in the PDF).
+ok(!es6.investigation.evidenceMethodologyNote.includes('('), 'S17 P1-1: ES methodology note has no parentheses/symbol');
+ok(!getReportTranslations('en').investigation.evidenceMethodologyNote.includes('('), 'S17 P1-1: EN methodology note has no parentheses/symbol');
+ok(!joinedNoMarks.includes('cumplen ()') && !joinedNoMarks.includes('met ()'), 'S17 P1-1: no empty "()" rendered in methodology note');
+// P1-2: abbreviated-timeline note explains the displayed events are a selection.
+ok(joined.includes('Cronología abreviada'), 'S17 P1-2: abbreviated-timeline label rendered (es)');
+ok(joined.includes('no suman el total reportado'), 'S17 P1-2: note states amounts do not sum to the total');
+ok(joined.includes('Historial de Transacciones') || joined.includes('Etherscan'), 'S17 P1-2: note references the full transaction history');
 // P1-B: recovery tier calibration — 23 reads "Baja a moderada", cap reads "Moderada".
 ok(recoveryTierForScore(23) === 'LOW_TO_MODERATE', 'P1-B: score 23 -> LOW_TO_MODERATE');
 ok(recoveryTierForScore(35) === 'MODERATE', 'P1-B: capped score 35 -> MODERATE (top reachable tier)');

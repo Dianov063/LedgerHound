@@ -32,6 +32,14 @@ Le escribo para reportar un caso de fraude con criptomonedas que requiere su ate
   - [dirección 2]
   - [dirección 3]
 
+**Direcciones adicionales del mismo grupo vanity (envenenamiento por dust — no recibieron fondos):**
+
+Las siguientes direcciones pertenecen al mismo cluster vanity (mismo prefijo/sufijo, p. ej. 0x073a4…609f) y participaron en el ataque enviando transacciones de valor cero o microcantidades (dust) hacia mi wallet para inducir confusión, aunque no recibieron fondos:
+
+- [direcciones que solo enviaron dust]
+
+Sugiero incluirlas también en cualquier revisión de cumplimiento, ya que constituyen evidencia del carácter coordinado del grupo.
+
 ## SOLICITUD
 
 Por favor consideren las siguientes acciones:

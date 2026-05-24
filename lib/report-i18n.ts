@@ -556,6 +556,9 @@ export interface TimelineT {
   totalActivePeriod: (first: string, last: string) => string;
   inactiveSuffix: (n: number) => string;
   noTimeline: string;
+  /** Phase 3.1 Stage 17 (P1-2): clarifies the timeline lists SELECTED key events,
+   *  so the displayed amounts intentionally do not sum to the reported total. */
+  abbreviatedNote: string;
 }
 
 /** Attack Technique Analysis (pages 11-12) translations. */
@@ -902,7 +905,7 @@ const en: ReportTranslations = {
     locateStep2: 'Note the date, amount, and transaction hash',
     locateStep3: 'Include this information in your police report and exchange complaint',
     evidenceStrengthTitle: 'Evidence Strength',
-    evidenceMethodologyNote: 'Score = the proportion of the evidentiary factors below that are met (✔). It measures documentation completeness, not recovery probability.',
+    evidenceMethodologyNote: 'Score = the proportion of the evidentiary factors listed below that are met. It measures documentation completeness, not recovery probability.',
     reportSuitabilityTitle: 'Report Suitability',
     exchangeKycEntryVsExit: 'Exchange KYC — Entry vs Exit',
     kycEntryPointLabel: "KYC ENTRY POINT (victim's funding source)",
@@ -1091,6 +1094,7 @@ const en: ReportTranslations = {
     totalActivePeriod: (first, last) => `Total Active Period: ${first} to ${last}`,
     inactiveSuffix: (n) => ` (inactive for ${n} days)`,
     noTimeline: 'No timestamped transactions available for timeline construction.',
+    abbreviatedNote: 'Abbreviated timeline — selected key events only. The amounts shown are a selection and intentionally do not sum to the reported total; see the Transaction History page (or Etherscan) for the complete list of transfers.',
   },
   behavioral: {
     introVictim: 'The subject wallet was classified as a victim wallet. The patterns below describe characteristics of the counterparty cluster that received funds, not allegations against the subject wallet.',
@@ -1566,7 +1570,7 @@ const es: ReportTranslations = {
     locateStep2: 'Anote la fecha, el monto y el hash de la transacción',
     locateStep3: 'Incluya esta información en su denuncia policial y en su reclamo ante el exchange',
     evidenceStrengthTitle: 'Solidez de la Evidencia',
-    evidenceMethodologyNote: 'Puntuación = la proporción de los factores evidenciarios siguientes que se cumplen (✔). Mide la integridad de la documentación, no la probabilidad de recuperación.',
+    evidenceMethodologyNote: 'Puntuación = la proporción de los factores evidenciarios listados abajo que se cumplen. Mide la integridad de la documentación, no la probabilidad de recuperación.',
     reportSuitabilityTitle: 'Usos del Informe',
     exchangeKycEntryVsExit: 'KYC del Exchange — Entrada vs Salida',
     kycEntryPointLabel: 'PUNTO DE ENTRADA KYC (fuente de financiamiento de la víctima)',
@@ -1755,6 +1759,7 @@ const es: ReportTranslations = {
     totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
     inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
     noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',
+    abbreviatedNote: 'Cronología abreviada — solo eventos clave seleccionados. Los montos mostrados son una selección y, de forma intencional, no suman el total reportado; consulte la página de Historial de Transacciones (o Etherscan) para el listado completo de transferencias.',
   },
   behavioral: {
     introVictim: 'La wallet analizada fue clasificada como wallet de víctima. Los patrones a continuación describen características del grupo de contraparte que recibió los fondos, no acusaciones contra la wallet analizada.',

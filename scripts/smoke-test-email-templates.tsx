@@ -81,6 +81,8 @@ ok(!teth.includes('Suplantaciones secundarias adicionales'), 'tether: plural-imp
 // Stage 16 P2-2: DIVINDAT clarifies why funds to the collector count as loss.
 const divi = byFile['divindat-denuncia-es.md'] || '';
 ok(divi.includes('El recolector NO es un destinatario legítimo'), 'divindat: loss-computation clarification (collector not legitimate) (P2-2)');
+// Stage 17 P2-2: Binance template flags the dust-only poisoners (whole vanity cluster).
+ok(bin.includes('envenenamiento por dust') && bin.includes('no recibieron fondos'), 'binance: dust-only poisoners section present (P2-2)');
 // DIVINDAT: accurate Art. 196 / 196-A + contact block
 ok(divv.includes('Art. 196-A'), 'divindat: references Art. 196-A (estafa agravada)');
 ok(divv.includes('participación de dos o más personas'), 'divindat: accurate 196-A aggravator (2+ persons, NOT 20-UIT)');

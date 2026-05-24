@@ -685,8 +685,10 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
 
       <View style={s.divider} />
 
-      {/* Evidence Strength + Legal Weight — side by side */}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      {/* Evidence Strength + Legal Weight — side by side.
+          Phase 3.1 Stage 17 (P1-3): wrap={false} keeps the section on one page
+          (no mid-section break between "Solidez de la Evidencia" / "Usos del Informe"). */}
+      <View style={{ flexDirection: 'row', gap: 10 }} wrap={false}>
         {/* Evidence Strength */}
         <View style={{ flex: 1 }}>
           <Text style={{ ...s.h3, marginBottom: 4 }}>{t.investigation.evidenceStrengthTitle}</Text>
@@ -885,6 +887,11 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
 
       {/* ACTIVITY TIMELINE */}
       <Text style={s.h2}>{t.sections.activityTimeline}</Text>
+      {/* Phase 3.1 Stage 17 (P1-2): clarify this is an abbreviated, selected-events
+          timeline so the displayed amounts are not expected to sum to the total. */}
+      {timeline && timeline.length > 0 && (
+        <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginBottom: 8, lineHeight: 1.4 }}>{tl.abbreviatedNote}</Text>
+      )}
       {timeline && timeline.length > 0 ? (
         <View style={{ paddingLeft: 8 }}>
           {(() => {
