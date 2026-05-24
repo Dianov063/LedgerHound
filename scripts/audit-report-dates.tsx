@@ -13,6 +13,7 @@ import React from 'react';
 import { ReportDocument } from '../lib/reportPdf';
 import { getReportTranslations } from '../lib/report-i18n';
 import type { ReportData } from '../lib/generateReport';
+import { recoveryTierForScore } from '../lib/generateReport';
 import { detectAddressPoisoning } from '../lib/address-poisoning';
 import { detectUnicodeSpoofing } from '../lib/unicode-spoofing';
 
@@ -69,11 +70,11 @@ const mock: ReportData = {
   // Phase 3.1 Stage 12 (P0-1): array of factor rows; baseline(50) + sum === riskScore(80).
   riskBreakdown: [
     { label: 'Interacción con exchange KYC (ayuda a la recuperación)', value: -10 },
-    { label: 'Wallet(s) de contraparte etiquetada(s) como phishing', value: 10 },
+    { label: 'Wallet(s) marcada(s) por fuentes internas/comunitarias (phishing)', value: 10 },
     { label: 'Campaña de envenenamiento de direcciones confirmada', value: 10 },
     { label: 'Suplantación de tokens Unicode detectada', value: 5 },
-    { label: 'Etiqueta Etherscan Fake_Phishing en el grupo', value: 5 },
-    { label: 'Entrada KYC propia de la víctima (no facilita la recuperación)', value: 10 },
+    { label: 'Verificación independiente Etherscan (etiqueta Fake_Phishing)', value: 5 },
+    { label: 'El exchange es la entrada de la víctima, no la salida del estafador — anula la ayuda a la recuperación (perfil de víctima)', value: 10 },
   ] as any,
   timeline: [
     { date: '2026-02-25', type: 'FIRST_ACTIVITY', description: 'First activity', highlight: false } as any,
@@ -240,6 +241,20 @@ ok(joined.includes('Campaña de envenenamiento de direcciones confirmada'), 'P0-
 // P0-2: no "Binance (Retiro)" when no scammer KYC exit; neutral suffix instead.
 ok(!joined.includes('(Retiro)'), 'P0-2: no "(Retiro)" route tail when exit not detected');
 ok(joined.includes('Grupo de Contraparte (rastreo ampliado pendiente)'), 'P0-2: neutral counterparty-group route tail');
+// ── Phase 3.1 Stage 13 ──
+// B-A: phishing-tag rows read as distinct sources (no double-count appearance).
+ok(joined.includes('fuentes internas/comunitarias'), 'B-A: phishing row attributes to internal/community sources');
+ok(joined.includes('Verificación independiente Etherscan'), 'B-A: Etherscan row framed as independent verification');
+ok(!joined.includes('Etiqueta Etherscan Fake_Phishing en el grupo'), 'B-A: old ambiguous Etherscan label removed');
+// B-B: victim-entry row reframed (no "KYC entry adds risk" reading).
+ok(joined.includes('perfil de víctima') && joined.includes('anula la ayuda a la recuperación'), 'B-B: victim-entry row reframed as recovery-aid cancellation');
+ok(!joined.includes('Entrada KYC propia de la víctima'), 'B-B: old "Entrada KYC propia de la víctima" label removed');
+// P1-B: recovery tier calibration — 23 reads "Baja a moderada", cap reads "Moderada".
+ok(recoveryTierForScore(23) === 'LOW_TO_MODERATE', 'P1-B: score 23 -> LOW_TO_MODERATE');
+ok(recoveryTierForScore(35) === 'MODERATE', 'P1-B: capped score 35 -> MODERATE (top reachable tier)');
+ok(recoveryTierForScore(15) === 'LOW' && recoveryTierForScore(7) === 'VERY_LOW', 'P1-B: lower bands intact (15->LOW, 7->VERY_LOW)');
+ok(es6.recovery.assessmentLabel.LOW_TO_MODERATE.includes('Baja a moderada'), 'P1-B: LOW_TO_MODERATE label reads "Baja a moderada"');
+ok(es6.recovery.assessmentLabel.MODERATE.includes('aún requiere acción legal sostenida'), 'P1-B: MODERATE label keeps sustained-legal-action caveat');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

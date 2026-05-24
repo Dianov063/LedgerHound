@@ -163,10 +163,11 @@ const riskColor = (score: number) => {
 /**
  * Recovery score color scale.
  * 2026-05-20: Recovery score is now hard-capped at 35% (see recoveryAssessment
- * in generateReport.ts). The old thresholds (>=60 green) are unreachable now,
- * so we use the new tiers: HIGHER_THAN_AVERAGE (>=25) is amber; MODERATE/LOW
- * (15-24, 8-14) is amber; VERY_LOW (<8) is red. We deliberately never return
- * green — the cap exists precisely because we don't want to imply high recovery.
+ * in generateReport.ts). The old thresholds (>=60 green) are unreachable now.
+ * 2026-05-24 (Stage 13 P1-B): tiers recalibrated to MODERATE (>=31),
+ * LOW_TO_MODERATE (16-30), LOW (8-15), VERY_LOW (<8). Coloring keys off the raw
+ * score: >=15 is amber, below is red. We deliberately never return green — the
+ * cap exists precisely because we don't want to imply high recovery.
  */
 const recoveryColor = (score: number) => {
   if (score >= 15) return amber;

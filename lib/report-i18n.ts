@@ -331,7 +331,7 @@ export interface Recovery {
   courtCertifiedText: string;
   // Recovery assessment label/disclaimer/factors (Exec Summary + Recovery page).
   // Generated in generateReport.ts; Phase 3.1 routes them through this table.
-  assessmentLabel: Record<'HIGHER_THAN_AVERAGE' | 'MODERATE' | 'LOW' | 'VERY_LOW', string>;
+  assessmentLabel: Record<'MODERATE' | 'LOW_TO_MODERATE' | 'LOW' | 'VERY_LOW', string>;
   assessmentDisclaimer: string;
   factorKycExchange: (label: string) => string;
   factorFraudCluster: string;
@@ -771,13 +771,13 @@ const en: ReportTranslations = {
     rowScamDb: 'LedgerHound Scam Database match',
     rowScamEntity: 'Scam-flagged counterparty entity',
     rowHighOutflow: 'High native outflow with no exchange',
-    rowVictimEntry: "Victim's own KYC entry (does not aid recovery)",
+    rowVictimEntry: "Exchange is the victim's entry, not the scammer's exit — cancels recovery aid (victim profile)",
     rowLowActivity: 'Very low transaction count',
-    rowPhishingTag: 'Phishing-tagged counterparty wallet(s)',
+    rowPhishingTag: 'Wallet(s) tagged by internal/community sources (phishing)',
     rowFederationScam: 'External scam-flagged counterparty(ies)',
     rowPoisoning: 'Confirmed address-poisoning campaign',
     rowUnicode: 'Unicode token spoofing detected',
-    rowEtherscanTag: 'Etherscan Fake_Phishing tag in cluster',
+    rowEtherscanTag: 'Independent Etherscan verification (Fake_Phishing tag)',
     rowSanctionsFloor: 'External sanctions flag (severity floor)',
     rowBehavioralFloor: 'Behavioral pattern severity floor',
     rowCap: 'Score capped at maximum (100)',
@@ -1215,8 +1215,8 @@ const en: ReportTranslations = {
     courtCertifiedBold: 'Court-Certified Forensic Investigation:',
     courtCertifiedText: 'For court testimony, certified methodology, or an expanded counterparty trace, contact LedgerHound at contact@ledgerhound.vip for a certified expanded forensic investigation.',
     assessmentLabel: {
-      HIGHER_THAN_AVERAGE: 'Higher than average — multiple positive factors present, but recovery still requires sustained legal action',
-      MODERATE: 'Moderate — some positive factors, recovery possible with proper legal action',
+      MODERATE: 'Moderate — multiple positive factors present, but recovery still requires sustained legal action',
+      LOW_TO_MODERATE: 'Low to moderate — some positive factors, but recovery requires sustained legal effort and is not guaranteed',
       LOW: 'Low — recovery requires sustained legal effort and may take 6-18 months',
       VERY_LOW: 'Very low — recovery is unlikely but documentation enables legal/tax claims',
     },
@@ -1421,13 +1421,13 @@ const es: ReportTranslations = {
     rowScamDb: 'Coincidencia en la Base de Datos de Estafas de LedgerHound',
     rowScamEntity: 'Contraparte marcada como estafa',
     rowHighOutflow: 'Alta salida de moneda nativa sin exchange',
-    rowVictimEntry: 'Entrada KYC propia de la víctima (no facilita la recuperación)',
+    rowVictimEntry: 'El exchange es la entrada de la víctima, no la salida del estafador — anula la ayuda a la recuperación (perfil de víctima)',
     rowLowActivity: 'Número de transacciones muy bajo',
-    rowPhishingTag: 'Wallet(s) de contraparte etiquetada(s) como phishing',
+    rowPhishingTag: 'Wallet(s) marcada(s) por fuentes internas/comunitarias (phishing)',
     rowFederationScam: 'Contraparte(s) marcada(s) como estafa por fuentes externas',
     rowPoisoning: 'Campaña de envenenamiento de direcciones confirmada',
     rowUnicode: 'Suplantación de tokens Unicode detectada',
-    rowEtherscanTag: 'Etiqueta Etherscan Fake_Phishing en el grupo',
+    rowEtherscanTag: 'Verificación independiente Etherscan (etiqueta Fake_Phishing)',
     rowSanctionsFloor: 'Marca de sanciones externa (piso de severidad)',
     rowBehavioralFloor: 'Piso de severidad por patrón conductual',
     rowCap: 'Puntuación limitada al máximo (100)',
@@ -1865,8 +1865,8 @@ const es: ReportTranslations = {
     courtCertifiedBold: 'Investigación Forense Certificada para Tribunales:',
     courtCertifiedText: 'Para testimonio en tribunales, metodología certificada o un rastreo ampliado de la contraparte, contacte a LedgerHound en contact@ledgerhound.vip para una investigación forense ampliada certificada.',
     assessmentLabel: {
-      HIGHER_THAN_AVERAGE: 'Superior al promedio — múltiples factores positivos presentes, pero la recuperación aún requiere acción legal sostenida',
-      MODERATE: 'Moderada — algunos factores positivos, recuperación posible con acción legal apropiada',
+      MODERATE: 'Moderada — múltiples factores positivos presentes, pero la recuperación aún requiere acción legal sostenida',
+      LOW_TO_MODERATE: 'Baja a moderada — algunos factores positivos, pero la recuperación requiere un esfuerzo legal sostenido y no está garantizada',
       LOW: 'Baja — la recuperación requiere un esfuerzo legal sostenido y puede tomar de 6 a 18 meses',
       VERY_LOW: 'Muy baja — la recuperación es improbable, pero la documentación permite reclamos legales/tributarios',
     },

@@ -659,7 +659,7 @@ export interface RecoveryAssessment {
   /** Human-readable label, e.g. "Low — recovery requires sustained legal effort..." */
   label: string;
   /** Bucket for UI coloring/sorting. */
-  tier: 'VERY_LOW' | 'LOW' | 'MODERATE' | 'HIGHER_THAN_AVERAGE';
+  tier: 'VERY_LOW' | 'LOW' | 'LOW_TO_MODERATE' | 'MODERATE';
   /** Mandatory legal disclaimer — must always be displayed alongside the score. */
   disclaimer: string;
   /** Factors that pushed score up/down — for transparency. */
@@ -667,6 +667,19 @@ export interface RecoveryAssessment {
     positive: string[];
     negative: string[];
   };
+}
+
+/**
+ * Phase 3.1 Stage 13 (P1-B): map a recovery score (hard-capped at 35) to its
+ * tier. Exported so smoke tests can verify the calibration directly. The top
+ * reachable tier is MODERATE — by design we never label recovery "higher than
+ * average". A borderline 16-30 score reads "low to moderate", not "moderate".
+ */
+export function recoveryTierForScore(score: number): RecoveryAssessment['tier'] {
+  if (score >= 31) return 'MODERATE';
+  if (score >= 16) return 'LOW_TO_MODERATE';
+  if (score >= 8) return 'LOW';
+  return 'VERY_LOW';
 }
 
 /**
@@ -1318,16 +1331,11 @@ export async function generateReport(
 
   recoveryScore = Math.max(2, Math.min(35, recoveryScore));
 
-  let recoveryTier: RecoveryAssessment['tier'];
-  if (recoveryScore >= 25) {
-    recoveryTier = 'HIGHER_THAN_AVERAGE';
-  } else if (recoveryScore >= 15) {
-    recoveryTier = 'MODERATE';
-  } else if (recoveryScore >= 8) {
-    recoveryTier = 'LOW';
-  } else {
-    recoveryTier = 'VERY_LOW';
-  }
+  // Phase 3.1 Stage 13 (P1-B): recalibrated bands so borderline scores read
+  // honestly. A 23% case (e.g. KYC entry + phishing-tagged counterparties) now
+  // lands in LOW_TO_MODERATE ("Baja a moderada"), not MODERATE. See
+  // recoveryTierForScore for the band definitions.
+  const recoveryTier = recoveryTierForScore(recoveryScore);
   const recoveryLabel = tReport.recovery.assessmentLabel[recoveryTier];
 
   const recoveryAssessment: RecoveryAssessment = {
