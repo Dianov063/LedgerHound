@@ -75,7 +75,6 @@ export interface ReportTranslations {
     // Phase 3.1 Stage 12 (P0-1): factor rows that mirror the live formula.
     rowScamEntity: string;
     rowHighOutflow: string;
-    rowVictimEntry: string;
     rowLowActivity: string;
     rowPhishingTag: string;
     rowFederationScam: string;
@@ -289,6 +288,7 @@ export interface Transactions {
   colToken: string;
   spoofFootnote: string;
   spamFilteredNote: (n: number) => string;
+  truncationNote: (shown: number, total: number) => string;
 }
 
 /** Recovery Assessment + Legal Recommendations (pages 15-16). */
@@ -771,7 +771,6 @@ const en: ReportTranslations = {
     rowScamDb: 'LedgerHound Scam Database match',
     rowScamEntity: 'Scam-flagged counterparty entity',
     rowHighOutflow: 'High native outflow with no exchange',
-    rowVictimEntry: "Exchange is the victim's entry, not the scammer's exit — cancels recovery aid (victim profile)",
     rowLowActivity: 'Very low transaction count',
     rowPhishingTag: 'Wallet(s) tagged by internal/community sources (phishing)',
     rowFederationScam: 'External scam-flagged counterparty(ies)',
@@ -1341,6 +1340,7 @@ const en: ReportTranslations = {
     colToken: 'Token',
     spoofFootnote: '⚠ Highlighted rows are Unicode-spoof tokens (fake symbols mimicking real currencies) — see Attack Technique Analysis.',
     spamFilteredNote: (n) => `Showing legitimate transfers only. ${n} spam/airdrop token transfers were filtered from this analysis.`,
+    truncationNote: (shown, total) => `Showing ${shown} representative transfers (up to 3 per asset) of ${total} total. The full transaction history is available on-chain (e.g. Etherscan).`,
   },
   countryGuidance: {
     peru: {
@@ -1421,7 +1421,6 @@ const es: ReportTranslations = {
     rowScamDb: 'Coincidencia en la Base de Datos de Estafas de LedgerHound',
     rowScamEntity: 'Contraparte marcada como estafa',
     rowHighOutflow: 'Alta salida de moneda nativa sin exchange',
-    rowVictimEntry: 'El exchange es la entrada de la víctima, no la salida del estafador — anula la ayuda a la recuperación (perfil de víctima)',
     rowLowActivity: 'Número de transacciones muy bajo',
     rowPhishingTag: 'Wallet(s) marcada(s) por fuentes internas/comunitarias (phishing)',
     rowFederationScam: 'Contraparte(s) marcada(s) como estafa por fuentes externas',
@@ -1991,6 +1990,7 @@ const es: ReportTranslations = {
     colToken: 'Token',
     spoofFootnote: '⚠ Las filas resaltadas son tokens de suplantación Unicode (símbolos falsos que imitan monedas reales) — ver Análisis de Técnicas de Ataque.',
     spamFilteredNote: (n) => `Mostrando solo transferencias legítimas. ${n} transferencias de tokens de spam/airdrop fueron filtradas de este análisis.`,
+    truncationNote: (shown, total) => `Se muestran ${shown} transferencias representativas (hasta 3 por activo) de ${total} en total. El historial completo está disponible en la cadena (p. ej., Etherscan).`,
   },
   countryGuidance: {
     peru: {

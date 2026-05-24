@@ -566,6 +566,12 @@ export interface ReportData {
     /** The legitimate ticker the spoof mimics (e.g. 'USDT'). */
     spoofTarget?: string;
   }[];
+  /**
+   * Phase 3.1 Stage 14 (P1-A): true total transfer count (all directions, all
+   * assets) before the per-asset display cap. Drives the locale-aware
+   * truncation footnote. Optional for back-compat with hand-built mocks.
+   */
+  transactionsTotalCount?: number;
   graphData: GraphData | null;
   riskBreakdown: RiskBreakdown;
   timeline: TimelineEvent[];
@@ -680,6 +686,24 @@ export function recoveryTierForScore(score: number): RecoveryAssessment['tier'] 
   if (score >= 16) return 'LOW_TO_MODERATE';
   if (score >= 8) return 'LOW';
   return 'VERY_LOW';
+}
+
+/**
+ * Phase 3.1 Stage 14: a wallet is a "victim entry" when funds were FUNDED via an
+ * exchange the victim controls (their own KYC entry) but no scammer KYC cash-out
+ * EXIT was detected, in a case that otherwise carries scam evidence. For such
+ * wallets the −10 "KYC interaction aids recovery" tie-breaker does not apply
+ * (the exchange is the victim's, not a recovery-relevant scammer exit), so we
+ * omit the KYC factor entirely rather than applying −10 and then a contradictory
+ * +10 cancellation row. Exported for direct unit testing of the gate.
+ */
+export function isVictimEntryCase(opts: {
+  ofac: boolean;
+  hasExchange: boolean;
+  hasKycExit: boolean;
+  hasScamEvidence: boolean;
+}): boolean {
+  return !opts.ofac && opts.hasExchange && !opts.hasKycExit && opts.hasScamEvidence;
 }
 
 /**
@@ -1244,6 +1268,19 @@ export async function generateReport(
     r.labels.some(l => l.source === 'ofac' && l.category === 'sanctions')
   );
 
+  // Phase 3.1 Stage 14: decide victim-entry UP FRONT (exit analysis + scam
+  // evidence) so the KYC factor can be omitted entirely for victim-profile
+  // cases. This replaces the old "−10 then +10 cancellation" pair, which read as
+  // a self-contradicting breakdown ("aids recovery" / "cancels recovery aid").
+  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
+  const caseHasScamEvidence = addressPoisoning.detected || unicodeSpoofing.detected || hasScam || scamDbMatches.length > 0;
+  const isVictimEntry = isVictimEntryCase({
+    ofac: ofacWarning || externalOfacFound,
+    hasExchange,
+    hasKycExit: exitPointAnalysis.hasKycExit,
+    hasScamEvidence: caseHasScamEvidence,
+  });
+
   if (ofacWarning || externalOfacFound) {
     // OFAC = instant CRITICAL (whether from local KNOWN_ENTITIES or external OFAC list)
     setRisk(RBL.rowOfac, 95);
@@ -1253,9 +1290,10 @@ export async function generateReport(
     if (scamDbMatches.length > 0) addRisk(RBL.rowScamDb, 20); // Scam DB match
     if (!hasExchange && ethSent > 10) addRisk(RBL.rowHighOutflow, 10);
     // 2026-05-20: CEX interaction does NOT lower risk by itself — victims
-    // interact with CEX too. Small tie-breaker (Stage 11.1 may undo it below
-    // for a victim's own KYC entry).
-    if (hasExchange) addRisk(RBL.rowKycExchange, -10);
+    // interact with CEX too. Small tie-breaker. Stage 14: omitted entirely for a
+    // victim's own KYC entry (see isVictimEntry above) so the breakdown never
+    // shows an "aids recovery" row alongside a "cancels recovery aid" row.
+    if (hasExchange && !isVictimEntry) addRisk(RBL.rowKycExchange, -10);
     if (outgoing.length + incoming.length < 5) addRisk(RBL.rowLowActivity, -15);
 
     // Phishing-tagged counterparty — local (KNOWN_PHISHING) + federation.
@@ -1367,18 +1405,8 @@ export async function generateReport(
   }
   const timeline = generateTimeline(incoming, outgoing, identifiedEntities, nativeCurrency, tReport.timeline, clusterRoles);
 
-  const exitPointAnalysis = analyzeExitPoints(outgoing, identifiedEntities, nativeCurrency, tReport.entityId);
-
-  // Phase 3.1 Stage 11.1: the baseline applies −10 for any exchange interaction,
-  // but a VICTIM's own KYC entry exchange (no scammer KYC exit detected) does not
-  // reduce case risk — only a scammer cash-out exit would. Undo the −10 in that
-  // case (net 0). Guarded on scam evidence so clean wallets keep the tie-breaker.
-  // Applied BEFORE the behavioral floor so it can't push a victim past the band.
-  // Skipped under OFAC (no −10 was applied there).
-  const caseHasScamEvidence = addressPoisoning.detected || unicodeSpoofing.detected || hasScam || scamDbMatches.length > 0;
-  if (!(ofacWarning || externalOfacFound) && hasExchange && !exitPointAnalysis.hasKycExit && caseHasScamEvidence) {
-    addRisk(RBL.rowVictimEntry, 10);
-  }
+  // exitPointAnalysis + caseHasScamEvidence are computed up front (see the risk
+  // block above) so the victim-entry KYC decision could gate the −10 factor.
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore, tReport.recovery);
 
@@ -1601,17 +1629,16 @@ export async function generateReport(
     return b.value - a.value; // higher value first within same priority
   });
 
-  // Deduplicate by TOKEN (max 3 rows per token symbol, then summary)
-  const tokenCounts = new Map<string, { shown: number; total: number; totalValue: number }>();
-  // Pre-count totals per token
-  for (const tx of rawTxs) {
-    const key = tx.token.toUpperCase();
-    const existing = tokenCounts.get(key) || { shown: 0, total: 0, totalValue: 0 };
-    existing.total++;
-    existing.totalValue += tx.value;
-    tokenCounts.set(key, existing);
-  }
-
+  // Phase 3.1 Stage 14 (P1-A): show up to 3 representative transfers per asset
+  // (already sorted above), capped at 50 rows. We deliberately DO NOT emit
+  // per-token "summary" rows anymore. The old summary row set value to the
+  // sum of face values for the token KEY — which ignored direction (an
+  // OUT-labelled row combined real USDT in AND out) and re-counted the rows
+  // already shown, producing a misleading mixed-unit aggregate (e.g.
+  // "OUT 117,476.11"). It also hardcoded the English word "more" in a Spanish
+  // report. The true total is surfaced via a locale-aware footnote instead
+  // (see transactionsTotalCount / transactions.truncationNote).
+  const transactionsTotalCount = rawTxs.length;
   const allTxs: TxRow[] = [];
   const tokenShown = new Map<string, number>();
   for (const tx of rawTxs) {
@@ -1620,21 +1647,6 @@ export async function generateReport(
     if (shown < 3) {
       allTxs.push(tx);
       tokenShown.set(key, shown + 1);
-    } else if (shown === 3) {
-      // Add summary row
-      const stats = tokenCounts.get(key)!;
-      const remaining = stats.total - 3;
-      if (remaining > 0) {
-        allTxs.push({
-          date: '',
-          direction: tx.direction,
-          from: '—',
-          to: '—',
-          value: stats.totalValue,
-          token: `+${remaining} more ${tx.token}`,
-        });
-      }
-      tokenShown.set(key, shown + 1); // prevent duplicate summary
     }
     if (allTxs.length >= 50) break;
   }
@@ -2064,6 +2076,7 @@ export async function generateReport(
     keyFindings,
     recommendations,
     transactions: allTxs,
+    transactionsTotalCount,
     graphData: buildGraphData({
       walletAddress: address,
       transactions: allTxs,

@@ -13,7 +13,7 @@ import React from 'react';
 import { ReportDocument } from '../lib/reportPdf';
 import { getReportTranslations } from '../lib/report-i18n';
 import type { ReportData } from '../lib/generateReport';
-import { recoveryTierForScore } from '../lib/generateReport';
+import { recoveryTierForScore, isVictimEntryCase } from '../lib/generateReport';
 import { detectAddressPoisoning } from '../lib/address-poisoning';
 import { detectUnicodeSpoofing } from '../lib/unicode-spoofing';
 
@@ -53,6 +53,7 @@ const mock: ReportData = {
     { date: '2026-03-07', direction: 'OUT', from: SUBJECT, to: SPOOF_MIS, value: 11020.5, token: 'USDT' },
     { date: '2026-04-01', direction: 'IN', from: REAL, to: SUBJECT, value: 22187.44, token: 'USDT' },
   ],
+  transactionsTotalCount: 44, // > 2 shown → exercises the Stage 14 truncation footnote
   // Phase 3.1 Stage 10: graph with one REAL edge + one SPOOF edge to exercise
   // the de-emphasized (grey/dashed) spoof rendering + "no value" label/legend.
   graphData: {
@@ -68,13 +69,13 @@ const mock: ReportData = {
     ],
   } as any,
   // Phase 3.1 Stage 12 (P0-1): array of factor rows; baseline(50) + sum === riskScore(80).
+  // Stage 14: victim-entry case omits the KYC factor entirely (no −10 tie-breaker,
+  // no +10 cancellation) — the four remaining rows still sum to +30 → 80.
   riskBreakdown: [
-    { label: 'Interacción con exchange KYC (ayuda a la recuperación)', value: -10 },
     { label: 'Wallet(s) marcada(s) por fuentes internas/comunitarias (phishing)', value: 10 },
     { label: 'Campaña de envenenamiento de direcciones confirmada', value: 10 },
     { label: 'Suplantación de tokens Unicode detectada', value: 5 },
     { label: 'Verificación independiente Etherscan (etiqueta Fake_Phishing)', value: 5 },
-    { label: 'El exchange es la entrada de la víctima, no la salida del estafador — anula la ayuda a la recuperación (perfil de víctima)', value: 10 },
   ] as any,
   timeline: [
     { date: '2026-02-25', type: 'FIRST_ACTIVITY', description: 'First activity', highlight: false } as any,
@@ -246,9 +247,23 @@ ok(joined.includes('Grupo de Contraparte (rastreo ampliado pendiente)'), 'P0-2: 
 ok(joined.includes('fuentes internas/comunitarias'), 'B-A: phishing row attributes to internal/community sources');
 ok(joined.includes('Verificación independiente Etherscan'), 'B-A: Etherscan row framed as independent verification');
 ok(!joined.includes('Etiqueta Etherscan Fake_Phishing en el grupo'), 'B-A: old ambiguous Etherscan label removed');
-// B-B: victim-entry row reframed (no "KYC entry adds risk" reading).
-ok(joined.includes('perfil de víctima') && joined.includes('anula la ayuda a la recuperación'), 'B-B: victim-entry row reframed as recovery-aid cancellation');
+// B-B / Stage 14: victim-entry case omits the KYC factor entirely — no
+// self-contradicting "aids recovery" (−10) alongside "cancels recovery aid" (+10).
 ok(!joined.includes('Entrada KYC propia de la víctima'), 'B-B: old "Entrada KYC propia de la víctima" label removed');
+ok(!joined.includes('anula la ayuda a la recuperación'), 'S14: no contradictory "cancels recovery aid" row');
+ok(!joined.includes('Interacción con exchange KYC (ayuda a la recuperación)'), 'S14: no KYC "aids recovery" row in victim-entry breakdown');
+// S14: gate is unit-tested directly — victim entry omits KYC, others keep it.
+ok(isVictimEntryCase({ ofac: false, hasExchange: true, hasKycExit: false, hasScamEvidence: true }) === true, 'S14: victim entry (CEX-funded, no scammer exit, scam evidence) -> omit KYC');
+ok(isVictimEntryCase({ ofac: false, hasExchange: true, hasKycExit: true, hasScamEvidence: true }) === false, 'S14: scammer KYC exit detected -> KYC discount applies');
+ok(isVictimEntryCase({ ofac: false, hasExchange: true, hasKycExit: false, hasScamEvidence: false }) === false, 'S14: clean wallet (no scam evidence) -> KYC discount applies');
+ok(isVictimEntryCase({ ofac: true, hasExchange: true, hasKycExit: false, hasScamEvidence: true }) === false, 'S14: OFAC case -> never treated as victim entry');
+// P1-A (confirmed real): Transaction History no longer emits mixed-unit "+N more"
+// summary rows; a locale-aware truncation footnote surfaces the true total instead.
+const joinedNoMarks = joined.split(String.fromCharCode(1)).join(''); // strip @react-pdf U+0001 word-break markers
+ok(!/\+\d+\s*mor/i.test(joinedNoMarks), 'P1-A: no truncated English "+N mor…/more" summary label');
+ok(joined.includes('El historial completo está disponible en la cadena'), 'P1-A: locale-aware truncation footnote rendered (es)');
+ok(joined.includes('de 44 en total'), 'P1-A: footnote reports true total (44), not a mixed-unit sum');
+ok(getReportTranslations('en').transactions.truncationNote(3, 44).includes('of 44 total'), 'P1-A: EN truncation footnote available');
 // P1-B: recovery tier calibration — 23 reads "Baja a moderada", cap reads "Moderada".
 ok(recoveryTierForScore(23) === 'LOW_TO_MODERATE', 'P1-B: score 23 -> LOW_TO_MODERATE');
 ok(recoveryTierForScore(35) === 'MODERATE', 'P1-B: capped score 35 -> MODERATE (top reachable tier)');

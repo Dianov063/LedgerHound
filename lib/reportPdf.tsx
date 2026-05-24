@@ -2004,6 +2004,14 @@ const TransactionsPage = ({ data, t }: { data: ReportData; t: ReportTranslations
       </Text>
     )}
 
+    {/* Phase 3.1 Stage 14 (P1-A): locale-aware truncation note replaces the old
+        mixed-unit "+N more" summary rows. */}
+    {(data.transactionsTotalCount ?? data.transactions.length) > data.transactions.length && (
+      <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 6 }}>
+        {tr.truncationNote(data.transactions.length, data.transactionsTotalCount!)}
+      </Text>
+    )}
+
     <Footer data={data} t={t} />
   </Page>
   );
