@@ -13,7 +13,7 @@ import React from 'react';
 import { ReportDocument } from '../lib/reportPdf';
 import { getReportTranslations } from '../lib/report-i18n';
 import type { ReportData } from '../lib/generateReport';
-import { recoveryTierForScore, isVictimEntryCase } from '../lib/generateReport';
+import { recoveryTierForScore, isVictimEntryCase, shortCollisionAddr } from '../lib/generateReport';
 import { detectAddressPoisoning } from '../lib/address-poisoning';
 import { detectUnicodeSpoofing } from '../lib/unicode-spoofing';
 
@@ -42,7 +42,10 @@ const mock: ReportData = {
   totalReceived: 50, totalSent: 49, netBalance: 1, ethReceived: 50, ethSent: 49,
   transactionCount: 27, uniqueTokens: ['USDT', 'ETH'], spamFiltered: 1,
   firstActivity: '2026-02-01', lastActivity: '2026-04-05', inactiveDays: 46,
-  topCounterparties: [{ address: REAL, label: 'Unknown', count: 2, volume: 27187 }],
+  topCounterparties: [
+    { address: REAL, label: 'Unknown', count: 2, volume: 53227.81, direction: 'OUT' },
+    { address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', count: 9, volume: 11020.50, direction: 'IN' },
+  ] as any,
   counterpartyVolumeSymbol: 'USDT',
   identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: '' }],
   riskScore: 80, riskLabel: 'HIGH', // Elayne-representative (ALTA) after Stage 11.1 recalibration
@@ -77,9 +80,12 @@ const mock: ReportData = {
     { label: 'Suplantación de tokens Unicode detectada', value: 5 },
     { label: 'Verificación independiente Etherscan (etiqueta Fake_Phishing)', value: 5 },
   ] as any,
+  // Stage 15 (P0-1): collector + spoof same-day same-amount pair to exercise the
+  // poisoning-collision note + prefix…suffix address format.
   timeline: [
     { date: '2026-02-25', type: 'FIRST_ACTIVITY', description: 'First activity', highlight: false } as any,
-    { date: '2026-03-07', type: 'MAJOR_OUTFLOW', description: 'Sent 11020 USDT', highlight: true } as any,
+    { date: '2026-03-07', type: 'MAJOR_OUTFLOW', description: 'Enviado 11,020.50 USDT al RECOLECTOR PRINCIPAL → 0x073a4abb…609f', highlight: true, counterparty: REAL, clusterRole: 'collector' } as any,
+    { date: '2026-03-07', type: 'MAJOR_OUTFLOW', description: 'Enviado 11,020.50 USDT a una DIRECCIÓN DE SUPLANTACIÓN → 0x073a4e18…609f', highlight: true, counterparty: SPOOF_MIS, clusterRole: 'spoof' } as any,
     { date: '2026-04-05', type: 'LAST_ACTIVITY', description: 'Last activity', highlight: false } as any,
   ],
   // Elayne-representative: victim funded via KYC exchange, but NO scammer KYC exit.
@@ -221,7 +227,7 @@ ok(!joined.includes('grupo de fraude controla los fondos'), 'A3: no "grupo de fr
 ok(!joined.includes('bloqueo y la incautación'), 'A3: no "bloqueo y la incautación"');
 ok(!joined.includes('servicio forense completo'), 'A3: no "servicio forense completo"');
 ok(es6.investigation.exitNotDetected.includes('consistente con control coordinado'), 'A3: exit-not-detected softened');
-ok(!es6.investigation.roleReasoning.victimForwarded(4).includes('controladas por el estafador'), 'A3: victimForwarded no "controladas por el estafador"');
+ok(!es6.investigation.roleReasoning.victimForwarded(4, 0).includes('controladas por el estafador'), 'A3: victimForwarded no "controladas por el estafador"');
 ok(es6.recovery.courtCertifiedText.includes('investigación forense ampliada certificada'), 'A3: court-certified wording softened');
 // A4: counterparty volume column uses the dominant asset (USDT here), not ETH.
 ok(joined.includes('Volumen (USDT)'), 'A4: counterparty volume column labeled USDT');
@@ -264,6 +270,23 @@ ok(!/\+\d+\s*mor/i.test(joinedNoMarks), 'P1-A: no truncated English "+N mor…/m
 ok(joined.includes('El historial completo está disponible en la cadena'), 'P1-A: locale-aware truncation footnote rendered (es)');
 ok(joined.includes('de 44 en total'), 'P1-A: footnote reports true total (44), not a mixed-unit sum');
 ok(getReportTranslations('en').transactions.truncationNote(3, 44).includes('of 44 total'), 'P1-A: EN truncation footnote available');
+// Stage 15 P0-1: timeline poisoning-collision note + prefix…suffix address format.
+ok(shortCollisionAddr('0x073a4abbf262d8f946866f3ce62660ee7cf4609f') === '0x073a4abb…609f', 'S15 P0-1: collision address format (collector) shows prefix…suffix');
+ok(shortCollisionAddr('0x073a4e18d36d6158475358eed4796235d84d609f') === '0x073a4e18…609f', 'S15 P0-1: collision address format (spoof) shows prefix…suffix');
+ok(joined.includes('la firma del ataque de envenenamiento'), 'S15 P0-1: collision note rendered when collector + spoof both present (es)');
+ok(joined.includes('no se cuenta dos veces'), 'S15 P0-1: collision note states the misdirection is not double-counted');
+ok(joinedNoMarks.includes('0x073a4abb…609f') && joinedNoMarks.includes('0x073a4e18…609f'), 'S15 P0-1: both collision addresses visible in prefix…suffix form');
+// Stage 15 P0-2: forwarding-recipient count split (real vs spoof-only), edge cases.
+const vf = es6.investigation.roleReasoning.victimForwarded;
+ok(vf(2, 2).includes('con valor económico real') && vf(2, 2).includes('solo recibieron tokens falsificados sin valor'), 'S15 P0-2: split phrasing (2 real + 2 spoof-only)');
+ok(!vf(2, 0).includes('tokens falsificados') && vf(2, 0).includes('2 dirección(es) desconocida(s) con valor económico real'), 'S15 P0-2: spoofOnly===0 omits parenthetical');
+ok(vf(0, 3).includes('únicamente tokens falsificados'), 'S15 P0-2: realCount===0 rewrites primary clause');
+// Stage 15 P1-1: every forwarding-pct on the investigation side is labeled by basis.
+ok(es6.investigation.roleReasoning.victimRapidForward(98).includes('(por volumen)'), 'S15 P1-1: victimRapidForward labeled "(por volumen)"');
+ok(es6.investigation.roleReasoning.transitForwarded(70).includes('(por volumen)'), 'S15 P1-1: transitForwarded labeled "(por volumen)"');
+ok(getReportTranslations('en').investigation.roleReasoning.victimRapidForward(98).includes('(by volume)'), 'S15 P1-1: EN victimRapidForward labeled "(by volume)"');
+// Stage 15 P1-2: counterparty direction tag + legend.
+ok(joined.includes('fondos recibidos por la wallet analizada') && joined.includes('fondos enviados por la wallet analizada'), 'S15 P1-2: IN/OUT direction legend rendered (es)');
 // P1-B: recovery tier calibration — 23 reads "Baja a moderada", cap reads "Moderada".
 ok(recoveryTierForScore(23) === 'LOW_TO_MODERATE', 'P1-B: score 23 -> LOW_TO_MODERATE');
 ok(recoveryTierForScore(35) === 'MODERATE', 'P1-B: capped score 35 -> MODERATE (top reachable tier)');

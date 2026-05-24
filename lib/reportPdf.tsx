@@ -941,6 +941,14 @@ const AssetTimelinePage = ({ data, t }: { data: ReportData; t: ReportTranslation
             });
           })()}
 
+          {/* Phase 3.1 Stage 15 (P0-1): explain the look-alike collision when the
+              timeline contains both a collector send and a spoof misdirection. */}
+          {timeline.some(e => e.clusterRole === 'collector') && timeline.some(e => e.clusterRole === 'spoof') && (
+            <View style={{ backgroundColor: '#fffbeb', borderRadius: 4, padding: 8, marginTop: 8, borderLeftWidth: 3, borderLeftColor: amber }}>
+              <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>{tl.poisoningCollisionNote}</Text>
+            </View>
+          )}
+
           {/* Active period */}
           {data.firstActivity !== 'N/A' && data.lastActivity !== 'N/A' && (
             <View style={{ backgroundColor: '#f1f5f9', borderRadius: 4, padding: 8, marginTop: 8 }}>
@@ -1199,10 +1207,17 @@ const AnalyticsPage = ({ data, t }: { data: ReportData; t: ReportTranslations })
           <Text style={{ ...s.td, ...s.mono, width: '40%' }}>{shortAddr(cp.address)}</Text>
           <Text style={{ ...s.td, width: '20%' }}>{cp.label}</Text>
           <Text style={{ ...s.td, width: '20%' }}>{cp.count}</Text>
-          <Text style={{ ...s.td, width: '20%' }}>{fmtEth(cp.volume)}</Text>
+          <Text style={{ ...s.td, width: '20%' }}>
+            {fmtEth(cp.volume)}
+            {cp.direction ? <Text style={{ color: cp.direction === 'IN' ? green : red, fontFamily: 'Helvetica-Bold' }}>{`  ${cp.direction}`}</Text> : null}
+          </Text>
         </View>
       ))}
     </View>
+    {/* Phase 3.1 Stage 15 (P1-2): direction legend so a CEX deposit isn't read as an outflow. */}
+    {data.topCounterparties.some(cp => cp.direction) && (
+      <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 4 }}>{an.directionLegend}</Text>
+    )}
 
     <Footer data={data} t={t} />
   </Page>

@@ -455,6 +455,10 @@ export interface TimelineEvent {
   /** Counterparty address (Phase 2.5 Fix 3) — lets the PDF flag misdirection
    *  events (OUT to a secondary spoof) distinctly from legitimate sends. */
   counterparty?: string;
+  /** Phase 3.1 Stage 15 (P0-1): fraud-cluster role of the destination, so the
+   *  PDF can render the address-poisoning collision note when the timeline
+   *  contains BOTH a main-collector send and a spoof misdirection. */
+  clusterRole?: 'collector' | 'spoof';
 }
 
 export interface ExitPoint {
@@ -526,7 +530,7 @@ export interface ReportData {
   firstActivity: string;
   lastActivity: string;
   inactiveDays: number;
-  topCounterparties: { address: string; label: string; count: number; volume: number }[];
+  topCounterparties: { address: string; label: string; count: number; volume: number; direction?: 'IN' | 'OUT' }[];
   /** Phase 3.1 Stage 11 (A4): asset symbol the counterparty volume is measured in. */
   counterpartyVolumeSymbol: string;
   /**
@@ -829,6 +833,17 @@ function classifyAssets(
   };
 }
 
+/**
+ * Phase 3.1 Stage 15 (P0-1): prefix…suffix address format so an
+ * address-poisoning vanity collision is visible to the reader
+ * (0x073a4abb…609f vs 0x073a4e18…609f — shared prefix/suffix, differing middle)
+ * instead of two identical-looking truncations. Exported for unit testing.
+ */
+export function shortCollisionAddr(addr: string): string {
+  if (!addr) return '—';
+  return addr.length > 14 ? `${addr.slice(0, 10)}…${addr.slice(-4)}` : addr;
+}
+
 function generateTimeline(
   incoming: (Transfer | UnifiedTransfer)[],
   outgoing: (Transfer | UnifiedTransfer)[],
@@ -886,15 +901,17 @@ function generateTimeline(
     const entityMatch = identifiedEntities.find(e => e.address === (tx.to || '').toLowerCase());
     const toLower = (tx.to || '').toLowerCase();
     const baseRecipient = entityMatch ? entityMatch.label : (tx.to || '').slice(0, 10) + '...';
-    const shortTo = (tx.to || '').slice(0, 10) + '...';
     const role = clusterRoles.get(toLower);
     const token = tx.asset || nativeCurrency;
+    // Phase 3.1 Stage 15 (P0-1): collector/spoof events show the prefix…suffix
+    // collision format so look-alike poisoning addresses are visibly distinct.
+    const collisionTo = shortCollisionAddr(tx.to || '');
     // Phase 3.1 Stage 9 (P2): role becomes prominent body text ("...al RECOLECTOR
     // PRINCIPAL -> 0x..."), not a trailing parenthetical, for visual scanning.
     const description = role === 'collector'
-      ? `${tl.sentToRole(fmtEth(val), token, tl.roleMainCollector)} → ${shortTo}`
+      ? `${tl.sentToRole(fmtEth(val), token, tl.roleMainCollector)} → ${collisionTo}`
       : role === 'spoof'
-        ? `${tl.sentToRole(fmtEth(val), token, tl.roleSpoofAddress)} → ${shortTo}`
+        ? `${tl.sentToRole(fmtEth(val), token, tl.roleSpoofAddress)} → ${collisionTo}`
         : tl.sent(fmtEth(val), token, baseRecipient);
     events.push({
       date: tx.metadata!.blockTimestamp!.split('T')[0],
@@ -902,6 +919,7 @@ function generateTimeline(
       description,
       highlight: true,
       counterparty: toLower,
+      clusterRole: role === 'collector' || role === 'spoof' ? role : undefined,
     });
   }
 
@@ -1096,7 +1114,7 @@ export async function generateReport(
   let ethReceived = 0;
   let ethSent = 0;
   const tokenSet = new Set<string>();
-  const counterpartyMap = new Map<string, { count: number; volume: number }>();
+  const counterpartyMap = new Map<string, { count: number; volume: number; volumeIn: number; volumeOut: number }>();
   const entityMap = new Map<string, { label: string; type: string; interactions: number; parentEntity?: string; complianceEmail?: string }>();
   const timestamps: number[] = [];
 
@@ -1123,11 +1141,15 @@ export async function generateReport(
   }
   const cpVolume = (tx: any) => ((tx.asset || nativeUpper).toUpperCase() === counterpartyVolumeSymbol ? safeValue(tx) : 0);
 
-  const processCounterparty = (addr: string, value: number) => {
+  // Phase 3.1 Stage 15 (P1-2): track in/out volume per counterparty so the PDF
+  // can label direction (e.g. a Binance deposit is INBOUND to the victim, not an
+  // outflow). dir = 'in' (counterparty → victim) or 'out' (victim → counterparty).
+  const processCounterparty = (addr: string, value: number, dir: 'in' | 'out') => {
     const lower = addr.toLowerCase();
-    const existing = counterpartyMap.get(lower) || { count: 0, volume: 0 };
+    const existing = counterpartyMap.get(lower) || { count: 0, volume: 0, volumeIn: 0, volumeOut: 0 };
     existing.count++;
     existing.volume += value;
+    if (dir === 'in') existing.volumeIn += value; else existing.volumeOut += value;
     counterpartyMap.set(lower, existing);
 
     const entity = KNOWN_ENTITIES[lower];
@@ -1149,7 +1171,7 @@ export async function generateReport(
     const val = safeValue(tx);
     if (isNativeLike(tx)) ethReceived += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.from) processCounterparty(tx.from, cpVolume(tx));
+    if (tx.from) processCounterparty(tx.from, cpVolume(tx), 'in');
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -1157,7 +1179,7 @@ export async function generateReport(
     const val = safeValue(tx);
     if (isNativeLike(tx)) ethSent += val;
     if (tx.asset) tokenSet.add(tx.asset);
-    if (tx.to) processCounterparty(tx.to, cpVolume(tx));
+    if (tx.to) processCounterparty(tx.to, cpVolume(tx), 'out');
     if (tx.metadata?.blockTimestamp) timestamps.push(new Date(tx.metadata.blockTimestamp).getTime());
   }
 
@@ -1173,7 +1195,10 @@ export async function generateReport(
     .slice(0, 5)
     .map(([addr, data]) => {
       const entity = KNOWN_ENTITIES[addr];
-      return { address: addr, label: entity?.label || 'Unknown', count: data.count, volume: data.volume };
+      // Dominant direction by volume: IN = counterparty funded the victim
+      // (e.g. a CEX deposit), OUT = victim sent to the counterparty.
+      const direction: 'IN' | 'OUT' = data.volumeIn >= data.volumeOut ? 'IN' : 'OUT';
+      return { address: addr, label: entity?.label || 'Unknown', count: data.count, volume: data.volume, direction };
     });
 
   // Identified entities
@@ -1657,6 +1682,23 @@ export async function generateReport(
   const uniqueSenders = new Set(incoming.map(tx => (tx.from || '').toLowerCase()).filter(Boolean)).size;
   const uniqueReceivers = new Set(outgoing.map(tx => (tx.to || '').toLowerCase()).filter(Boolean)).size;
 
+  // Phase 3.1 Stage 15 (P0-2): split forwarding recipients by economic value so
+  // the narrative never mixes real-value recipients with spoof-only ones (the
+  // last leak of the Phase 2.7 mixed-unit anti-pattern in the narrative layer).
+  // A recipient counts as "real" if it received any non-spam, non-spoof transfer
+  // with value > 0 (the misdirection spoof, which received REAL USDT, is real).
+  const realReceiverSet = new Set<string>();
+  const spoofReceiverSet = new Set<string>();
+  for (const tx of outgoing) {
+    const to = (tx.to || '').toLowerCase();
+    if (!to) continue;
+    const cls = classifyToken(tx);
+    if (!cls.isSpam && !cls.isSpoof && safeValue(tx) > 0) realReceiverSet.add(to);
+    else if (cls.isSpoof) spoofReceiverSet.add(to);
+  }
+  const realReceiverCount = realReceiverSet.size;
+  const spoofOnlyReceiverCount = Array.from(spoofReceiverSet).filter((a) => !realReceiverSet.has(a)).length;
+
   // Forwarding % — check how much of incoming value was sent out within 24h
   let forwardedWithin24h = 0;
   let totalInValue = 0;
@@ -1779,7 +1821,7 @@ export async function generateReport(
     walletRole = 'victim';
     roleConfidence = 0.85;
     roleReasoning.push(tInv.roleReasoning.victimKycEntry(cexInboundCount));
-    roleReasoning.push(tInv.roleReasoning.victimForwarded(uniqueReceivers));
+    roleReasoning.push(tInv.roleReasoning.victimForwarded(realReceiverCount, spoofOnlyReceiverCount));
     roleReasoning.push(tInv.roleReasoning.victimLimitedHistory(totalTxCount));
     if (forwardingPercent >= 80) {
       roleReasoning.push(tInv.roleReasoning.victimRapidForward(forwardingPercent));
@@ -1844,7 +1886,8 @@ export async function generateReport(
   let narrativeConclusion = '';
 
   if (walletRole === 'victim') {
-    narrativeSummary = tInv.narrative.summaryVictim(totalInDisplay, cexInboundCount, forwardingPercent, uniqueReceivers, totalOutDisplay, nativeDustSuffix);
+    // P0-2: use real-value recipient count (consistent with the "by volume" pct).
+    narrativeSummary = tInv.narrative.summaryVictim(totalInDisplay, cexInboundCount, forwardingPercent, realReceiverCount, totalOutDisplay, nativeDustSuffix);
     narrativeConclusion = tInv.narrative.conclusionVictim;
   } else if (walletRole === 'aggregator') {
     narrativeSummary = tInv.narrative.summaryAggregator(uniqueSenders, forwardingPercent, totalInDisplay, totalOutDisplay);

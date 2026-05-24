@@ -75,6 +75,9 @@ ok(!bin.includes('ce@binance.com'), 'binance: no longer points victims at ce@bin
 ok(teth.includes('DESPUÉS de presentar'), 'tether: direct-victim limitation note present');
 ok(teth.includes('0x9a0c5ce706b1b7242158065e4aef90750775cee5'), 'tether: full spoof contract address (not truncated)');
 ok(!teth.includes('0x9a0C...Cee5'), 'tether: truncated contract removed');
+// Stage 15 P1-3: count-agnostic wording for spoof addresses that received real funds.
+ok(teth.includes('recibieron fondos reales (una o más)'), 'tether: count-agnostic real-fund spoof wording (P1-3)');
+ok(!teth.includes('Suplantaciones secundarias adicionales'), 'tether: plural-implying "Suplantaciones secundarias adicionales" removed (P1-3)');
 // DIVINDAT: accurate Art. 196 / 196-A + contact block
 ok(divv.includes('Art. 196-A'), 'divindat: references Art. 196-A (estafa agravada)');
 ok(divv.includes('participación de dos o más personas'), 'divindat: accurate 196-A aggravator (2+ persons, NOT 20-UIT)');

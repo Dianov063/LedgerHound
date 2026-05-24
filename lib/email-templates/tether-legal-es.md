@@ -23,8 +23,7 @@ Soy víctima de fraude con criptomonedas que utilizó tokens USDT (stablecoin de
 ### Direcciones receptoras presuntamente controladas por los operadores del fraude (USDT real):
 
 - **Recolector principal:** [dirección] — recibió [monto] USDT
-- **Suplantación que recibió fondos reales:** [dirección] — recibió [monto] USDT
-- **Suplantaciones secundarias adicionales:** [direcciones]
+- **Dirección(es) de suplantación que recibieron fondos reales (una o más):** [direcciones] — [monto] USDT
 
 ### Tokens USDT-falsificados utilizados por los estafadores:
 

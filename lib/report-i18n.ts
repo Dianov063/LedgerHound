@@ -501,6 +501,9 @@ export interface Analytics {
   colEntity: string;
   colInteractions: string;
   colVolume: (sym: string) => string;
+  /** Phase 3.1 Stage 15 (P1-2): explains the IN/OUT direction tag on each
+   *  counterparty volume row (e.g. a CEX deposit is inbound, not an outflow). */
+  directionLegend: string;
   inactiveTitle: (n: number) => string;
   inactiveBody: (lastActivity: string) => string;
 }
@@ -543,6 +546,10 @@ export interface TimelineT {
   sentToRole: (amount: string, token: string, role: string) => string;
   roleMainCollector: string;
   roleSpoofAddress: string;
+  /** Phase 3.1 Stage 15 (P0-1): shown when the timeline has both a collector
+   *  send and a spoof misdirection — explains the look-alike collision is the
+   *  attack signature, not a duplicate, and isn't double-counted. */
+  poisoningCollisionNote: string;
   totalActivePeriod: (first: string, last: string) => string;
   inactiveSuffix: (n: number) => string;
   noTimeline: string;
@@ -661,7 +668,7 @@ export interface Investigation {
     knownExchange: (label: string) => string;
     knownInfra: (label: string) => string;
     victimKycEntry: (n: number) => string;
-    victimForwarded: (n: number) => string;
+    victimForwarded: (realCount: number, spoofOnlyCount: number) => string;
     victimLimitedHistory: (n: number) => string;
     victimRapidForward: (pct: number) => string;
     aggregatorSenders: (senders: number, receivers: number) => string;
@@ -905,12 +912,19 @@ const en: ReportTranslations = {
       knownExchange: (label) => `Subject wallet is a known ${label} address (KYC exchange)`,
       knownInfra: (label) => `Subject wallet is a known ${label} — analyzing as opaque infrastructure, not as victim/scammer`,
       victimKycEntry: (n) => `Received funds from ${n} KYC exchange deposit(s) — characteristic of a victim funding their own wallet`,
-      victimForwarded: (n) => `Forwarded funds to ${n} unknown address(es) — consistent with sending to wallets presumably controlled by the fraud operators`,
+      victimForwarded: (realCount, spoofOnlyCount) => {
+        const tail = ' — consistent with sending to wallets presumably controlled by the fraud operators';
+        if (realCount === 0) return `Sent only worthless spoof tokens to ${spoofOnlyCount} unknown address(es)${tail}`;
+        const base = `Forwarded funds to ${realCount} unknown address(es) with real economic value`;
+        return spoofOnlyCount > 0
+          ? `${base} (and to ${spoofOnlyCount} additional address(es) that received only worthless spoof tokens)${tail}`
+          : `${base}${tail}`;
+      },
       victimLimitedHistory: (n) => `Limited transaction history (${n} txs) — typical retail user profile`,
-      victimRapidForward: (pct) => `${pct}% of funds forwarded within 24h — rapid action under social engineering pressure`,
+      victimRapidForward: (pct) => `${pct}% of funds forwarded within 24h (by volume) — rapid action under social engineering pressure`,
       aggregatorSenders: (senders, receivers) => `${senders} unique senders aggregated into ${receivers} destination(s)`,
       aggregatorConsolidated: (exchange) => `Funds consolidated and forwarded to KYC exchange (${exchange}) — characteristic of a scam collection wallet`,
-      transitForwarded: (pct) => `${pct}% of funds forwarded within 24h`,
+      transitForwarded: (pct) => `${pct}% of funds forwarded within 24h (by volume)`,
       transitNoCex: 'No CEX deposits in incoming flow — pure on-chain routing pattern',
       transitSenders: (n) => `${n} unique senders feeding this wallet`,
       exchangeSingleRecipient: (exchange) => `Single recipient identified — a KYC exchange (${exchange})`,
@@ -1056,6 +1070,7 @@ const en: ReportTranslations = {
     sentToRole: (amount, token, role) => `Sent ${amount} ${token} ${role}`,
     roleMainCollector: 'to the MAIN COLLECTOR',
     roleSpoofAddress: 'to a SPOOF ADDRESS',
+    poisoningCollisionNote: 'Note: the main collector and the spoof address are distinct transactions to visually similar addresses (same prefix/suffix, different middle) — the signature of the address-poisoning attack. The misdirected amount is already included once in the total real USDT forwarded (it is not counted twice).',
     totalActivePeriod: (first, last) => `Total Active Period: ${first} to ${last}`,
     inactiveSuffix: (n) => ` (inactive for ${n} days)`,
     noTimeline: 'No timestamped transactions available for timeline construction.',
@@ -1126,6 +1141,7 @@ const en: ReportTranslations = {
     colEntity: 'Entity',
     colInteractions: 'Interactions',
     colVolume: (sym) => `Volume (${sym})`,
+    directionLegend: 'IN = funds received by the analyzed wallet (e.g. an exchange deposit); OUT = funds sent by the analyzed wallet.',
     inactiveTitle: (n) => `Wallet Inactive — ${n} Days`,
     inactiveBody: (lastActivity) => `Last activity: ${lastActivity}. Possible: key loss, cooling-off, or fund redistribution.`,
   },
@@ -1555,12 +1571,19 @@ const es: ReportTranslations = {
       knownExchange: (label) => `La wallet analizada es una dirección conocida de ${label} (exchange KYC)`,
       knownInfra: (label) => `La wallet analizada es un(a) ${label} conocido(a) — analizada como infraestructura opaca, no como víctima/estafador`,
       victimKycEntry: (n) => `Recibió fondos de ${n} depósito(s) de exchange KYC — característico de una víctima financiando su propia wallet`,
-      victimForwarded: (n) => `Reenvió fondos a ${n} dirección(es) desconocida(s) — consistente con envíos a wallets presuntamente controladas por los operadores del fraude`,
+      victimForwarded: (realCount, spoofOnlyCount) => {
+        const tail = ' — consistente con envíos a wallets presuntamente controladas por los operadores del fraude';
+        if (realCount === 0) return `Envió únicamente tokens falsificados sin valor a ${spoofOnlyCount} dirección(es) desconocida(s)${tail}`;
+        const base = `Reenvió fondos a ${realCount} dirección(es) desconocida(s) con valor económico real`;
+        return spoofOnlyCount > 0
+          ? `${base} (y a ${spoofOnlyCount} dirección(es) adicional(es) que solo recibieron tokens falsificados sin valor)${tail}`
+          : `${base}${tail}`;
+      },
       victimLimitedHistory: (n) => `Historial de transacciones limitado (${n} txs) — perfil típico de usuario minorista`,
-      victimRapidForward: (pct) => `${pct}% de los fondos reenviados en 24h — acción rápida bajo presión de ingeniería social`,
+      victimRapidForward: (pct) => `${pct}% de los fondos reenviados en 24h (por volumen) — acción rápida bajo presión de ingeniería social`,
       aggregatorSenders: (senders, receivers) => `${senders} remitentes únicos agregados en ${receivers} destino(s)`,
       aggregatorConsolidated: (exchange) => `Fondos consolidados y reenviados a un exchange KYC (${exchange}) — característico de una wallet de recolección de estafa`,
-      transitForwarded: (pct) => `${pct}% de los fondos reenviados en 24h`,
+      transitForwarded: (pct) => `${pct}% de los fondos reenviados en 24h (por volumen)`,
       transitNoCex: 'Sin depósitos de exchange en el flujo entrante — patrón de enrutamiento puramente on-chain',
       transitSenders: (n) => `${n} remitentes únicos alimentando esta wallet`,
       exchangeSingleRecipient: (exchange) => `Un único receptor identificado — un exchange KYC (${exchange})`,
@@ -1706,6 +1729,7 @@ const es: ReportTranslations = {
     sentToRole: (amount, token, role) => `Enviado ${amount} ${token} ${role}`,
     roleMainCollector: 'al RECOLECTOR PRINCIPAL',
     roleSpoofAddress: 'a una DIRECCIÓN DE SUPLANTACIÓN',
+    poisoningCollisionNote: 'Nota: el recolector principal y la dirección de suplantación son transacciones distintas a direcciones visualmente similares (mismo prefijo/sufijo, distinto el centro) — la firma del ataque de envenenamiento de direcciones. El monto desviado ya está incluido una sola vez en el total de USDT real reenviado (no se cuenta dos veces).',
     totalActivePeriod: (first, last) => `Período Activo Total: ${first} a ${last}`,
     inactiveSuffix: (n) => ` (inactiva por ${n} días)`,
     noTimeline: 'No hay transacciones con marca de tiempo disponibles para construir la cronología.',
@@ -1776,6 +1800,7 @@ const es: ReportTranslations = {
     colEntity: 'Entidad',
     colInteractions: 'Interacciones',
     colVolume: (sym) => `Volumen (${sym})`,
+    directionLegend: 'IN = fondos recibidos por la wallet analizada (p. ej., un depósito de exchange); OUT = fondos enviados por la wallet analizada.',
     inactiveTitle: (n) => `Wallet Inactiva — ${n} Días`,
     inactiveBody: (lastActivity) => `Última actividad: ${lastActivity}. Posible: pérdida de claves, período de espera o redistribución de fondos.`,
   },
