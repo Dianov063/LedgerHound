@@ -80,8 +80,9 @@ ok(divv.includes('Art. 196-A'), 'divindat: references Art. 196-A (estafa agravad
 ok(divv.includes('participación de dos o más personas'), 'divindat: accurate 196-A aggravator (2+ persons, NOT 20-UIT)');
 ok(!divv.includes('20 UIT'), 'divindat: no incorrect "20 UIT" basis');
 ok(divv.includes('(01) 431-8898') && divv.includes('divindat.pnp@gmail.com'), 'divindat: contact block (phone + email)');
-// SHA256 references point to the email integrity section
-ok([bin, teth, divv].every((b) => b.includes('Verificación de Integridad')), 'all 3: SHA256 references the email integrity section');
+// SHA256 references the PDF integrity section (primary) + email (backup) — Stage 11.2.
+ok([bin, teth, divv].every((b) => b.includes('Verificación de Integridad')), 'all 3: SHA256 references the integrity section');
+ok([bin, teth, divv].every((b) => b.includes('informe forense PDF')), 'all 3: SHA256 points to the PDF (primary) + email (backup)');
 
 /* ── 2e. Stage 9 P3: anti-bait guard-rails (real vs spoof) in Binance + Tether ── */
 console.log('\n[2e] Stage 9 P3 — anti-bait guard-rails');

@@ -2134,17 +2134,21 @@ export async function generateReport(
     exchangeAnalysis,
   };
 
-  // Generate PDF
-  const doc = React.createElement(ReportDocument, { data: reportData, locale: reportLocale, country: reportCountry }) as any;
-  const pdfBuffer = await renderToBuffer(doc);
-  const buf = Buffer.from(pdfBuffer);
-
-  // Phase 3.1 Stage 6 (T7): tamper-evidence hash of the final PDF, surfaced in
-  // the delivery email so it can be cited as chain-of-custody (a self-embedded
-  // hash is impossible — embedding it would change the bytes it hashes).
+  // Generate PDF — Phase 3.1 Stage 11.2 (B1): two-pass so the report can carry
+  // its own SHA-256 (a self-embedded hash is otherwise impossible — printing it
+  // changes the bytes it hashes). Pass 1 renders WITHOUT the hash; we hash that
+  // content; pass 2 re-renders with the hash printed on the disclaimer page. The
+  // printed/emailed value is the pass-1 (hashless-content) hash, documented as
+  // "computed over report content excluding this verification field" — so the
+  // PDF footer, email, and templates all cite the SAME canonical hash.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfSha256 = require('crypto').createHash('sha256').update(buf).digest('hex');
-  logger.info({ caseId, pdfSha256 }, '[generateReport] PDF SHA256 computed');
+  const crypto = require('crypto');
+  const doc1 = React.createElement(ReportDocument, { data: reportData, locale: reportLocale, country: reportCountry }) as any;
+  const buf1 = Buffer.from(await renderToBuffer(doc1));
+  const pdfSha256 = crypto.createHash('sha256').update(buf1).digest('hex');
+  const doc2 = React.createElement(ReportDocument, { data: reportData, locale: reportLocale, country: reportCountry, reportHash: pdfSha256 }) as any;
+  const buf = Buffer.from(await renderToBuffer(doc2));
+  logger.info({ caseId, pdfSha256 }, '[generateReport] PDF SHA256 computed (two-pass, embedded)');
 
   // Upload to S3 and get presigned download URL
   let downloadUrl = '';

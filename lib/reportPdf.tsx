@@ -2382,7 +2382,7 @@ const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslati
 /* ═══════════════════════════════════════════════════════════════
    PAGE 12/13: DISCLAIMER
    ═══════════════════════════════════════════════════════════════ */
-const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+const DisclaimerPage = ({ data, t, reportHash }: { data: ReportData; t: ReportTranslations; reportHash?: string }) => {
   const d = t.disclaimer;
   return (
   <Page size="A4" style={s.page}>
@@ -2408,6 +2408,16 @@ const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }
       {d.para6}
     </Text>
 
+    {/* Phase 3.1 Stage 11.2 (B1): SHA-256 integrity block (two-pass; hash of the
+        hashless render, identical to the value cited in the email + templates). */}
+    {reportHash ? (
+      <View style={{ ...s.card, marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 2 }}>{d.integrityTitle}</Text>
+        <Text style={{ ...s.mono, fontSize: 7, color: slate900, marginBottom: 2 }}>SHA-256: {reportHash}</Text>
+        <Text style={{ fontSize: 6.5, color: slate600, lineHeight: 1.4 }}>{d.integrityNote}</Text>
+      </View>
+    ) : null}
+
     <View style={s.sectionDivider} />
 
     <View style={{ alignItems: 'center', marginTop: 20 }}>
@@ -2426,7 +2436,7 @@ const DisclaimerPage = ({ data, t }: { data: ReportData; t: ReportTranslations }
 /* ═══════════════════════════════════════════════════════════════
    DOCUMENT
    ═══════════════════════════════════════════════════════════════ */
-export const ReportDocument = ({ data, locale, country }: { data: ReportData; locale?: ReportLocale | string; country?: string }) => {
+export const ReportDocument = ({ data, locale, country, reportHash }: { data: ReportData; locale?: ReportLocale | string; country?: string; reportHash?: string }) => {
   const hasCrossChain = data.crossChainTrace?.detected === true;
   // 2026-05-20 Phase 1: only render the new federation page when at least
   // one counterparty was analyzed. Avoids a blank section on tiny wallets.
@@ -2463,7 +2473,7 @@ export const ReportDocument = ({ data, locale, country }: { data: ReportData; lo
       <RecoveryLegalPage data={data} t={t} />
       {showPeruGuidance && <PeruGuidancePage data={data} t={t} />}
       <ActionableStepsPage data={data} t={t} />
-      <DisclaimerPage data={data} t={t} />
+      <DisclaimerPage data={data} t={t} reportHash={reportHash} />
     </Document>
   );
 };

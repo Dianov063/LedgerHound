@@ -115,7 +115,8 @@ function walk(node: any, depth = 0): void {
   if (children !== undefined) walk(children, depth + 1);
 }
 
-const tree = (ReportDocument as any)({ data: mock, locale: 'es', country: 'PE' });
+const TEST_HASH = 'a'.repeat(64); // Phase 3.1 Stage 11.2: exercise the SHA-256 integrity block
+const tree = (ReportDocument as any)({ data: mock, locale: 'es', country: 'PE', reportHash: TEST_HASH });
 walk(tree);
 
 const joined = texts.join('');
@@ -217,6 +218,12 @@ ok(joined.includes('Volumen (USDT)'), 'A4: counterparty volume column labeled US
 // B2: documents-in-package checklist (es + PE).
 ok(joined.includes('Documentos en este paquete'), 'B2: documents checklist rendered (es+PE)');
 ok(joined.includes('divindat-denuncia-es.md') && joined.includes('binance-compliance-es.md') && joined.includes('tether-legal-es.md'), 'B2: all 3 templates listed in order');
+// B1 (Stage 11.2): SHA-256 integrity block rendered on the disclaimer page.
+ok(joined.includes('Verificación de Integridad (SHA-256)'), 'B1: integrity title rendered');
+// @react-pdf inserts U+0001 word-break markers around interpolated text nodes;
+// strip them before checking the literal+variable boundary.
+ok(joined.replace(//g, '').includes('SHA-256: ' + TEST_HASH), 'B1: report hash printed in PDF');
+ok(joined.includes('excluyendo este campo de verificación'), 'B1: "excluding this field" note present');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

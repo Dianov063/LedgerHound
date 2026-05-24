@@ -99,7 +99,7 @@ Para garantizar la integridad de la evidencia digital:
 
 - **Informe forense LedgerHound (PDF):**
   - Archivo: LedgerHound-Report-[{caseId}].pdf
-  - SHA256: [ver la sección "Verificación de Integridad" en el email de entrega del informe LedgerHound]
+  - SHA256: aparece en la última página del informe forense PDF (sección "Verificación de Integridad"); también incluido en el email de entrega como respaldo
 
 - **Capturas de evidencia (archivo comprimido):**
   - Archivo: capturas-evidencia.zip

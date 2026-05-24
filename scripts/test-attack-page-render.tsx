@@ -118,6 +118,13 @@ async function main() {
   const bufPe = await renderToBuffer(React.createElement(ReportDocument, { data: mock, locale: 'es', country: 'PE' }) as any);
   fs.writeFileSync(path.join(out, 'attack-page-render-test-es-PE.pdf'), bufPe);
   console.log(`✓ ES+PE ReportDocument rendered: ${bufPe.length} bytes (Peru guidance page included)`);
+
+  // Phase 3.1 Stage 11.2 (B1): two-pass SHA-256 — pass 1 hashless, pass 2 embeds the hash.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const sha = require('crypto').createHash('sha256').update(bufPe).digest('hex');
+  const bufHashed = await renderToBuffer(React.createElement(ReportDocument, { data: mock, locale: 'es', country: 'PE', reportHash: sha }) as any);
+  fs.writeFileSync(path.join(out, 'attack-page-render-test-es-PE-hashed.pdf'), bufHashed);
+  console.log(`✓ ES+PE two-pass rendered: ${bufHashed.length} bytes (SHA-256 ${sha.slice(0, 16)}… embedded on disclaimer page)`);
 }
 
 main().catch((e) => { console.error('RENDER FAILED:', e); process.exit(1); });
