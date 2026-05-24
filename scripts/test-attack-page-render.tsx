@@ -71,7 +71,7 @@ const mock: ReportData = {
   },
   patternAnalysis: { overallRisk: 'SUSPICIOUS', interpretation: 'Test', patterns: [] } as any,
   crossChainTrace: null,
-  narrative: { walletType: 'victim', walletTypeLabel: 'Victim Wallet — Funds Sent to Identified Counterparty', roleConfidence: 0.85, roleReasoning: ['CEX-funded', 'rapid forward'], uniqueSenders: 5, uniqueReceivers: 4, forwardingPercent: 80, primaryExitExchange: '', primaryExitExchangeEmail: '', summary: 'Victim wallet.', conclusion: 'Conclusion: victim.' },
+  narrative: { walletType: 'victim', walletTypeLabel: 'Victim Wallet — Funds Sent to Identified Counterparty', roleConfidence: 0.85, roleReasoning: ['CEX-funded', 'rapid forward'], uniqueSenders: 5, uniqueReceivers: 4, realReceiverCount: 2, spoofOnlyReceiverCount: 2, forwardingPercent: 80, primaryExitExchange: '', primaryExitExchangeEmail: '', summary: 'Victim wallet.', conclusion: 'Conclusion: victim.' },
   evidenceStrength: { score: 70, label: 'STRONG', factors: [
     { label: 'Address poisoning attack identified (4 spoof addresses)', met: true, severity: 'high' },
     { label: 'CRITICAL: victim misdirected 11020.50 USDT to spoof address(es)', met: true, severity: 'critical' },

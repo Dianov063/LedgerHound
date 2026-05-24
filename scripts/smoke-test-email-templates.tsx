@@ -78,6 +78,9 @@ ok(!teth.includes('0x9a0C...Cee5'), 'tether: truncated contract removed');
 // Stage 15 P1-3: count-agnostic wording for spoof addresses that received real funds.
 ok(teth.includes('recibieron fondos reales (una o más)'), 'tether: count-agnostic real-fund spoof wording (P1-3)');
 ok(!teth.includes('Suplantaciones secundarias adicionales'), 'tether: plural-implying "Suplantaciones secundarias adicionales" removed (P1-3)');
+// Stage 16 P2-2: DIVINDAT clarifies why funds to the collector count as loss.
+const divi = byFile['divindat-denuncia-es.md'] || '';
+ok(divi.includes('El recolector NO es un destinatario legítimo'), 'divindat: loss-computation clarification (collector not legitimate) (P2-2)');
 // DIVINDAT: accurate Art. 196 / 196-A + contact block
 ok(divv.includes('Art. 196-A'), 'divindat: references Art. 196-A (estafa agravada)');
 ok(divv.includes('participación de dos o más personas'), 'divindat: accurate 196-A aggravator (2+ persons, NOT 20-UIT)');

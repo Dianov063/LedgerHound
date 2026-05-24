@@ -32,6 +32,8 @@ La pérdida total confirmada asciende a aproximadamente **US$ [monto]** (**[mont
 
 Nota: Las unidades de tokens de suplantación Unicode son falsificaciones digitales sin valor de mercado, utilizadas por los estafadores como técnica de ocultamiento ("Address Poisoning"). Detalles en el informe forense adjunto.
 
+Nota sobre el cómputo de la pérdida: La pérdida económica total comprende tanto los fondos que la víctima envió al recolector del grupo de fraude (engañada por la plataforma DZHLWK) como los fondos desviados por confusión visual de direcciones (envenenamiento). El recolector NO es un destinatario legítimo: es una wallet receptora presuntamente controlada por los operadores del fraude. Por ello, la totalidad de los USDT reales enviados a las direcciones del grupo constituye la pérdida patrimonial, con independencia de que la víctima creyera estar "invirtiendo" en ese momento.
+
 ## III. EVIDENCIA TÉCNICA
 
 Adjunto a la presente denuncia un **INFORME FORENSE COMPLETO** emitido por LedgerHound (Caso ID: **[{caseId}]**), que contiene:

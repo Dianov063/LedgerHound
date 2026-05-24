@@ -438,6 +438,9 @@ export interface EntityId {
   exitNoneBody: string;
   /** Phase 3.1 Stage 6 (T3): footnote when the exit-points table is truncated. */
   exitTruncatedNote: string;
+  /** Phase 3.1 Stage 16 (P1-2): amounts are per-destination totals (summed across
+   *  all transfers), with the transaction count shown in parentheses. */
+  exitAggregateNote: string;
   noOutflows: string;
   recoveryDiff: (entityType: string) => string;
 }
@@ -561,6 +564,9 @@ export interface AttackTechnique {
   // ── Address poisoning campaign ──
   poisoningHeader: string;
   poisoningIntro: string;
+  /** Phase 3.1 Stage 16 (P2-1): explains HOW poisoning works for a lay reader —
+   *  zero-value / dust transfers planted in the victim's history. */
+  poisoningMechanismNote: string;
   vanityCluster: (pattern: string) => string;
   statClusterAddresses: string;
   statRealMisdirections: string;
@@ -632,6 +638,10 @@ export interface Investigation {
   victimWalletBadge: string;
   scamWalletBadge: string;
   counterpartyWallets: (n: number) => string;
+  /** Phase 3.1 Stage 16 (P1-1): flow-box label using the real-value recipient
+   *  count (consistent with the Stage 15 narrative split), plus a spoof note. */
+  counterpartyWalletsReal: (n: number) => string;
+  spoofRecipientsNote: (n: number) => string;
   receiversCount: (n: number) => string;
   kycExchange: string;
   suspectedScammerCluster: string;
@@ -646,6 +656,9 @@ export interface Investigation {
   locateStep2: string;
   locateStep3: string;
   evidenceStrengthTitle: string;
+  /** Phase 3.1 Stage 16 (P2-3): explains the evidence-strength score is the
+   *  proportion of evidentiary factors met (documentation completeness). */
+  evidenceMethodologyNote: string;
   reportSuitabilityTitle: string;
   exchangeKycEntryVsExit: string;
   kycEntryPointLabel: string;
@@ -874,6 +887,8 @@ const en: ReportTranslations = {
     victimWalletBadge: 'VICTIM WALLET',
     scamWalletBadge: 'SCAM WALLET',
     counterpartyWallets: (n) => `${n} Counterparty Wallet(s)`,
+    counterpartyWalletsReal: (n) => `${n} Wallet(s) received real funds`,
+    spoofRecipientsNote: (n) => `+ ${n} with spoof tokens (no value)`,
     receiversCount: (n) => `${n} Receivers`,
     kycExchange: 'KYC Exchange',
     suspectedScammerCluster: 'Suspected Scammer Cluster',
@@ -887,6 +902,7 @@ const en: ReportTranslations = {
     locateStep2: 'Note the date, amount, and transaction hash',
     locateStep3: 'Include this information in your police report and exchange complaint',
     evidenceStrengthTitle: 'Evidence Strength',
+    evidenceMethodologyNote: 'Score = the proportion of the evidentiary factors below that are met (✔). It measures documentation completeness, not recovery probability.',
     reportSuitabilityTitle: 'Report Suitability',
     exchangeKycEntryVsExit: 'Exchange KYC — Entry vs Exit',
     kycEntryPointLabel: "KYC ENTRY POINT (victim's funding source)",
@@ -987,6 +1003,7 @@ const en: ReportTranslations = {
   attackTechnique: {
     intro: 'Forensic analysis identified specific scam techniques used against this wallet. These are professional methods employed by coordinated cryptocurrency fraud operations and constitute important supporting documentation for legal and administrative proceedings.',
     poisoningHeader: 'Address Poisoning Campaign Detected',
+    poisoningMechanismNote: 'How poisoning works: these addresses sent zero-value (0 USDT) or tiny dust transfers TO the victim’s wallet — not to move funds, but so the look-alike address appears in the victim’s transaction history. When the victim later copies an address from that history to make a payment, they can mistakenly copy the spoofed address instead of the legitimate one. Addresses that planted dust but received no real funds are part of the attack even though they hold no value.',
     poisoningIntro: 'A coordinated address poisoning attack was identified. A cluster of visually similar addresses (sharing prefix and suffix patterns) was deployed to confuse the victim and distribute fraudulent inflows across multiple wallets — hindering compliance and investigative actions. All addresses in this cluster are consistent with coordinated control; the highest-volume address functions as the main collector, while the rest operate as secondary spoofs.',
     vanityCluster: (pattern) => `Vanity Cluster: ${pattern}`,
     statClusterAddresses: 'CLUSTER ADDRESSES',
@@ -1171,6 +1188,7 @@ const en: ReportTranslations = {
     exitNoneTitle: 'No KYC Exchange Exit Detected',
     exitNoneBody: 'Without exchange interaction, recovery requires deeper investigation. The largest outflow destination should be traced further.',
     exitTruncatedNote: 'Showing primary destinations by volume. See the Complete Transaction History for all transfers.',
+    exitAggregateNote: 'Amounts are the cumulative total sent to each destination; the number in parentheses is the transaction count.',
     noOutflows: 'No significant outflows detected for exit point analysis.',
     recoveryDiff: (entityType) => (({
       exchange: 'LOW - Subpoena possible',
@@ -1533,6 +1551,8 @@ const es: ReportTranslations = {
     victimWalletBadge: 'WALLET DE VÍCTIMA',
     scamWalletBadge: 'WALLET DE ESTAFA',
     counterpartyWallets: (n) => `${n} Wallet(s) de Contraparte`,
+    counterpartyWalletsReal: (n) => `${n} Wallet(s) recibieron fondos reales`,
+    spoofRecipientsNote: (n) => `+ ${n} con tokens falsificados (sin valor)`,
     receiversCount: (n) => `${n} Receptores`,
     kycExchange: 'Exchange KYC',
     suspectedScammerCluster: 'Grupo Sospechoso de Estafa',
@@ -1546,6 +1566,7 @@ const es: ReportTranslations = {
     locateStep2: 'Anote la fecha, el monto y el hash de la transacción',
     locateStep3: 'Incluya esta información en su denuncia policial y en su reclamo ante el exchange',
     evidenceStrengthTitle: 'Solidez de la Evidencia',
+    evidenceMethodologyNote: 'Puntuación = la proporción de los factores evidenciarios siguientes que se cumplen (✔). Mide la integridad de la documentación, no la probabilidad de recuperación.',
     reportSuitabilityTitle: 'Usos del Informe',
     exchangeKycEntryVsExit: 'KYC del Exchange — Entrada vs Salida',
     kycEntryPointLabel: 'PUNTO DE ENTRADA KYC (fuente de financiamiento de la víctima)',
@@ -1646,6 +1667,7 @@ const es: ReportTranslations = {
   attackTechnique: {
     intro: 'El análisis forense identificó técnicas de estafa específicas utilizadas contra esta wallet. Estos son métodos profesionales empleados por operaciones coordinadas de fraude con criptomonedas y constituyen documentación de apoyo importante para procedimientos legales y administrativos.',
     poisoningHeader: 'Campaña de Envenenamiento de Direcciones Detectada',
+    poisoningMechanismNote: 'Cómo funciona el envenenamiento: estas direcciones enviaron transacciones de valor cero (0 USDT) o microcantidades (dust) HACIA la wallet de la víctima — no para transferir fondos, sino para que la dirección suplantada aparezca en el historial de transacciones de la víctima. Cuando la víctima posteriormente copia una dirección de ese historial para hacer un pago, puede copiar por error la dirección suplantada en vez de la legítima. Las direcciones que solo sembraron dust y no recibieron fondos reales forman parte del ataque aunque no tengan valor.',
     poisoningIntro: 'Se identificó un ataque coordinado de envenenamiento de direcciones. Se desplegó un grupo de direcciones visualmente similares (que comparten patrones de prefijo y sufijo) para confundir a la víctima y distribuir las entradas fraudulentas entre múltiples wallets — dificultando las acciones de cumplimiento e investigación. Todas las direcciones de este grupo son consistentes con control coordinado; la dirección de mayor volumen funciona como recolector principal, mientras que el resto operan como suplantaciones secundarias.',
     vanityCluster: (pattern) => `Grupo de Direcciones Vanity: ${pattern}`,
     statClusterAddresses: 'DIRECCIONES DEL GRUPO',
@@ -1830,6 +1852,7 @@ const es: ReportTranslations = {
     exitNoneTitle: 'No se Detectó Salida por Exchange KYC',
     exitNoneBody: 'Sin interacción con un exchange, la recuperación requiere una investigación más profunda. El mayor destino de salida debe rastrearse más a fondo.',
     exitTruncatedNote: 'Mostrando destinos principales por volumen. Ver el Historial Completo de Transacciones para todas las transferencias.',
+    exitAggregateNote: 'Los montos son el total acumulado enviado a cada destino; el número entre paréntesis es la cantidad de transacciones.',
     noOutflows: 'No se detectaron salidas significativas para el análisis de puntos de salida.',
     recoveryDiff: (entityType) => (({
       exchange: 'BAJA - Citación judicial posible',

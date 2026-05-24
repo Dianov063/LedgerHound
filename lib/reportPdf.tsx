@@ -655,9 +655,10 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
           <Text style={{ fontSize: 14, color: slate400, paddingHorizontal: 2 }}>{'\u2192'}</Text>
           <View style={{ alignItems: 'center', backgroundColor: isVictim ? '#fef2f2' : n.primaryExitExchange ? '#f0fdf4' : '#fffbeb', borderRadius: 6, padding: 8, flex: 1, borderWidth: 1, borderColor: isVictim ? '#fecaca' : n.primaryExitExchange ? '#bbf7d0' : '#fde68a' }}>
             <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: isVictim ? red : n.primaryExitExchange ? green : amber }}>
-              {isVictim ? t.investigation.counterpartyWallets(n.uniqueReceivers) : (n.primaryExitExchange || t.investigation.receiversCount(n.uniqueReceivers))}
+              {isVictim ? t.investigation.counterpartyWalletsReal(n.realReceiverCount ?? n.uniqueReceivers) : (n.primaryExitExchange || t.investigation.receiversCount(n.uniqueReceivers))}
             </Text>
             <Text style={{ fontSize: 7, color: slate600, marginTop: 2 }}>{flowOut} {flowSymbol}</Text>
+            {isVictim && (n.spoofOnlyReceiverCount ?? 0) > 0 && <Text style={{ fontSize: 6, color: slate400, marginTop: 1 }}>{t.investigation.spoofRecipientsNote(n.spoofOnlyReceiverCount!)}</Text>}
             {!isVictim && n.primaryExitExchange && <Text style={{ fontSize: 6, color: green, marginTop: 1 }}>{t.investigation.kycExchange}</Text>}
             {isVictim && <Text style={{ fontSize: 6, color: red, marginTop: 1 }}>{t.investigation.suspectedScammerCluster}</Text>}
           </View>
@@ -714,6 +715,8 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
               );
             })}
           </View>
+          {/* Phase 3.1 Stage 16 (P2-3): score methodology — proportion of factors met. */}
+          <Text style={{ fontSize: 6, color: slate400, marginTop: 3, lineHeight: 1.3 }}>{t.investigation.evidenceMethodologyNote}</Text>
         </View>
 
         {/* Legal Weight */}
@@ -1384,6 +1387,14 @@ const AttackTechniqueAnalysisPage = ({ data, t }: { data: ReportData; t: ReportT
             {ta.poisoningIntro}
           </Text>
 
+          {/* Phase 3.1 Stage 16 (P2-1): explain the poisoning mechanism (zero-value /
+              dust transfers planted in the victim's history) once, on the first campaign. */}
+          {ci === 0 && (
+            <View style={{ backgroundColor: '#f8fafc', borderRadius: 4, padding: 8, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: slate400 }}>
+              <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>{ta.poisoningMechanismNote}</Text>
+            </View>
+          )}
+
           {/* Cluster overview */}
           <View style={{ ...s.card, padding: 8, marginBottom: 8 }}>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate900, marginBottom: 4 }}>{ta.vanityCluster(campaign.vanityPattern)}</Text>
@@ -1620,13 +1631,17 @@ const EntitiesExitPage = ({ data, t }: { data: ReportData; t: ReportTranslations
             {exits.exitPoints.slice(0, 6).map((ep, i) => (
               <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                 <Text style={{ ...s.td, ...s.mono, width: '28%' }}>{ep.entityName || shortAddr(ep.address)}</Text>
-                <Text style={{ ...s.td, width: '18%' }}>{fmtEth(ep.amount)}</Text>
+                <Text style={{ ...s.td, width: '18%' }}>{fmtEth(ep.amount)}{ep.txCount && ep.txCount > 1 ? ` (${ep.txCount})` : ''}</Text>
                 <Text style={{ ...s.td, width: '10%' }}>{ep.token}</Text>
                 <Text style={{ ...s.td, width: '14%', color: ep.entityType === 'exchange' ? green : ep.entityType === 'mixer' ? red : slate600 }}>{ei.entityType(ep.entityType)}</Text>
                 <Text style={{ ...s.td, width: '30%', fontSize: 7, color: ep.entityType === 'exchange' ? green : ep.entityType === 'mixer' ? red : ep.entityType === 'defi' ? amber : slate600 }}>{ep.recoveryDifficulty}</Text>
               </View>
             ))}
           </View>
+          {/* Phase 3.1 Stage 16 (P1-2): amounts are per-destination totals + tx count. */}
+          {exits.exitPoints.some(ep => ep.txCount && ep.txCount > 1) && (
+            <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 4 }}>{ei.exitAggregateNote}</Text>
+          )}
           {/* Phase 3.1 Stage 6 (T3): truncation footnote when >6 destinations. */}
           {exits.exitPoints.length > 6 && (
             <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic', marginTop: 4 }}>{ei.exitTruncatedNote}</Text>

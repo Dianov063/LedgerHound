@@ -89,11 +89,15 @@ const mock: ReportData = {
     { date: '2026-04-05', type: 'LAST_ACTIVITY', description: 'Last activity', highlight: false } as any,
   ],
   // Elayne-representative: victim funded via KYC exchange, but NO scammer KYC exit.
-  exitPointAnalysis: { exitPoints: [], hasKycExit: false, hasMixerUsage: false, hasCrossChain: false, overallRecoveryAssessment: 'MEDIUM' } as any,
+  // Stage 16 P1-2: aggregated destination totals with tx counts (53,227.81 across 8).
+  exitPointAnalysis: { exitPoints: [
+    { address: REAL, amount: 53227.81, token: 'USDT', date: '2026-03-07', entityType: 'unknown', entityName: null, recoveryDifficulty: 'Media', txCount: 8 },
+    { address: SPOOF_MIS, amount: 11020.50, token: 'USDT', date: '2026-03-07', entityType: 'unknown', entityName: null, recoveryDifficulty: 'Media', txCount: 1 },
+  ], hasKycExit: false, hasMixerUsage: false, hasCrossChain: false, overallRecoveryAssessment: 'MEDIUM' } as any,
   recoveryScenarios: [], assetSummary: { realAssets: [{ symbol: 'USDT', totalIn: 22187, totalOut: 11020 }], spamTokens: [{ symbol: 'HEX', count: 1 }], spoofTokens: [], spamCount: 1 } as any,
   patternAnalysis: { overallRisk: 'SUSPICIOUS', interpretation: 'Test', patterns: [] } as any,
   crossChainTrace: null,
-  narrative: { walletType: 'victim', walletTypeLabel: 'Victim', roleConfidence: 0.85, roleReasoning: ['CEX-funded'], uniqueSenders: 5, uniqueReceivers: 4, forwardingPercent: 80, primaryExitExchange: '', primaryExitExchangeEmail: '', summary: 'Victim.', conclusion: 'Conclusion.' } as any,
+  narrative: { walletType: 'victim', walletTypeLabel: 'Victim', roleConfidence: 0.85, roleReasoning: ['CEX-funded'], uniqueSenders: 5, uniqueReceivers: 4, realReceiverCount: 2, spoofOnlyReceiverCount: 2, forwardingPercent: 80, primaryExitExchange: '', primaryExitExchangeEmail: '', summary: 'Victim.', conclusion: 'Conclusion.' } as any,
   evidenceStrength: { score: 70, label: 'STRONG', factors: [{ label: 'Poisoning identified', met: true, severity: 'high' }] } as any,
   topInflows: [{ from: REAL, value: 22187.44, token: 'USDT', date: '2026-04-01' }],
   exchangeComplianceEmails: [{ name: 'Binance', email: '' }],
@@ -287,6 +291,19 @@ ok(es6.investigation.roleReasoning.transitForwarded(70).includes('(por volumen)'
 ok(getReportTranslations('en').investigation.roleReasoning.victimRapidForward(98).includes('(by volume)'), 'S15 P1-1: EN victimRapidForward labeled "(by volume)"');
 // Stage 15 P1-2: counterparty direction tag + legend.
 ok(joined.includes('fondos recibidos por la wallet analizada') && joined.includes('fondos enviados por la wallet analizada'), 'S15 P1-2: IN/OUT direction legend rendered (es)');
+// ── Phase 3.1 Stage 16 ──
+// P1-1: flow box uses the real-value recipient count + spoof-only sub-note.
+ok(joined.includes('Wallet(s) recibieron fondos reales'), 'S16 P1-1: flow box uses real-recipient count label');
+ok(joined.includes('con tokens falsificados (sin valor)'), 'S16 P1-1: flow box spoof-only sub-note present');
+// P1-2: exit points show aggregated destination totals (53,227.81 with 8 tx) + note.
+ok(joined.includes('total acumulado enviado a cada destino'), 'S16 P1-2: exit-points aggregation note rendered (es)');
+ok(joinedNoMarks.includes('53,227.81 (8)'), 'S16 P1-2: destination total + tx count rendered (53,227.81 (8))');
+// P2-1: address-poisoning mechanism explanation present.
+ok(joined.includes('Cómo funciona el envenenamiento'), 'S16 P2-1: poisoning mechanism note rendered (es)');
+ok(joined.includes('transacciones de valor cero') || joined.includes('valor cero'), 'S16 P2-1: mechanism note explains zero-value/dust planting');
+// P2-3: evidence-strength score methodology footnote.
+ok(joined.includes('proporción de los factores evidenciarios'), 'S16 P2-3: evidence-strength methodology note rendered (es)');
+ok(getReportTranslations('en').investigation.evidenceMethodologyNote.includes('proportion of the evidentiary factors'), 'S16 P2-3: EN evidence methodology note available');
 // P1-B: recovery tier calibration — 23 reads "Baja a moderada", cap reads "Moderada".
 ok(recoveryTierForScore(23) === 'LOW_TO_MODERATE', 'P1-B: score 23 -> LOW_TO_MODERATE');
 ok(recoveryTierForScore(35) === 'MODERATE', 'P1-B: capped score 35 -> MODERATE (top reachable tier)');

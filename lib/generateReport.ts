@@ -469,6 +469,9 @@ export interface ExitPoint {
   entityType: string;
   entityName: string | null;
   recoveryDifficulty: string;
+  /** Phase 3.1 Stage 16 (P1-2): number of transfers aggregated into `amount`
+   *  for this (destination, token). amount is the SUM, not the largest single tx. */
+  txCount: number;
 }
 
 export interface ExitPointAnalysis {
@@ -655,6 +658,11 @@ export interface NarrativeData {
   roleReasoning: string[];
   uniqueSenders: number;
   uniqueReceivers: number;
+  /** Phase 3.1 Stage 16 (P1-1): recipients that received real economic value vs
+   *  recipients that received only worthless spoof tokens. Keeps the flow box
+   *  consistent with the Stage 15 narrative split. */
+  realReceiverCount: number;
+  spoofOnlyReceiverCount: number;
   forwardingPercent: number;     // % of funds forwarded within 24h
   primaryExitExchange: string;   // e.g. "Binance"
   primaryExitExchangeEmail: string;
@@ -953,32 +961,42 @@ function analyzeExitPoints(
     return REAL_ASSET_SYMBOLS.has(asset) || tx.category === 'external';
   });
 
-  // Group by destination address, sum values
-  const destMap = new Map<string, { amount: number; token: string; date: string }>();
+  // Phase 3.1 Stage 16 (P1-2): aggregate the TOTAL sent to each destination
+  // (the old code kept only the largest single transaction). Keyed by
+  // destination + token so different tokens to the same address never sum into a
+  // mixed unit (Phase 2.7 discipline). Tracks the transaction count and latest date.
+  const destMap = new Map<string, { address: string; amount: number; token: string; date: string; txCount: number }>();
   for (const tx of realOutflows) {
     const to = (tx.to || '').toLowerCase();
     if (!to || to === NULL_ADDRESS) continue;
-    const existing = destMap.get(to);
+    const token = tx.asset || nativeCurrency;
+    const key = `${to}|${token.toUpperCase()}`;
     const val = safeValue(tx);
     const date = tx.metadata?.blockTimestamp?.split('T')[0] || '';
-    if (!existing || val > existing.amount) {
-      destMap.set(to, { amount: val, token: tx.asset || nativeCurrency, date });
+    const existing = destMap.get(key);
+    if (existing) {
+      existing.amount += val;
+      existing.txCount += 1;
+      if (date > existing.date) existing.date = date;
+    } else {
+      destMap.set(key, { address: to, amount: val, token, date, txCount: 1 });
     }
   }
 
-  const exitPoints: ExitPoint[] = Array.from(destMap.entries())
-    .sort((a, b) => b[1].amount - a[1].amount)
+  const exitPoints: ExitPoint[] = Array.from(destMap.values())
+    .sort((a, b) => b.amount - a.amount)
     .slice(0, 8)
-    .map(([address, data]) => {
-      const entity = identifiedEntities.find(e => e.address === address);
+    .map((data) => {
+      const entity = identifiedEntities.find(e => e.address === data.address);
       return {
-        address,
+        address: data.address,
         amount: Math.round(data.amount * 10000) / 10000,
         token: data.token,
         date: data.date,
         entityType: entity?.type || 'unknown',
         entityName: entity?.label || null,
         recoveryDifficulty: getRecoveryDifficulty(entity?.type || '', ei),
+        txCount: data.txCount,
       };
     });
 
@@ -1676,6 +1694,11 @@ export async function generateReport(
     if (allTxs.length >= 50) break;
   }
 
+  // Phase 3.1 Stage 16 (P1-3): display the selected transfers in chronological
+  // order (oldest first) for investigator readability. Dates are YYYY-MM-DD, so
+  // a lexical sort is chronological; undated rows sort first.
+  allTxs.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
   const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
   // ── Narrative computation ──
@@ -1920,6 +1943,8 @@ export async function generateReport(
     roleReasoning,
     uniqueSenders,
     uniqueReceivers,
+    realReceiverCount,
+    spoofOnlyReceiverCount,
     forwardingPercent,
     primaryExitExchange,
     primaryExitExchangeEmail,
