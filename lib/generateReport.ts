@@ -437,15 +437,15 @@ export interface ScamDbMatch {
   qrDataUri?: string; // Pre-generated QR code data URI for PDF
 }
 
-export interface RiskBreakdown {
-  unknownWalletInteraction: number;
-  mixerInteraction: number;
-  exchangeInteraction: number;
-  multiHopTransfers: number;
-  stablecoinUsage: number;
-  sanctionedAddress: number;
-  scamDbMatch: number;
+/** Phase 3.1 Stage 12 (P0-1): the breakdown is now built FROM the live scoring
+ *  formula (each applied factor pushes a row), so baseline + sum(rows) === the
+ *  displayed risk score by construction. Replaces the old decoupled heuristic. */
+export interface RiskFactorRow {
+  label: string;
+  value: number;
 }
+export type RiskBreakdown = RiskFactorRow[];
+export const RISK_BASELINE = 50;
 
 export interface TimelineEvent {
   date: string;
@@ -702,53 +702,6 @@ export interface EvidenceStrength {
    * misdirection of victim funds to a spoof address).
    */
   factors: { label: string; met: boolean; severity?: 'critical' | 'high' }[];
-}
-
-function calculateRiskBreakdown(
-  identifiedEntities: { type: string }[],
-  counterpartyCount: number,
-  outgoing: (Transfer | UnifiedTransfer)[],
-  incoming: (Transfer | UnifiedTransfer)[],
-  ofacWarning: boolean,
-  scamDbMatches: ScamDbMatch[],
-): RiskBreakdown {
-  const breakdown: RiskBreakdown = {
-    unknownWalletInteraction: 0,
-    mixerInteraction: 0,
-    exchangeInteraction: 0,
-    multiHopTransfers: 0,
-    stablecoinUsage: 0,
-    sanctionedAddress: 0,
-    scamDbMatch: 0,
-  };
-
-  const knownCount = identifiedEntities.length;
-  if (counterpartyCount > 0 && knownCount / counterpartyCount < 0.2) {
-    breakdown.unknownWalletInteraction = 20;
-  }
-  if (identifiedEntities.some(e => e.type === 'mixer')) breakdown.mixerInteraction = 30;
-  if (identifiedEntities.some(e => e.type === 'exchange')) breakdown.exchangeInteraction = -10;
-
-  // Multi-hop: check for rapid sequential outflows (3+ within same day)
-  const outDates = outgoing
-    .map(tx => tx.metadata?.blockTimestamp ? new Date(tx.metadata.blockTimestamp).toDateString() : '')
-    .filter(Boolean);
-  const dateCounts = new Map<string, number>();
-  for (const d of outDates) dateCounts.set(d, (dateCounts.get(d) || 0) + 1);
-  if (Array.from(dateCounts.values()).some(c => c >= 3)) breakdown.multiHopTransfers = 15;
-
-  // Stablecoin movement
-  const allTx = [...outgoing, ...incoming];
-  const hasStable = allTx.some(tx => {
-    const asset = (tx.asset || '').toUpperCase();
-    return ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'FRAX', 'PYUSD'].includes(asset);
-  });
-  if (hasStable) breakdown.stablecoinUsage = 5;
-
-  if (ofacWarning) breakdown.sanctionedAddress = 40;
-  if (scamDbMatches.length > 0) breakdown.scamDbMatch = 25;
-
-  return breakdown;
 }
 
 function classifyAssets(
@@ -1257,7 +1210,15 @@ export async function generateReport(
   }
 
   // ── Risk score (improved with OFAC + scam DB + Phase 1 federation) ──
-  let riskScore = 50; // baseline
+  // Phase 3.1 Stage 12 (P0-1): every adjustment goes through addRisk/setRisk so
+  // the rendered breakdown is built FROM the formula — baseline + sum(rows) ===
+  // riskScore by construction (asserted below). No more decoupled heuristic.
+  const RBL = tReport.exec;
+  const riskFactors: { label: string; value: number }[] = [];
+  let riskScore = RISK_BASELINE; // baseline (50)
+  const addRisk = (label: string, delta: number) => { if (delta !== 0) { riskFactors.push({ label, value: delta }); riskScore += delta; } };
+  const setRisk = (label: string, target: number) => { addRisk(label, target - riskScore); };
+
   const hasMixer = identifiedEntities.some((e) => e.type === 'mixer');
   const hasExchange = identifiedEntities.some((e) => e.type === 'exchange');
   const hasScam = identifiedEntities.some((e) => e.type === 'scam');
@@ -1272,44 +1233,38 @@ export async function generateReport(
 
   if (ofacWarning || externalOfacFound) {
     // OFAC = instant CRITICAL (whether from local KNOWN_ENTITIES or external OFAC list)
-    riskScore = 95;
+    setRisk(RBL.rowOfac, 95);
   } else {
-    if (hasMixer) riskScore += 30;
-    if (hasScam) riskScore += 25;
-    if (scamDbMatches.length > 0) riskScore += 20; // Scam DB match
-    if (!hasExchange && ethSent > 10) riskScore += 10;
-    // 2026-05-20: was -20. CEX interaction does NOT lower risk by itself —
-    // victims interact with CEX too (deposit before sending to scammer).
-    // Smaller adjustment, just to break ties between otherwise-equal scores.
-    if (hasExchange) riskScore -= 10;
-    if (outgoing.length + incoming.length < 5) riskScore -= 15;
+    if (hasMixer) addRisk(RBL.rowMixer, 30);
+    if (hasScam) addRisk(RBL.rowScamEntity, 25);
+    if (scamDbMatches.length > 0) addRisk(RBL.rowScamDb, 20); // Scam DB match
+    if (!hasExchange && ethSent > 10) addRisk(RBL.rowHighOutflow, 10);
+    // 2026-05-20: CEX interaction does NOT lower risk by itself — victims
+    // interact with CEX too. Small tie-breaker (Stage 11.1 may undo it below
+    // for a victim's own KYC entry).
+    if (hasExchange) addRisk(RBL.rowKycExchange, -10);
+    if (outgoing.length + incoming.length < 5) addRisk(RBL.rowLowActivity, -15);
 
-    // Phishing-tagged counterparty is strong signal — combine local list
-    // (KNOWN_PHISHING) with anything the federation found from external sources.
+    // Phishing-tagged counterparty — local (KNOWN_PHISHING) + federation.
     const localPhishingHits = Array.from(counterpartyMap.keys()).filter(isKnownPhishing).length;
     const totalPhishingHits = Math.max(localPhishingHits, federationPhishingHits);
-    if (totalPhishingHits > 0) {
-      // +10 per phishing-tagged counterparty, capped at +30.
-      riskScore += Math.min(30, totalPhishingHits * 10);
-    }
+    if (totalPhishingHits > 0) addRisk(RBL.rowPhishingTag, Math.min(30, totalPhishingHits * 10));
 
     // Federation scam-only hits (no phishing) — moderate boost.
-    if (federationScamHits > 0) riskScore += Math.min(15, federationScamHits * 5);
+    if (federationScamHits > 0) addRisk(RBL.rowFederationScam, Math.min(15, federationScamHits * 5));
 
-    // Phase 3.1 Stage 11.1: confirmed attack techniques are strong severity
-    // signals that previously did not feed the risk score (undersold rich
-    // evidence). The Etherscan Fake_Phishing bonus STACKS with the +10 phishing
-    // hit above for a +15 total — it is NOT a second full +15 (no double-count).
-    if (addressPoisoning.detected) riskScore += 10;
-    if (unicodeSpoofing.detected) riskScore += 5;
-    if (addressPoisoning.campaigns.some((c) => c.hasFakePhishingTag)) riskScore += 5;
+    // Phase 3.1 Stage 11.1: confirmed attack techniques. Etherscan Fake_Phishing
+    // bonus STACKS with the +10 phishing hit for +15 total — not a double +15.
+    if (addressPoisoning.detected) addRisk(RBL.rowPoisoning, 10);
+    if (unicodeSpoofing.detected) addRisk(RBL.rowUnicode, 5);
+    if (addressPoisoning.campaigns.some((c) => c.hasFakePhishingTag)) addRisk(RBL.rowEtherscanTag, 5);
 
-    // Sanctions hits NOT covered by ofacWarning (e.g. GoPlus 'sanctioned' flag
-    // on an address not in our KNOWN_ENTITIES). Hard-bump to CRITICAL.
-    if (federationSanctionsHits > 0) riskScore = Math.max(riskScore, 85);
+    // External sanctions flag not covered by ofacWarning — severity floor.
+    if (federationSanctionsHits > 0 && riskScore < 85) setRisk(RBL.rowSanctionsFloor, 85);
   }
 
-  riskScore = Math.max(0, Math.min(100, riskScore));
+  // Clamp low end (the high-end cap is applied after all adjustments below).
+  if (riskScore < 0) setRisk(RBL.rowCap, 0);
   // riskLabel assigned after patternAnalysis (behavioral boost may adjust score)
 
   // ── Recovery Probability — realistic formula with hard cap ──
@@ -1392,10 +1347,7 @@ export async function generateReport(
     : 0;
 
   // ── Premium analysis sections ──
-  const riskBreakdown = calculateRiskBreakdown(
-    identifiedEntities, counterpartyMap.size, outgoing, incoming, ofacWarning, scamDbMatches,
-  );
-
+  // (riskBreakdown is assigned after all score adjustments below — see P0-1.)
   const assetSummary = classifyAssets(incoming, outgoing, nativeCurrency);
 
   // Phase 3.1 Stage 7 (A3): map cluster addresses to their role so the timeline
@@ -1417,7 +1369,7 @@ export async function generateReport(
   // Skipped under OFAC (no −10 was applied there).
   const caseHasScamEvidence = addressPoisoning.detected || unicodeSpoofing.detected || hasScam || scamDbMatches.length > 0;
   if (!(ofacWarning || externalOfacFound) && hasExchange && !exitPointAnalysis.hasKycExit && caseHasScamEvidence) {
-    riskScore = Math.min(100, riskScore + 10);
+    addRisk(RBL.rowVictimEntry, 10);
   }
 
   const recoveryScenarios = generateRecoveryScenarios(exitPointAnalysis, recoveryScore, tReport.recovery);
@@ -1453,9 +1405,19 @@ export async function generateReport(
   // Fix: if behavioral analysis says CONFIRMED_SCAM, ensure risk score >= 75
   // Prevents contradiction of "LOW RISK" label alongside "CONFIRMED SCAM" behavioral assessment
   if (patternAnalysis.overallRisk === 'CONFIRMED_SCAM' && riskScore < 75) {
-    riskScore = 75;
+    setRisk(RBL.rowBehavioralFloor, 75);
   } else if (patternAnalysis.overallRisk === 'LIKELY_SCAM' && riskScore < 55) {
-    riskScore = 55;
+    setRisk(RBL.rowBehavioralFloor, 55);
+  }
+
+  // P0-1: apply the high-end cap last, then freeze the breakdown. Sum of rows +
+  // baseline must equal riskScore exactly (asserted) — the rendered table can
+  // never disagree with the displayed total again.
+  if (riskScore > 100) setRisk(RBL.rowCap, 100);
+  const riskBreakdown: RiskBreakdown = riskFactors;
+  const reconSum = RISK_BASELINE + riskFactors.reduce((a, r) => a + r.value, 0);
+  if (reconSum !== riskScore) {
+    logger.error({ caseId, riskScore, reconSum }, '[generateReport] risk breakdown does not reconcile with score');
   }
 
   let riskLabel: string;

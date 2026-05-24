@@ -44,7 +44,7 @@ const mock: ReportData = {
   topCounterparties: [{ address: REAL, label: 'Unknown', count: 2, volume: 27187 }],
   counterpartyVolumeSymbol: 'USDT',
   identifiedEntities: [{ address: '0x28c6c06298d514db089934071355e5743bf21d60', label: 'Binance', type: 'exchange', interactions: 3, parentEntity: 'Binance', complianceEmail: '' }],
-  riskScore: 55, riskLabel: 'MODERATE',
+  riskScore: 80, riskLabel: 'HIGH', // Elayne-representative (ALTA) after Stage 11.1 recalibration
   recoveryAssessment: { score: 20, label: 'Low', tier: 'LOW', disclaimer: 'Estimate.', factors: { positive: ['KYC exit'], negative: ['Rapid forward'] } } as any,
   recoveryScore: 20, recoveryLabel: 'Low', ofacWarning: false, scamDbMatches: [],
   keyFindings: ['Address poisoning detected.'], recommendations: ['File IC3 report.'],
@@ -66,7 +66,15 @@ const mock: ReportData = {
       { fromId: 'src', toId: 'spoof', x1: 262, y1: 150, x2: 400, y2: 215, direction: 'OUT', label: '26.2K USDT ⚠', labelX: 331, labelY: 182, isSpoof: true },
     ],
   } as any,
-  riskBreakdown: { unknownWalletInteraction: 20, mixerInteraction: 0, exchangeInteraction: -10, multiHopTransfers: 0, stablecoinUsage: 5, sanctionedAddress: 0, scamDbMatch: 0 } as any,
+  // Phase 3.1 Stage 12 (P0-1): array of factor rows; baseline(50) + sum === riskScore(80).
+  riskBreakdown: [
+    { label: 'Interacción con exchange KYC (ayuda a la recuperación)', value: -10 },
+    { label: 'Wallet(s) de contraparte etiquetada(s) como phishing', value: 10 },
+    { label: 'Campaña de envenenamiento de direcciones confirmada', value: 10 },
+    { label: 'Suplantación de tokens Unicode detectada', value: 5 },
+    { label: 'Etiqueta Etherscan Fake_Phishing en el grupo', value: 5 },
+    { label: 'Entrada KYC propia de la víctima (no facilita la recuperación)', value: 10 },
+  ] as any,
   timeline: [
     { date: '2026-02-25', type: 'FIRST_ACTIVITY', description: 'First activity', highlight: false } as any,
     { date: '2026-03-07', type: 'MAJOR_OUTFLOW', description: 'Sent 11020 USDT', highlight: true } as any,
@@ -224,6 +232,14 @@ ok(joined.includes('Verificación de Integridad (SHA-256)'), 'B1: integrity titl
 // strip them before checking the literal+variable boundary.
 ok(joined.replace(//g, '').includes('SHA-256: ' + TEST_HASH), 'B1: report hash printed in PDF');
 ok(joined.includes('excluyendo este campo de verificación'), 'B1: "excluding this field" note present');
+// ── Phase 3.1 Stage 12 ──
+// P0-1: breakdown reconciles to the displayed score (baseline 50 + sum(rows)).
+const rbRows = (mock.riskBreakdown as Array<{ value: number }>);
+ok(50 + rbRows.reduce((a, r) => a + r.value, 0) === mock.riskScore, `P0-1: breakdown reconciles to score (${50 + rbRows.reduce((a, r) => a + r.value, 0)} === ${mock.riskScore})`);
+ok(joined.includes('Campaña de envenenamiento de direcciones confirmada'), 'P0-1: factor rows rendered in breakdown table');
+// P0-2: no "Binance (Retiro)" when no scammer KYC exit; neutral suffix instead.
+ok(!joined.includes('(Retiro)'), 'P0-2: no "(Retiro)" route tail when exit not detected');
+ok(joined.includes('Grupo de Contraparte (rastreo ampliado pendiente)'), 'P0-2: neutral counterparty-group route tail');
 // ── Phase 3.1 Stage 8: PDF/template channel consistency ──
 ok(!joined.includes('ce@binance.com'), 'S8 #1: no ce@binance.com anywhere in PDF');
 ok(joined.includes("'Report fraud/scam'") || joined.includes('ticket de soporte'), 'S8 #1: Binance routed to support-ticket channel');

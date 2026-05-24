@@ -59,7 +59,7 @@ const mock: ReportData = {
   recommendations: ['File FBI IC3 report.'],
   transactions: [{ date: '2026-03-07', direction: 'OUT', from: SUBJECT, to: SPOOF_MIS, value: 11020.5, token: 'USDT' }],
   graphData: null,
-  riskBreakdown: { unknownWalletInteraction: 20, mixerInteraction: 0, exchangeInteraction: -10, multiHopTransfers: 0, stablecoinUsage: 5, sanctionedAddress: 0, scamDbMatch: 0 },
+  riskBreakdown: [{ label: 'Interacción con exchange KYC (ayuda a la recuperación)', value: -10 }, { label: 'Campaña de envenenamiento de direcciones confirmada', value: 10 }, { label: 'Suplantación de tokens Unicode detectada', value: 5 }] as any,
   timeline: [{ date: '2026-03-07', type: 'MAJOR_OUTFLOW', description: 'Sent 11020 USDT', highlight: true }],
   exitPointAnalysis: { exitPoints: [], hasKycExit: true, hasMixerUsage: false, hasCrossChain: false, overallRecoveryAssessment: 'MEDIUM' },
   recoveryScenarios: [],

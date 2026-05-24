@@ -72,6 +72,19 @@ export interface ReportTranslations {
     rowStablecoin: string;
     rowOfac: string;
     rowScamDb: string;
+    // Phase 3.1 Stage 12 (P0-1): factor rows that mirror the live formula.
+    rowScamEntity: string;
+    rowHighOutflow: string;
+    rowVictimEntry: string;
+    rowLowActivity: string;
+    rowPhishingTag: string;
+    rowFederationScam: string;
+    rowPoisoning: string;
+    rowUnicode: string;
+    rowEtherscanTag: string;
+    rowSanctionsFloor: string;
+    rowBehavioralFloor: string;
+    rowCap: string;
     totalRiskScore: string;
     scamDbLinked: string;
     scamDbCounterpartyLinked: string;
@@ -619,6 +632,8 @@ export interface Investigation {
   ifYouSentFunds: string;
   transactionPath: (label: string) => string;
   cashOutSuffix: (exchange: string) => string;
+  /** Phase 3.1 Stage 12 (P0-2): route tail when NO scammer KYC exit was detected. */
+  counterpartyGroupSuffix: string;
   toLocateTransaction: string;
   locateStep1: string;
   locateStep2: string;
@@ -754,6 +769,18 @@ const en: ReportTranslations = {
     rowStablecoin: 'Stablecoin movement detected',
     rowOfac: 'OFAC sanctioned address interaction',
     rowScamDb: 'LedgerHound Scam Database match',
+    rowScamEntity: 'Scam-flagged counterparty entity',
+    rowHighOutflow: 'High native outflow with no exchange',
+    rowVictimEntry: "Victim's own KYC entry (does not aid recovery)",
+    rowLowActivity: 'Very low transaction count',
+    rowPhishingTag: 'Phishing-tagged counterparty wallet(s)',
+    rowFederationScam: 'External scam-flagged counterparty(ies)',
+    rowPoisoning: 'Confirmed address-poisoning campaign',
+    rowUnicode: 'Unicode token spoofing detected',
+    rowEtherscanTag: 'Etherscan Fake_Phishing tag in cluster',
+    rowSanctionsFloor: 'External sanctions flag (severity floor)',
+    rowBehavioralFloor: 'Behavioral pattern severity floor',
+    rowCap: 'Score capped at maximum (100)',
     totalRiskScore: 'TOTAL RISK SCORE',
     scamDbLinked: 'Linked to LedgerHound Scam Database',
     scamDbCounterpartyLinked: 'Counterparty Linked to LedgerHound Scam Database',
@@ -848,6 +875,7 @@ const en: ReportTranslations = {
     ifYouSentFunds: 'If You Sent Funds to This Wallet:',
     transactionPath: (label) => `Your transaction likely followed this path: YOU → This Wallet (${label})`,
     cashOutSuffix: (exchange) => ` → ${exchange} (Cash-out)`,
+    counterpartyGroupSuffix: ' → Counterparty Group (extended trace pending)',
     toLocateTransaction: 'To locate your specific transaction:',
     locateStep1: 'Find your TXID in the Transaction History section of this report',
     locateStep2: 'Note the date, amount, and transaction hash',
@@ -1391,6 +1419,18 @@ const es: ReportTranslations = {
     rowStablecoin: 'Movimiento de stablecoins detectado',
     rowOfac: 'Interacción con dirección sancionada por OFAC',
     rowScamDb: 'Coincidencia en la Base de Datos de Estafas de LedgerHound',
+    rowScamEntity: 'Contraparte marcada como estafa',
+    rowHighOutflow: 'Alta salida de moneda nativa sin exchange',
+    rowVictimEntry: 'Entrada KYC propia de la víctima (no facilita la recuperación)',
+    rowLowActivity: 'Número de transacciones muy bajo',
+    rowPhishingTag: 'Wallet(s) de contraparte etiquetada(s) como phishing',
+    rowFederationScam: 'Contraparte(s) marcada(s) como estafa por fuentes externas',
+    rowPoisoning: 'Campaña de envenenamiento de direcciones confirmada',
+    rowUnicode: 'Suplantación de tokens Unicode detectada',
+    rowEtherscanTag: 'Etiqueta Etherscan Fake_Phishing en el grupo',
+    rowSanctionsFloor: 'Marca de sanciones externa (piso de severidad)',
+    rowBehavioralFloor: 'Piso de severidad por patrón conductual',
+    rowCap: 'Puntuación limitada al máximo (100)',
     totalRiskScore: 'PUNTUACIÓN TOTAL DE RIESGO',
     scamDbLinked: 'Vinculada a la Base de Datos de Estafas de LedgerHound',
     scamDbCounterpartyLinked: 'Contraparte Vinculada a la Base de Datos de Estafas de LedgerHound',
@@ -1485,6 +1525,7 @@ const es: ReportTranslations = {
     ifYouSentFunds: 'Si Usted Envió Fondos a Esta Wallet:',
     transactionPath: (label) => `Su transacción probablemente siguió esta ruta: USTED → Esta Wallet (${label})`,
     cashOutSuffix: (exchange) => ` → ${exchange} (Retiro)`,
+    counterpartyGroupSuffix: ' → Grupo de Contraparte (rastreo ampliado pendiente)',
     toLocateTransaction: 'Para localizar su transacción específica:',
     locateStep1: 'Encuentre su TXID en la sección Historial de Transacciones de este informe',
     locateStep2: 'Anote la fecha, el monto y el hash de la transacción',
@@ -1652,7 +1693,7 @@ const es: ReportTranslations = {
     spoofTokensNote: 'Estos tokens usan caracteres no latinos para hacerse pasar por monedas reales. Ver Análisis de Técnicas de Ataque para el detalle completo.',
     footnoteNote: 'Nota: El saldo neto aparente subestima la pérdida económica real.',
     footnoteRealMisdirected: (breakdown) => ` Fondos reales desviados a direcciones de envenenamiento: ${breakdown}.`,
-    footnoteSpoofUnits: (breakdown) => ` Por separado, ${breakdown} de unidades de tokens falsificados sin valor de mercado fueron enviados a direcciones controladas por el atacante.`,
+    footnoteSpoofUnits: (breakdown) => ` Por separado, ${breakdown} de unidades de tokens falsificados sin valor de mercado fueron enviados a direcciones asociadas al patrón coordinado.`,
     footnoteTail: ' Ver Análisis de Técnicas de Ataque. Los fondos reales se perdieron por confusión visual de direcciones, no fueron transferidos legítimamente; las unidades de tokens falsificados no tienen valor y se reportan por separado.',
   },
   timeline: {

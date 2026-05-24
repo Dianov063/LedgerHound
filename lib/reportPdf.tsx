@@ -303,13 +303,11 @@ const SummaryPage = ({ data, t, country }: { data: ReportData; t: ReportTranslat
             <Text style={{ fontSize: 8, color: slate600 }}>{t.exec.baseline}</Text>
             <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate400 }}>50</Text>
           </View>
-          <RiskBreakdownRow label={t.exec.rowUnknownWallet} score={bd.unknownWalletInteraction} />
-          <RiskBreakdownRow label={t.exec.rowMixer} score={bd.mixerInteraction} />
-          <RiskBreakdownRow label={t.exec.rowKycExchange} score={bd.exchangeInteraction} />
-          <RiskBreakdownRow label={t.exec.rowMultiHop} score={bd.multiHopTransfers} />
-          <RiskBreakdownRow label={t.exec.rowStablecoin} score={bd.stablecoinUsage} />
-          <RiskBreakdownRow label={t.exec.rowOfac} score={bd.sanctionedAddress} />
-          <RiskBreakdownRow label={t.exec.rowScamDb} score={bd.scamDbMatch} />
+          {/* Phase 3.1 Stage 12 (P0-1): rows are the actual scored factors, built
+              in generateReport so baseline (50) + these always equal the total. */}
+          {bd.map((row, i) => (
+            <RiskBreakdownRow key={i} label={row.label} score={row.value} />
+          ))}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, paddingHorizontal: 8, backgroundColor: '#f1f5f9', borderRadius: 4, marginTop: 4 }}>
             <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: slate900 }}>{t.exec.totalRiskScore}</Text>
             <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: riskColor(data.riskScore) }}>{data.riskScore} {riskLabelL}</Text>
@@ -462,7 +460,7 @@ function calculateInvestigationDifficulty(data: ReportData, t: ReportTranslation
   const r = t.readiness;
   const factors: { positive: boolean; text: string }[] = [];
   let d = 50;
-  const hasMixer = data.identifiedEntities?.some(e => e.type === 'mixer') || (data.riskBreakdown?.mixerInteraction ?? 0) > 0;
+  const hasMixer = data.identifiedEntities?.some(e => e.type === 'mixer') ?? false;
   const hasCrossChain = data.crossChainTrace?.detected === true;
   const ap = data.attackTechniques?.addressPoisoning;
 
@@ -675,7 +673,7 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
       <View style={{ backgroundColor: '#eff6ff', borderRadius: 6, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#bfdbfe' }}>
         <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: blue, marginBottom: 4 }}>{t.investigation.ifYouSentFunds}</Text>
         <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.5, marginBottom: 3 }}>
-          {t.investigation.transactionPath(n.walletTypeLabel)}{n.primaryExitExchange ? t.investigation.cashOutSuffix(n.primaryExitExchange) : ''}
+          {t.investigation.transactionPath(n.walletTypeLabel)}{(data.exitPointAnalysis?.hasKycExit && n.primaryExitExchange) ? t.investigation.cashOutSuffix(n.primaryExitExchange) : t.investigation.counterpartyGroupSuffix}
         </Text>
         <Text style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>{t.investigation.toLocateTransaction}</Text>
         <Text style={{ fontSize: 7, color: slate600, paddingLeft: 8 }}>1. {t.investigation.locateStep1}</Text>
