@@ -25,6 +25,7 @@ const pages = [
   { path: '/graph-tracer', priority: 0.9, changeFreq: 'weekly' },
   { path: '/recovery-calculator', priority: 0.9, changeFreq: 'weekly' },
   { path: '/report', priority: 0.9, changeFreq: 'weekly' },
+  { path: '/whats-included', priority: 0.7, changeFreq: 'monthly' },
   { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
   { path: '/tx-lookup', priority: 0.9, changeFreq: 'weekly' },
   { path: '/scam-database', priority: 0.9, changeFreq: 'daily' },

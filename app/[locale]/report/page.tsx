@@ -391,6 +391,13 @@ export default function ReportPage() {
                     <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</p>
                   )}
 
+                  <Link
+                    href={`${base}/whats-included`}
+                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline"
+                  >
+                    <FileText size={12} /> {locale === 'es' ? 'Ver qué incluye el informe' : "See what's included in the report"}
+                  </Link>
+
                   <button
                     onClick={handleSubmit}
                     disabled={!canSubmit}
