@@ -7,6 +7,12 @@ export default function Footer() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 
+  // Active-investigation page label (localized inline; brand stays "DZHLWK").
+  const dzhlwkLabel: Record<string, string> = {
+    en: 'DZHLWK Victims', es: 'Víctimas DZHLWK', ru: 'Пострадавшие DZHLWK',
+    zh: 'DZHLWK 受害者', fr: 'Victimes DZHLWK', ar: 'ضحايا DZHLWK',
+  };
+
   const services = [
     { href: `${base}/services/crypto-tracing`, label: t('crypto_tracing') },
     { href: `${base}/services/romance-scams`, label: t('romance_scams') },
@@ -24,6 +30,7 @@ export default function Footer() {
     { href: `${base}/about`, label: t('about') },
     { href: `${base}/blog`, label: t('blog') },
     { href: `${base}/cases`, label: t('cases') },
+    { href: `${base}/dzhlwk-victims`, label: dzhlwkLabel[locale] || dzhlwkLabel.en },
     { href: `${base}/investigators`, label: 'Investigators' },
     { href: `${base}/join-network`, label: 'Join Network' },
     { href: `${base}/contact`, label: t('contact') },

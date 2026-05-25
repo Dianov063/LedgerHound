@@ -11,6 +11,16 @@ import { makeMetadata } from '@/lib/metadata';
 import { getAllBlogPosts } from '@/lib/blog/posts';
 import { formatBlogDate, categoryKey } from '@/lib/blog/format-blog-meta';
 
+// Active-investigation banner (DZHLWK). Inline per-locale to avoid threading new
+// keys through all six messages/*.json files; matches the site's 6 locales.
+const DZHLWK_BANNER: Record<string, { text: string; cta: string }> = {
+  en: { text: 'Active investigation: are you a DZHLWK crypto-fraud victim?', cta: 'Join the coordinated case' },
+  es: { text: 'Investigación activa: ¿es víctima del fraude cripto DZHLWK?', cta: 'Únase al caso coordinado' },
+  ru: { text: 'Активное расследование: вы пострадали от криптомошенничества DZHLWK?', cta: 'Присоединиться к делу' },
+  zh: { text: '正在进行的调查：您是 DZHLWK 加密货币诈骗的受害者吗？', cta: '加入协同案件' },
+  fr: { text: "Enquête en cours : êtes-vous victime de l'arnaque crypto DZHLWK ?", cta: 'Rejoindre le dossier coordonné' },
+  ar: { text: 'تحقيق جارٍ: هل أنت ضحية لاحتيال DZHLWK للعملات الرقمية؟', cta: 'انضم إلى القضية المنسّقة' },
+};
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
   return await makeMetadata({
@@ -166,6 +176,17 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* ─── DZHLWK active-investigation banner ─── */}
+      <Link href={`${base}/dzhlwk-victims`} className="block bg-red-600 hover:bg-red-700 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-white text-sm font-semibold">
+          <Shield size={16} className="flex-shrink-0" />
+          <span>{(DZHLWK_BANNER[locale] || DZHLWK_BANNER.en).text}</span>
+          <span className="inline-flex items-center gap-1 underline underline-offset-2">
+            {(DZHLWK_BANNER[locale] || DZHLWK_BANNER.en).cta} <ArrowRight size={14} />
+          </span>
+        </div>
+      </Link>
 
       {/* ─── STATS ─── */}
       <section className="py-14 bg-white">
