@@ -11,11 +11,14 @@ const intlMiddleware = createMiddleware({
 
 const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+  // Google Analytics 4 (@next/third-parties): tag is loaded from googletagmanager
+  // and beacons go to *.google-analytics.com (region-prefixed: region1.*, etc.)
+  // plus analytics.google.com. Wildcard kept so non-US regions also report.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self' https://api.stripe.com https://*.alchemy.com https://*.etherscan.io",
+  "connect-src 'self' https://api.stripe.com https://*.alchemy.com https://*.etherscan.io https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com",
   "frame-src https://js.stripe.com",
 ].join('; ');
 
