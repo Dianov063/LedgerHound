@@ -10,7 +10,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-syne)', 'sans-serif'],
+        display: ['var(--font-manrope)', 'sans-serif'],
       },
       colors: {
         brand: {

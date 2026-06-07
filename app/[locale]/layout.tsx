@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Syne } from 'next/font/google';
+import { Inter, Manrope } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
@@ -13,9 +13,10 @@ const inter = Inter({
   display: 'swap',
 });
 
-const syne = Syne({
-  subsets: ['latin'],
-  variable: '--font-syne',
+const manrope = Manrope({
+  // Manrope ships Cyrillic, unlike Syne — so RU headings get real glyphs now too.
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-manrope',
   display: 'swap',
 });
 
@@ -77,7 +78,7 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={isRtl ? 'rtl' : 'ltr'}
-      className={`${inter.variable} ${syne.variable}`}
+      className={`${inter.variable} ${manrope.variable}`}
     >
       <body className="font-sans antialiased bg-white text-slate-900">
         <NextIntlClientProvider messages={messages}>

@@ -3,13 +3,12 @@
 @tailwind utilities;
 
 @layer base {
-  /* NOTE: do NOT define --font-inter / --font-syne here. next/font (see
+  /* NOTE: do NOT define --font-inter / --font-manrope here. next/font (see
      app/[locale]/layout.tsx) owns these variables and self-hosts the optimized
      fonts under hashed names applied via a class on <html>. A bare :root rule
      has the SAME specificity as that single-class rule, so redefining the
-     variables here ("'Syne', sans-serif" — a font that isn't loaded by name)
-     made the winner depend on CSS source order and could silently drop Syne
-     from every heading. Let next/font be the sole source of truth. */
+     variables here would make the winner depend on CSS source order and could
+     silently drop the heading font. Let next/font be the sole source of truth. */
 
   html {
     scroll-behavior: smooth;
