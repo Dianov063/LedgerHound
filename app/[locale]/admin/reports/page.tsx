@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { FileText, Download, Shield, Lock, RefreshCw } from 'lucide-react';
 
 interface ReportEntry {
@@ -25,31 +24,38 @@ export default function AdminReportsPage() {
 }
 
 function AdminReportsContent() {
-  const searchParams = useSearchParams();
-  const password = searchParams.get('password') || '';
-
+  // Security fix: the admin key is sent via the x-admin-key header (matching the
+  // API) and kept in sessionStorage — NEVER in the URL, where it would leak into
+  // browser history, server logs, and Referer headers. Same pattern as
+  // /admin/investigators.
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [inputPw, setInputPw] = useState(password);
-  const [authed, setAuthed] = useState(!!password);
+  const [inputPw, setInputPw] = useState('');
+  const [adminPw, setAdminPw] = useState('');
+  const [authed, setAuthed] = useState(false);
 
   const fetchReports = async (pw: string) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/admin/reports?password=${encodeURIComponent(pw)}`);
+      const res = await fetch('/api/admin/reports', {
+        headers: { 'x-admin-key': pw },
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Unauthorized');
         setAuthed(false);
         setReports([]);
+        sessionStorage.removeItem('lh-admin-key');
         return;
       }
       setReports(data.reports || []);
       setTotal(data.total || 0);
+      setAdminPw(pw);
       setAuthed(true);
+      sessionStorage.setItem('lh-admin-key', pw);
     } catch (err: any) {
       setError(err.message || 'Failed to load');
     } finally {
@@ -58,20 +64,19 @@ function AdminReportsContent() {
   };
 
   useEffect(() => {
-    if (password) {
-      fetchReports(password);
+    const saved = sessionStorage.getItem('lh-admin-key');
+    if (saved) {
+      setInputPw(saved);
+      fetchReports(saved);
     } else {
       setLoading(false);
     }
-  }, [password]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputPw) {
-      // Update URL with password param
-      window.history.replaceState(null, '', `?password=${encodeURIComponent(inputPw)}`);
-      fetchReports(inputPw);
-    }
+    if (inputPw) fetchReports(inputPw);
   };
 
   const fmtDate = (iso: string) => {
@@ -131,7 +136,7 @@ function AdminReportsContent() {
             </div>
           </div>
           <button
-            onClick={() => fetchReports(password || inputPw)}
+            onClick={() => fetchReports(adminPw || inputPw)}
             className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm"
           >
             <RefreshCw size={14} /> Refresh

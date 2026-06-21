@@ -355,8 +355,31 @@ async function fetchTxAutoDetect(hash: string): Promise<any> {
 }
 
 /* ── Route handler ── */
+/* ── Rate limiting ──
+   Every lookup fans out to paid third-party APIs (Alchemy / Blockstream /
+   Helius / TronGrid — 'auto' mode hits ALL of them in parallel), so an
+   unthrottled loop can drain the API quotas that paid report generation
+   depends on. 60/hour per IP is generous for the tx-lookup tool and for
+   internal calls from /api/scam-database/report (which share Vercel's
+   egress IP but are themselves capped at 3 reports/hour per user). */
+const RATE_LIMIT_WINDOW = 3600000;
+const rateLimit = new Map<string, { count: number; reset: number }>();
+setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const now = Date.now();
+    const entry = rateLimit.get(ip);
+    if (entry && entry.reset > now) {
+      if (entry.count >= 60) {
+        return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+      }
+      entry.count++;
+    } else {
+      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    }
+
     const { hash, network } = await req.json();
 
     if (!hash || typeof hash !== 'string') {

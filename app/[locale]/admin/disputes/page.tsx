@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Shield, Lock, RefreshCw, Scale, Clock, CheckCircle2, XCircle, Eye, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
 interface Dispute {
@@ -34,14 +33,15 @@ export default function AdminDisputesPage() {
 }
 
 function AdminDisputesContent() {
-  const searchParams = useSearchParams();
-  const password = searchParams.get('password') || '';
-
+  // Security fix: admin key goes in the x-admin-key header (matching the API)
+  // and lives in sessionStorage — never in the URL (history/log/Referer leak).
+  // Same pattern as /admin/investigators.
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [inputPw, setInputPw] = useState(password);
-  const [authed, setAuthed] = useState(!!password);
+  const [inputPw, setInputPw] = useState('');
+  const [adminPw, setAdminPw] = useState('');
+  const [authed, setAuthed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
@@ -51,15 +51,20 @@ function AdminDisputesContent() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/scam-database/admin?password=${encodeURIComponent(pw)}`);
+      const res = await fetch('/api/scam-database/admin', {
+        headers: { 'x-admin-key': pw },
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Unauthorized');
         setAuthed(false);
+        sessionStorage.removeItem('lh-admin-key');
         return;
       }
       setDisputes(data.disputes || []);
+      setAdminPw(pw);
       setAuthed(true);
+      sessionStorage.setItem('lh-admin-key', pw);
     } catch (err: any) {
       setError(err.message || 'Failed to load');
     } finally {
@@ -68,24 +73,27 @@ function AdminDisputesContent() {
   };
 
   useEffect(() => {
-    if (password) fetchDisputes(password);
-    else setLoading(false);
-  }, [password]);
+    const saved = sessionStorage.getItem('lh-admin-key');
+    if (saved) {
+      setInputPw(saved);
+      fetchDisputes(saved);
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputPw) {
-      window.history.replaceState(null, '', `?password=${encodeURIComponent(inputPw)}`);
-      fetchDisputes(inputPw);
-    }
+    if (inputPw) fetchDisputes(inputPw);
   };
 
   const updateStatus = async (disputeId: string, newStatus: string, sendEmail: boolean = false) => {
     setActionLoading(disputeId);
     try {
-      const res = await fetch(`/api/scam-database/admin?password=${encodeURIComponent(password || inputPw)}`, {
+      const res = await fetch('/api/scam-database/admin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminPw || inputPw },
         body: JSON.stringify({
           action: 'updateDispute',
           disputeId,
@@ -164,11 +172,11 @@ function AdminDisputesContent() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a href={`/admin/reports?password=${encodeURIComponent(password || inputPw)}`} className="text-sm text-slate-400 hover:text-white transition-colors">
+            <a href="/admin/reports" className="text-sm text-slate-400 hover:text-white transition-colors">
               Reports Dashboard →
             </a>
             <button
-              onClick={() => fetchDisputes(password || inputPw)}
+              onClick={() => fetchDisputes(adminPw || inputPw)}
               className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm"
             >
               <RefreshCw size={14} /> Refresh
