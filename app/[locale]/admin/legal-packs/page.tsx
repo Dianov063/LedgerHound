@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   Lock,
   RefreshCw,
@@ -51,12 +50,12 @@ export default function AdminLegalPacksPage() {
 }
 
 function AdminLegalPacksContent() {
-  const searchParams = useSearchParams();
-  const passwordParam = searchParams.get('password') || '';
-
-  const [inputPw, setInputPw] = useState(passwordParam);
-  const [authed, setAuthed] = useState(!!passwordParam);
-  const [password, setPassword] = useState(passwordParam);
+  // Security fix (P1c): admin key goes in the x-admin-key header and lives in
+  // sessionStorage — never in the URL (history/log/screenshot/Referer leak).
+  // Shared 'lh-admin-key' with the other admin pages so one login covers all.
+  const [inputPw, setInputPw] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [password, setPassword] = useState('');
 
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,10 +89,13 @@ function AdminLegalPacksContent() {
         if (!res.ok) {
           setError(data.error || 'Unauthorized');
           setAuthed(false);
+          sessionStorage.removeItem('lh-admin-key');
           return;
         }
         setPipelineStatus(data);
+        setPassword(pw);
         setAuthed(true);
+        sessionStorage.setItem('lh-admin-key', pw);
       } catch (err: any) {
         setError(err.message || 'Failed to load');
       } finally {
@@ -104,21 +106,19 @@ function AdminLegalPacksContent() {
   );
 
   useEffect(() => {
-    if (passwordParam) {
-      setPassword(passwordParam);
-      fetchList(passwordParam);
+    const saved = sessionStorage.getItem('lh-admin-key');
+    if (saved) {
+      setInputPw(saved);
+      fetchList(saved);
     } else {
       setLoading(false);
     }
-  }, [passwordParam, fetchList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputPw) {
-      setPassword(inputPw);
-      window.history.replaceState(null, '', `?password=${encodeURIComponent(inputPw)}`);
-      fetchList(inputPw);
-    }
+    if (inputPw) fetchList(inputPw);
   };
 
   const refreshCountry = async (code: string) => {
@@ -127,7 +127,7 @@ function AdminLegalPacksContent() {
       const res = await fetch('/api/legal-packs', {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ action: 'refresh', country: code }),
+        body: JSON.stringify({ action: 'refresh', countryCode: code }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
@@ -146,7 +146,7 @@ function AdminLegalPacksContent() {
       const res = await fetch('/api/legal-packs', {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ action: 'generate-pdf', country: code }),
+        body: JSON.stringify({ action: 'generate-pdf', countryCode: code }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'PDF generation failed');
@@ -159,20 +159,35 @@ function AdminLegalPacksContent() {
   };
 
   const refreshAll = async () => {
+    // The API is per-country (requires countryCode), so "Refresh All" iterates
+    // the configured countries sequentially. Sequential, not parallel: each
+    // refresh runs an Anthropic research call + template generation, so we avoid
+    // hammering the model and surface per-country failures without aborting the rest.
     setRefreshingAll(true);
+    const failures: string[] = [];
     try {
-      const res = await fetch('/api/legal-packs', {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ action: 'refresh' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Refresh all failed');
+      for (const c of COUNTRIES) {
+        setRefreshingCountry(c.code);
+        try {
+          const res = await fetch('/api/legal-packs', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ action: 'refresh', countryCode: c.code }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Refresh failed');
+        } catch (err: any) {
+          failures.push(`${c.code}: ${err.message}`);
+        }
+      }
+      setRefreshingCountry(null);
       await fetchList(password);
+      if (failures.length) alert(`Some countries failed:\n${failures.join('\n')}`);
     } catch (err: any) {
       alert(`Error refreshing all: ${err.message}`);
     } finally {
       setRefreshingAll(false);
+      setRefreshingCountry(null);
     }
   };
 

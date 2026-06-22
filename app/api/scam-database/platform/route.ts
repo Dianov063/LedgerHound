@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
 import { getPlatformBySlug, getReportsForPlatform } from '@/lib/scam-db';
 
+// Reads request.url (query params) → must be dynamic, like the sibling scam-db
+// API routes. Silences the build-time "Dynamic server usage" warning.
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

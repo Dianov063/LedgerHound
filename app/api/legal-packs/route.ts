@@ -9,6 +9,14 @@ export const revalidate = 0;
 // ── GET /api/legal-packs?action=... ──
 
 export async function GET(req: NextRequest) {
+  // SECURITY (P0): the GET branch reads private research/status from S3 and, for
+  // action=pdf-url, mints a 24h signed download URL to generated legal packs.
+  // It MUST require the same admin auth as POST — otherwise anyone can pull
+  // signed URLs and research data. The admin UI already sends x-admin-key on
+  // every GET call, so this does not break it.
+  const authError = checkAdmin(req);
+  if (authError) return authError;
+
   try {
     const { searchParams } = req.nextUrl;
     const action = searchParams.get('action');
