@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
     },
     admin: {
       hasPassword: !!process.env.ADMIN_PASSWORD,
+    },
+    rateLimit: {
+      hasUpstash: !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN,
     }
   });
 }

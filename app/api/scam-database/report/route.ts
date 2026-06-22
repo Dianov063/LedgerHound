@@ -1,26 +1,16 @@
 import { NextRequest } from 'next/server';
 import { saveReport, isTxidUsed, calcRecoveryScore } from '@/lib/scam-db';
 import type { ScamType } from '@/lib/scam-db';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_TYPES: ScamType[] = ['fake_exchange', 'pig_butchering', 'rug_pull', 'phishing', 'ponzi', 'other'];
-
-/* Rate limiting */
-const RATE_LIMIT_WINDOW = 3600000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
 
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 3) {
-        return Response.json({ error: 'Too many reports. Try again in 1 hour.' }, { status: 429 });
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    const rl = await checkRateLimit(ip, { name: 'scam-report', limit: 3, windowSec: 3600 });
+    if (!rl.success) {
+      return Response.json({ error: 'Too many reports. Try again in 1 hour.' }, { status: 429 });
     }
 
     const body = await req.json();

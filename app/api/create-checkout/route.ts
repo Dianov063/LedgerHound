@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const getStripe = () => {
   // @ts-expect-error Stripe types mismatch with ESM default import
@@ -31,22 +32,12 @@ const ADDRESS_VALIDATORS: Record<string, RegExp> = {
   polygon: /^0x[a-fA-F0-9]{40}$/,
 };
 
-const RATE_LIMIT_WINDOW = 3600000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
-
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 10) {
-        return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    const rl = await checkRateLimit(ip, { name: 'checkout', limit: 10, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
     }
 
     const { walletAddress, email, network = 'eth', locale, country } = await req.json();

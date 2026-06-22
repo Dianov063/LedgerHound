@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const getS3 = () =>
   new S3Client({
@@ -23,10 +24,6 @@ const getStripe = () => {
 };
 
 /* ── Rate limiter: 5/hour per IP ── */
-const RATE_LIMIT_WINDOW = 3600000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
-
 /* ── Product definitions ── */
 const PRODUCTS = {
   emergency_pack: {
@@ -47,18 +44,12 @@ export async function POST(req: NextRequest) {
   try {
     /* ── Rate limiting ── */
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 5) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded. Try again later.' },
-          { status: 429 },
-        );
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    const rl = await checkRateLimit(ip, { name: 'emergency-checkout', limit: 5, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429 },
+      );
     }
 
     /* ── Parse body ── */

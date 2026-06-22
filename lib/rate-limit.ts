@@ -1,6 +1,17 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
+/**
+ * Rate limiting with Upstash (Redis) as the shared, cross-instance store and a
+ * process-local in-memory fallback (fallback "A").
+ *
+ * Why the fallback: on Vercel serverless an in-memory-only limiter is unreliable
+ * (resets on cold start, not shared between concurrent instances). Upstash fixes
+ * that. But if Upstash is not configured OR is momentarily unreachable, we must
+ * NOT silently drop all protection — we fall back to the in-memory limiter so a
+ * (weaker, process-local) limit still applies. Service stays up either way.
+ */
+
 const redis = process.env.UPSTASH_REDIS_REST_URL
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
@@ -8,45 +19,77 @@ const redis = process.env.UPSTASH_REDIS_REST_URL
     })
   : null;
 
-export const apiRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(10, '1 m'),
-      analytics: true,
-      prefix: 'rl:api',
-    })
-  : null;
+/** True when Upstash is configured (surfaced via /api/check-env for ops). */
+export const hasUpstash = !!redis;
 
-export const checkoutRateLimit = redis
-  ? new Ratelimit({
+// Cache one Upstash limiter per unique (name, limit, windowSec) so repeated
+// calls reuse the same instance instead of rebuilding it per request.
+const upstashCache = new Map<string, Ratelimit>();
+function getUpstashLimiter(name: string, limit: number, windowSec: number): Ratelimit | null {
+  if (!redis) return null;
+  const key = `${name}:${limit}:${windowSec}`;
+  let rl = upstashCache.get(key);
+  if (!rl) {
+    rl = new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(5, '1 m'),
+      // fixedWindow matches the routes' original semantics (count resets at the
+      // end of a fixed window) and is cheap on Redis.
+      limiter: Ratelimit.fixedWindow(limit, `${windowSec} s`),
       analytics: true,
-      prefix: 'rl:checkout',
-    })
-  : null;
+      prefix: `rl:${name}`,
+    });
+    upstashCache.set(key, rl);
+  }
+  return rl;
+}
 
-export const adminRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(5, '1 m'),
-      analytics: true,
-      prefix: 'rl:admin',
-    })
-  : null;
+// ── In-memory fallback (process-local fixed window) ──
+const memStore = new Map<string, { count: number; reset: number }>();
+setInterval(() => {
+  const now = Date.now();
+  Array.from(memStore.entries()).forEach(([k, v]) => { if (v.reset <= now) memStore.delete(k); });
+}, 600000).unref?.();
 
+function checkMemory(key: string, limit: number, windowSec: number): { success: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = memStore.get(key);
+  if (entry && entry.reset > now) {
+    if (entry.count >= limit) return { success: false, remaining: 0 };
+    entry.count++;
+    return { success: true, remaining: limit - entry.count };
+  }
+  memStore.set(key, { count: 1, reset: now + windowSec * 1000 });
+  return { success: true, remaining: limit - 1 };
+}
+
+export interface RateLimitConfig {
+  /** Stable bucket name → Redis key prefix + in-memory namespace. */
+  name: string;
+  /** Max requests allowed within the window. */
+  limit: number;
+  /** Window length in seconds. */
+  windowSec: number;
+}
+
+/**
+ * Check (and consume) one unit against the limit for `identifier` (usually IP).
+ * Tries Upstash first; on missing config OR runtime error falls back to the
+ * in-memory limiter (fallback A). Never throws.
+ */
 export async function checkRateLimit(
   identifier: string,
-  limiter: Ratelimit | null = apiRateLimit
-): Promise<{ success: boolean; remaining: number }> {
-  if (!limiter) {
-    return { success: true, remaining: 999 };
+  config: RateLimitConfig,
+): Promise<{ success: boolean; remaining: number; backend: 'upstash' | 'memory' }> {
+  const { name, limit, windowSec } = config;
+  const limiter = getUpstashLimiter(name, limit, windowSec);
+  if (limiter) {
+    try {
+      const r = await limiter.limit(identifier);
+      return { success: r.success, remaining: r.remaining, backend: 'upstash' };
+    } catch (err) {
+      console.warn(`[rate-limit] Upstash error for "${name}", falling back to in-memory:`, err);
+      // fall through to in-memory (fallback A)
+    }
   }
-  try {
-    const result = await limiter.limit(identifier);
-    return { success: result.success, remaining: result.remaining };
-  } catch (err) {
-    console.warn('[rate-limit] Upstash error, allowing request:', err);
-    return { success: true, remaining: 999 };
-  }
+  return { ...checkMemory(`${name}:${identifier}`, limit, windowSec), backend: 'memory' };
 }
