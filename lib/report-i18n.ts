@@ -211,7 +211,35 @@ export interface Findings {
 /** Country-specific recovery guidance (Phase 3 Part 3). */
 export interface CountryGuidance {
   peru: PeruGuidance;
+  india: IndiaGuidance;
   // TODO(Phase 3): mexico, colombia, argentina, chile, spain as content lands.
+}
+
+/** India-specific recovery resources page. English-first (India's official
+ *  fraud-reporting channels operate in English/Hindi). Rendered when country==='IN'. */
+export interface IndiaGuidance {
+  title: string;
+  intro: string;
+  // 1. I4C / National Cyber Crime Reporting Portal + 1930 helpline
+  i4cTitle: string;
+  i4cPortal: string;
+  i4cHelpline: string;
+  i4cGoldenHour: string;
+  i4cZeroFir: string;
+  i4cDescription: string;
+  // 2. Local police cyber cell / Zero FIR
+  policeTitle: string;
+  policeFir: string;
+  policeDescription: string;
+  // 3. RBI Ombudsman (RB-IOS) via CMS
+  rbiTitle: string;
+  rbiPortal: string;
+  rbiProcess: string;
+  rbiDescription: string;
+  // 4. FIU-IND registered VDA exchange grievance officer
+  exchangeTitle: string;
+  exchangeProcess: string;
+  exchangeDescription: string;
 }
 
 /** Peru-specific recovery resources page. */
@@ -752,6 +780,33 @@ export interface Investigation {
     courtUpgrade: string;
   };
 }
+
+/**
+ * India recovery-resources content. English-first (India's official fraud-
+ * reporting channels operate in English/Hindi), shared across locales until
+ * hi/bn/mr translations land. All facts verified June 2026 against official
+ * sources (cybercrime.gov.in, I4C/MHA, RBI CMS, FIU-IND).
+ */
+const INDIA_GUIDANCE: IndiaGuidance = {
+  title: 'Reporting in India — Authorities & Process',
+  intro: 'India operates a centralized cybercrime-reporting system. The fastest action for a crypto-fraud victim is to call the 1930 helpline and file on the National Cyber Crime Reporting Portal — ideally within the first hour, while funds may still be frozen at the receiving account.',
+  i4cTitle: 'I4C — National Cyber Crime Reporting Portal + 1930 Helpline',
+  i4cPortal: 'Portal: cybercrime.gov.in (NCRP — Ministry of Home Affairs / I4C)',
+  i4cHelpline: 'Helpline: 1930 — 24/7, toll-free, available in Hindi, English and major regional languages',
+  i4cGoldenHour: 'Golden hour: call 1930 within ~1 hour of the transfer — the operator can coordinate with banks to freeze the destination account before withdrawal.',
+  i4cZeroFir: 'For losses above ₹10 lakh, the e-Zero FIR initiative (since May 2025) automatically registers a Zero FIR.',
+  i4cDescription: 'This is the primary, first-stop channel for any cryptocurrency-fraud victim in India. File here first, then attach this forensic report to your complaint.',
+  policeTitle: 'Local Police — Cyber Cell / Zero FIR',
+  policeFir: 'File an FIR at your local cyber cell. A Zero FIR can be lodged at any police station regardless of jurisdiction, then transferred to the competent one.',
+  policeDescription: 'Opens the formal criminal case. Submit this LedgerHound forensic report as supporting evidence of the coordinated fraud and the on-chain fund flow.',
+  rbiTitle: 'RBI Ombudsman (RB-IOS) — via CMS',
+  rbiPortal: 'Portal: cms.rbi.org.in (Reserve Bank Integrated Ombudsman Scheme)',
+  rbiProcess: 'Complain to your bank first and allow 30 days; then escalate to the RBI Ombudsman. Compensation of up to ₹30 lakh is possible.',
+  rbiDescription: 'The banking track — relevant if your funds passed through a bank account or UPI before being converted to cryptocurrency.',
+  exchangeTitle: 'FIU-IND Registered Exchange — Grievance Officer',
+  exchangeProcess: 'Every Indian Virtual Digital Asset (VDA) exchange must register with FIU-IND and designate a principal officer plus a grievance-redressal mechanism.',
+  exchangeDescription: "If the trail reaches an Indian exchange, submit this forensic report to that exchange's grievance officer to request KYC disclosure and record preservation (with your police case number).",
+};
 
 const en: ReportTranslations = {
   locale: 'en',
@@ -1415,6 +1470,7 @@ const en: ReportTranslations = {
       documentsTether: 'tether-legal-es.md — Email to Tether Legal (send after you have the police case number).',
       documentsOrder: 'Each template references this forensic report as supporting evidence.',
     },
+    india: INDIA_GUIDANCE,
   },
 };
 
@@ -2080,6 +2136,7 @@ const es: ReportTranslations = {
       documentsTether: 'tether-legal-es.md — Email a Tether Legal (enviar después de tener el número de expediente policial).',
       documentsOrder: 'Cada plantilla referencia este informe forense como evidencia de apoyo.',
     },
+    india: INDIA_GUIDANCE,
   },
 };
 

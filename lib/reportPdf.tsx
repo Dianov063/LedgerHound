@@ -2236,6 +2236,67 @@ const PeruGuidancePage = ({ data, t }: { data: ReportData; t: ReportTranslations
 };
 
 /* ═══════════════════════════════════════════════════════════════
+   COUNTRY GUIDANCE: INDIA (rendered when country === 'IN', any locale —
+   India's official fraud-reporting channels operate in English/Hindi)
+   ═══════════════════════════════════════════════════════════════ */
+const IndiaGuidancePage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
+  const ig = t.countryGuidance.india;
+
+  const OrgCard = ({
+    num, color, title, lines, description,
+  }: { num: number; color: string; title: string; lines: string[]; description: string }) => (
+    <View style={{ ...s.card, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: color }}>
+      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color, marginBottom: 3 }}>
+        {num}. {title}
+      </Text>
+      {lines.map((ln, i) => (
+        <Text key={i} style={{ fontSize: 8, color: slate900, marginBottom: 1 }}>{ln}</Text>
+      ))}
+      <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, marginTop: 4 }}>{description}</Text>
+    </View>
+  );
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Header data={data} t={t} />
+      <Text style={s.h2}>{ig.title}</Text>
+      <Text style={{ ...s.p, fontSize: 9 }}>{ig.intro}</Text>
+
+      <OrgCard
+        num={1}
+        color={blue}
+        title={ig.i4cTitle}
+        lines={[ig.i4cPortal, ig.i4cHelpline, ig.i4cGoldenHour, ig.i4cZeroFir]}
+        description={ig.i4cDescription}
+      />
+      <OrgCard
+        num={2}
+        color={purple}
+        title={ig.policeTitle}
+        lines={[ig.policeFir]}
+        description={ig.policeDescription}
+      />
+      <OrgCard
+        num={3}
+        color={green}
+        title={ig.rbiTitle}
+        lines={[ig.rbiPortal, ig.rbiProcess]}
+        description={ig.rbiDescription}
+      />
+      <OrgCard
+        num={4}
+        color={amber}
+        title={ig.exchangeTitle}
+        lines={[ig.exchangeProcess]}
+        description={ig.exchangeDescription}
+      />
+
+      <Footer data={data} t={t} />
+    </Page>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
    PAGE 11/12: ACTIONABLE NEXT STEPS
    ═══════════════════════════════════════════════════════════════ */
 const ActionableStepsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
@@ -2498,6 +2559,9 @@ export const ReportDocument = ({ data, locale, country, reportHash }: { data: Re
   // TODO: add ArgentinaGuidancePage / ChileGuidancePage
   // TODO: add SpainGuidancePage (Policía Nacional, Banco de España, etc.)
   const showPeruGuidance = locale === 'es' && country === 'PE';
+  // India guidance is English-first (official channels operate in English/Hindi),
+  // so it renders for country === 'IN' in ANY locale.
+  const showIndiaGuidance = country === 'IN';
 
   return (
     <Document>
@@ -2516,6 +2580,7 @@ export const ReportDocument = ({ data, locale, country, reportHash }: { data: Re
       <TransactionsPage data={data} t={t} />
       <RecoveryLegalPage data={data} t={t} />
       {showPeruGuidance && <PeruGuidancePage data={data} t={t} />}
+      {showIndiaGuidance && <IndiaGuidancePage data={data} t={t} />}
       <ActionableStepsPage data={data} t={t} />
       <DisclaimerPage data={data} t={t} reportHash={reportHash} />
     </Document>

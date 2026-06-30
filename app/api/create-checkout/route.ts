@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     // Phase 3: victim's country. Unlocks country-specific recovery guidance.
     // Only a known allow-list is honoured; anything else (incl. empty) becomes
     // '' → report falls back to generic guidance.
-    const ALLOWED_COUNTRIES = ['PE', 'MX', 'CO', 'AR', 'CL', 'ES', 'US', 'OTHER'];
+    const ALLOWED_COUNTRIES = ['PE', 'IN', 'MX', 'CO', 'AR', 'CL', 'ES', 'US', 'OTHER'];
     const reportCountry = (typeof country === 'string' && ALLOWED_COUNTRIES.includes(country)) ? country : '';
 
     const net = (network || 'eth').toLowerCase();

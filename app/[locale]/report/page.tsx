@@ -37,6 +37,7 @@ const NETWORKS: { id: Network; label: string; short: string }[] = [
 const COUNTRY_OPTIONS: { code: string; en: string; es: string }[] = [
   { code: '', en: 'Not specified', es: 'Sin especificar' },
   { code: 'PE', en: 'Peru', es: 'Perú' },
+  { code: 'IN', en: 'India', es: 'India' },
   { code: 'MX', en: 'Mexico', es: 'México' },
   { code: 'CO', en: 'Colombia', es: 'Colombia' },
   { code: 'AR', en: 'Argentina', es: 'Argentina' },
