@@ -42,6 +42,17 @@ interface ScamPlatform {
   blockchainVerifiedCount: number;
   firstReported: string;
   lastReported: string;
+  sources?: PlatformSource[];
+}
+
+interface PlatformSource {
+  type: string;
+  authority: string;
+  reference?: string;
+  url: string;
+  date: string;
+  note?: string;
+  clonesLegitimate?: string;
 }
 
 interface SafeReport {
@@ -214,11 +225,32 @@ export default function PlatformPage() {
 
   const trustInfo = getTrustLabel(platform.trustScore);
 
+  // ── Source-aware framing ──
+  // A "source-listed" entry (regulator warning / OFAC / Etherscan tag) has no
+  // victim reports of its own — it restates a published third-party finding. Its
+  // public copy must cite that source, never say "reported by 0 victims" or make
+  // an unqualified "Yes, it's a scam" claim. Clone-firm entries name the impersonated
+  // legitimate firm — which must NEVER itself be presented as the scam.
+  const sources = platform.sources ?? [];
+  const isSourceListed = sources.length > 0;
+  const primarySource = sources[0];
+  const cloneOf = sources.find((s) => s.clonesLegitimate)?.clonesLegitimate;
+  const flaggedSummary = isSourceListed
+    ? (cloneOf
+        ? `Listed by ${primarySource.authority} on ${formatDate(primarySource.date)} as a clone firm impersonating ${cloneOf}.`
+        : `Listed by ${primarySource.authority} on ${formatDate(primarySource.date)}${primarySource.note ? ` — ${primarySource.note}` : '.'}`)
+    : '';
+
+  const faqScamAnswer = isSourceListed
+    ? `${platform.name} appears on the ${primarySource.authority} warning list (${formatDate(primarySource.date)})${cloneOf ? ` as a clone firm impersonating ${cloneOf}` : ''}. This entry restates that published warning — verify at the primary source before acting. Exercise extreme caution.`
+    : `Yes. ${platform.name} has been reported by ${platform.victims} victims with total losses of ${formatLoss(platform.totalLoss)}.${platform.verified ? ' Multiple reports have been blockchain-verified.' : ''} Exercise extreme caution.`;
+
   const schemaClaimReview = {
     '@context': 'https://schema.org',
     '@type': 'ClaimReview',
     claimReviewed: `${platform.name} is a legitimate exchange`,
     author: { '@type': 'Organization', name: 'LedgerHound' },
+    ...(isSourceListed ? { itemReviewed: { '@type': 'CreativeWork', url: primarySource.url } } : {}),
     reviewRating: {
       '@type': 'Rating',
       ratingValue: '1',
@@ -237,7 +269,7 @@ export default function PlatformPage() {
         name: `Is ${platform.name} a scam?`,
         acceptedAnswer: {
           '@type': 'Answer',
-          text: `Yes. ${platform.name} has been reported by ${platform.victims} victims with total losses of ${formatLoss(platform.totalLoss)}.${platform.verified ? ' Multiple reports have been blockchain-verified.' : ''} Exercise extreme caution.`,
+          text: faqScamAnswer,
         },
       },
       {
@@ -272,12 +304,25 @@ export default function PlatformPage() {
                     </span>
                   )}
                 </div>
-                <p className="font-display font-bold text-lg text-red-800">
-                  {t('warning_prefix')} {platform.name} {t('warning_reported')} {platform.victims} {t('warning_victims')}
-                </p>
-                <p className="text-red-700 text-sm mt-1">
-                  {t('warning_losses')} {formatLoss(platform.totalLoss)}. {t('warning_caution')}
-                </p>
+                {isSourceListed ? (
+                  <>
+                    <p className="font-display font-bold text-lg text-red-800">
+                      {platform.name} — {flaggedSummary}
+                    </p>
+                    <p className="text-red-700 text-sm mt-1">
+                      This entry restates a published third-party warning (see sources below). {t('warning_caution')}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display font-bold text-lg text-red-800">
+                      {t('warning_prefix')} {platform.name} {t('warning_reported')} {platform.victims} {t('warning_victims')}
+                    </p>
+                    <p className="text-red-700 text-sm mt-1">
+                      {t('warning_losses')} {formatLoss(platform.totalLoss)}. {t('warning_caution')}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -286,12 +331,46 @@ export default function PlatformPage() {
             {t('platform_h1_prefix')} {platform.name} {t('platform_h1_suffix')}
           </h1>
           <p className="text-slate-600">
-            {platform.victims} {t('platform_victims_report')}
+            {isSourceListed
+              ? flaggedSummary
+              : `${platform.victims} ${t('platform_victims_report')}`}
           </p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Corroborating sources — the legal spine of a source-listed entry */}
+        {isSourceListed && (
+          <section className="mb-10">
+            <h2 className="font-display font-bold text-lg text-slate-900 mb-1">Corroborating sources</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              This entry restates published third-party findings. Each source links to its primary page — verify there before acting.
+            </p>
+            <div className="space-y-3">
+              {sources.map((src, i) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
+                      {src.authority}
+                    </span>
+                    <span className="text-xs text-slate-400">{formatDate(src.date)}</span>
+                    {src.reference && <span className="text-xs text-slate-400 font-mono">{src.reference}</span>}
+                  </div>
+                  {src.clonesLegitimate && (
+                    <p className="text-xs text-amber-700 mb-1">
+                      Clone impersonating <strong>{src.clonesLegitimate}</strong> — the legitimate firm is not implicated.
+                    </p>
+                  )}
+                  {src.note && <p className="text-sm text-slate-600 mb-1">{src.note}</p>}
+                  <a href={src.url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline break-all">
+                    <ExternalLink size={12} /> {src.url}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">

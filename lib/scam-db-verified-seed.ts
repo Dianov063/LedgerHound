@@ -31,28 +31,116 @@ import type { ScamPlatform } from './scam-db';
  *      with admin auth
  */
 export const VERIFIED_SEED_PLATFORMS: ScamPlatform[] = [
-  // Empty until Phase 4 adds DZHLWK FINTECH LTD.
+  // Empty until reviewed entries are approved.
   //
-  // Template for future entries:
+  // Two kinds of entry — both REQUIRE a sources[] chain:
   //
-  // {
-  //   slug: 'dzhlwk-fintech',
-  //   name: 'DZHLWK FINTECH LTD',
-  //   urls: ['dzhlwk.com', 'dzhlwk.net'],
-  //   types: ['pig_butchering'],
-  //   reportIds: ['<generate via generateId()>'],
-  //   totalLoss: 625000,
-  //   lossCurrency: 'USD',
-  //   victims: 105,
-  //   addresses: [
-  //     '0x073a4abbf262d8f946866f3ce62660ee7cf4609f',  // main collector — real, verified on-chain
-  //     // ... more verified addresses
-  //   ],
-  //   verified: true,
-  //   trustScore: 95,
-  //   staffVerified: true,
-  //   blockchainVerifiedCount: 60,
-  //   firstReported: '2025-12-26',
-  //   lastReported: new Date().toISOString(),
-  // },
+  // (A) SOURCE-LISTED (regulator warning / OFAC / Etherscan). No victim reports of
+  //     our own → victims:0, totalLoss:0. The public page frames it as a factual
+  //     restatement of the source, never "reported by 0 victims". For clone-firm
+  //     warnings, set clonesLegitimate — the impersonated legit firm must NEVER be
+  //     presented as the scam.
+  //
+  //   {
+  //     slug: 'crypto-trade-365',
+  //     name: 'Crypto-Trade 365',
+  //     urls: ['<fraudulent domain from the FCA warning>'],
+  //     types: ['fake_exchange'],
+  //     reportIds: [], totalLoss: 0, lossCurrency: 'USD', victims: 0,
+  //     addresses: [],
+  //     verified: true, trustScore: 90, staffVerified: true, blockchainVerifiedCount: 0,
+  //     firstReported: '<FCA warning date>', lastReported: '<FCA warning date>',
+  //     sources: [{
+  //       type: 'regulator_warning', authority: 'FCA (UK)',
+  //       url: 'https://www.fca.org.uk/news/warnings/crypto-trade-365-clone-fca-authorised-firm',
+  //       date: '<from the FCA page>',
+  //       clonesLegitimate: '<the FCA-authorised firm being cloned>',
+  //       note: 'Clone of an FCA-authorised firm; not authorised to operate in the UK.',
+  //     }],
+  //   },
+  //
+  // (B) FORENSIC/VICTIM-REPORTED (our own case, e.g. DZHLWK). Real on-chain
+  //     evidence + Etherscan tag; victims/totalLoss come from the actual case.
+
+  // ── Batch 1: FCA clone-firm warnings (verified against fca.org.uk primary
+  //    pages, 2026-06-29). Source-listed entries: victims/totalLoss = 0 by
+  //    design — the page restates the regulator's warning, not victim reports. ──
+  {
+    slug: 'crypto-trade-365',
+    name: 'Crypto-Trade 365',
+    urls: ['crypto-trade365.com'],
+    types: ['fake_exchange'],
+    reportIds: [],
+    totalLoss: 0,
+    lossCurrency: 'USD',
+    victims: 0,
+    addresses: [],
+    verified: true,
+    trustScore: 90,
+    staffVerified: true,
+    blockchainVerifiedCount: 0,
+    firstReported: '2022-04-25',
+    lastReported: '2022-04-25',
+    sources: [{
+      type: 'regulator_warning',
+      authority: 'FCA (UK)',
+      reference: 'Clone of FRN 507958',
+      url: 'https://www.fca.org.uk/news/warnings/crypto-trade-365-clone-fca-authorised-firm',
+      date: '2022-04-25',
+      clonesLegitimate: 'Rational Foreign Exchange Limited (FRN 507958)',
+      note: 'FCA warning: clone firm impersonating an FCA-authorised firm; not authorised to operate in the UK. Fraudulent site: crypto-trade365.com.',
+    }],
+  },
+  {
+    slug: 'spreadex-fx-clone',
+    name: 'Spreadex FX (spreadexfx.com)',
+    urls: ['spreadexfx.com'],
+    types: ['fake_exchange'],
+    reportIds: [],
+    totalLoss: 0,
+    lossCurrency: 'USD',
+    victims: 0,
+    addresses: [],
+    verified: true,
+    trustScore: 90,
+    staffVerified: true,
+    blockchainVerifiedCount: 0,
+    firstReported: '2026-02-24',
+    lastReported: '2026-02-24',
+    sources: [{
+      type: 'regulator_warning',
+      authority: 'FCA (UK)',
+      reference: 'Clone of FRN 190941',
+      url: 'https://www.fca.org.uk/news/warnings/spreadex-fx-spreadfxcom-clone-fca-authorised-firm',
+      date: '2026-02-24',
+      clonesLegitimate: 'Spreadex Limited (FRN 190941)',
+      note: 'FCA warning: clone firm impersonating an FCA-authorised firm; not authorised or registered by the FCA. Fraudulent site: spreadexfx.com.',
+    }],
+  },
+  {
+    slug: 'global-markets-ltd-clone',
+    name: 'Global Markets Ltd (globalmarketsltd.org)',
+    urls: ['globalmarketsltd.org', 'cabinet.globalmarketsltd.org'],
+    types: ['fake_exchange'],
+    reportIds: [],
+    totalLoss: 0,
+    lossCurrency: 'USD',
+    victims: 0,
+    addresses: [],
+    verified: true,
+    trustScore: 90,
+    staffVerified: true,
+    blockchainVerifiedCount: 0,
+    firstReported: '2026-03-17',
+    lastReported: '2026-03-17',
+    sources: [{
+      type: 'regulator_warning',
+      authority: 'FCA (UK)',
+      reference: 'Clone of FRN 124384',
+      url: 'https://www.fca.org.uk/news/warnings/global-markets-ltd-clone-fca-authorised-firm',
+      date: '2026-03-17',
+      clonesLegitimate: 'Citigroup Global Markets Limited (FRN 124384)',
+      note: 'FCA warning: clone firm impersonating an FCA-authorised firm; not authorised or registered by the FCA. Fraudulent sites: globalmarketsltd.org, cabinet.globalmarketsltd.org.',
+    }],
+  },
 ];

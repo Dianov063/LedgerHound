@@ -16,6 +16,37 @@ const PREFIX = 'scam-database';
 /* ── Types ── */
 export type ScamType = 'fake_exchange' | 'pig_butchering' | 'rug_pull' | 'phishing' | 'ponzi' | 'other';
 
+/**
+ * External corroborating source for a platform entry. This is the legal spine of
+ * the public scam-database: every seeded platform states WHO flagged it and WHERE,
+ * so an entry is a factual restatement of a published third-party finding — not
+ * LedgerHound's own accusation. Ordered by evidentiary weight in getSourceWeight.
+ */
+export type PlatformSourceType =
+  | 'regulator_warning'   // FCA / SEC / CFTC / ASIC / CSA warning or alert list
+  | 'ofac_sdn'            // US Treasury OFAC sanctions listing
+  | 'court_doj'           // DOJ indictment / court filing / law-enforcement action
+  | 'etherscan_tag'       // Etherscan Fake_Phishing#### address tag
+  | 'onchain_forensic'    // LedgerHound forensic case (own analysis, with case ID)
+  | 'community_report';   // Chainabuse / community corroboration (secondary)
+
+export interface PlatformSource {
+  type: PlatformSourceType;
+  /** Issuing authority as published, e.g. "FCA (UK)", "SEC (US)", "OFAC", "Etherscan". */
+  authority: string;
+  /** Reference/ID at the source: warning slug, case number, Fake_Phishing####, or TXID. */
+  reference?: string;
+  /** Direct link to the PRIMARY source page (regulator's own URL, not a blog). */
+  url: string;
+  /** Date the source published/listed it (ISO). Regulator warnings can be withdrawn — date matters. */
+  date: string;
+  /** Factual restatement of the source's finding, verbatim-ish. NOT our own claim. */
+  note?: string;
+  /** For clone-firm warnings: the LEGITIMATE firm being impersonated (must never be
+   *  listed as the scam itself). Present ⇒ the entry is the impersonator, not this firm. */
+  clonesLegitimate?: string;
+}
+
 export interface ScamReport {
   id: string;
   createdAt: string;
@@ -54,6 +85,9 @@ export interface ScamPlatform {
   blockchainVerifiedCount: number;
   firstReported: string;
   lastReported: string;
+  /** External corroborating sources (regulator warnings, OFAC, Etherscan, etc.).
+   *  Optional for legacy/community entries; REQUIRED for seeded platforms. */
+  sources?: PlatformSource[];
 }
 
 export interface PlatformIndexEntry {
