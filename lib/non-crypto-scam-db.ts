@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const getS3 = () =>
   new S3Client({
@@ -137,6 +137,12 @@ export interface NonCryptoStats {
   indexedEligibleIdentities: number;
   paymentProofReports: number;
   updatedAt: string;
+}
+
+export interface NonCryptoAdminSnapshot {
+  reports: NonCryptoScamReport[];
+  identities: PaymentIdentitySummary[];
+  stats: NonCryptoStats;
 }
 
 function generateId(): string {
@@ -314,6 +320,33 @@ async function s3Put(key: string, data: unknown): Promise<void> {
   }));
 }
 
+async function s3ListJson<T>(prefix: string): Promise<T[]> {
+  const out: T[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const resp = await getS3().send(new ListObjectsV2Command({
+      Bucket: bucket(),
+      Prefix: `${PREFIX}/${prefix}`,
+      ContinuationToken: continuationToken,
+    }));
+    const keys = (resp.Contents || [])
+      .map((obj) => obj.Key)
+      .filter((key): key is string => !!key && key.endsWith('.json'));
+    const settled = await Promise.allSettled(keys.map(async (key) => {
+      const data = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+      return JSON.parse(await streamToString(data.Body)) as T;
+    }));
+
+    for (const item of settled) {
+      if (item.status === 'fulfilled') out.push(item.value);
+    }
+    continuationToken = resp.IsTruncated ? resp.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return out;
+}
+
 function defaultStats(): NonCryptoStats {
   return {
     totalReports: 0,
@@ -332,6 +365,13 @@ function addUnique<T>(items: T[], item: T): void {
 function cleanShortText(value: string | undefined, maxLength = 80): string | undefined {
   const clean = collapseSpaces(value || '').slice(0, maxLength);
   return clean.length >= 3 ? clean : undefined;
+}
+
+function recalculateIdentity(summary: PaymentIdentitySummary): PaymentIdentitySummary {
+  summary.reportCount = summary.reportIds.length;
+  summary.independentReporters = summary.independentReporterKeys.length;
+  Object.assign(summary, derivePublicLevel(summary));
+  return summary;
 }
 
 export async function saveNonCryptoReport(input: {
@@ -425,14 +465,12 @@ export async function saveNonCryptoReport(input: {
   }
   addUnique(summary.reportIds, id);
   addUnique(summary.independentReporterKeys, reporterKey);
-  summary.reportCount = summary.reportIds.length;
-  summary.independentReporters = summary.independentReporterKeys.length;
   summary.paymentProofCount += hasPaymentProof ? 1 : 0;
   summary.totalReportedAmount += input.amount || 0;
   summary.currency = input.currency || summary.currency || 'USD';
   summary.firstReported = summary.firstReported < now ? summary.firstReported : now;
   summary.lastReported = now;
-  Object.assign(summary, derivePublicLevel(summary));
+  recalculateIdentity(summary);
 
   await s3Put(`identities/${identity.hash}.json`, summary);
 
@@ -472,4 +510,90 @@ export async function getNonCryptoStats(): Promise<NonCryptoStats> {
 export async function getPublicPaymentIdentityIndex(): Promise<PaymentIdentityPublicView[]> {
   const index = (await s3Get<PaymentIdentityPublicView[]>('index/identities.json')) || [];
   return index.filter((i) => i.publicEligible);
+}
+
+export async function getNonCryptoAdminSnapshot(): Promise<NonCryptoAdminSnapshot> {
+  const [reports, identities, stats] = await Promise.all([
+    s3ListJson<NonCryptoScamReport>('reports/'),
+    s3ListJson<PaymentIdentitySummary>('identities/'),
+    getNonCryptoStats(),
+  ]);
+
+  reports.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  identities.sort((a, b) => b.lastReported.localeCompare(a.lastReported));
+  return { reports, identities, stats };
+}
+
+export async function updateNonCryptoReportStatus(
+  reportId: string,
+  status: NonCryptoScamReport['status'],
+): Promise<NonCryptoScamReport> {
+  if (!['pending', 'accepted', 'rejected'].includes(status)) {
+    throw new Error('Invalid report status');
+  }
+
+  const report = await s3Get<NonCryptoScamReport>(`reports/${reportId}.json`);
+  if (!report) throw new Error('Report not found');
+
+  const oldStatus = report.status;
+  report.status = status;
+  await s3Put(`reports/${reportId}.json`, report);
+
+  if (oldStatus !== 'rejected' && status === 'rejected') {
+    await removeReportFromIdentity(report);
+  }
+
+  await refreshNonCryptoIndexes();
+  return report;
+}
+
+export async function markNonCryptoIdentityStaffReviewed(identityHash: string): Promise<PaymentIdentityPublicView> {
+  const summary = await s3Get<PaymentIdentitySummary>(`identities/${identityHash}.json`);
+  if (!summary) throw new Error('Identity not found');
+
+  summary.publicLevel = 'staff_reviewed';
+  summary.publicEligible = true;
+  summary.indexedEligible = true;
+  await s3Put(`identities/${identityHash}.json`, summary);
+  await refreshNonCryptoIndexes();
+  return publicView(summary);
+}
+
+async function removeReportFromIdentity(report: NonCryptoScamReport): Promise<void> {
+  const summary = await s3Get<PaymentIdentitySummary>(`identities/${report.identityHash}.json`);
+  if (!summary) return;
+
+  summary.reportIds = summary.reportIds.filter((id) => id !== report.id);
+  summary.paymentProofCount = Math.max(0, summary.paymentProofCount - (report.hasPaymentProof ? 1 : 0));
+  summary.totalReportedAmount = Math.max(0, summary.totalReportedAmount - (report.amount || 0));
+
+  const remainingReports = await Promise.all(
+    summary.reportIds.map((id) => s3Get<NonCryptoScamReport>(`reports/${id}.json`)),
+  );
+  summary.independentReporterKeys = Array.from(new Set(
+    remainingReports
+      .filter((r): r is NonCryptoScamReport => !!r && r.status !== 'rejected')
+      .map((r) => r.reporterFingerprint),
+  ));
+  recalculateIdentity(summary);
+  await s3Put(`identities/${report.identityHash}.json`, summary);
+}
+
+async function refreshNonCryptoIndexes(): Promise<void> {
+  const [reports, identities] = await Promise.all([
+    s3ListJson<NonCryptoScamReport>('reports/'),
+    s3ListJson<PaymentIdentitySummary>('identities/'),
+  ]);
+  const safe = identities.map(publicView);
+  await s3Put('index/identities.json', safe);
+
+  const stats: NonCryptoStats = {
+    totalReports: reports.length,
+    totalIdentities: identities.length,
+    publicEligibleIdentities: safe.filter((i) => i.publicEligible).length,
+    indexedEligibleIdentities: safe.filter((i) => i.indexedEligible).length,
+    paymentProofReports: reports.filter((r) => r.hasPaymentProof && r.status !== 'rejected').length,
+    updatedAt: new Date().toISOString(),
+  };
+  await s3Put('index/stats.json', stats);
 }
