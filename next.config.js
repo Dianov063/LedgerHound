@@ -24,11 +24,24 @@ const FABRICATED_PLATFORM_SLUGS = [
 ];
 
 const SUPPORTED_LOCALES = ['ru', 'es', 'zh', 'fr', 'ar'];
+const ALL_LOCALES = ['en', ...SUPPORTED_LOCALES];
+
+const LEGACY_BLOG_SLUGS = [
+  'how-crypto-scammers-launder-money',
+  'crypto-ransomware-payment-tracing',
+  'crypto-divorce-hidden-assets',
+];
 
 const fabricatedPlatformRedirects = [
   // English (root): /scam-database/platform/<slug> → /scam-database
   ...FABRICATED_PLATFORM_SLUGS.map((slug) => ({
     source: `/scam-database/platform/${slug}`,
+    destination: '/scam-database',
+    permanent: true,
+  })),
+  // Explicit /en cleanup before the broad /en/* canonical redirect runs.
+  ...FABRICATED_PLATFORM_SLUGS.map((slug) => ({
+    source: `/en/scam-database/platform/${slug}`,
     destination: '/scam-database',
     permanent: true,
   })),
@@ -42,6 +55,43 @@ const fabricatedPlatformRedirects = [
   ),
 ];
 
+const fabricatedOldPatternRedirects = [
+  ...FABRICATED_PLATFORM_SLUGS.flatMap((slug) =>
+    ALL_LOCALES.map((locale) => ({
+      source:
+        locale === 'en'
+          ? `/scam-database/is-${slug}-a-scam`
+          : `/${locale}/scam-database/is-${slug}-a-scam`,
+      destination: locale === 'en' ? '/scam-database' : `/${locale}/scam-database`,
+      permanent: true,
+    })),
+  ),
+  // Some Google-discovered URLs include /en even though English is served at root.
+  ...FABRICATED_PLATFORM_SLUGS.map((slug) => ({
+    source: `/en/scam-database/is-${slug}-a-scam`,
+    destination: '/scam-database',
+    permanent: true,
+  })),
+];
+
+const legacyBlogRedirects = LEGACY_BLOG_SLUGS.flatMap((slug) => [
+  {
+    source: `/blog/${slug}`,
+    destination: '/blog',
+    permanent: true,
+  },
+  {
+    source: `/en/blog/${slug}`,
+    destination: '/blog',
+    permanent: true,
+  },
+  ...SUPPORTED_LOCALES.map((locale) => ({
+    source: `/${locale}/blog/${slug}`,
+    destination: `/${locale}/blog`,
+    permanent: true,
+  })),
+]);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -49,6 +99,10 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Direct one-hop fixes for old indexed URLs. Keep these before the broad
+      // /en/* canonicalization and before the generic old slug pattern below.
+      ...fabricatedOldPatternRedirects,
+      ...legacyBlogRedirects,
       // ─── /en/* → /* ───
       // localePrefix: 'as-needed' means English uses the root URL (no /en prefix).
       // /en and /en/* are not real routes — collapse them to root to prevent
@@ -65,40 +119,6 @@ const nextConfig = {
       },
       // ─── Fabricated scam-db platforms (10 slugs × 6 locales = 60 redirects) ───
       ...fabricatedPlatformRedirects,
-      // ─── Legacy redirects for non-existent blog posts (GSC 404s) ───
-      // TODO(2026-06-09): Remove these after Google has had 30+ days to recrawl.
-      // Cross-links to these slugs were removed from internal pages on 2026-05-09;
-      // these redirects only catch old external bookmarks / Google cache hits.
-      {
-        source: '/blog/how-crypto-scammers-launder-money',
-        destination: '/blog',
-        permanent: true,
-      },
-      {
-        source: '/blog/crypto-ransomware-payment-tracing',
-        destination: '/blog',
-        permanent: true,
-      },
-      {
-        source: '/:locale/blog/how-crypto-scammers-launder-money',
-        destination: '/:locale/blog',
-        permanent: true,
-      },
-      {
-        source: '/:locale/blog/crypto-ransomware-payment-tracing',
-        destination: '/:locale/blog',
-        permanent: true,
-      },
-      {
-        source: '/blog/crypto-divorce-hidden-assets',
-        destination: '/blog',
-        permanent: true,
-      },
-      {
-        source: '/:locale/blog/crypto-divorce-hidden-assets',
-        destination: '/:locale/blog',
-        permanent: true,
-      },
       // Old scam-database slug pattern → new platform/ pattern
       {
         source: '/scam-database/is-:slug-a-scam',
