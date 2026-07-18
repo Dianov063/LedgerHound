@@ -50,6 +50,7 @@ export default function Navbar() {
     { href: `${prefix}/graph-tracer`, label: t('graph'), badge: undefined },
     { href: `${prefix}/recovery-calculator`, label: t('calculator'), badge: undefined },
     { href: `${prefix}/scam-checker`, label: t('scam_checker'), badge: undefined },
+    { href: `${prefix}/payment-safety`, label: 'Payment Check', badge: 'NEW' },
     { href: `${prefix}/report`, label: t('report'), badge: '$49' },
     { href: `${prefix}/tx-lookup`, label: t('tx'), badge: undefined },
     { href: `${prefix}/scam-database`, label: t('scam_db'), badge: 'NEW' },
