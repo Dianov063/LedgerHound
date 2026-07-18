@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -111,12 +111,22 @@ export default function PaymentSafetyPage() {
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkError, setCheckError] = useState('');
   const [checkResult, setCheckResult] = useState<{ matched: boolean; identity: IdentityView | null } | null>(null);
+  const [publicWarnings, setPublicWarnings] = useState<IdentityView[]>([]);
+  const [warningsLoading, setWarningsLoading] = useState(true);
 
   const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [reportError, setReportError] = useState('');
   const [reportId, setReportId] = useState('');
   const [reportRail, setReportRail] = useState<PaymentRail>('zelle');
   const [reportCategory, setReportCategory] = useState<ScamCategory>('non_delivery_goods');
+
+  useEffect(() => {
+    fetch('/api/non-crypto-scam-database/search')
+      .then((res) => res.json())
+      .then((data) => setPublicWarnings(Array.isArray(data.identities) ? data.identities : []))
+      .catch(() => setPublicWarnings([]))
+      .finally(() => setWarningsLoading(false));
+  }, []);
 
   async function handleCheck(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -449,10 +459,94 @@ export default function PaymentSafetyPage() {
             </form>
           )}
         </section>
+
+        <PublicWarningsSection warnings={publicWarnings} loading={warningsLoading} />
       </main>
 
       <Footer />
     </div>
+  );
+}
+
+function PublicWarningsSection({ warnings, loading }: { warnings: IdentityView[]; loading: boolean }) {
+  const visible = [...warnings]
+    .sort((a, b) => b.lastReported.localeCompare(a.lastReported))
+    .slice(0, 6);
+
+  return (
+    <section className="border-t border-slate-200 bg-white">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 className="font-display font-bold text-2xl text-slate-950">Public payment warnings</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Only recipients with corroborated independent reports appear here.
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+            <ShieldCheck size={13} />
+            Masked identifiers
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+            <Loader2 size={16} className="animate-spin" />
+            Loading public warnings
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+            No public warnings yet. Single reports remain private until corroborated.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visible.map((identity) => (
+              <article key={identity.identityHash} className="rounded-xl border border-amber-200 bg-amber-50/40 p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                      {identity.country} / {RAILS.find((r) => r.value === identity.rail)?.label || identity.rail}
+                    </p>
+                    <h3 className="font-display font-bold text-base text-slate-950 mt-1">
+                      {identity.identityMask}
+                    </h3>
+                  </div>
+                  <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs mb-4">
+                  <div className="rounded-lg bg-white border border-amber-100 p-2">
+                    <span className="block font-bold text-slate-950">{identity.reportCount}</span>
+                    <span className="text-slate-500">reports</span>
+                  </div>
+                  <div className="rounded-lg bg-white border border-amber-100 p-2">
+                    <span className="block font-bold text-slate-950">{identity.independentReporters}</span>
+                    <span className="text-slate-500">people</span>
+                  </div>
+                  <div className="rounded-lg bg-white border border-amber-100 p-2">
+                    <span className="block font-bold text-slate-950">{identity.paymentProofCount}</span>
+                    <span className="text-slate-500">proofs</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {identity.categories.map((category) => (
+                    <span key={category} className="rounded-full bg-white border border-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                      {formatCategory(category)}
+                    </span>
+                  ))}
+                  {[...identity.paymentMethodDetails, ...identity.categoryDetails].map((detail) => (
+                    <span key={detail} className="rounded-full bg-white border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600">
+                      {detail}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
