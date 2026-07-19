@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       description,
       reporterEmail,
       evidenceTypes,
+      evidenceFiles,
     } = body;
 
     if (!rail || !VALID_RAILS.includes(rail)) {
@@ -95,6 +96,12 @@ export async function POST(req: NextRequest) {
     const cleanEvidence = Array.isArray(evidenceTypes)
       ? evidenceTypes.filter((e: EvidenceType) => VALID_EVIDENCE.includes(e))
       : [];
+    const cleanEvidenceFiles = Array.isArray(evidenceFiles)
+      ? evidenceFiles
+        .filter((key: unknown): key is string => typeof key === 'string')
+        .filter((key) => key.startsWith('non-crypto-scam-database/evidence/'))
+        .slice(0, 5)
+      : [];
 
     const result = await saveNonCryptoReport({
       country,
@@ -112,6 +119,7 @@ export async function POST(req: NextRequest) {
       description,
       reporterEmail,
       evidenceTypes: cleanEvidence,
+      evidenceFiles: cleanEvidenceFiles,
       ip,
     });
 

@@ -34,6 +34,7 @@ interface AdminReport {
   description: string;
   reporterEmail?: string;
   evidenceTypes: string[];
+  evidenceFiles: string[];
   hasPaymentProof: boolean;
   status: ReportStatus;
 }
@@ -148,6 +149,19 @@ function PaymentSafetyAdminContent() {
       alert(err.message || 'Action failed');
     } finally {
       setActionLoading('');
+    }
+  };
+
+  const openEvidence = async (key: string) => {
+    try {
+      const res = await fetch(`/api/non-crypto-scam-database/evidence?key=${encodeURIComponent(key)}`, {
+        headers: { 'x-admin-key': adminPw || inputPw },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to open evidence');
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      alert(err.message || 'Failed to open evidence');
     }
   };
 
@@ -280,6 +294,23 @@ function PaymentSafetyAdminContent() {
                       <Info label="Recipient" value={[report.recipientName, report.businessName].filter(Boolean).join(' / ') || '-'} />
                       <Info label="Amount" value={report.amount ? `${report.currency || 'USD'} ${report.amount}` : '-'} />
                     </div>
+                    {report.evidenceFiles && report.evidenceFiles.length > 0 && (
+                      <div className="mt-4">
+                        <span className="text-xs text-slate-500 block mb-2">Evidence files ({report.evidenceFiles.length})</span>
+                        <div className="flex flex-wrap gap-2">
+                          {report.evidenceFiles.map((file) => (
+                            <button
+                              key={file}
+                              type="button"
+                              onClick={() => openEvidence(file)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+                            >
+                              Open evidence
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <p className="text-sm text-slate-300 leading-relaxed bg-slate-800 rounded-lg p-3 mt-4 whitespace-pre-wrap">
                       {report.description}
                     </p>

@@ -1,0 +1,64 @@
+import { NextRequest } from 'next/server';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+export const dynamic = 'force-dynamic';
+
+const getS3 = () =>
+  new S3Client({
+    region: process.env.AWS_REGION || 'eu-central-1',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+
+const ALLOWED_TYPES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+const MAX_SIZE = 10 * 1024 * 1024;
+
+export async function POST(req: NextRequest) {
+  try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const rl = await checkRateLimit(ip, { name: 'non-crypto-evidence-upload', limit: 10, windowSec: 3600 });
+    if (!rl.success) {
+      return Response.json({ error: 'Upload rate limit exceeded.' }, { status: 429 });
+    }
+
+    const formData = await req.formData();
+    const file = formData.get('file') as File | null;
+    if (!file) {
+      return Response.json({ error: 'No file provided.' }, { status: 400 });
+    }
+
+    const ext = ALLOWED_TYPES[file.type];
+    if (!ext) {
+      return Response.json({ error: 'File type not allowed. Use PDF, PNG, JPG, or WebP.' }, { status: 400 });
+    }
+    if (file.size > MAX_SIZE) {
+      return Response.json({ error: 'File too large. Maximum 10MB.' }, { status: 400 });
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const key = `non-crypto-scam-database/evidence/${fileId}.${ext}`;
+
+    await getS3().send(new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+      ServerSideEncryption: 'aws:kms',
+    }));
+
+    return Response.json({ key, fileName: file.name });
+  } catch (err) {
+    console.error('[non-crypto-scam-database/upload]', err);
+    return Response.json({ error: 'Upload failed.' }, { status: 500 });
+  }
+}

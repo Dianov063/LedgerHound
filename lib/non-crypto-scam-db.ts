@@ -82,6 +82,7 @@ export interface NonCryptoScamReport {
   reporterEmail?: string;
   reporterFingerprint: string;
   evidenceTypes: EvidenceType[];
+  evidenceFiles: string[];
   hasPaymentProof: boolean;
   status: 'pending' | 'accepted' | 'rejected';
 }
@@ -390,6 +391,7 @@ export async function saveNonCryptoReport(input: {
   description: string;
   reporterEmail?: string;
   evidenceTypes?: EvidenceType[];
+  evidenceFiles?: string[];
   ip?: string;
 }): Promise<{ id: string; report: NonCryptoScamReport; identity: PaymentIdentityPublicView }> {
   const identity = normalizePaymentIdentifier(input.rail, input.paymentIdentifier, input.country);
@@ -424,6 +426,7 @@ export async function saveNonCryptoReport(input: {
     reporterEmail: input.reporterEmail?.trim() || undefined,
     reporterFingerprint: reporterKey,
     evidenceTypes,
+    evidenceFiles: input.evidenceFiles?.map((file) => file.trim()).filter(Boolean).slice(0, 5) || [],
     hasPaymentProof,
     status: 'pending',
   };

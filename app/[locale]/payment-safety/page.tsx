@@ -119,6 +119,8 @@ export default function PaymentSafetyPage() {
   const [reportId, setReportId] = useState('');
   const [reportRail, setReportRail] = useState<PaymentRail>('zelle');
   const [reportCategory, setReportCategory] = useState<ScamCategory>('non_delivery_goods');
+  const [reportFiles, setReportFiles] = useState<File[]>([]);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   useEffect(() => {
     fetch('/api/non-crypto-scam-database/search')
@@ -155,6 +157,7 @@ export default function PaymentSafetyPage() {
     setReportStatus('loading');
     setReportError('');
     setReportId('');
+    setUploadStatus(reportFiles.length > 0 ? `Uploading ${reportFiles.length} evidence file(s)...` : '');
 
     const data = new FormData(e.currentTarget);
     const evidenceTypes = [
@@ -164,6 +167,20 @@ export default function PaymentSafetyPage() {
     ].filter(Boolean);
 
     try {
+      const evidenceFiles: string[] = [];
+      for (const file of reportFiles.slice(0, 5)) {
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        const uploadRes = await fetch('/api/non-crypto-scam-database/upload', {
+          method: 'POST',
+          body: uploadData,
+        });
+        const uploaded = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploaded.error || `Failed to upload ${file.name}`);
+        evidenceFiles.push(uploaded.key);
+      }
+      setUploadStatus(evidenceFiles.length > 0 ? 'Evidence uploaded. Submitting report...' : '');
+
       const res = await fetch('/api/non-crypto-scam-database/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,6 +203,7 @@ export default function PaymentSafetyPage() {
           description: data.get('description'),
           reporterEmail: data.get('reporterEmail'),
           evidenceTypes,
+          evidenceFiles,
         }),
       });
       const body = await res.json();
@@ -193,11 +211,14 @@ export default function PaymentSafetyPage() {
       setReportId(body.reportId);
       setReportStatus('success');
       e.currentTarget.reset();
+      setReportFiles([]);
+      setUploadStatus('');
       setReportRail('zelle');
       setReportCategory('non_delivery_goods');
     } catch (err: any) {
       setReportError(err.message || 'Report failed');
       setReportStatus('error');
+      setUploadStatus('');
     }
   }
 
@@ -430,6 +451,27 @@ export default function PaymentSafetyPage() {
               </div>
 
               <div className="mb-5">
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Upload evidence</label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,image/webp,application/pdf"
+                  onChange={(e) => setReportFiles(Array.from(e.target.files || []).slice(0, 5))}
+                  className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+                />
+                <p className="mt-1 text-xs text-slate-500">Optional. Up to 5 files, 10MB each. PDF, PNG, JPG, or WebP.</p>
+                {reportFiles.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {reportFiles.map((file) => (
+                      <span key={`${file.name}-${file.size}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {file.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">What happened?</label>
                 <textarea
                   name="description"
@@ -444,6 +486,11 @@ export default function PaymentSafetyPage() {
               {reportStatus === 'success' && (
                 <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                   Report received. ID: <span className="font-mono font-semibold">{reportId}</span>
+                </div>
+              )}
+              {uploadStatus && (
+                <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  {uploadStatus}
                 </div>
               )}
               {reportStatus === 'error' && (
