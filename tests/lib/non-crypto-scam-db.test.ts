@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   derivePublicLevel,
+  hasUploadedPaymentProof,
   maskPaymentIdentifier,
   normalizeCountry,
   normalizePaymentIdentifier,
+  normalizeTransactionReference,
   publicView,
+  sanitizeHttpUrl,
   type PaymentIdentitySummary,
 } from '@/lib/non-crypto-scam-db';
 
@@ -41,6 +44,16 @@ describe('normalizePaymentIdentifier', () => {
     expect(normalizePaymentIdentifier('venmo', ' @CakeSeller ', 'US').normalized).toBe('cakeseller');
   });
 
+  it('normalizes Apple Cash email and phone identities', () => {
+    expect(normalizePaymentIdentifier('apple_cash', ' Seller@Example.COM ', 'US').normalized).toBe('seller@example.com');
+    expect(normalizePaymentIdentifier('apple_cash', '(415) 555-0199', 'US').normalized).toBe('4155550199');
+  });
+
+  it('normalizes Chime handles without confusing handle digits for a phone', () => {
+    expect(normalizePaymentIdentifier('chime', ' $CakeShop21 ', 'US').normalized).toBe('cakeshop21');
+    expect(normalizePaymentIdentifier('chime', '(415) 555-0199', 'US').normalized).toBe('4155550199');
+  });
+
   it('normalizes IBAN identifiers without spaces or hyphens', () => {
     const identity = normalizePaymentIdentifier('iban', 'gb82 west 1234-5698-7654-32', 'GB');
     expect(identity.normalized).toBe('GB82WEST12345698765432');
@@ -59,6 +72,36 @@ describe('maskPaymentIdentifier', () => {
     const mask = maskPaymentIdentifier('cashapp', 'cakeseller2026', 'US');
     expect(mask).toBe('Cash App $cak***26');
     expect(mask).not.toContain('cakeseller2026');
+  });
+
+  it('masks US Apple Cash and Chime identifiers', () => {
+    expect(maskPaymentIdentifier('apple_cash', '4155550199', 'US')).toBe('Apple Cash phone ending 0199');
+    expect(maskPaymentIdentifier('chime', 'cakeshop21', 'US')).toBe('Chime $cak***21');
+    expect(maskPaymentIdentifier('chime', '4155550199', 'US')).toBe('Chime phone ending 0199');
+  });
+});
+
+describe('private US report fields', () => {
+  it('normalizes transaction references for private duplicate detection', () => {
+    const a = normalizeTransactionReference('zelle', ' TXN-123 456 ');
+    const b = normalizeTransactionReference('zelle', 'txn123456');
+    const otherRail = normalizeTransactionReference('venmo', 'txn123456');
+
+    expect(a.privateValue).toBe('TXN-123 456');
+    expect(a.hash).toBe(b.hash);
+    expect(a.hash).not.toBe(otherRail.hash);
+  });
+
+  it('keeps only http and https listing URLs', () => {
+    expect(sanitizeHttpUrl('https://example.com/listing/123')).toBe('https://example.com/listing/123');
+    expect(sanitizeHttpUrl('javascript:alert(1)')).toBeUndefined();
+    expect(sanitizeHttpUrl('not a url')).toBeUndefined();
+  });
+
+  it('counts payment proof only when a private evidence file was uploaded', () => {
+    expect(hasUploadedPaymentProof(['payment_receipt'], [])).toBe(false);
+    expect(hasUploadedPaymentProof(['chat_screenshot'], ['non-crypto-scam-database/evidence/chat.png'])).toBe(false);
+    expect(hasUploadedPaymentProof(['payment_receipt'], ['non-crypto-scam-database/evidence/receipt.png'])).toBe(true);
   });
 });
 

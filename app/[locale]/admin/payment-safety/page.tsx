@@ -31,8 +31,23 @@ interface AdminReport {
   amount?: number;
   currency?: string;
   incidentDate?: string;
+  saleChannel?: string;
+  saleChannelDetails?: string;
+  sellerProfile?: string;
+  listingUrl?: string;
+  itemOrService?: string;
+  promisedDeliveryDate?: string;
+  refundRequested?: boolean;
+  refundRequestDate?: string;
+  lastContactDate?: string;
+  privateTransactionReference?: string;
+  transactionReferenceHash?: string;
+  reportedTo?: string[];
+  externalReportReference?: string;
+  duplicateTransactionReference?: boolean;
   description: string;
   reporterEmail?: string;
+  reporterEmailVerifiedAt?: string;
   evidenceTypes: string[];
   evidenceFiles: string[];
   hasPaymentProof: boolean;
@@ -59,6 +74,24 @@ interface AdminIdentity {
   indexedEligible: boolean;
 }
 
+interface AdminCorrection {
+  id: string;
+  createdAt: string;
+  country: string;
+  rail: string;
+  identityHash: string;
+  identityMask: string;
+  privateIdentifier: string;
+  contactName: string;
+  contactEmail: string;
+  relationship: string;
+  reason: string;
+  explanation: string;
+  evidenceFiles: string[];
+  status: 'pending' | 'under_review' | 'resolved' | 'rejected';
+  resolutionNote?: string;
+}
+
 interface AdminStats {
   totalReports: number;
   totalIdentities: number;
@@ -83,9 +116,10 @@ function PaymentSafetyAdminContent() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'clusters' | 'reports'>('clusters');
+  const [tab, setTab] = useState<'clusters' | 'reports' | 'corrections'>('clusters');
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [identities, setIdentities] = useState<AdminIdentity[]>([]);
+  const [corrections, setCorrections] = useState<AdminCorrection[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
 
   const fetchAdmin = async (pw: string) => {
@@ -104,6 +138,7 @@ function PaymentSafetyAdminContent() {
       }
       setReports(data.reports || []);
       setIdentities(data.identities || []);
+      setCorrections(data.corrections || []);
       setStats(data.stats || null);
       setAdminPw(pw);
       setAuthed(true);
@@ -132,7 +167,7 @@ function PaymentSafetyAdminContent() {
   };
 
   const adminAction = async (body: Record<string, unknown>) => {
-    setActionLoading(String(body.reportId || body.identityHash || 'action'));
+    setActionLoading(String(body.reportId || body.identityHash || body.correctionId || 'action'));
     try {
       const res = await fetch('/api/non-crypto-scam-database/admin', {
         method: 'POST',
@@ -236,6 +271,12 @@ function PaymentSafetyAdminContent() {
           >
             Reports ({reports.length})
           </button>
+          <button
+            onClick={() => setTab('corrections')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'corrections' ? 'bg-brand-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+          >
+            Corrections ({corrections.length})
+          </button>
         </div>
 
         {loading ? (
@@ -275,7 +316,7 @@ function PaymentSafetyAdminContent() {
               </article>
             ))}
           </div>
-        ) : (
+        ) : tab === 'reports' ? (
           <div className="space-y-4">
             {reports.map((report) => (
               <article key={report.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -284,7 +325,15 @@ function PaymentSafetyAdminContent() {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <ReportStatusBadge status={report.status} />
                       <span className="text-xs text-slate-500">{report.country} / {report.rail} / {report.category}</span>
+                      {report.reporterEmailVerifiedAt ? (
+                        <span className="text-xs text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded-full">email verified</span>
+                      ) : (
+                        <span className="text-xs text-amber-300 bg-amber-950/50 px-2 py-1 rounded-full">email unverified</span>
+                      )}
                       {report.hasPaymentProof && <span className="text-xs text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded-full">payment proof</span>}
+                      {report.duplicateTransactionReference && (
+                        <span className="text-xs text-red-300 bg-red-950/60 px-2 py-1 rounded-full">duplicate transaction reference</span>
+                      )}
                     </div>
                     <h2 className="font-display font-bold text-lg text-white">{report.identityMask}</h2>
                     <p className="text-xs font-mono text-slate-500 mt-1">Report {report.id}</p>
@@ -293,7 +342,26 @@ function PaymentSafetyAdminContent() {
                       <Info label="Reporter email" value={report.reporterEmail || '-'} />
                       <Info label="Recipient" value={[report.recipientName, report.businessName].filter(Boolean).join(' / ') || '-'} />
                       <Info label="Amount" value={report.amount ? `${report.currency || 'USD'} ${report.amount}` : '-'} />
+                      <Info label="Item or service" value={report.itemOrService || '-'} />
+                      <Info label="Sale channel" value={[report.saleChannel, report.saleChannelDetails].filter(Boolean).join(' / ') || '-'} />
+                      <Info label="Seller profile" value={report.sellerProfile || '-'} mono />
+                      <Info label="Transaction reference" value={report.privateTransactionReference || '-'} mono />
+                      <Info label="Incident / promised" value={[report.incidentDate, report.promisedDeliveryDate].filter(Boolean).join(' / ') || '-'} />
+                      <Info label="Last response" value={report.lastContactDate || '-'} />
+                      <Info label="Refund requested" value={report.refundRequested ? `Yes${report.refundRequestDate ? ` / ${report.refundRequestDate}` : ''}` : 'No'} />
+                      <Info label="Reported to" value={report.reportedTo?.join(', ') || '-'} />
+                      <Info label="External report number" value={report.externalReportReference || '-'} mono />
                     </div>
+                    {report.listingUrl && (
+                      <a
+                        href={report.listingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex mt-3 text-sm font-semibold text-brand-400 hover:text-brand-300 break-all"
+                      >
+                        Open listing or seller page
+                      </a>
+                    )}
                     {report.evidenceFiles && report.evidenceFiles.length > 0 && (
                       <div className="mt-4">
                         <span className="text-xs text-slate-500 block mb-2">Evidence files ({report.evidenceFiles.length})</span>
@@ -319,7 +387,8 @@ function PaymentSafetyAdminContent() {
                   <div className="flex lg:flex-col gap-2 shrink-0">
                     <button
                       onClick={() => adminAction({ action: 'updateReportStatus', reportId: report.id, status: 'accepted' })}
-                      disabled={actionLoading === report.id || report.status === 'accepted'}
+                      disabled={actionLoading === report.id || report.status === 'accepted' || !report.reporterEmailVerifiedAt}
+                      title={!report.reporterEmailVerifiedAt ? 'Reporter email must be verified first' : undefined}
                       className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                     >
                       <CheckCircle2 size={14} /> Accept
@@ -327,6 +396,79 @@ function PaymentSafetyAdminContent() {
                     <button
                       onClick={() => adminAction({ action: 'updateReportStatus', reportId: report.id, status: 'rejected' })}
                       disabled={actionLoading === report.id || report.status === 'rejected'}
+                      className="inline-flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                    >
+                      <XCircle size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {corrections.length === 0 && (
+              <p className="text-slate-500 py-12 text-center">No correction requests yet.</p>
+            )}
+            {corrections.map((correction) => (
+              <article key={correction.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <CorrectionStatusBadge status={correction.status} />
+                      <span className="text-xs text-slate-500">{correction.country} / {correction.rail}</span>
+                    </div>
+                    <h2 className="font-display font-bold text-lg text-white">{correction.identityMask}</h2>
+                    <p className="text-xs font-mono text-slate-500 mt-1">Request {correction.id}</p>
+                    <div className="grid md:grid-cols-2 gap-3 mt-4 text-sm">
+                      <Info label="Private identifier" value={correction.privateIdentifier} mono />
+                      <Info label="Contact" value={`${correction.contactName} / ${correction.contactEmail}`} />
+                      <Info label="Relationship" value={correction.relationship} />
+                      <Info label="Reason" value={correction.reason} />
+                    </div>
+                    {correction.evidenceFiles.length > 0 && (
+                      <div className="mt-4">
+                        <span className="text-xs text-slate-500 block mb-2">Private evidence ({correction.evidenceFiles.length})</span>
+                        <div className="flex flex-wrap gap-2">
+                          {correction.evidenceFiles.map((file) => (
+                            <button
+                              key={file}
+                              type="button"
+                              onClick={() => openEvidence(file)}
+                              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+                            >
+                              Open evidence
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-sm text-slate-300 leading-relaxed bg-slate-800 rounded-lg p-3 mt-4 whitespace-pre-wrap">
+                      {correction.explanation}
+                    </p>
+                    {correction.resolutionNote && (
+                      <p className="text-sm text-slate-400 mt-3">Resolution note: {correction.resolutionNote}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap lg:flex-col gap-2 shrink-0">
+                    <button
+                      onClick={() => adminAction({ action: 'updateCorrectionStatus', correctionId: correction.id, status: 'under_review' })}
+                      disabled={actionLoading === correction.id || correction.status === 'under_review'}
+                      className="inline-flex items-center justify-center gap-1.5 bg-amber-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      <AlertTriangle size={14} /> Review
+                    </button>
+                    <button
+                      onClick={() => adminAction({ action: 'updateCorrectionStatus', correctionId: correction.id, status: 'resolved' })}
+                      disabled={actionLoading === correction.id || correction.status === 'resolved'}
+                      className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={14} /> Resolve
+                    </button>
+                    <button
+                      onClick={() => adminAction({ action: 'updateCorrectionStatus', correctionId: correction.id, status: 'rejected' })}
+                      disabled={actionLoading === correction.id || correction.status === 'rejected'}
                       className="inline-flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50"
                     >
                       <XCircle size={14} /> Reject
@@ -387,4 +529,15 @@ function ReportStatusBadge({ status }: { status: ReportStatus }) {
       ? 'text-red-400 bg-red-950/50'
       : 'text-amber-400 bg-amber-950/50';
   return <span className={`text-xs px-2 py-1 rounded-full font-semibold ${style}`}>{status}</span>;
+}
+
+function CorrectionStatusBadge({ status }: { status: AdminCorrection['status'] }) {
+  const style = status === 'resolved'
+    ? 'text-emerald-400 bg-emerald-950/50'
+    : status === 'rejected'
+      ? 'text-red-400 bg-red-950/50'
+      : status === 'under_review'
+        ? 'text-sky-400 bg-sky-950/50'
+        : 'text-amber-400 bg-amber-950/50';
+  return <span className={`text-xs px-2 py-1 rounded-full font-semibold ${style}`}>{status.replace('_', ' ')}</span>;
 }

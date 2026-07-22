@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -8,6 +9,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Database,
+  ExternalLink,
   FileText,
   Loader2,
   Lock,
@@ -20,6 +22,8 @@ type PaymentRail =
   | 'cashapp'
   | 'venmo'
   | 'paypal'
+  | 'apple_cash'
+  | 'chime'
   | 'wise'
   | 'revolut'
   | 'iban'
@@ -39,6 +43,26 @@ type ScamCategory =
   | 'marketplace_scam'
   | 'employment_scam'
   | 'other';
+
+type SaleChannel =
+  | 'facebook_marketplace'
+  | 'instagram'
+  | 'tiktok'
+  | 'craigslist'
+  | 'offerup'
+  | 'nextdoor'
+  | 'discord'
+  | 'direct_website'
+  | 'text_message'
+  | 'other';
+
+type ReportDestination =
+  | 'payment_provider'
+  | 'bank_or_card_issuer'
+  | 'marketplace'
+  | 'ftc'
+  | 'state_attorney_general'
+  | 'ic3';
 
 interface IdentityView {
   identityHash: string;
@@ -66,6 +90,8 @@ const RAILS: { value: PaymentRail; label: string }[] = [
   { value: 'cashapp', label: 'Cash App' },
   { value: 'venmo', label: 'Venmo' },
   { value: 'paypal', label: 'PayPal' },
+  { value: 'apple_cash', label: 'Apple Cash' },
+  { value: 'chime', label: 'Chime' },
   { value: 'wise', label: 'Wise' },
   { value: 'revolut', label: 'Revolut' },
   { value: 'iban', label: 'IBAN' },
@@ -87,6 +113,61 @@ const CATEGORIES: { value: ScamCategory; label: string }[] = [
   { value: 'employment_scam', label: 'Employment scam' },
   { value: 'other', label: 'Other' },
 ];
+
+const SALE_CHANNEL_OPTIONS: { value: SaleChannel; label: string }[] = [
+  { value: 'facebook_marketplace', label: 'Facebook Marketplace' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'craigslist', label: 'Craigslist' },
+  { value: 'offerup', label: 'OfferUp' },
+  { value: 'nextdoor', label: 'Nextdoor' },
+  { value: 'discord', label: 'Discord' },
+  { value: 'direct_website', label: 'Website' },
+  { value: 'text_message', label: 'Text message' },
+  { value: 'other', label: 'Other' },
+];
+
+const REPORT_DESTINATION_OPTIONS: { value: ReportDestination; label: string }[] = [
+  { value: 'payment_provider', label: 'Payment app' },
+  { value: 'bank_or_card_issuer', label: 'Bank or card issuer' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'ftc', label: 'FTC' },
+  { value: 'state_attorney_general', label: 'State attorney general' },
+  { value: 'ic3', label: 'IC3' },
+];
+
+const PROVIDER_RECOVERY: Partial<Record<PaymentRail, { instruction: string; href: string; linkLabel: string }>> = {
+  zelle: {
+    instruction: 'Contact the bank or credit union that provides your Zelle service immediately.',
+    href: 'https://www.zellepay.com/safety-education/zeller-safety-101',
+    linkLabel: 'Zelle safety guidance',
+  },
+  cashapp: {
+    instruction: 'Open the payment, choose Report an Issue, then I was scammed.',
+    href: 'https://cash.app/outsmart-scams',
+    linkLabel: 'Cash App scam reporting',
+  },
+  venmo: {
+    instruction: 'Open Venmo support from the app and report the payment and recipient profile.',
+    href: 'https://help.venmo.com/cs/contact-us',
+    linkLabel: 'Contact Venmo',
+  },
+  paypal: {
+    instruction: 'Open a dispute in the PayPal Resolution Center if the transaction is eligible.',
+    href: 'https://www.paypal.com/disputes/',
+    linkLabel: 'PayPal Resolution Center',
+  },
+  apple_cash: {
+    instruction: 'Review the transaction and contact an Apple Cash Specialist at Green Dot Bank.',
+    href: 'https://support.apple.com/en-us/117946',
+    linkLabel: 'Apple Cash transaction help',
+  },
+  chime: {
+    instruction: 'Contact Chime support and report the Pay Anyone transfer.',
+    href: 'https://help.chime.com/can-i-file-a-dispute-for-a-pay-anyone-transfer-b7e0ebd3',
+    linkLabel: 'Chime Pay Anyone help',
+  },
+};
 
 const DEFAULT_COUNTRIES = ['US', 'GB', 'CA', 'EU', 'UA', 'RU', 'OTHER'];
 
@@ -117,8 +198,14 @@ export default function PaymentSafetyPage() {
   const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [reportError, setReportError] = useState('');
   const [reportId, setReportId] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState<'verified' | 'error' | ''>('');
   const [reportRail, setReportRail] = useState<PaymentRail>('zelle');
   const [reportCategory, setReportCategory] = useState<ScamCategory>('non_delivery_goods');
+  const [reportSaleChannel, setReportSaleChannel] = useState<SaleChannel>('facebook_marketplace');
+  const [refundRequested, setRefundRequested] = useState(false);
+  const [submittedRail, setSubmittedRail] = useState<PaymentRail>('zelle');
   const [reportFiles, setReportFiles] = useState<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -128,6 +215,12 @@ export default function PaymentSafetyPage() {
       .then((data) => setPublicWarnings(Array.isArray(data.identities) ? data.identities : []))
       .catch(() => setPublicWarnings([]))
       .finally(() => setWarningsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('emailVerified') === '1') setVerificationNotice('verified');
+    if (params.get('emailVerificationError') === '1') setVerificationNotice('error');
   }, []);
 
   async function handleCheck(e: FormEvent<HTMLFormElement>) {
@@ -165,6 +258,9 @@ export default function PaymentSafetyPage() {
       data.get('chat_screenshot') ? 'chat_screenshot' : '',
       data.get('marketplace_listing') ? 'marketplace_listing' : '',
     ].filter(Boolean);
+    const reportedTo = REPORT_DESTINATION_OPTIONS
+      .filter(({ value }) => data.get(`reportedTo_${value}`))
+      .map(({ value }) => value);
 
     try {
       const evidenceFiles: string[] = [];
@@ -200,14 +296,30 @@ export default function PaymentSafetyPage() {
           amount: data.get('amount'),
           currency: data.get('currency') || 'USD',
           incidentDate: data.get('incidentDate'),
+          saleChannel: data.get('saleChannel'),
+          saleChannelDetails: data.get('saleChannelDetails'),
+          sellerProfile: data.get('sellerProfile'),
+          listingUrl: data.get('listingUrl'),
+          itemOrService: data.get('itemOrService'),
+          promisedDeliveryDate: data.get('promisedDeliveryDate'),
+          refundRequested: data.get('refundRequested') === 'on',
+          refundRequestDate: data.get('refundRequestDate'),
+          lastContactDate: data.get('lastContactDate'),
+          transactionReference: data.get('transactionReference'),
+          reportedTo,
+          externalReportReference: data.get('externalReportReference'),
           description: data.get('description'),
           reporterEmail: data.get('reporterEmail'),
+          locale,
           evidenceTypes,
           evidenceFiles,
         }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || 'Report failed');
+      setSubmittedRail(reportRail);
+      setSubmittedEmail(String(data.get('reporterEmail') || ''));
+      setVerificationEmailSent(body.verificationEmailSent === true);
       setReportId(body.reportId);
       setReportStatus('success');
       e.currentTarget.reset();
@@ -215,10 +327,28 @@ export default function PaymentSafetyPage() {
       setUploadStatus('');
       setReportRail('zelle');
       setReportCategory('non_delivery_goods');
+      setReportSaleChannel('facebook_marketplace');
+      setRefundRequested(false);
     } catch (err: any) {
       setReportError(err.message || 'Report failed');
       setReportStatus('error');
       setUploadStatus('');
+    }
+  }
+
+  async function resendVerification() {
+    setReportError('');
+    try {
+      const res = await fetch('/api/non-crypto-scam-database/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, email: submittedEmail, locale }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Unable to resend verification email');
+      setVerificationEmailSent(true);
+    } catch (err: any) {
+      setReportError(err.message || 'Unable to resend verification email');
     }
   }
 
@@ -227,6 +357,15 @@ export default function PaymentSafetyPage() {
       <Navbar />
 
       <main className="pt-32 pb-20">
+        {verificationNotice && (
+          <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mb-5 ${verificationNotice === 'verified' ? 'text-emerald-800' : 'text-red-800'}`}>
+            <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${verificationNotice === 'verified' ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+              {verificationNotice === 'verified'
+                ? 'Email verified. Your report can now be reviewed by the moderation team.'
+                : 'This verification link is invalid, expired, or already used.'}
+            </div>
+          </div>
+        )}
         <section className="border-b border-slate-200 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
             <div className="grid lg:grid-cols-[1fr_26rem] gap-10 items-start">
@@ -239,7 +378,7 @@ export default function PaymentSafetyPage() {
                   Check a payment recipient before sending money.
                 </h1>
                 <p className="text-lg text-slate-600 max-w-2xl">
-                  Search by Zelle, Cash App, Venmo, PayPal, bank account, IBAN, phone, email, or marketplace handle. Full identifiers are matched privately; public results show masked details only.
+                  Search by Zelle, Cash App, Venmo, PayPal, Apple Cash, Chime, bank account, phone, email, or marketplace handle. Full identifiers are matched privately; public results show masked details only.
                 </p>
               </div>
 
@@ -400,7 +539,7 @@ export default function PaymentSafetyPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Your email</label>
-                  <input name="reporterEmail" type="email" className="input" placeholder="you@example.com" />
+                  <input name="reporterEmail" type="email" required className="input" placeholder="you@example.com" />
                 </div>
               </div>
 
@@ -419,10 +558,51 @@ export default function PaymentSafetyPage() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
+              <div className="border-t border-slate-200 pt-5 mt-5 mb-4">
+                <h3 className="font-display font-bold text-base text-slate-950 mb-4">Sale details</h3>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Item or service</label>
+                    <input name="itemOrService" required minLength={3} maxLength={120} className="input" placeholder="Concert ticket, cake order, repair" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Where you found the seller</label>
+                    <select
+                      name="saleChannel"
+                      value={reportSaleChannel}
+                      onChange={(e) => setReportSaleChannel(e.target.value as SaleChannel)}
+                      className="input bg-white"
+                    >
+                      {SALE_CHANNEL_OPTIONS.map((channel) => (
+                        <option key={channel.value} value={channel.value}>{channel.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {reportSaleChannel === 'other' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sale channel details</label>
+                    <input name="saleChannelDetails" required minLength={3} maxLength={120} className="input" placeholder="Local group, community board, messaging app" />
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seller profile or handle</label>
+                    <input name="sellerProfile" maxLength={200} className="input" placeholder="@seller or profile name" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Listing URL</label>
+                    <input name="listingUrl" type="url" maxLength={500} className="input" placeholder="https://..." />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-4 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Amount</label>
-                  <input name="amount" type="number" min="0" step="0.01" className="input" placeholder="150" />
+                  <input name="amount" type="number" min="0.01" step="0.01" className="input" placeholder="35" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Currency</label>
@@ -432,7 +612,41 @@ export default function PaymentSafetyPage() {
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Incident date</label>
                   <input name="incidentDate" type="date" className="input" />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Transaction reference</label>
+                  <input name="transactionReference" maxLength={160} className="input" placeholder="From payment receipt" />
+                </div>
               </div>
+
+              <div className="grid md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Promised delivery date</label>
+                  <input name="promisedDeliveryDate" type="date" className="input" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last seller response</label>
+                  <input name="lastContactDate" type="date" className="input" />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex min-h-[46px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      name="refundRequested"
+                      checked={refundRequested}
+                      onChange={(e) => setRefundRequested(e.target.checked)}
+                      className="accent-brand-600"
+                    />
+                    Refund requested
+                  </label>
+                </div>
+              </div>
+
+              {refundRequested && (
+                <div className="mb-4 max-w-sm">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Refund request date</label>
+                  <input name="refundRequestDate" type="date" className="input" />
+                </div>
+              )}
 
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Evidence available</label>
@@ -471,6 +685,23 @@ export default function PaymentSafetyPage() {
                 )}
               </div>
 
+              <div className="border-t border-slate-200 pt-5 mt-5 mb-5">
+                <h3 className="font-display font-bold text-base text-slate-950 mb-1">Reports already filed</h3>
+                <p className="text-xs text-slate-500 mb-3">Select every organization you already contacted.</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+                  {REPORT_DESTINATION_OPTIONS.map(({ value, label }) => (
+                    <label key={value} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      <input type="checkbox" name={`reportedTo_${value}`} className="accent-brand-600" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">External report number</label>
+                  <input name="externalReportReference" maxLength={160} className="input" placeholder="FTC, marketplace, bank, or provider case number" />
+                </div>
+              </div>
+
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">What happened?</label>
                 <textarea
@@ -484,8 +715,17 @@ export default function PaymentSafetyPage() {
               </div>
 
               {reportStatus === 'success' && (
-                <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  Report received. ID: <span className="font-mono font-semibold">{reportId}</span>
+                <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+                  <p className="font-semibold">Report received. ID: <span className="font-mono">{reportId}</span></p>
+                  <p className="mt-1">
+                    {verificationEmailSent
+                      ? `Verification email sent to ${submittedEmail}.`
+                      : 'The verification email could not be sent.'}
+                  </p>
+                  <button type="button" onClick={resendVerification} className="mt-2 font-semibold underline underline-offset-2">
+                    Resend verification email
+                  </button>
+                  <RecoveryActions rail={submittedRail} />
                 </div>
               )}
               {uploadStatus && (
@@ -493,7 +733,7 @@ export default function PaymentSafetyPage() {
                   {uploadStatus}
                 </div>
               )}
-              {reportStatus === 'error' && (
+              {reportError && (
                 <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {reportError}
                 </div>
@@ -507,7 +747,7 @@ export default function PaymentSafetyPage() {
           )}
         </section>
 
-        <PublicWarningsSection warnings={publicWarnings} loading={warningsLoading} />
+        <PublicWarningsSection warnings={publicWarnings} loading={warningsLoading} base={base} />
       </main>
 
       <Footer />
@@ -515,7 +755,33 @@ export default function PaymentSafetyPage() {
   );
 }
 
-function PublicWarningsSection({ warnings, loading }: { warnings: IdentityView[]; loading: boolean }) {
+function RecoveryActions({ rail }: { rail: PaymentRail }) {
+  const provider = PROVIDER_RECOVERY[rail];
+  return (
+    <div className="border-t border-emerald-200 mt-3 pt-3">
+      <p className="font-semibold mb-2">Act now</p>
+      <ol className="list-decimal pl-5 space-y-1.5 text-emerald-900">
+        {provider && <li>{provider.instruction}</li>}
+        <li>Contact the bank or card issuer that funded the payment and ask what dispute options apply.</li>
+        <li>Report the seller profile to the marketplace or social platform.</li>
+        <li>File a report with the Federal Trade Commission.</li>
+      </ol>
+      <div className="flex flex-wrap gap-3 mt-3">
+        {provider && (
+          <a href={provider.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2">
+            {provider.linkLabel} <ExternalLink size={13} />
+          </a>
+        )}
+        <a href="https://reportfraud.ftc.gov/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2">
+          Report to the FTC <ExternalLink size={13} />
+        </a>
+      </div>
+      <p className="text-xs text-emerald-700 mt-3">Recovery is not guaranteed. Never pay anyone who promises a refund for an upfront fee.</p>
+    </div>
+  );
+}
+
+function PublicWarningsSection({ warnings, loading, base }: { warnings: IdentityView[]; loading: boolean; base: string }) {
   const visible = [...warnings]
     .sort((a, b) => b.lastReported.localeCompare(a.lastReported))
     .slice(0, 6);
@@ -534,6 +800,11 @@ function PublicWarningsSection({ warnings, loading }: { warnings: IdentityView[]
             <ShieldCheck size={13} />
             Masked identifiers
           </div>
+        </div>
+        <div className="mb-5">
+          <Link href={`${base}/payment-safety/correction`} className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+            Request a correction or appeal a warning
+          </Link>
         </div>
 
         {loading ? (

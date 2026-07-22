@@ -14,6 +14,8 @@ const VALID_RAILS: PaymentRail[] = [
   'cashapp',
   'venmo',
   'paypal',
+  'apple_cash',
+  'chime',
   'wise',
   'revolut',
   'iban',
@@ -59,6 +61,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('[non-crypto-scam-database/search]', err);
-    return Response.json({ error: err.message || 'Search failed' }, { status: 500 });
+    return Response.json({ error: 'Search failed' }, { status: 500 });
   }
 }

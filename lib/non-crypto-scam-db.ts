@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const getS3 = () =>
@@ -18,6 +18,8 @@ export type PaymentRail =
   | 'cashapp'
   | 'venmo'
   | 'paypal'
+  | 'apple_cash'
+  | 'chime'
   | 'wise'
   | 'revolut'
   | 'iban'
@@ -45,6 +47,62 @@ export type EvidenceType =
   | 'delivery_promise'
   | 'marketplace_listing'
   | 'other';
+
+export const SALE_CHANNELS = [
+  'facebook_marketplace',
+  'instagram',
+  'tiktok',
+  'craigslist',
+  'offerup',
+  'nextdoor',
+  'discord',
+  'direct_website',
+  'text_message',
+  'other',
+] as const;
+
+export type SaleChannel = typeof SALE_CHANNELS[number];
+
+export const REPORT_DESTINATIONS = [
+  'payment_provider',
+  'bank_or_card_issuer',
+  'marketplace',
+  'ftc',
+  'state_attorney_general',
+  'ic3',
+] as const;
+
+export type ReportDestination = typeof REPORT_DESTINATIONS[number];
+
+export type PaymentSafetyCorrectionStatus = 'pending' | 'under_review' | 'resolved' | 'rejected';
+
+export interface PaymentSafetyCorrection {
+  id: string;
+  createdAt: string;
+  country: string;
+  rail: PaymentRail;
+  identityHash: string;
+  identityMask: string;
+  privateIdentifier: string;
+  contactName: string;
+  contactEmail: string;
+  relationship: 'account_owner' | 'authorized_representative' | 'affected_person' | 'other';
+  reason: 'wrong_recipient' | 'inaccurate_information' | 'identifier_reassigned' | 'false_or_duplicate_reports' | 'other';
+  explanation: string;
+  evidenceFiles: string[];
+  status: PaymentSafetyCorrectionStatus;
+  resolutionNote?: string;
+  updatedAt?: string;
+}
+
+interface EmailVerificationRecord {
+  reportId: string;
+  email: string;
+  locale: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+}
 
 export type PublicWarningLevel =
   | 'private_intake'
@@ -78,8 +136,23 @@ export interface NonCryptoScamReport {
   amount?: number;
   currency?: string;
   incidentDate?: string;
+  saleChannel?: SaleChannel;
+  saleChannelDetails?: string;
+  sellerProfile?: string;
+  listingUrl?: string;
+  itemOrService?: string;
+  promisedDeliveryDate?: string;
+  refundRequested?: boolean;
+  refundRequestDate?: string;
+  lastContactDate?: string;
+  privateTransactionReference?: string;
+  transactionReferenceHash?: string;
+  reportedTo?: ReportDestination[];
+  externalReportReference?: string;
+  duplicateTransactionReference?: boolean;
   description: string;
   reporterEmail?: string;
+  reporterEmailVerifiedAt?: string;
   reporterFingerprint: string;
   evidenceTypes: EvidenceType[];
   evidenceFiles: string[];
@@ -143,6 +216,7 @@ export interface NonCryptoStats {
 export interface NonCryptoAdminSnapshot {
   reports: NonCryptoScamReport[];
   identities: PaymentIdentitySummary[];
+  corrections: PaymentSafetyCorrection[];
   stats: NonCryptoStats;
 }
 
@@ -186,6 +260,7 @@ export function normalizePaymentIdentifier(
       normalized = raw.trim().toLowerCase();
       break;
     case 'zelle':
+    case 'apple_cash':
       normalized = raw.includes('@') ? raw.trim().toLowerCase() : normalizePhoneLike(raw);
       break;
     case 'phone':
@@ -194,6 +269,17 @@ export function normalizePaymentIdentifier(
     case 'cashapp':
       normalized = raw.trim().toLowerCase().replace(/\s+/g, '').replace(/^\$+/, '');
       break;
+    case 'chime': {
+      const trimmed = raw.trim();
+      if (trimmed.includes('@')) {
+        normalized = trimmed.toLowerCase();
+      } else if (!trimmed.startsWith('$') && /^\+?[\d\s().-]{7,}$/.test(trimmed)) {
+        normalized = normalizePhoneLike(trimmed);
+      } else {
+        normalized = trimmed.toLowerCase().replace(/\s+/g, '').replace(/^\$+/, '');
+      }
+      break;
+    }
     case 'venmo':
     case 'social_handle':
       normalized = raw.trim().toLowerCase().replace(/\s+/g, '').replace(/^@+/, '');
@@ -230,17 +316,20 @@ export function maskPaymentIdentifier(rail: PaymentRail, normalized: string, cou
   if (normalized.includes('@')) {
     const [name, domain = ''] = normalized.split('@');
     const safeName = name.length <= 2 ? `${name[0] || '*'}***` : `${name.slice(0, 2)}***`;
-    return `${rail} email ${safeName}@${domain}`;
+    const label = rail === 'apple_cash' ? 'Apple Cash' : rail === 'chime' ? 'Chime' : rail;
+    return `${label} email ${safeName}@${domain}`;
   }
 
   if (rail === 'cashapp') return `Cash App $${maskHandle(normalized)}`;
   if (rail === 'venmo') return `Venmo @${maskHandle(normalized)}`;
+  if (rail === 'chime' && !/^\+?\d{7,}$/.test(normalized)) return `Chime $${maskHandle(normalized)}`;
   if (rail === 'social_handle') return `social @${maskHandle(normalized)}`;
   if (rail === 'iban') return `IBAN ending ${normalized.slice(-4)} (${c})`;
   if (rail === 'bank_account') return `bank account ending ${normalized.slice(-4)} (${c})`;
 
-  if (['zelle', 'phone'].includes(rail) || /^\+?\d{7,}$/.test(normalized)) {
-    return `${rail} phone ending ${normalized.slice(-4)}`;
+  if (['zelle', 'apple_cash', 'phone'].includes(rail) || /^\+?\d{7,}$/.test(normalized)) {
+    const label = rail === 'apple_cash' ? 'Apple Cash' : rail === 'chime' ? 'Chime' : rail;
+    return `${label} phone ending ${normalized.slice(-4)}`;
   }
 
   return `${rail} ending ${normalized.slice(-4)} (${c})`;
@@ -368,6 +457,42 @@ function cleanShortText(value: string | undefined, maxLength = 80): string | und
   return clean.length >= 3 ? clean : undefined;
 }
 
+function cleanDate(value: string | undefined): string | undefined {
+  const clean = (value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) return undefined;
+  const parsed = new Date(`${clean}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === clean ? clean : undefined;
+}
+
+export function sanitizeHttpUrl(value: string | undefined): string | undefined {
+  const clean = (value || '').trim().slice(0, 500);
+  if (!clean) return undefined;
+  try {
+    const parsed = new URL(clean);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function normalizeTransactionReference(
+  rail: PaymentRail,
+  value: string | undefined,
+): { privateValue?: string; hash?: string } {
+  const privateValue = collapseSpaces(value || '').slice(0, 160);
+  const normalized = privateValue.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalized.length < 3) return {};
+  return {
+    privateValue,
+    hash: sha256(`lh-payment-transaction-reference:v1:${rail}:${normalized}`),
+  };
+}
+
+export function hasUploadedPaymentProof(evidenceTypes: EvidenceType[], evidenceFiles: string[]): boolean {
+  return evidenceTypes.includes('payment_receipt')
+    && evidenceFiles.some((file) => file.startsWith(`${PREFIX}/evidence/`));
+}
+
 function recalculateIdentity(summary: PaymentIdentitySummary): PaymentIdentitySummary {
   summary.reportCount = summary.reportIds.length;
   summary.independentReporters = summary.independentReporterKeys.length;
@@ -388,6 +513,18 @@ export async function saveNonCryptoReport(input: {
   amount?: number;
   currency?: string;
   incidentDate?: string;
+  saleChannel?: SaleChannel;
+  saleChannelDetails?: string;
+  sellerProfile?: string;
+  listingUrl?: string;
+  itemOrService?: string;
+  promisedDeliveryDate?: string;
+  refundRequested?: boolean;
+  refundRequestDate?: string;
+  lastContactDate?: string;
+  transactionReference?: string;
+  reportedTo?: ReportDestination[];
+  externalReportReference?: string;
   description: string;
   reporterEmail?: string;
   evidenceTypes?: EvidenceType[];
@@ -400,10 +537,20 @@ export async function saveNonCryptoReport(input: {
   const now = new Date().toISOString();
   const id = generateId();
   const evidenceTypes = input.evidenceTypes || [];
-  const hasPaymentProof = evidenceTypes.includes('payment_receipt');
+  const evidenceFiles = input.evidenceFiles
+    ?.map((file) => file.trim())
+    .filter((file) => file.startsWith(`${PREFIX}/evidence/`))
+    .slice(0, 5) || [];
+  const hasPaymentProof = hasUploadedPaymentProof(evidenceTypes, evidenceFiles);
   const reporterKey = reporterFingerprint(input.reporterEmail, input.ip || 'unknown');
   const paymentMethodDetails = input.rail === 'other' ? cleanShortText(input.paymentMethodDetails) : undefined;
   const categoryDetails = input.category === 'other' ? cleanShortText(input.categoryDetails) : undefined;
+  const saleChannel = input.saleChannel && SALE_CHANNELS.includes(input.saleChannel) ? input.saleChannel : undefined;
+  const saleChannelDetails = saleChannel === 'other' ? cleanShortText(input.saleChannelDetails, 120) : undefined;
+  const transactionReference = normalizeTransactionReference(input.rail, input.transactionReference);
+  const reportedTo = Array.from(new Set(
+    (input.reportedTo || []).filter((destination): destination is ReportDestination => REPORT_DESTINATIONS.includes(destination)),
+  ));
 
   const report: NonCryptoScamReport = {
     id,
@@ -421,20 +568,34 @@ export async function saveNonCryptoReport(input: {
     categoryDetails,
     amount: typeof input.amount === 'number' ? input.amount : undefined,
     currency: input.currency || 'USD',
-    incidentDate: input.incidentDate,
+    incidentDate: cleanDate(input.incidentDate),
+    saleChannel,
+    saleChannelDetails,
+    sellerProfile: cleanShortText(input.sellerProfile, 200),
+    listingUrl: sanitizeHttpUrl(input.listingUrl),
+    itemOrService: cleanShortText(input.itemOrService, 120),
+    promisedDeliveryDate: cleanDate(input.promisedDeliveryDate),
+    refundRequested: !!input.refundRequested,
+    refundRequestDate: input.refundRequested ? cleanDate(input.refundRequestDate) : undefined,
+    lastContactDate: cleanDate(input.lastContactDate),
+    privateTransactionReference: transactionReference.privateValue,
+    transactionReferenceHash: transactionReference.hash,
+    reportedTo,
+    externalReportReference: cleanShortText(input.externalReportReference, 160),
     description: input.description.trim(),
     reporterEmail: input.reporterEmail?.trim() || undefined,
     reporterFingerprint: reporterKey,
     evidenceTypes,
-    evidenceFiles: input.evidenceFiles?.map((file) => file.trim()).filter(Boolean).slice(0, 5) || [],
+    evidenceFiles,
     hasPaymentProof,
     status: 'pending',
   };
 
   await s3Put(`reports/${id}.json`, report);
+  await refreshNonCryptoIndexes();
 
-  const existing = await s3Get<PaymentIdentitySummary>(`identities/${identity.hash}.json`);
-  const summary: PaymentIdentitySummary = existing || {
+  const acceptedSummary = await s3Get<PaymentIdentitySummary>(`identities/${identity.hash}.json`);
+  const pendingView: PaymentIdentitySummary = acceptedSummary || {
     identityHash: identity.hash,
     country: identity.country,
     rail: input.rail,
@@ -457,43 +618,111 @@ export async function saveNonCryptoReport(input: {
     indexedEligible: false,
   };
 
-  addUnique(summary.categories, input.category);
-  summary.paymentMethodDetails ||= [];
-  summary.categoryDetails ||= [];
-  if (paymentMethodDetails) addUnique(summary.paymentMethodDetails, paymentMethodDetails);
-  if (categoryDetails) addUnique(summary.categoryDetails, categoryDetails);
-  for (const alias of [input.recipientName, input.businessName, ...(input.aliases || [])]) {
-    const clean = alias?.trim();
-    if (clean) addUnique(summary.aliases, clean);
+  return { id, report, identity: publicView(pendingView) };
+}
+
+export async function createNonCryptoEmailVerification(
+  reportId: string,
+  email: string,
+  locale = 'en',
+): Promise<{ token: string; expiresAt: string }> {
+  const report = await s3Get<NonCryptoScamReport>(`reports/${reportId}.json`);
+  if (!report) throw new Error('Report not found');
+  if (!report.reporterEmail || report.reporterEmail.toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error('Report email does not match');
   }
-  addUnique(summary.reportIds, id);
-  addUnique(summary.independentReporterKeys, reporterKey);
-  summary.paymentProofCount += hasPaymentProof ? 1 : 0;
-  summary.totalReportedAmount += input.amount || 0;
-  summary.currency = input.currency || summary.currency || 'USD';
-  summary.firstReported = summary.firstReported < now ? summary.firstReported : now;
-  summary.lastReported = now;
-  recalculateIdentity(summary);
+  if (report.reporterEmailVerifiedAt) throw new Error('Email is already verified');
 
-  await s3Put(`identities/${identity.hash}.json`, summary);
+  const token = randomBytes(32).toString('hex');
+  const tokenHash = sha256(`lh-payment-email-verification:v1:${token}`);
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const record: EmailVerificationRecord = {
+    reportId,
+    email: report.reporterEmail,
+    locale: /^[a-z]{2}$/i.test(locale) ? locale.toLowerCase() : 'en',
+    createdAt: createdAt.toISOString(),
+    expiresAt,
+  };
+  await s3Put(`email-verifications/${tokenHash}.json`, record);
+  return { token, expiresAt };
+}
 
-  const index = (await s3Get<PaymentIdentityPublicView[]>('index/identities.json')) || [];
-  const safeSummary = publicView(summary);
-  const idx = index.findIndex((i) => i.identityHash === identity.hash);
-  if (idx >= 0) index[idx] = safeSummary;
-  else index.push(safeSummary);
-  await s3Put('index/identities.json', index);
+export async function verifyNonCryptoEmailToken(token: string): Promise<{ reportId: string; locale: string }> {
+  if (!/^[a-f0-9]{64}$/i.test(token)) throw new Error('Invalid verification token');
+  const tokenHash = sha256(`lh-payment-email-verification:v1:${token}`);
+  const record = await s3Get<EmailVerificationRecord>(`email-verifications/${tokenHash}.json`);
+  if (!record || record.usedAt) throw new Error('Verification link is invalid or already used');
+  if (new Date(record.expiresAt).getTime() < Date.now()) throw new Error('Verification link has expired');
 
-  const stats = (await s3Get<NonCryptoStats>('index/stats.json')) || defaultStats();
-  stats.totalReports += 1;
-  stats.totalIdentities = index.length;
-  stats.publicEligibleIdentities = index.filter((i) => i.publicEligible).length;
-  stats.indexedEligibleIdentities = index.filter((i) => i.indexedEligible).length;
-  stats.paymentProofReports += hasPaymentProof ? 1 : 0;
-  stats.updatedAt = now;
-  await s3Put('index/stats.json', stats);
+  const report = await s3Get<NonCryptoScamReport>(`reports/${record.reportId}.json`);
+  if (!report || report.reporterEmail?.toLowerCase() !== record.email.toLowerCase()) {
+    throw new Error('Report verification failed');
+  }
 
-  return { id, report, identity: safeSummary };
+  const verifiedAt = new Date().toISOString();
+  report.reporterEmailVerifiedAt = verifiedAt;
+  record.usedAt = verifiedAt;
+  await Promise.all([
+    s3Put(`reports/${report.id}.json`, report),
+    s3Put(`email-verifications/${tokenHash}.json`, record),
+  ]);
+  await refreshNonCryptoIndexes();
+  return { reportId: report.id, locale: record.locale };
+}
+
+export async function savePaymentSafetyCorrection(input: {
+  country?: string;
+  rail: PaymentRail;
+  paymentIdentifier: string;
+  contactName: string;
+  contactEmail: string;
+  relationship: PaymentSafetyCorrection['relationship'];
+  reason: PaymentSafetyCorrection['reason'];
+  explanation: string;
+  evidenceFiles?: string[];
+}): Promise<PaymentSafetyCorrection> {
+  const identity = normalizePaymentIdentifier(input.rail, input.paymentIdentifier, input.country);
+  if (!identity.normalized) throw new Error('Payment identifier is required');
+  const now = new Date().toISOString();
+  const correction: PaymentSafetyCorrection = {
+    id: `COR-${generateId()}`,
+    createdAt: now,
+    country: identity.country,
+    rail: input.rail,
+    identityHash: identity.hash,
+    identityMask: identity.mask,
+    privateIdentifier: identity.normalized,
+    contactName: cleanShortText(input.contactName, 120) || '',
+    contactEmail: input.contactEmail.trim().toLowerCase().slice(0, 254),
+    relationship: input.relationship,
+    reason: input.reason,
+    explanation: input.explanation.trim().slice(0, 5000),
+    evidenceFiles: input.evidenceFiles
+      ?.map((file) => file.trim())
+      .filter((file) => file.startsWith(`${PREFIX}/evidence/`))
+      .slice(0, 5) || [],
+    status: 'pending',
+  };
+  await s3Put(`corrections/${correction.id}.json`, correction);
+  return correction;
+}
+
+export async function updatePaymentSafetyCorrectionStatus(
+  correctionId: string,
+  status: PaymentSafetyCorrectionStatus,
+  resolutionNote?: string,
+): Promise<PaymentSafetyCorrection> {
+  if (!['pending', 'under_review', 'resolved', 'rejected'].includes(status)) {
+    throw new Error('Invalid correction status');
+  }
+  const correction = await s3Get<PaymentSafetyCorrection>(`corrections/${correctionId}.json`);
+  if (!correction) throw new Error('Correction request not found');
+  correction.status = status;
+  correction.resolutionNote = cleanShortText(resolutionNote, 1000);
+  correction.updatedAt = new Date().toISOString();
+  await s3Put(`corrections/${correction.id}.json`, correction);
+  return correction;
 }
 
 export async function searchPaymentIdentity(input: {
@@ -516,15 +745,32 @@ export async function getPublicPaymentIdentityIndex(): Promise<PaymentIdentityPu
 }
 
 export async function getNonCryptoAdminSnapshot(): Promise<NonCryptoAdminSnapshot> {
-  const [reports, identities, stats] = await Promise.all([
+  const [reports, identities, corrections, stats] = await Promise.all([
     s3ListJson<NonCryptoScamReport>('reports/'),
     s3ListJson<PaymentIdentitySummary>('identities/'),
+    s3ListJson<PaymentSafetyCorrection>('corrections/'),
     getNonCryptoStats(),
   ]);
 
   reports.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  identities.sort((a, b) => b.lastReported.localeCompare(a.lastReported));
-  return { reports, identities, stats };
+  const transactionReferenceCounts = new Map<string, number>();
+  for (const report of reports) {
+    if (report.status !== 'rejected' && report.transactionReferenceHash) {
+      transactionReferenceCounts.set(
+        report.transactionReferenceHash,
+        (transactionReferenceCounts.get(report.transactionReferenceHash) || 0) + 1,
+      );
+    }
+  }
+  for (const report of reports) {
+    report.duplicateTransactionReference = !!report.transactionReferenceHash
+      && (transactionReferenceCounts.get(report.transactionReferenceHash) || 0) > 1;
+  }
+  const activeIdentities = identities
+    .filter((identity) => identity.reportCount > 0)
+    .sort((a, b) => b.lastReported.localeCompare(a.lastReported));
+  corrections.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { reports, identities: activeIdentities, corrections, stats };
 }
 
 export async function updateNonCryptoReportStatus(
@@ -537,14 +783,12 @@ export async function updateNonCryptoReportStatus(
 
   const report = await s3Get<NonCryptoScamReport>(`reports/${reportId}.json`);
   if (!report) throw new Error('Report not found');
+  if (status === 'accepted' && !report.reporterEmailVerifiedAt) {
+    throw new Error('Reporter email must be verified before acceptance');
+  }
 
-  const oldStatus = report.status;
   report.status = status;
   await s3Put(`reports/${reportId}.json`, report);
-
-  if (oldStatus !== 'rejected' && status === 'rejected') {
-    await removeReportFromIdentity(report);
-  }
 
   await refreshNonCryptoIndexes();
   return report;
@@ -553,33 +797,67 @@ export async function updateNonCryptoReportStatus(
 export async function markNonCryptoIdentityStaffReviewed(identityHash: string): Promise<PaymentIdentityPublicView> {
   const summary = await s3Get<PaymentIdentitySummary>(`identities/${identityHash}.json`);
   if (!summary) throw new Error('Identity not found');
+  if (summary.independentReporters < 3) {
+    throw new Error('At least three independent verified reports are required before staff review');
+  }
 
   summary.publicLevel = 'staff_reviewed';
   summary.publicEligible = true;
-  summary.indexedEligible = true;
   await s3Put(`identities/${identityHash}.json`, summary);
   await refreshNonCryptoIndexes();
   return publicView(summary);
 }
 
-async function removeReportFromIdentity(report: NonCryptoScamReport): Promise<void> {
-  const summary = await s3Get<PaymentIdentitySummary>(`identities/${report.identityHash}.json`);
-  if (!summary) return;
+function rebuildIdentitySummary(
+  existing: PaymentIdentitySummary | undefined,
+  reports: NonCryptoScamReport[],
+): PaymentIdentitySummary {
+  const first = reports[0];
+  const now = new Date().toISOString();
+  const summary: PaymentIdentitySummary = {
+    identityHash: first?.identityHash || existing?.identityHash || '',
+    country: first?.country || existing?.country || 'OTHER',
+    rail: first?.rail || existing?.rail || 'other',
+    identityMask: first?.identityMask || existing?.identityMask || 'payment identifier',
+    categories: [],
+    paymentMethodDetails: [],
+    categoryDetails: [],
+    aliases: [],
+    reportIds: [],
+    reportCount: 0,
+    independentReporterKeys: [],
+    independentReporters: 0,
+    paymentProofCount: 0,
+    totalReportedAmount: 0,
+    currency: first?.currency || existing?.currency || 'USD',
+    firstReported: first?.createdAt || existing?.firstReported || now,
+    lastReported: first?.createdAt || existing?.lastReported || now,
+    publicLevel: 'private_intake',
+    publicEligible: false,
+    indexedEligible: false,
+  };
 
-  summary.reportIds = summary.reportIds.filter((id) => id !== report.id);
-  summary.paymentProofCount = Math.max(0, summary.paymentProofCount - (report.hasPaymentProof ? 1 : 0));
-  summary.totalReportedAmount = Math.max(0, summary.totalReportedAmount - (report.amount || 0));
+  for (const report of reports) {
+    addUnique(summary.categories, report.category);
+    if (report.paymentMethodDetails) addUnique(summary.paymentMethodDetails, report.paymentMethodDetails);
+    if (report.categoryDetails) addUnique(summary.categoryDetails, report.categoryDetails);
+    for (const alias of [report.recipientName, report.businessName, ...(report.aliases || [])]) {
+      if (alias) addUnique(summary.aliases, alias);
+    }
+    addUnique(summary.reportIds, report.id);
+    addUnique(summary.independentReporterKeys, report.reporterFingerprint);
+    summary.paymentProofCount += report.hasPaymentProof ? 1 : 0;
+    summary.totalReportedAmount += report.amount || 0;
+    summary.firstReported = summary.firstReported < report.createdAt ? summary.firstReported : report.createdAt;
+    summary.lastReported = summary.lastReported > report.createdAt ? summary.lastReported : report.createdAt;
+  }
 
-  const remainingReports = await Promise.all(
-    summary.reportIds.map((id) => s3Get<NonCryptoScamReport>(`reports/${id}.json`)),
-  );
-  summary.independentReporterKeys = Array.from(new Set(
-    remainingReports
-      .filter((r): r is NonCryptoScamReport => !!r && r.status !== 'rejected')
-      .map((r) => r.reporterFingerprint),
-  ));
   recalculateIdentity(summary);
-  await s3Put(`identities/${report.identityHash}.json`, summary);
+  if (summary.independentReporters >= 3 && existing?.publicLevel === 'staff_reviewed') {
+    summary.publicLevel = 'staff_reviewed';
+    summary.publicEligible = true;
+  }
+  return summary;
 }
 
 async function refreshNonCryptoIndexes(): Promise<void> {
@@ -587,15 +865,35 @@ async function refreshNonCryptoIndexes(): Promise<void> {
     s3ListJson<NonCryptoScamReport>('reports/'),
     s3ListJson<PaymentIdentitySummary>('identities/'),
   ]);
-  const safe = identities.map(publicView);
+  const existingByHash = new Map(identities.map((identity) => [identity.identityHash, identity]));
+  const acceptedByHash = new Map<string, NonCryptoScamReport[]>();
+  for (const report of reports) {
+    if (report.status !== 'accepted' || !report.reporterEmailVerifiedAt) continue;
+    const group = acceptedByHash.get(report.identityHash) || [];
+    group.push(report);
+    acceptedByHash.set(report.identityHash, group);
+  }
+
+  const identityHashes = Array.from(new Set([
+    ...Array.from(existingByHash.keys()),
+    ...Array.from(acceptedByHash.keys()),
+  ]));
+  const rebuilt: PaymentIdentitySummary[] = [];
+  for (const identityHash of identityHashes) {
+    const summary = rebuildIdentitySummary(existingByHash.get(identityHash), acceptedByHash.get(identityHash) || []);
+    await s3Put(`identities/${identityHash}.json`, summary);
+    if (summary.reportCount > 0) rebuilt.push(summary);
+  }
+
+  const safe = rebuilt.map(publicView);
   await s3Put('index/identities.json', safe);
 
   const stats: NonCryptoStats = {
     totalReports: reports.length,
-    totalIdentities: identities.length,
+    totalIdentities: rebuilt.length,
     publicEligibleIdentities: safe.filter((i) => i.publicEligible).length,
     indexedEligibleIdentities: safe.filter((i) => i.indexedEligible).length,
-    paymentProofReports: reports.filter((r) => r.hasPaymentProof && r.status !== 'rejected').length,
+    paymentProofReports: reports.filter((r) => r.hasPaymentProof && r.status === 'accepted' && r.reporterEmailVerifiedAt).length,
     updatedAt: new Date().toISOString(),
   };
   await s3Put('index/stats.json', stats);

@@ -2,24 +2,20 @@ import { NextRequest } from 'next/server';
 import {
   getNonCryptoAdminSnapshot,
   markNonCryptoIdentityStaffReviewed,
+  updatePaymentSafetyCorrectionStatus,
   updateNonCryptoReportStatus,
   type NonCryptoScamReport,
+  type PaymentSafetyCorrectionStatus,
 } from '@/lib/non-crypto-scam-db';
+import { requireAdmin } from '@/lib/admin-auth';
+import { sendPaymentCorrectionResolution } from '@/lib/payment-safety-emails';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function unauthorized() {
-  return Response.json({ error: 'Unauthorized' }, { status: 401 });
-}
-
-function checkAdmin(req: NextRequest): boolean {
-  const key = req.headers.get('x-admin-key');
-  return !!process.env.ADMIN_PASSWORD && key === process.env.ADMIN_PASSWORD;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAdmin(req)) return unauthorized();
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   try {
     const snapshot = await getNonCryptoAdminSnapshot();
@@ -31,7 +27,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAdmin(req)) return unauthorized();
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   try {
     const body = await req.json();
@@ -44,6 +41,20 @@ export async function POST(req: NextRequest) {
     if (body.action === 'staffReviewIdentity') {
       const identity = await markNonCryptoIdentityStaffReviewed(String(body.identityHash || ''));
       return Response.json({ identity });
+    }
+
+    if (body.action === 'updateCorrectionStatus') {
+      const correction = await updatePaymentSafetyCorrectionStatus(
+        String(body.correctionId || ''),
+        body.status as PaymentSafetyCorrectionStatus,
+        typeof body.resolutionNote === 'string' ? body.resolutionNote : undefined,
+      );
+      if (['resolved', 'rejected'].includes(correction.status)) {
+        sendPaymentCorrectionResolution(correction).catch((emailError) =>
+          console.error('[payment-safety correction resolution email]', emailError),
+        );
+      }
+      return Response.json({ correction });
     }
 
     return Response.json({ error: 'Unknown admin action' }, { status: 400 });

@@ -1,11 +1,17 @@
 import { NextRequest } from 'next/server';
 import {
+  createNonCryptoEmailVerification,
   saveNonCryptoReport,
+  REPORT_DESTINATIONS,
+  SALE_CHANNELS,
   type EvidenceType,
   type NonCryptoScamCategory,
   type PaymentRail,
+  type ReportDestination,
+  type SaleChannel,
 } from '@/lib/non-crypto-scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { sendPaymentReportVerification } from '@/lib/payment-safety-emails';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,6 +21,8 @@ const VALID_RAILS: PaymentRail[] = [
   'cashapp',
   'venmo',
   'paypal',
+  'apple_cash',
+  'chime',
   'wise',
   'revolut',
   'iban',
@@ -68,8 +76,21 @@ export async function POST(req: NextRequest) {
       amount,
       currency,
       incidentDate,
+      saleChannel,
+      saleChannelDetails,
+      sellerProfile,
+      listingUrl,
+      itemOrService,
+      promisedDeliveryDate,
+      refundRequested,
+      refundRequestDate,
+      lastContactDate,
+      transactionReference,
+      reportedTo,
+      externalReportReference,
       description,
       reporterEmail,
+      locale,
       evidenceTypes,
       evidenceFiles,
     } = body;
@@ -80,6 +101,9 @@ export async function POST(req: NextRequest) {
     if (!paymentIdentifier || typeof paymentIdentifier !== 'string' || paymentIdentifier.trim().length < 3) {
       return Response.json({ error: 'Payment identifier is required.' }, { status: 400 });
     }
+    if (!reporterEmail || typeof reporterEmail !== 'string' || !/^\S+@\S+\.\S+$/.test(reporterEmail.trim())) {
+      return Response.json({ error: 'A valid email is required for report verification.' }, { status: 400 });
+    }
     if (!category || !VALID_CATEGORIES.includes(category)) {
       return Response.json({ error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` }, { status: 400 });
     }
@@ -88,6 +112,23 @@ export async function POST(req: NextRequest) {
     }
     if (category === 'other' && (!categoryDetails || typeof categoryDetails !== 'string' || categoryDetails.trim().length < 3)) {
       return Response.json({ error: 'Category details are required when category is Other.' }, { status: 400 });
+    }
+    if (!saleChannel || !SALE_CHANNELS.includes(saleChannel as SaleChannel)) {
+      return Response.json({ error: `Invalid sale channel. Must be one of: ${SALE_CHANNELS.join(', ')}` }, { status: 400 });
+    }
+    if (saleChannel === 'other' && (!saleChannelDetails || typeof saleChannelDetails !== 'string' || saleChannelDetails.trim().length < 3)) {
+      return Response.json({ error: 'Sale channel details are required when sale channel is Other.' }, { status: 400 });
+    }
+    if (!itemOrService || typeof itemOrService !== 'string' || itemOrService.trim().length < 3) {
+      return Response.json({ error: 'Item or service is required.' }, { status: 400 });
+    }
+    if (listingUrl) {
+      try {
+        const parsedUrl = new URL(String(listingUrl));
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('protocol');
+      } catch {
+        return Response.json({ error: 'Listing URL must be a valid http or https URL.' }, { status: 400 });
+      }
     }
     if (!description || typeof description !== 'string' || description.trim().length < 80) {
       return Response.json({ error: 'Description is required (minimum 80 characters).' }, { status: 400 });
@@ -101,6 +142,9 @@ export async function POST(req: NextRequest) {
         .filter((key: unknown): key is string => typeof key === 'string')
         .filter((key) => key.startsWith('non-crypto-scam-database/evidence/'))
         .slice(0, 5)
+      : [];
+    const cleanReportedTo = Array.isArray(reportedTo)
+      ? reportedTo.filter((destination: ReportDestination) => REPORT_DESTINATIONS.includes(destination))
       : [];
 
     const result = await saveNonCryptoReport({
@@ -116,6 +160,18 @@ export async function POST(req: NextRequest) {
       amount: typeof amount === 'number' ? amount : (parseFloat(amount) || undefined),
       currency: currency || 'USD',
       incidentDate,
+      saleChannel,
+      saleChannelDetails,
+      sellerProfile,
+      listingUrl,
+      itemOrService,
+      promisedDeliveryDate,
+      refundRequested: refundRequested === true,
+      refundRequestDate,
+      lastContactDate,
+      transactionReference,
+      reportedTo: cleanReportedTo,
+      externalReportReference,
       description,
       reporterEmail,
       evidenceTypes: cleanEvidence,
@@ -123,15 +179,30 @@ export async function POST(req: NextRequest) {
       ip,
     });
 
+    let verificationEmailSent = false;
+    try {
+      const verification = await createNonCryptoEmailVerification(result.id, reporterEmail, locale);
+      await sendPaymentReportVerification({
+        to: reporterEmail.trim(),
+        reportId: result.id,
+        token: verification.token,
+      });
+      verificationEmailSent = true;
+    } catch (emailError) {
+      console.error('[non-crypto-scam-database/report verification email]', emailError);
+    }
+
     return Response.json({
       reportId: result.id,
       identity: result.identity,
-      message: result.identity.publicEligible
-        ? 'Report received. This payment identity has multiple independent reports.'
-        : 'Report received. It will remain private until corroborated by independent reports.',
+      verificationRequired: true,
+      verificationEmailSent,
+      message: verificationEmailSent
+        ? 'Report received. Verify your email before moderation can begin.'
+        : 'Report received, but the verification email could not be sent. Use resend verification.',
     });
   } catch (err: any) {
     console.error('[non-crypto-scam-database/report]', err);
-    return Response.json({ error: err.message || 'Failed to submit report' }, { status: 500 });
+    return Response.json({ error: 'Failed to submit report' }, { status: 500 });
   }
 }
