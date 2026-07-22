@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { createHash } from 'crypto';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -45,8 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const key = `non-crypto-scam-database/evidence/${fileId}.${ext}`;
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    const key = `non-crypto-scam-database/evidence/${fileHash}.${ext}`;
 
     await getS3().send(new PutObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET!,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       ServerSideEncryption: 'aws:kms',
     }));
 
-    return Response.json({ key, fileName: file.name });
+    return Response.json({ key, fileName: file.name, fileHash });
   } catch (err) {
     console.error('[non-crypto-scam-database/upload]', err);
     return Response.json({ error: 'Upload failed.' }, { status: 500 });

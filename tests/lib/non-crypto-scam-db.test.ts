@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   derivePublicLevel,
+  evidenceFingerprint,
   hasUploadedPaymentProof,
+  independentReportIds,
   maskPaymentIdentifier,
   normalizeCountry,
   normalizePaymentIdentifier,
   normalizeTransactionReference,
+  normalizeUsState,
   publicView,
   sanitizeHttpUrl,
   type PaymentIdentitySummary,
+  type NonCryptoScamReport,
 } from '@/lib/non-crypto-scam-db';
 
 describe('normalizeCountry', () => {
@@ -82,6 +86,50 @@ describe('maskPaymentIdentifier', () => {
 });
 
 describe('private US report fields', () => {
+  it('accepts US state codes and rejects arbitrary location text', () => {
+    expect(normalizeUsState(' ny ')).toBe('NY');
+    expect(normalizeUsState('PR')).toBe('PR');
+    expect(normalizeUsState('New York')).toBeUndefined();
+  });
+
+  it('extracts content fingerprints from new evidence keys', () => {
+    const hash = 'a'.repeat(64);
+    expect(evidenceFingerprint(`non-crypto-scam-database/evidence/${hash}.png`)).toBe(hash);
+    expect(evidenceFingerprint('non-crypto-scam-database/evidence/legacy-file.png')).toBeUndefined();
+  });
+
+  it('does not count reports sharing a network, transaction, or evidence as independent', () => {
+    const makeReport = (id: string, overrides: Partial<NonCryptoScamReport> = {}) => ({
+      id,
+      createdAt: '2026-07-20T00:00:00.000Z',
+      country: 'US',
+      rail: 'zelle',
+      identityHash: 'identity',
+      identityMask: 'zelle phone ending 1234',
+      privateIdentifier: '2125551234',
+      category: 'marketplace_scam',
+      description: 'description',
+      reporterFingerprint: `email-${id}`,
+      reporterNetworkFingerprint: `network-${id}`,
+      evidenceTypes: [],
+      evidenceFiles: [],
+      hasPaymentProof: false,
+      status: 'accepted',
+      ...overrides,
+    }) as NonCryptoScamReport;
+    const proofHash = 'b'.repeat(64);
+    const reports = [
+      makeReport('one', { reporterNetworkFingerprint: 'shared-network' }),
+      makeReport('two', { reporterNetworkFingerprint: 'shared-network' }),
+      makeReport('three', { transactionReferenceHash: 'same-transaction' }),
+      makeReport('four', { transactionReferenceHash: 'same-transaction' }),
+      makeReport('five', { evidenceFiles: [`non-crypto-scam-database/evidence/${proofHash}.jpg`] }),
+      makeReport('six', { evidenceFiles: [`non-crypto-scam-database/evidence/${proofHash}.jpg`] }),
+    ];
+
+    expect(independentReportIds(reports)).toEqual(['one', 'three', 'five']);
+  });
+
   it('normalizes transaction references for private duplicate detection', () => {
     const a = normalizeTransactionReference('zelle', ' TXN-123 456 ');
     const b = normalizeTransactionReference('zelle', 'txn123456');
@@ -151,6 +199,7 @@ describe('publicView', () => {
       paymentMethodDetails: [],
       categoryDetails: [],
       aliases: ['Cake Seller'],
+      states: ['NY'],
       reportIds: ['R1', 'R2'],
       reportCount: 2,
       independentReporterKeys: ['K1', 'K2'],

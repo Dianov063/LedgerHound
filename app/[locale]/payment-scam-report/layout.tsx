@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Report a Payment Scam | Zelle, Cash App, PayPal, Bank Transfer',
+  title: 'Report a Payment Scam | Zelle, Cash App, Telegram, Apple Cash',
   description:
-    'Report a non-crypto payment scam involving Zelle, Cash App, Venmo, PayPal, bank transfer, IBAN, phone, email, or marketplace profiles. LedgerHound keeps single reports private until corroborated.',
+    'Report a non-crypto payment scam involving Zelle, Cash App, Venmo, Apple Cash, Chime, Telegram sellers, bank transfers, or marketplace profiles.',
   alternates: {
     canonical: '/payment-scam-report',
   },

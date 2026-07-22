@@ -55,6 +55,7 @@ export const SALE_CHANNELS = [
   'craigslist',
   'offerup',
   'nextdoor',
+  'telegram',
   'discord',
   'direct_website',
   'text_message',
@@ -73,6 +74,25 @@ export const REPORT_DESTINATIONS = [
 ] as const;
 
 export type ReportDestination = typeof REPORT_DESTINATIONS[number];
+
+export const COMMUNITY_LANGUAGES = ['english', 'russian', 'spanish', 'chinese', 'other'] as const;
+export type CommunityLanguage = typeof COMMUNITY_LANGUAGES[number];
+
+export type PaymentSafetyRiskFlag =
+  | 'shared_network'
+  | 'duplicate_transaction_reference'
+  | 'duplicate_evidence';
+
+export interface PaymentSafetyAuditEvent {
+  id: string;
+  createdAt: string;
+  action: 'report_status' | 'identity_staff_review' | 'correction_status';
+  entityId: string;
+  fromStatus?: string;
+  toStatus?: string;
+  actorHash: string;
+  note?: string;
+}
 
 export type PaymentSafetyCorrectionStatus = 'pending' | 'under_review' | 'resolved' | 'rejected';
 
@@ -138,6 +158,9 @@ export interface NonCryptoScamReport {
   incidentDate?: string;
   saleChannel?: SaleChannel;
   saleChannelDetails?: string;
+  usState?: string;
+  communityLanguage?: CommunityLanguage;
+  communityName?: string;
   sellerProfile?: string;
   listingUrl?: string;
   itemOrService?: string;
@@ -154,9 +177,11 @@ export interface NonCryptoScamReport {
   reporterEmail?: string;
   reporterEmailVerifiedAt?: string;
   reporterFingerprint: string;
+  reporterNetworkFingerprint?: string;
   evidenceTypes: EvidenceType[];
   evidenceFiles: string[];
   hasPaymentProof: boolean;
+  riskFlags?: PaymentSafetyRiskFlag[];
   status: 'pending' | 'accepted' | 'rejected';
 }
 
@@ -169,6 +194,7 @@ export interface PaymentIdentitySummary {
   paymentMethodDetails: string[];
   categoryDetails: string[];
   aliases: string[];
+  states: string[];
   reportIds: string[];
   reportCount: number;
   independentReporterKeys: string[];
@@ -181,6 +207,7 @@ export interface PaymentIdentitySummary {
   publicLevel: PublicWarningLevel;
   publicEligible: boolean;
   indexedEligible: boolean;
+  publicationPaused?: boolean;
 }
 
 export interface PaymentIdentityPublicView {
@@ -192,6 +219,7 @@ export interface PaymentIdentityPublicView {
   paymentMethodDetails: string[];
   categoryDetails: string[];
   aliases: string[];
+  states: string[];
   reportCount: number;
   independentReporters: number;
   paymentProofCount: number;
@@ -202,6 +230,7 @@ export interface PaymentIdentityPublicView {
   publicLevel: PublicWarningLevel;
   publicEligible: boolean;
   indexedEligible: boolean;
+  publicationPaused?: boolean;
 }
 
 export interface NonCryptoStats {
@@ -217,6 +246,7 @@ export interface NonCryptoAdminSnapshot {
   reports: NonCryptoScamReport[];
   identities: PaymentIdentitySummary[];
   corrections: PaymentSafetyCorrection[];
+  auditEvents: PaymentSafetyAuditEvent[];
   stats: NonCryptoStats;
 }
 
@@ -231,6 +261,17 @@ function sha256(input: string): string {
 export function normalizeCountry(country: string | undefined): string {
   const c = (country || 'OTHER').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   return c.length >= 2 && c.length <= 3 ? c : 'OTHER';
+}
+
+export function normalizeUsState(value: string | undefined): string | undefined {
+  const state = (value || '').trim().toUpperCase();
+  const valid = new Set([
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
+    'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM',
+    'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
+    'WV', 'WI', 'WY', 'PR',
+  ]);
+  return valid.has(state) ? state : undefined;
 }
 
 function collapseSpaces(value: string): string {
@@ -352,6 +393,7 @@ export function publicView(summary: PaymentIdentitySummary): PaymentIdentityPubl
     paymentMethodDetails: safe.paymentMethodDetails || [],
     categoryDetails: safe.categoryDetails || [],
     aliases: safe.aliases || [],
+    states: safe.states || [],
   };
 }
 
@@ -380,6 +422,42 @@ export function derivePublicLevel(summary: Pick<PaymentIdentitySummary, 'indepen
 function reporterFingerprint(email: string | undefined, ip: string): string {
   const key = email?.trim().toLowerCase() || ip || 'unknown';
   return sha256(`lh-non-crypto-reporter:v1:${key}`);
+}
+
+function reporterNetworkFingerprint(ip: string): string | undefined {
+  const normalized = ip.trim().toLowerCase();
+  if (!normalized || normalized === 'unknown') return undefined;
+  return sha256(`lh-non-crypto-network:v1:${normalized}`);
+}
+
+export function evidenceFingerprint(key: string): string | undefined {
+  const match = key.match(/\/([a-f0-9]{64})\.(?:pdf|png|jpg|webp)$/i);
+  return match?.[1]?.toLowerCase();
+}
+
+export function independentReportIds(reports: NonCryptoScamReport[]): string[] {
+  const seenReporters = new Set<string>();
+  const seenNetworks = new Set<string>();
+  const seenTransactions = new Set<string>();
+  const seenEvidence = new Set<string>();
+  const independent: string[] = [];
+
+  for (const report of [...reports].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    const fileFingerprints = (report.evidenceFiles || [])
+      .map(evidenceFingerprint)
+      .filter((value): value is string => !!value);
+    const canCount = !seenReporters.has(report.reporterFingerprint)
+      && (!report.reporterNetworkFingerprint || !seenNetworks.has(report.reporterNetworkFingerprint))
+      && (!report.transactionReferenceHash || !seenTransactions.has(report.transactionReferenceHash))
+      && !fileFingerprints.some((fingerprint) => seenEvidence.has(fingerprint));
+
+    seenReporters.add(report.reporterFingerprint);
+    if (report.reporterNetworkFingerprint) seenNetworks.add(report.reporterNetworkFingerprint);
+    if (report.transactionReferenceHash) seenTransactions.add(report.transactionReferenceHash);
+    fileFingerprints.forEach((fingerprint) => seenEvidence.add(fingerprint));
+    if (canCount) independent.push(report.id);
+  }
+  return independent;
 }
 
 async function streamToString(stream: any): Promise<string> {
@@ -515,6 +593,9 @@ export async function saveNonCryptoReport(input: {
   incidentDate?: string;
   saleChannel?: SaleChannel;
   saleChannelDetails?: string;
+  usState?: string;
+  communityLanguage?: CommunityLanguage;
+  communityName?: string;
   sellerProfile?: string;
   listingUrl?: string;
   itemOrService?: string;
@@ -543,6 +624,7 @@ export async function saveNonCryptoReport(input: {
     .slice(0, 5) || [];
   const hasPaymentProof = hasUploadedPaymentProof(evidenceTypes, evidenceFiles);
   const reporterKey = reporterFingerprint(input.reporterEmail, input.ip || 'unknown');
+  const reporterNetworkKey = reporterNetworkFingerprint(input.ip || 'unknown');
   const paymentMethodDetails = input.rail === 'other' ? cleanShortText(input.paymentMethodDetails) : undefined;
   const categoryDetails = input.category === 'other' ? cleanShortText(input.categoryDetails) : undefined;
   const saleChannel = input.saleChannel && SALE_CHANNELS.includes(input.saleChannel) ? input.saleChannel : undefined;
@@ -571,6 +653,11 @@ export async function saveNonCryptoReport(input: {
     incidentDate: cleanDate(input.incidentDate),
     saleChannel,
     saleChannelDetails,
+    usState: identity.country === 'US' ? normalizeUsState(input.usState) : undefined,
+    communityLanguage: input.communityLanguage && COMMUNITY_LANGUAGES.includes(input.communityLanguage)
+      ? input.communityLanguage
+      : undefined,
+    communityName: cleanShortText(input.communityName, 160),
     sellerProfile: cleanShortText(input.sellerProfile, 200),
     listingUrl: sanitizeHttpUrl(input.listingUrl),
     itemOrService: cleanShortText(input.itemOrService, 120),
@@ -585,6 +672,7 @@ export async function saveNonCryptoReport(input: {
     description: input.description.trim(),
     reporterEmail: input.reporterEmail?.trim() || undefined,
     reporterFingerprint: reporterKey,
+    reporterNetworkFingerprint: reporterNetworkKey,
     evidenceTypes,
     evidenceFiles,
     hasPaymentProof,
@@ -604,6 +692,7 @@ export async function saveNonCryptoReport(input: {
     paymentMethodDetails: [],
     categoryDetails: [],
     aliases: [],
+    states: [],
     reportIds: [],
     reportCount: 0,
     independentReporterKeys: [],
@@ -712,16 +801,27 @@ export async function updatePaymentSafetyCorrectionStatus(
   correctionId: string,
   status: PaymentSafetyCorrectionStatus,
   resolutionNote?: string,
+  actorSource = 'system',
 ): Promise<PaymentSafetyCorrection> {
   if (!['pending', 'under_review', 'resolved', 'rejected'].includes(status)) {
     throw new Error('Invalid correction status');
   }
   const correction = await s3Get<PaymentSafetyCorrection>(`corrections/${correctionId}.json`);
   if (!correction) throw new Error('Correction request not found');
+  const previousStatus = correction.status;
   correction.status = status;
   correction.resolutionNote = cleanShortText(resolutionNote, 1000);
   correction.updatedAt = new Date().toISOString();
   await s3Put(`corrections/${correction.id}.json`, correction);
+  await refreshNonCryptoIndexes();
+  await recordPaymentSafetyAuditEvent({
+    action: 'correction_status',
+    entityId: correction.id,
+    fromStatus: previousStatus,
+    toStatus: status,
+    actorSource,
+    note: resolutionNote,
+  });
   return correction;
 }
 
@@ -745,15 +845,18 @@ export async function getPublicPaymentIdentityIndex(): Promise<PaymentIdentityPu
 }
 
 export async function getNonCryptoAdminSnapshot(): Promise<NonCryptoAdminSnapshot> {
-  const [reports, identities, corrections, stats] = await Promise.all([
+  const [reports, identities, corrections, auditEvents, stats] = await Promise.all([
     s3ListJson<NonCryptoScamReport>('reports/'),
     s3ListJson<PaymentIdentitySummary>('identities/'),
     s3ListJson<PaymentSafetyCorrection>('corrections/'),
+    s3ListJson<PaymentSafetyAuditEvent>('audit/'),
     getNonCryptoStats(),
   ]);
 
   reports.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const transactionReferenceCounts = new Map<string, number>();
+  const evidenceCounts = new Map<string, number>();
+  const networkCounts = new Map<string, number>();
   for (const report of reports) {
     if (report.status !== 'rejected' && report.transactionReferenceHash) {
       transactionReferenceCounts.set(
@@ -761,21 +864,69 @@ export async function getNonCryptoAdminSnapshot(): Promise<NonCryptoAdminSnapsho
         (transactionReferenceCounts.get(report.transactionReferenceHash) || 0) + 1,
       );
     }
+    if (report.status !== 'rejected' && report.reporterNetworkFingerprint) {
+      const key = `${report.identityHash}:${report.reporterNetworkFingerprint}`;
+      networkCounts.set(key, (networkCounts.get(key) || 0) + 1);
+    }
+    if (report.status !== 'rejected') {
+      for (const file of report.evidenceFiles || []) {
+        const fingerprint = evidenceFingerprint(file);
+        if (fingerprint) evidenceCounts.set(fingerprint, (evidenceCounts.get(fingerprint) || 0) + 1);
+      }
+    }
   }
   for (const report of reports) {
     report.duplicateTransactionReference = !!report.transactionReferenceHash
       && (transactionReferenceCounts.get(report.transactionReferenceHash) || 0) > 1;
+    const flags: PaymentSafetyRiskFlag[] = [];
+    if (report.duplicateTransactionReference) flags.push('duplicate_transaction_reference');
+    if (report.reporterNetworkFingerprint
+      && (networkCounts.get(`${report.identityHash}:${report.reporterNetworkFingerprint}`) || 0) > 1) {
+      flags.push('shared_network');
+    }
+    if ((report.evidenceFiles || []).some((file) => {
+      const fingerprint = evidenceFingerprint(file);
+      return !!fingerprint && (evidenceCounts.get(fingerprint) || 0) > 1;
+    })) {
+      flags.push('duplicate_evidence');
+    }
+    report.riskFlags = flags;
   }
   const activeIdentities = identities
     .filter((identity) => identity.reportCount > 0)
     .sort((a, b) => b.lastReported.localeCompare(a.lastReported));
   corrections.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { reports, identities: activeIdentities, corrections, stats };
+  auditEvents.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { reports, identities: activeIdentities, corrections, auditEvents: auditEvents.slice(0, 250), stats };
+}
+
+export async function recordPaymentSafetyAuditEvent(input: {
+  action: PaymentSafetyAuditEvent['action'];
+  entityId: string;
+  fromStatus?: string;
+  toStatus?: string;
+  actorSource: string;
+  note?: string;
+}): Promise<PaymentSafetyAuditEvent> {
+  const createdAt = new Date().toISOString();
+  const event: PaymentSafetyAuditEvent = {
+    id: `AUD-${generateId()}`,
+    createdAt,
+    action: input.action,
+    entityId: input.entityId,
+    fromStatus: cleanShortText(input.fromStatus, 80),
+    toStatus: cleanShortText(input.toStatus, 80),
+    actorHash: sha256(`lh-payment-safety-admin:v1:${input.actorSource || 'unknown'}`),
+    note: cleanShortText(input.note, 500),
+  };
+  await s3Put(`audit/${createdAt.replace(/[:.]/g, '-')}-${event.id}.json`, event);
+  return event;
 }
 
 export async function updateNonCryptoReportStatus(
   reportId: string,
   status: NonCryptoScamReport['status'],
+  actorSource = 'system',
 ): Promise<NonCryptoScamReport> {
   if (!['pending', 'accepted', 'rejected'].includes(status)) {
     throw new Error('Invalid report status');
@@ -787,14 +938,25 @@ export async function updateNonCryptoReportStatus(
     throw new Error('Reporter email must be verified before acceptance');
   }
 
+  const previousStatus = report.status;
   report.status = status;
   await s3Put(`reports/${reportId}.json`, report);
 
   await refreshNonCryptoIndexes();
+  await recordPaymentSafetyAuditEvent({
+    action: 'report_status',
+    entityId: report.id,
+    fromStatus: previousStatus,
+    toStatus: status,
+    actorSource,
+  });
   return report;
 }
 
-export async function markNonCryptoIdentityStaffReviewed(identityHash: string): Promise<PaymentIdentityPublicView> {
+export async function markNonCryptoIdentityStaffReviewed(
+  identityHash: string,
+  actorSource = 'system',
+): Promise<PaymentIdentityPublicView> {
   const summary = await s3Get<PaymentIdentitySummary>(`identities/${identityHash}.json`);
   if (!summary) throw new Error('Identity not found');
   if (summary.independentReporters < 3) {
@@ -805,6 +967,13 @@ export async function markNonCryptoIdentityStaffReviewed(identityHash: string): 
   summary.publicEligible = true;
   await s3Put(`identities/${identityHash}.json`, summary);
   await refreshNonCryptoIndexes();
+  await recordPaymentSafetyAuditEvent({
+    action: 'identity_staff_review',
+    entityId: identityHash,
+    fromStatus: 'corroborated',
+    toStatus: 'staff_reviewed',
+    actorSource,
+  });
   return publicView(summary);
 }
 
@@ -823,6 +992,7 @@ function rebuildIdentitySummary(
     paymentMethodDetails: [],
     categoryDetails: [],
     aliases: [],
+    states: [],
     reportIds: [],
     reportCount: 0,
     independentReporterKeys: [],
@@ -837,16 +1007,22 @@ function rebuildIdentitySummary(
     indexedEligible: false,
   };
 
-  for (const report of reports) {
+  const independentIds = new Set(independentReportIds(reports));
+
+  for (const report of [...reports].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     addUnique(summary.categories, report.category);
     if (report.paymentMethodDetails) addUnique(summary.paymentMethodDetails, report.paymentMethodDetails);
     if (report.categoryDetails) addUnique(summary.categoryDetails, report.categoryDetails);
     for (const alias of [report.recipientName, report.businessName, ...(report.aliases || [])]) {
       if (alias) addUnique(summary.aliases, alias);
     }
+    if (report.usState) addUnique(summary.states, report.usState);
     addUnique(summary.reportIds, report.id);
-    addUnique(summary.independentReporterKeys, report.reporterFingerprint);
-    summary.paymentProofCount += report.hasPaymentProof ? 1 : 0;
+
+    if (independentIds.has(report.id)) {
+      addUnique(summary.independentReporterKeys, report.reporterFingerprint);
+      summary.paymentProofCount += report.hasPaymentProof ? 1 : 0;
+    }
     summary.totalReportedAmount += report.amount || 0;
     summary.firstReported = summary.firstReported < report.createdAt ? summary.firstReported : report.createdAt;
     summary.lastReported = summary.lastReported > report.createdAt ? summary.lastReported : report.createdAt;
@@ -861,10 +1037,14 @@ function rebuildIdentitySummary(
 }
 
 async function refreshNonCryptoIndexes(): Promise<void> {
-  const [reports, identities] = await Promise.all([
+  const [reports, identities, corrections] = await Promise.all([
     s3ListJson<NonCryptoScamReport>('reports/'),
     s3ListJson<PaymentIdentitySummary>('identities/'),
+    s3ListJson<PaymentSafetyCorrection>('corrections/'),
   ]);
+  const pausedIdentityHashes = new Set(
+    corrections.filter((correction) => correction.status === 'under_review').map((correction) => correction.identityHash),
+  );
   const existingByHash = new Map(identities.map((identity) => [identity.identityHash, identity]));
   const acceptedByHash = new Map<string, NonCryptoScamReport[]>();
   for (const report of reports) {
@@ -881,6 +1061,11 @@ async function refreshNonCryptoIndexes(): Promise<void> {
   const rebuilt: PaymentIdentitySummary[] = [];
   for (const identityHash of identityHashes) {
     const summary = rebuildIdentitySummary(existingByHash.get(identityHash), acceptedByHash.get(identityHash) || []);
+    summary.publicationPaused = pausedIdentityHashes.has(identityHash);
+    if (summary.publicationPaused) {
+      summary.publicEligible = false;
+      summary.indexedEligible = false;
+    }
     await s3Put(`identities/${identityHash}.json`, summary);
     if (summary.reportCount > 0) rebuilt.push(summary);
   }
@@ -893,7 +1078,7 @@ async function refreshNonCryptoIndexes(): Promise<void> {
     totalIdentities: rebuilt.length,
     publicEligibleIdentities: safe.filter((i) => i.publicEligible).length,
     indexedEligibleIdentities: safe.filter((i) => i.indexedEligible).length,
-    paymentProofReports: reports.filter((r) => r.hasPaymentProof && r.status === 'accepted' && r.reporterEmailVerifiedAt).length,
+    paymentProofReports: rebuilt.reduce((total, identity) => total + identity.paymentProofCount, 0),
     updatedAt: new Date().toISOString(),
   };
   await s3Put('index/stats.json', stats);

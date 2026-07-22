@@ -19,10 +19,13 @@ const paymentMethods = [
   'Cash App $cashtags',
   'Venmo usernames',
   'PayPal emails',
+  'Apple Cash phone numbers and emails',
+  'Chime $ChimeSigns, phones, and emails',
   'Wise and Revolut recipients',
   'IBAN and bank accounts',
   'Phone numbers and email addresses',
   'Marketplace or social media profiles',
+  'Telegram usernames, groups, and channels',
   'Local wallets and other payment methods',
 ];
 
@@ -34,6 +37,14 @@ const scamTypes = [
   'Marketplace seller scams',
   'Employment or onboarding fee scams',
   'Custom orders, cake orders, event deposits, and local service scams',
+];
+
+const scenarioPages = [
+  ['telegram-russian-community-scams', 'Russian-speaking US Telegram groups'],
+  ['marketplace-payment-scam', 'Marketplace payment scams'],
+  ['ticket-payment-scam', 'Ticket payment scams'],
+  ['goods-not-delivered-payment-scam', 'Goods not delivered'],
+  ['fake-local-service-scam', 'Fake local services and deposits'],
 ];
 
 export default function PaymentScamReportSeoPage() {
@@ -221,6 +232,17 @@ export default function PaymentScamReportSeoPage() {
               Open payment safety tool
               <ArrowRight size={17} />
             </Link>
+          </div>
+
+          <div className="mt-10 border-t border-slate-200 pt-8">
+            <h2 className="font-display font-bold text-2xl text-slate-950 mb-4">Report by situation</h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {scenarioPages.map(([slug, label]) => (
+                <Link key={slug} href={`${base}/payment-scam/${slug}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700">
+                  {label}<ArrowRight size={16} />
+                </Link>
+              ))}
+            </div>
           </div>
         </section>
       </main>

@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { locales } from '@/i18n';
 import { BLOG_POSTS } from '@/lib/blog/posts';
+import { PAYMENT_SCAM_SCENARIOS } from '@/lib/payment-scam-scenarios';
 
 const baseUrl = 'https://www.ledgerhound.vip';
 
@@ -30,6 +31,11 @@ const pages = [
   { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
   { path: '/payment-scam-report', priority: 0.9, changeFreq: 'weekly' },
   { path: '/payment-safety', priority: 0.8, changeFreq: 'weekly' },
+  ...PAYMENT_SCAM_SCENARIOS.map((scenario) => ({
+    path: `/payment-scam/${scenario.slug}`,
+    priority: 0.8,
+    changeFreq: 'weekly',
+  })),
   { path: '/tx-lookup', priority: 0.9, changeFreq: 'weekly' },
   { path: '/scam-database', priority: 0.9, changeFreq: 'daily' },
   { path: '/scam-database/report', priority: 0.8, changeFreq: 'weekly' },

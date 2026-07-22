@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import {
   createNonCryptoEmailVerification,
+  COMMUNITY_LANGUAGES,
   saveNonCryptoReport,
   REPORT_DESTINATIONS,
   SALE_CHANNELS,
   type EvidenceType,
+  type CommunityLanguage,
   type NonCryptoScamCategory,
   type PaymentRail,
   type ReportDestination,
@@ -78,6 +80,9 @@ export async function POST(req: NextRequest) {
       incidentDate,
       saleChannel,
       saleChannelDetails,
+      usState,
+      communityLanguage,
+      communityName,
       sellerProfile,
       listingUrl,
       itemOrService,
@@ -118,6 +123,9 @@ export async function POST(req: NextRequest) {
     }
     if (saleChannel === 'other' && (!saleChannelDetails || typeof saleChannelDetails !== 'string' || saleChannelDetails.trim().length < 3)) {
       return Response.json({ error: 'Sale channel details are required when sale channel is Other.' }, { status: 400 });
+    }
+    if (communityLanguage && !COMMUNITY_LANGUAGES.includes(communityLanguage as CommunityLanguage)) {
+      return Response.json({ error: 'Invalid community language.' }, { status: 400 });
     }
     if (!itemOrService || typeof itemOrService !== 'string' || itemOrService.trim().length < 3) {
       return Response.json({ error: 'Item or service is required.' }, { status: 400 });
@@ -162,6 +170,9 @@ export async function POST(req: NextRequest) {
       incidentDate,
       saleChannel,
       saleChannelDetails,
+      usState,
+      communityLanguage,
+      communityName,
       sellerProfile,
       listingUrl,
       itemOrService,

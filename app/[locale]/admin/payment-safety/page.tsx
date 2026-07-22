@@ -33,6 +33,9 @@ interface AdminReport {
   incidentDate?: string;
   saleChannel?: string;
   saleChannelDetails?: string;
+  usState?: string;
+  communityLanguage?: string;
+  communityName?: string;
   sellerProfile?: string;
   listingUrl?: string;
   itemOrService?: string;
@@ -51,6 +54,7 @@ interface AdminReport {
   evidenceTypes: string[];
   evidenceFiles: string[];
   hasPaymentProof: boolean;
+  riskFlags?: string[];
   status: ReportStatus;
 }
 
@@ -61,6 +65,7 @@ interface AdminIdentity {
   identityMask: string;
   categories: string[];
   aliases: string[];
+  states: string[];
   reportIds: string[];
   reportCount: number;
   independentReporters: number;
@@ -72,6 +77,7 @@ interface AdminIdentity {
   publicLevel: string;
   publicEligible: boolean;
   indexedEligible: boolean;
+  publicationPaused?: boolean;
 }
 
 interface AdminCorrection {
@@ -101,6 +107,17 @@ interface AdminStats {
   updatedAt: string;
 }
 
+interface AdminAuditEvent {
+  id: string;
+  createdAt: string;
+  action: string;
+  entityId: string;
+  fromStatus?: string;
+  toStatus?: string;
+  actorHash: string;
+  note?: string;
+}
+
 export default function PaymentSafetyAdminPage() {
   return (
     <Suspense fallback={null}>
@@ -116,10 +133,11 @@ function PaymentSafetyAdminContent() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'clusters' | 'reports' | 'corrections'>('clusters');
+  const [tab, setTab] = useState<'clusters' | 'reports' | 'corrections' | 'audit'>('clusters');
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [identities, setIdentities] = useState<AdminIdentity[]>([]);
   const [corrections, setCorrections] = useState<AdminCorrection[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AdminAuditEvent[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
 
   const fetchAdmin = async (pw: string) => {
@@ -139,6 +157,7 @@ function PaymentSafetyAdminContent() {
       setReports(data.reports || []);
       setIdentities(data.identities || []);
       setCorrections(data.corrections || []);
+      setAuditEvents(data.auditEvents || []);
       setStats(data.stats || null);
       setAdminPw(pw);
       setAuthed(true);
@@ -258,7 +277,7 @@ function PaymentSafetyAdminContent() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
           <button
             onClick={() => setTab('clusters')}
             className={`px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'clusters' ? 'bg-brand-600 text-white' : 'bg-slate-800 text-slate-400'}`}
@@ -277,6 +296,12 @@ function PaymentSafetyAdminContent() {
           >
             Corrections ({corrections.length})
           </button>
+          <button
+            onClick={() => setTab('audit')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'audit' ? 'bg-brand-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+          >
+            Audit ({auditEvents.length})
+          </button>
         </div>
 
         {loading ? (
@@ -290,12 +315,14 @@ function PaymentSafetyAdminContent() {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <StatusBadge publicEligible={identity.publicEligible} indexedEligible={identity.indexedEligible} level={identity.publicLevel} />
                       <span className="text-xs text-slate-500">{identity.country} / {identity.rail}</span>
+                      {identity.publicationPaused && <span className="text-xs text-sky-300 bg-sky-950/60 px-2 py-1 rounded-full">publication paused</span>}
                     </div>
                     <h2 className="font-display font-bold text-lg text-white">{identity.identityMask}</h2>
                     <p className="text-xs font-mono text-slate-500 mt-1">{identity.identityHash}</p>
                     {identity.aliases.length > 0 && (
                       <p className="text-sm text-slate-400 mt-3">Aliases: {identity.aliases.join(', ')}</p>
                     )}
+                    {identity.states?.length > 0 && <p className="text-sm text-slate-400 mt-2">States: {identity.states.join(', ')}</p>}
                   </div>
 
                   <button
@@ -334,6 +361,12 @@ function PaymentSafetyAdminContent() {
                       {report.duplicateTransactionReference && (
                         <span className="text-xs text-red-300 bg-red-950/60 px-2 py-1 rounded-full">duplicate transaction reference</span>
                       )}
+                      {report.riskFlags?.includes('shared_network') && (
+                        <span className="text-xs text-amber-300 bg-amber-950/60 px-2 py-1 rounded-full">shared network</span>
+                      )}
+                      {report.riskFlags?.includes('duplicate_evidence') && (
+                        <span className="text-xs text-red-300 bg-red-950/60 px-2 py-1 rounded-full">duplicate evidence</span>
+                      )}
                     </div>
                     <h2 className="font-display font-bold text-lg text-white">{report.identityMask}</h2>
                     <p className="text-xs font-mono text-slate-500 mt-1">Report {report.id}</p>
@@ -344,6 +377,7 @@ function PaymentSafetyAdminContent() {
                       <Info label="Amount" value={report.amount ? `${report.currency || 'USD'} ${report.amount}` : '-'} />
                       <Info label="Item or service" value={report.itemOrService || '-'} />
                       <Info label="Sale channel" value={[report.saleChannel, report.saleChannelDetails].filter(Boolean).join(' / ') || '-'} />
+                      <Info label="Community" value={[report.usState, report.communityLanguage, report.communityName].filter(Boolean).join(' / ') || '-'} />
                       <Info label="Seller profile" value={report.sellerProfile || '-'} mono />
                       <Info label="Transaction reference" value={report.privateTransactionReference || '-'} mono />
                       <Info label="Incident / promised" value={[report.incidentDate, report.promisedDeliveryDate].filter(Boolean).join(' / ') || '-'} />
@@ -405,7 +439,7 @@ function PaymentSafetyAdminContent() {
               </article>
             ))}
           </div>
-        ) : (
+        ) : tab === 'corrections' ? (
           <div className="space-y-4">
             {corrections.length === 0 && (
               <p className="text-slate-500 py-12 text-center">No correction requests yet.</p>
@@ -477,6 +511,32 @@ function PaymentSafetyAdminContent() {
                 </div>
               </article>
             ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-slate-800 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Action</th>
+                  <th className="px-4 py-3">Entity</th>
+                  <th className="px-4 py-3">Change</th>
+                  <th className="px-4 py-3">Admin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {auditEvents.map((event) => (
+                  <tr key={event.id} className="text-slate-300">
+                    <td className="px-4 py-3 whitespace-nowrap">{new Date(event.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3">{event.action.replaceAll('_', ' ')}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{event.entityId}</td>
+                    <td className="px-4 py-3">{[event.fromStatus, event.toStatus].filter(Boolean).join(' -> ') || '-'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{event.actorHash.slice(0, 12)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {auditEvents.length === 0 && <p className="px-4 py-10 text-center text-slate-500">No moderation actions logged yet.</p>}
           </div>
         )}
       </div>

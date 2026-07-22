@@ -1,6 +1,6 @@
 # United States Micro-Scam Research
 
-Status: phases 1 through 3 implemented
+Status: phases 1 through 5 implemented
 
 Last checked: 2026-07-21
 
@@ -15,6 +15,13 @@ Included situations:
 - Ticket sales where the ticket is fake, reused, invalid, or never transferred
 - Small reservation, rental, pet, or appointment deposits followed by disappearance
 - Sellers who move a buyer outside a marketplace payment system to a peer-to-peer payment app
+- Sellers and service providers operating in local or diaspora Telegram groups, including Russian-speaking US communities
+
+## Research blind spot: private messaging communities
+
+Official US complaint data and mainstream marketplace guidance can underrepresent scams that stay inside private-language communities. Telegram is therefore modeled as a sale and contact channel, not as a payment rail. A report records the Telegram handle, group or channel name, community language, and US state privately, while the transfer is matched separately through Zelle, Cash App, Venmo, Apple Cash, Chime, or another payment method.
+
+Community names and links are moderation context. They are not published from a single report.
 
 Initially excluded from this workflow:
 
@@ -108,6 +115,18 @@ Phase 3:
 - Keep public warnings behind three independent, verified, moderator-accepted reports
 - Add correction/appeal intake with private evidence and an admin review queue
 - Detect duplicate private transaction references during moderation
+
+Phase 4:
+
+- Exclude shared network, duplicate transaction, and duplicate evidence submissions from independent corroboration counts
+- Pause public visibility while a correction is under active review
+- Record moderator decisions in a private audit log
+
+Phase 5:
+
+- Add Telegram, community language, private group/channel context, and US state intake
+- Add public payment rail, category, and state filters
+- Add privacy-safe aggregate statistics and US scenario pages
 
 ## Official sources
 

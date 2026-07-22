@@ -32,14 +32,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const actorSource = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     if (body.action === 'updateReportStatus') {
       const status = body.status as NonCryptoScamReport['status'];
-      const report = await updateNonCryptoReportStatus(String(body.reportId || ''), status);
+      const report = await updateNonCryptoReportStatus(String(body.reportId || ''), status, actorSource);
       return Response.json({ report });
     }
 
     if (body.action === 'staffReviewIdentity') {
-      const identity = await markNonCryptoIdentityStaffReviewed(String(body.identityHash || ''));
+      const identity = await markNonCryptoIdentityStaffReviewed(String(body.identityHash || ''), actorSource);
       return Response.json({ identity });
     }
 
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
         String(body.correctionId || ''),
         body.status as PaymentSafetyCorrectionStatus,
         typeof body.resolutionNote === 'string' ? body.resolutionNote : undefined,
+        actorSource,
       );
       if (['resolved', 'rejected'].includes(correction.status)) {
         sendPaymentCorrectionResolution(correction).catch((emailError) =>

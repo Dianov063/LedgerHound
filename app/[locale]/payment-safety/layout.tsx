@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'Payment Recipient Safety Check | LedgerHound',
-    description: 'Check and report payment recipients across Zelle, Cash App, Venmo, PayPal, bank accounts, IBAN, phone, email, and marketplace profiles.',
+    description: 'Check and report payment recipients across Zelle, Cash App, Venmo, Apple Cash, Chime, Telegram sellers, bank accounts, phone, email, and marketplace profiles.',
   };
 }
 

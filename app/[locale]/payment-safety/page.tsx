@@ -51,10 +51,13 @@ type SaleChannel =
   | 'craigslist'
   | 'offerup'
   | 'nextdoor'
+  | 'telegram'
   | 'discord'
   | 'direct_website'
   | 'text_message'
   | 'other';
+
+type CommunityLanguage = 'english' | 'russian' | 'spanish' | 'chinese' | 'other';
 
 type ReportDestination =
   | 'payment_provider'
@@ -73,6 +76,7 @@ interface IdentityView {
   paymentMethodDetails: string[];
   categoryDetails: string[];
   aliases: string[];
+  states: string[];
   reportCount: number;
   independentReporters: number;
   paymentProofCount: number;
@@ -83,6 +87,13 @@ interface IdentityView {
   publicLevel: string;
   publicEligible: boolean;
   indexedEligible: boolean;
+}
+
+interface PublicStats {
+  totalReports: number;
+  totalIdentities: number;
+  publicEligibleIdentities: number;
+  paymentProofReports: number;
 }
 
 const RAILS: { value: PaymentRail; label: string }[] = [
@@ -121,10 +132,26 @@ const SALE_CHANNEL_OPTIONS: { value: SaleChannel; label: string }[] = [
   { value: 'craigslist', label: 'Craigslist' },
   { value: 'offerup', label: 'OfferUp' },
   { value: 'nextdoor', label: 'Nextdoor' },
+  { value: 'telegram', label: 'Telegram' },
   { value: 'discord', label: 'Discord' },
   { value: 'direct_website', label: 'Website' },
   { value: 'text_message', label: 'Text message' },
   { value: 'other', label: 'Other' },
+];
+
+const COMMUNITY_LANGUAGE_OPTIONS: { value: CommunityLanguage; label: string }[] = [
+  { value: 'english', label: 'English-speaking' },
+  { value: 'russian', label: 'Russian-speaking' },
+  { value: 'spanish', label: 'Spanish-speaking' },
+  { value: 'chinese', label: 'Chinese-speaking' },
+  { value: 'other', label: 'Other language' },
+];
+
+const US_STATE_CODES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
+  'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM',
+  'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
+  'WV', 'WI', 'WY', 'PR',
 ];
 
 const REPORT_DESTINATION_OPTIONS: { value: ReportDestination; label: string }[] = [
@@ -194,6 +221,7 @@ export default function PaymentSafetyPage() {
   const [checkResult, setCheckResult] = useState<{ matched: boolean; identity: IdentityView | null } | null>(null);
   const [publicWarnings, setPublicWarnings] = useState<IdentityView[]>([]);
   const [warningsLoading, setWarningsLoading] = useState(true);
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
 
   const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [reportError, setReportError] = useState('');
@@ -204,6 +232,7 @@ export default function PaymentSafetyPage() {
   const [reportRail, setReportRail] = useState<PaymentRail>('zelle');
   const [reportCategory, setReportCategory] = useState<ScamCategory>('non_delivery_goods');
   const [reportSaleChannel, setReportSaleChannel] = useState<SaleChannel>('facebook_marketplace');
+  const [reportCommunityLanguage, setReportCommunityLanguage] = useState<CommunityLanguage>('english');
   const [refundRequested, setRefundRequested] = useState(false);
   const [submittedRail, setSubmittedRail] = useState<PaymentRail>('zelle');
   const [reportFiles, setReportFiles] = useState<File[]>([]);
@@ -218,9 +247,23 @@ export default function PaymentSafetyPage() {
   }, []);
 
   useEffect(() => {
+    fetch('/api/non-crypto-scam-database/stats')
+      .then((res) => res.json())
+      .then((data) => setPublicStats(typeof data.totalReports === 'number' ? data : null))
+      .catch(() => setPublicStats(null));
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('emailVerified') === '1') setVerificationNotice('verified');
     if (params.get('emailVerificationError') === '1') setVerificationNotice('error');
+    if (params.get('mode') === 'report') setMode('report');
+    const category = params.get('category') as ScamCategory | null;
+    if (category && CATEGORIES.some((item) => item.value === category)) setReportCategory(category);
+    const channel = params.get('channel') as SaleChannel | null;
+    if (channel && SALE_CHANNEL_OPTIONS.some((item) => item.value === channel)) setReportSaleChannel(channel);
+    const language = params.get('language') as CommunityLanguage | null;
+    if (language && COMMUNITY_LANGUAGE_OPTIONS.some((item) => item.value === language)) setReportCommunityLanguage(language);
   }, []);
 
   async function handleCheck(e: FormEvent<HTMLFormElement>) {
@@ -298,6 +341,9 @@ export default function PaymentSafetyPage() {
           incidentDate: data.get('incidentDate'),
           saleChannel: data.get('saleChannel'),
           saleChannelDetails: data.get('saleChannelDetails'),
+          usState: data.get('usState'),
+          communityLanguage: data.get('communityLanguage'),
+          communityName: data.get('communityName'),
           sellerProfile: data.get('sellerProfile'),
           listingUrl: data.get('listingUrl'),
           itemOrService: data.get('itemOrService'),
@@ -328,6 +374,7 @@ export default function PaymentSafetyPage() {
       setReportRail('zelle');
       setReportCategory('non_delivery_goods');
       setReportSaleChannel('facebook_marketplace');
+      setReportCommunityLanguage('english');
       setRefundRequested(false);
     } catch (err: any) {
       setReportError(err.message || 'Report failed');
@@ -587,6 +634,33 @@ export default function PaymentSafetyPage() {
                   </div>
                 )}
 
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">US state</label>
+                    <select name="usState" defaultValue="" className="input bg-white">
+                      <option value="">Not specified</option>
+                      {US_STATE_CODES.map((state) => <option key={state} value={state}>{state}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Community language</label>
+                    <select
+                      name="communityLanguage"
+                      value={reportCommunityLanguage}
+                      onChange={(event) => setReportCommunityLanguage(event.target.value as CommunityLanguage)}
+                      className="input bg-white"
+                    >
+                      {COMMUNITY_LANGUAGE_OPTIONS.map((language) => (
+                        <option key={language.value} value={language.value}>{language.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Group or channel name</label>
+                    <input name="communityName" maxLength={160} className="input" placeholder="Kept private for moderation" />
+                  </div>
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seller profile or handle</label>
@@ -747,11 +821,34 @@ export default function PaymentSafetyPage() {
           )}
         </section>
 
+        <PublicStatsBand stats={publicStats} />
         <PublicWarningsSection warnings={publicWarnings} loading={warningsLoading} base={base} />
       </main>
 
       <Footer />
     </div>
+  );
+}
+
+function PublicStatsBand({ stats }: { stats: PublicStats | null }) {
+  if (!stats) return null;
+  const items = [
+    ['Private reports', stats.totalReports],
+    ['Payment recipients', stats.totalIdentities],
+    ['Public warnings', stats.publicEligibleIdentities],
+    ['Accepted payment proofs', stats.paymentProofReports],
+  ];
+  return (
+    <section className="border-t border-slate-200 bg-slate-950 text-white">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid grid-cols-2 lg:grid-cols-4 gap-5">
+        {items.map(([label, value]) => (
+          <div key={String(label)}>
+            <p className="font-display text-2xl font-bold">{Number(value).toLocaleString()}</p>
+            <p className="text-xs text-slate-400 mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -782,9 +879,16 @@ function RecoveryActions({ rail }: { rail: PaymentRail }) {
 }
 
 function PublicWarningsSection({ warnings, loading, base }: { warnings: IdentityView[]; loading: boolean; base: string }) {
+  const [railFilter, setRailFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const availableStates = Array.from(new Set(warnings.flatMap((warning) => warning.states || []))).sort();
   const visible = [...warnings]
+    .filter((warning) => !railFilter || warning.rail === railFilter)
+    .filter((warning) => !categoryFilter || warning.categories.includes(categoryFilter as ScamCategory))
+    .filter((warning) => !stateFilter || warning.states?.includes(stateFilter))
     .sort((a, b) => b.lastReported.localeCompare(a.lastReported))
-    .slice(0, 6);
+    .slice(0, 12);
 
   return (
     <section className="border-t border-slate-200 bg-white">
@@ -807,6 +911,21 @@ function PublicWarningsSection({ warnings, loading, base }: { warnings: Identity
           </Link>
         </div>
 
+        <div className="grid sm:grid-cols-3 gap-3 mb-6" aria-label="Warning filters">
+          <select value={railFilter} onChange={(event) => setRailFilter(event.target.value)} className="input bg-white" aria-label="Filter by payment method">
+            <option value="">All payment methods</option>
+            {RAILS.map((rail) => <option key={rail.value} value={rail.value}>{rail.label}</option>)}
+          </select>
+          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="input bg-white" aria-label="Filter by category">
+            <option value="">All categories</option>
+            {CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+          </select>
+          <select value={stateFilter} onChange={(event) => setStateFilter(event.target.value)} className="input bg-white" aria-label="Filter by US state">
+            <option value="">All US states</option>
+            {availableStates.map((state) => <option key={state} value={state}>{state}</option>)}
+          </select>
+        </div>
+
         {loading ? (
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
             <Loader2 size={16} className="animate-spin" />
@@ -814,7 +933,7 @@ function PublicWarningsSection({ warnings, loading, base }: { warnings: Identity
           </div>
         ) : visible.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-            No public warnings yet. Single reports remain private until corroborated.
+            No public warnings match these filters. Single reports remain private until corroborated.
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -823,7 +942,7 @@ function PublicWarningsSection({ warnings, loading, base }: { warnings: Identity
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                      {identity.country} / {RAILS.find((r) => r.value === identity.rail)?.label || identity.rail}
+                      {identity.country}{identity.states?.length ? ` (${identity.states.join(', ')})` : ''} / {RAILS.find((r) => r.value === identity.rail)?.label || identity.rail}
                     </p>
                     <h3 className="font-display font-bold text-base text-slate-950 mt-1">
                       {identity.identityMask}
