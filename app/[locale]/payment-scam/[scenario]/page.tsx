@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AlertTriangle, ArrowRight, CheckCircle2, FileText, Lock, ShieldCheck } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -10,28 +10,36 @@ export function generateStaticParams() {
 }
 
 export default function PaymentScamScenarioPage({ params }: { params: { locale: string; scenario: string } }) {
+  const base = params.locale === 'en' ? '' : `/${params.locale}`;
+  if (params.scenario === 'telegram-russian-community-scams') {
+    redirect(`${base}/payment-scam/telegram-payment-scams`);
+  }
   const scenario = getPaymentScamScenario(params.scenario);
   if (!scenario) notFound();
-  const base = params.locale === 'en' ? '' : `/${params.locale}`;
   const query = new URLSearchParams({ mode: 'report', category: scenario.category });
   if (scenario.channel) query.set('channel', scenario.channel);
-  if (scenario.communityLanguage) query.set('language', scenario.communityLanguage);
+  if (scenario.channel === 'telegram') {
+    const localeLanguage: Record<string, string> = {
+      ru: 'russian', es: 'spanish', zh: 'chinese', fr: 'french', ar: 'arabic',
+    };
+    query.set('language', localeLanguage[params.locale] || 'english');
+  }
   const reportHref = `${base}/payment-safety?${query.toString()}`;
-  const isRussianTelegram = params.locale === 'ru' && scenario.slug === 'telegram-russian-community-scams';
-  const title = isRussianTelegram ? 'Мошенничество в русскоязычных Telegram-группах США' : scenario.title;
+  const isRussianTelegram = params.locale === 'ru' && scenario.slug === 'telegram-payment-scams';
+  const title = isRussianTelegram ? 'Как сообщить о мошенничестве в Telegram' : scenario.title;
   const description = isRussianTelegram
-    ? 'Сообщите о мелком обмане с товарами, услугами, билетами, арендой и депозитами, который начался в русскоязычной Telegram-группе в США.'
+    ? 'Сообщите об обмане с товарами, услугами, билетами, арендой, работой, обменом валют и депозитами, который начался в Telegram-группе, канале или личной переписке в любой стране.'
     : scenario.description;
   const examples = isRussianTelegram ? [
-    'Продавец получил перевод через Zelle или Cash App за товар и исчез.',
-    'Исполнитель взял депозит за торт, ремонт, переезд, документы или другую услугу, но ничего не сделал.',
-    'В местной Telegram-группе разместили фальшивое предложение билетов, аренды, работы или доставки.',
+    'Продавец получил перевод за товар и исчез.',
+    'Исполнитель взял депозит, но не предоставил обещанную услугу.',
+    'В Telegram разместили фальшивое предложение билетов, аренды, работы, доставки или обмена валют.',
   ] : scenario.examples;
   const collect = isRussianTelegram
     ? ['Telegram @username', 'название группы или канала', 'скриншоты переписки', 'квитанция платежа', 'номер транзакции']
     : scenario.collect;
   const labels = isRussianTelegram ? {
-    eyebrow: 'Мелкое платёжное мошенничество в США',
+    eyebrow: 'Мошенничество через Telegram',
     report: 'Открыть приватную форму',
     cases: 'Какие случаи можно сообщить',
     save: 'Что сохранить до подачи жалобы',
@@ -42,13 +50,13 @@ export default function PaymentScamScenarioPage({ params }: { params: { locale: 
     warn: 'Предупреждаем после подтверждений',
     warnText: 'Для маскированного предупреждения нужны три независимые принятые жалобы.',
     actions: 'Куда сообщить сразу',
-    actionsText: 'Сначала обратитесь в платёжную систему и банк, из которого ушли деньги. Также можно подать заявление в FTC и, при повторяющемся интернет-мошенничестве, в IC3. На аккаунт и сообщения Telegram можно пожаловаться внутри приложения.',
+    actionsText: 'Сначала обратитесь в платёжную систему и банк, из которого ушли деньги. Пожалуйтесь на аккаунт и сообщения внутри Telegram и сообщите о происшествии в орган по борьбе с интернет-мошенничеством своей страны. Для США доступны FTC и IC3.',
   } : {
-    eyebrow: 'US small-payment scam reporting', report: 'Open private report form', cases: 'Cases this form covers',
+    eyebrow: 'Telegram payment scam reporting', report: 'Open private report form', cases: 'Cases this form covers',
     save: 'Save before reporting', verify: 'Verify the reporter', verifyText: 'Email verification is required before moderation.',
     private: 'Match privately', privateText: 'Full payment identifiers and community names are not published.',
     warn: 'Warn after corroboration', warnText: 'Three independent accepted reports are required for a masked warning.',
-    actions: 'Immediate reporting options', actionsText: 'Contact the payment provider and funding bank first. You can also file with the FTC and, for repeated internet crime, IC3. Telegram accounts and messages can be reported from inside the Telegram app.',
+    actions: 'Immediate reporting options', actionsText: 'Contact the payment provider and funding bank first. Report the account and messages inside Telegram, then contact the cybercrime or consumer protection authority in your country. US victims can also file with the FTC and IC3.',
   };
 
   const faq = {
@@ -119,8 +127,8 @@ export default function PaymentScamScenarioPage({ params }: { params: { locale: 
           <h2 className="font-display text-2xl font-bold text-slate-950">{labels.actions}</h2>
           <p className="text-sm text-slate-600 mt-3 max-w-3xl">{labels.actionsText}</p>
           <div className="flex flex-wrap gap-4 mt-5 text-sm font-semibold">
-            <a href="https://reportfraud.ftc.gov/" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">FTC ReportFraud</a>
-            <a href="https://www.ic3.gov/" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">FBI IC3</a>
+            <a href="https://reportfraud.ftc.gov/" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">US: FTC ReportFraud</a>
+            <a href="https://www.ic3.gov/" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">US: FBI IC3</a>
             <a href="https://telegram.org/faq" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">Telegram FAQ</a>
           </div>
         </section>

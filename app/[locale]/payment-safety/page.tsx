@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
@@ -57,7 +57,18 @@ type SaleChannel =
   | 'text_message'
   | 'other';
 
-type CommunityLanguage = 'english' | 'russian' | 'spanish' | 'chinese' | 'other';
+type CommunityLanguage =
+  | 'english'
+  | 'russian'
+  | 'spanish'
+  | 'chinese'
+  | 'arabic'
+  | 'french'
+  | 'portuguese'
+  | 'ukrainian'
+  | 'vietnamese'
+  | 'hindi'
+  | 'other';
 
 type ReportDestination =
   | 'payment_provider'
@@ -144,6 +155,12 @@ const COMMUNITY_LANGUAGE_OPTIONS: { value: CommunityLanguage; label: string }[] 
   { value: 'russian', label: 'Russian-speaking' },
   { value: 'spanish', label: 'Spanish-speaking' },
   { value: 'chinese', label: 'Chinese-speaking' },
+  { value: 'arabic', label: 'Arabic-speaking' },
+  { value: 'french', label: 'French-speaking' },
+  { value: 'portuguese', label: 'Portuguese-speaking' },
+  { value: 'ukrainian', label: 'Ukrainian-speaking' },
+  { value: 'vietnamese', label: 'Vietnamese-speaking' },
+  { value: 'hindi', label: 'Hindi-speaking' },
   { value: 'other', label: 'Other language' },
 ];
 
@@ -196,7 +213,24 @@ const PROVIDER_RECOVERY: Partial<Record<PaymentRail, { instruction: string; href
   },
 };
 
-const DEFAULT_COUNTRIES = ['US', 'GB', 'CA', 'EU', 'UA', 'RU', 'OTHER'];
+const ISO_COUNTRY_CODES = [
+  'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AW', 'AX', 'AZ',
+  'BA', 'BB', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BL', 'BM', 'BN', 'BO', 'BQ', 'BR', 'BS',
+  'BT', 'BV', 'BW', 'BY', 'BZ', 'CA', 'CC', 'CD', 'CF', 'CG', 'CH', 'CI', 'CK', 'CL', 'CM', 'CN',
+  'CO', 'CR', 'CU', 'CV', 'CW', 'CX', 'CY', 'CZ', 'DE', 'DJ', 'DK', 'DM', 'DO', 'DZ', 'EC', 'EE',
+  'EG', 'EH', 'ER', 'ES', 'ET', 'FI', 'FJ', 'FK', 'FM', 'FO', 'FR', 'GA', 'GB', 'GD', 'GE', 'GF',
+  'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GP', 'GQ', 'GR', 'GS', 'GT', 'GU', 'GW', 'GY', 'HK', 'HM',
+  'HN', 'HR', 'HT', 'HU', 'ID', 'IE', 'IL', 'IM', 'IN', 'IO', 'IQ', 'IR', 'IS', 'IT', 'JE', 'JM',
+  'JO', 'JP', 'KE', 'KG', 'KH', 'KI', 'KM', 'KN', 'KP', 'KR', 'KW', 'KY', 'KZ', 'LA', 'LB', 'LC',
+  'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV', 'LY', 'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MH', 'MK',
+  'ML', 'MM', 'MN', 'MO', 'MP', 'MQ', 'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ', 'NA',
+  'NC', 'NE', 'NF', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NU', 'NZ', 'OM', 'PA', 'PE', 'PF', 'PG',
+  'PH', 'PK', 'PL', 'PM', 'PN', 'PR', 'PS', 'PT', 'PW', 'PY', 'QA', 'RE', 'RO', 'RS', 'RU', 'RW',
+  'SA', 'SB', 'SC', 'SD', 'SE', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS',
+  'ST', 'SV', 'SX', 'SY', 'SZ', 'TC', 'TD', 'TF', 'TG', 'TH', 'TJ', 'TK', 'TL', 'TM', 'TN', 'TO',
+  'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY', 'UZ', 'VA', 'VC', 'VE', 'VG', 'VI',
+  'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW',
+] as const;
 
 function formatAmount(amount: number, currency: string) {
   if (!amount) return '$0';
@@ -210,6 +244,17 @@ function formatCategory(category: string) {
 export default function PaymentSafetyPage() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
+  const countryOptions = useMemo(() => {
+    const displayNames = new Intl.DisplayNames([locale, 'en'], { type: 'region' });
+    const countries: { code: string; label: string }[] = ISO_COUNTRY_CODES
+      .map((code) => ({ code, label: displayNames.of(code) || code }))
+      .sort((a, b) => a.label.localeCompare(b.label, locale));
+    return [
+      ...countries,
+      { code: 'EU', label: locale === 'ru' ? 'Европейский союз' : 'European Union' },
+      { code: 'OTHER', label: locale === 'ru' ? 'Другая территория' : 'Other territory' },
+    ];
+  }, [locale]);
 
   const [mode, setMode] = useState<'check' | 'report'>('check');
 
@@ -230,6 +275,7 @@ export default function PaymentSafetyPage() {
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState<'verified' | 'error' | ''>('');
   const [reportRail, setReportRail] = useState<PaymentRail>('zelle');
+  const [reportCountry, setReportCountry] = useState('US');
   const [reportCategory, setReportCategory] = useState<ScamCategory>('non_delivery_goods');
   const [reportSaleChannel, setReportSaleChannel] = useState<SaleChannel>('facebook_marketplace');
   const [reportCommunityLanguage, setReportCommunityLanguage] = useState<CommunityLanguage>('english');
@@ -372,6 +418,7 @@ export default function PaymentSafetyPage() {
       setReportFiles([]);
       setUploadStatus('');
       setReportRail('zelle');
+      setReportCountry('US');
       setReportCategory('non_delivery_goods');
       setReportSaleChannel('facebook_marketplace');
       setReportCommunityLanguage('english');
@@ -476,7 +523,9 @@ export default function PaymentSafetyPage() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Country</label>
                     <select value={checkCountry} onChange={(e) => setCheckCountry(e.target.value)} className="input bg-white">
-                      {DEFAULT_COUNTRIES.map((c) => <option key={c}>{c}</option>)}
+                      {countryOptions.map(({ code, label }) => (
+                        <option key={code} value={code}>{label} ({code})</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -522,8 +571,15 @@ export default function PaymentSafetyPage() {
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Country</label>
-                  <select name="country" defaultValue="US" className="input bg-white">
-                    {DEFAULT_COUNTRIES.map((c) => <option key={c}>{c}</option>)}
+                  <select
+                    name="country"
+                    value={reportCountry}
+                    onChange={(event) => setReportCountry(event.target.value)}
+                    className="input bg-white"
+                  >
+                    {countryOptions.map(({ code, label }) => (
+                      <option key={code} value={code}>{label} ({code})</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -635,13 +691,15 @@ export default function PaymentSafetyPage() {
                 )}
 
                 <div className="grid md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">US state</label>
-                    <select name="usState" defaultValue="" className="input bg-white">
-                      <option value="">Not specified</option>
-                      {US_STATE_CODES.map((state) => <option key={state} value={state}>{state}</option>)}
-                    </select>
-                  </div>
+                  {reportCountry === 'US' ? (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">US state</label>
+                      <select name="usState" defaultValue="" className="input bg-white">
+                        <option value="">Not specified</option>
+                        {US_STATE_CODES.map((state) => <option key={state} value={state}>{state}</option>)}
+                      </select>
+                    </div>
+                  ) : null}
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Community language</label>
                     <select

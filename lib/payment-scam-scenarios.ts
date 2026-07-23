@@ -4,23 +4,21 @@ export interface PaymentScamScenario {
   description: string;
   category: string;
   channel?: string;
-  communityLanguage?: string;
   examples: string[];
   collect: string[];
 }
 
 export const PAYMENT_SCAM_SCENARIOS: PaymentScamScenario[] = [
   {
-    slug: 'telegram-russian-community-scams',
-    title: 'Telegram Scams in Russian-Speaking US Communities',
-    description: 'Report small seller, service, ticket, rental, and deposit scams that begin in Russian-speaking Telegram groups in the United States.',
+    slug: 'telegram-payment-scams',
+    title: 'Report a Telegram Payment Scam',
+    description: 'Report seller, service, ticket, rental, job, and deposit scams that begin in Telegram groups, channels, or private messages in any country.',
     category: 'marketplace_scam',
     channel: 'telegram',
-    communityLanguage: 'russian',
     examples: [
-      'A seller takes Zelle or Cash App payment for an item and disappears.',
-      'A cake, repair, moving, document, or beauty service takes a deposit and is not provided.',
-      'A ticket, apartment, job, or delivery offer is posted in a local Telegram group and is not real.',
+      'A seller takes payment for an item and disappears.',
+      'A service provider takes a deposit but does not provide the promised work.',
+      'A ticket, apartment, job, delivery, or currency-exchange offer posted in Telegram is not real.',
     ],
     collect: ['Telegram @username', 'group or channel name', 'message screenshots', 'payment receipt', 'transaction reference'],
   },
@@ -59,5 +57,8 @@ export const PAYMENT_SCAM_SCENARIOS: PaymentScamScenario[] = [
 ];
 
 export function getPaymentScamScenario(slug: string): PaymentScamScenario | undefined {
+  if (slug === 'telegram-russian-community-scams') {
+    return PAYMENT_SCAM_SCENARIOS.find((scenario) => scenario.slug === 'telegram-payment-scams');
+  }
   return PAYMENT_SCAM_SCENARIOS.find((scenario) => scenario.slug === slug);
 }

@@ -40,7 +40,7 @@ const scamTypes = [
 ];
 
 const scenarioPages = [
-  ['telegram-russian-community-scams', 'Russian-speaking US Telegram groups'],
+  ['telegram-payment-scams', 'Telegram payment scams worldwide'],
   ['marketplace-payment-scam', 'Marketplace payment scams'],
   ['ticket-payment-scam', 'Ticket payment scams'],
   ['goods-not-delivered-payment-scam', 'Goods not delivered'],

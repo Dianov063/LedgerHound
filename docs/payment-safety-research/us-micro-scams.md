@@ -15,11 +15,11 @@ Included situations:
 - Ticket sales where the ticket is fake, reused, invalid, or never transferred
 - Small reservation, rental, pet, or appointment deposits followed by disappearance
 - Sellers who move a buyer outside a marketplace payment system to a peer-to-peer payment app
-- Sellers and service providers operating in local or diaspora Telegram groups, including Russian-speaking US communities
+- Sellers and service providers operating in Telegram groups, channels, and private messages across languages and countries
 
 ## Research blind spot: private messaging communities
 
-Official US complaint data and mainstream marketplace guidance can underrepresent scams that stay inside private-language communities. Telegram is therefore modeled as a sale and contact channel, not as a payment rail. A report records the Telegram handle, group or channel name, community language, and US state privately, while the transfer is matched separately through Zelle, Cash App, Venmo, Apple Cash, Chime, or another payment method.
+Official complaint data and mainstream marketplace guidance can underrepresent scams that stay inside private-language communities. Telegram is therefore modeled globally as a sale and contact channel, not as a payment rail. A report records the country, Telegram handle, group or channel name, community language, and US state when applicable, while the transfer is matched separately through the payment method used in that country.
 
 Community names and links are moderation context. They are not published from a single report.
 

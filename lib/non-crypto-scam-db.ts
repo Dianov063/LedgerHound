@@ -75,7 +75,10 @@ export const REPORT_DESTINATIONS = [
 
 export type ReportDestination = typeof REPORT_DESTINATIONS[number];
 
-export const COMMUNITY_LANGUAGES = ['english', 'russian', 'spanish', 'chinese', 'other'] as const;
+export const COMMUNITY_LANGUAGES = [
+  'english', 'russian', 'spanish', 'chinese', 'arabic', 'french', 'portuguese', 'ukrainian',
+  'vietnamese', 'hindi', 'other',
+] as const;
 export type CommunityLanguage = typeof COMMUNITY_LANGUAGES[number];
 
 export type PaymentSafetyRiskFlag =
