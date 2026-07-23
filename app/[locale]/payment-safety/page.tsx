@@ -650,7 +650,8 @@ export default function PaymentSafetyPage() {
 
   async function handleReport(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const data = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const data = new FormData(form);
     const missingRequired = requiredChecklist.filter((item) => !item.done);
     if (missingRequired.length > 0) {
       setReportStep(REPORT_STEP_COUNT - 1);
@@ -734,7 +735,7 @@ export default function PaymentSafetyPage() {
       setVerificationEmailSent(body.verificationEmailSent === true);
       setReportId(body.reportId);
       setReportStatus('success');
-      e.currentTarget.reset();
+      form.reset();
       setReportFiles([]);
       setUploadStatus('');
       setReportRail('zelle');
