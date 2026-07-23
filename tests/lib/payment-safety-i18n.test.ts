@@ -13,6 +13,8 @@ const REQUIRED_TRANSLATIONS = [
   'Payment method',
   'Category',
   'Community language',
+  'Popular languages',
+  'More languages',
   'Group or channel name',
   'What happened?',
   'Who did you send the money to?',

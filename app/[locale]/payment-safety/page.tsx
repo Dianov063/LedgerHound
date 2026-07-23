@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import {
+  COMMUNITY_LANGUAGE_OPTIONS,
+  isCommunityLanguage,
+  type CommunityLanguage,
+} from '@/lib/community-languages';
 import { translatePaymentSafety } from '@/lib/payment-safety-i18n';
 import {
   AlertTriangle,
@@ -57,19 +62,6 @@ type SaleChannel =
   | 'discord'
   | 'direct_website'
   | 'text_message'
-  | 'other';
-
-type CommunityLanguage =
-  | 'english'
-  | 'russian'
-  | 'spanish'
-  | 'chinese'
-  | 'arabic'
-  | 'french'
-  | 'portuguese'
-  | 'ukrainian'
-  | 'vietnamese'
-  | 'hindi'
   | 'other';
 
 type ReportDestination =
@@ -150,20 +142,6 @@ const SALE_CHANNEL_OPTIONS: { value: SaleChannel; label: string }[] = [
   { value: 'direct_website', label: 'Website' },
   { value: 'text_message', label: 'Text message' },
   { value: 'other', label: 'Other' },
-];
-
-const COMMUNITY_LANGUAGE_OPTIONS: { value: CommunityLanguage; label: string }[] = [
-  { value: 'english', label: 'English-speaking' },
-  { value: 'russian', label: 'Russian-speaking' },
-  { value: 'spanish', label: 'Spanish-speaking' },
-  { value: 'chinese', label: 'Chinese-speaking' },
-  { value: 'arabic', label: 'Arabic-speaking' },
-  { value: 'french', label: 'French-speaking' },
-  { value: 'portuguese', label: 'Portuguese-speaking' },
-  { value: 'ukrainian', label: 'Ukrainian-speaking' },
-  { value: 'vietnamese', label: 'Vietnamese-speaking' },
-  { value: 'hindi', label: 'Hindi-speaking' },
-  { value: 'other', label: 'Other language' },
 ];
 
 const US_STATE_CODES = [
@@ -252,6 +230,11 @@ function formatCategory(category: string) {
   return CATEGORIES.find((c) => c.value === category)?.label || category;
 }
 
+function capitalizeLanguageLabel(label: string, locale: string) {
+  if (!label) return label;
+  return `${label[0].toLocaleUpperCase(locale)}${label.slice(1)}`;
+}
+
 export default function PaymentSafetyPage() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
@@ -261,6 +244,13 @@ export default function PaymentSafetyPage() {
     { code: 'EU', label: 'EU' },
     { code: 'OTHER', label: 'OTHER' },
   ]);
+  const [communityLanguageOptions, setCommunityLanguageOptions] = useState<
+    { value: CommunityLanguage; label: string; popular: boolean }[]
+  >(() => COMMUNITY_LANGUAGE_OPTIONS.map((language) => ({
+    value: language.value,
+    label: language.fallbackLabel,
+    popular: language.popular,
+  })));
 
   useEffect(() => {
     const displayNames = new Intl.DisplayNames([locale, 'en'], { type: 'region' });
@@ -272,6 +262,31 @@ export default function PaymentSafetyPage() {
       { code: 'EU', label: translatePaymentSafety(locale, 'European Union') },
       { code: 'OTHER', label: translatePaymentSafety(locale, 'Other territory') },
     ]);
+  }, [locale]);
+
+  useEffect(() => {
+    const displayNames = new Intl.DisplayNames([locale, 'en'], { type: 'language' });
+    const englishDisplayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+    const localized = COMMUNITY_LANGUAGE_OPTIONS.map((language) => ({
+      value: language.value,
+      label: capitalizeLanguageLabel(language.code
+        ? (() => {
+            const localizedName = displayNames.of(language.code);
+            if (localizedName && localizedName.toLowerCase() !== language.code) return localizedName;
+            const englishName = englishDisplayNames.of(language.code);
+            return englishName && englishName.toLowerCase() !== language.code
+              ? englishName
+              : language.fallbackLabel;
+          })()
+        : translatePaymentSafety(locale, 'Other language'), locale),
+      popular: language.popular,
+    }));
+    const popular = localized.filter((language) => language.popular);
+    const remaining = localized
+      .filter((language) => !language.popular && language.value !== 'other')
+      .sort((a, b) => a.label.localeCompare(b.label, locale));
+    const other = localized.find((language) => language.value === 'other');
+    setCommunityLanguageOptions(other ? [...popular, ...remaining, other] : [...popular, ...remaining]);
   }, [locale]);
 
   const [mode, setMode] = useState<'check' | 'report'>('check');
@@ -336,7 +351,11 @@ export default function PaymentSafetyPage() {
           setReportRail((draft.fields.rail as PaymentRail) || 'zelle');
           setReportCategory((draft.fields.category as ScamCategory) || 'non_delivery_goods');
           setReportSaleChannel((draft.fields.saleChannel as SaleChannel) || 'facebook_marketplace');
-          setReportCommunityLanguage((draft.fields.communityLanguage as CommunityLanguage) || 'english');
+          setReportCommunityLanguage(
+            isCommunityLanguage(draft.fields.communityLanguage)
+              ? draft.fields.communityLanguage
+              : 'english',
+          );
           setRefundRequested(draft.fields.refundRequested === true);
           setDraftSavedAt(draft.updatedAt || '');
           setDraftTouched(true);
@@ -360,8 +379,8 @@ export default function PaymentSafetyPage() {
     if (category && CATEGORIES.some((item) => item.value === category)) setReportCategory(category);
     const channel = params.get('channel') as SaleChannel | null;
     if (channel && SALE_CHANNEL_OPTIONS.some((item) => item.value === channel)) setReportSaleChannel(channel);
-    const language = params.get('language') as CommunityLanguage | null;
-    if (language && COMMUNITY_LANGUAGE_OPTIONS.some((item) => item.value === language)) setReportCommunityLanguage(language);
+    const language = params.get('language');
+    if (isCommunityLanguage(language)) setReportCommunityLanguage(language);
   }, []);
 
   useEffect(() => {
@@ -408,14 +427,14 @@ export default function PaymentSafetyPage() {
     const params = new URLSearchParams(window.location.search);
     const category = params.get('category') as ScamCategory | null;
     const channel = params.get('channel') as SaleChannel | null;
-    const language = params.get('language') as CommunityLanguage | null;
+    const language = params.get('language');
     setDraftFields({});
     setReportStep(0);
     setReportCountry('US');
     setReportRail('zelle');
     setReportCategory(category && CATEGORIES.some((item) => item.value === category) ? category : 'non_delivery_goods');
     setReportSaleChannel(channel && SALE_CHANNEL_OPTIONS.some((item) => item.value === channel) ? channel : 'facebook_marketplace');
-    setReportCommunityLanguage(language && COMMUNITY_LANGUAGE_OPTIONS.some((item) => item.value === language) ? language : 'english');
+    setReportCommunityLanguage(isCommunityLanguage(language) ? language : 'english');
     setRefundRequested(false);
     setReportFiles([]);
     setDraftSavedAt('');
@@ -997,9 +1016,20 @@ export default function PaymentSafetyPage() {
                       onChange={(event) => setReportCommunityLanguage(event.target.value as CommunityLanguage)}
                       className="input bg-white"
                     >
-                      {COMMUNITY_LANGUAGE_OPTIONS.map((language) => (
-                        <option key={language.value} value={language.value}>{t(language.label)}</option>
-                      ))}
+                      <optgroup label={t('Popular languages')}>
+                        {communityLanguageOptions
+                          .filter((language) => language.popular)
+                          .map((language) => (
+                            <option key={language.value} value={language.value}>{language.label}</option>
+                          ))}
+                      </optgroup>
+                      <optgroup label={t('More languages')}>
+                        {communityLanguageOptions
+                          .filter((language) => !language.popular)
+                          .map((language) => (
+                            <option key={language.value} value={language.value}>{language.label}</option>
+                          ))}
+                      </optgroup>
                     </select>
                   </div>
                   <div>

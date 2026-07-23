@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from 'crypto';
 import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  COMMUNITY_LANGUAGES,
+  isCommunityLanguage,
+  type CommunityLanguage,
+} from '@/lib/community-languages';
 
 const getS3 = () =>
   new S3Client({
@@ -75,11 +80,7 @@ export const REPORT_DESTINATIONS = [
 
 export type ReportDestination = typeof REPORT_DESTINATIONS[number];
 
-export const COMMUNITY_LANGUAGES = [
-  'english', 'russian', 'spanish', 'chinese', 'arabic', 'french', 'portuguese', 'ukrainian',
-  'vietnamese', 'hindi', 'other',
-] as const;
-export type CommunityLanguage = typeof COMMUNITY_LANGUAGES[number];
+export { COMMUNITY_LANGUAGES, type CommunityLanguage };
 
 export type PaymentSafetyRiskFlag =
   | 'shared_network'
@@ -657,7 +658,7 @@ export async function saveNonCryptoReport(input: {
     saleChannel,
     saleChannelDetails,
     usState: identity.country === 'US' ? normalizeUsState(input.usState) : undefined,
-    communityLanguage: input.communityLanguage && COMMUNITY_LANGUAGES.includes(input.communityLanguage)
+    communityLanguage: isCommunityLanguage(input.communityLanguage)
       ? input.communityLanguage
       : undefined,
     communityName: cleanShortText(input.communityName, 160),
