@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import { translatePaymentSafety } from '@/lib/payment-safety-i18n';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Database,
   ExternalLink,
@@ -233,6 +234,15 @@ const ISO_COUNTRY_CODES = [
   'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW',
 ] as const;
 
+const REPORT_DRAFT_STORAGE_KEY = 'ledgerhound:payment-report-draft:v2';
+const REPORT_STEP_COUNT = 6;
+
+interface PaymentReportDraft {
+  fields: Record<string, string | boolean>;
+  step: number;
+  updatedAt: string;
+}
+
 function formatAmount(amount: number, currency: string) {
   if (!amount) return '$0';
   return `${currency || 'USD'} ${amount.toLocaleString()}`;
@@ -246,16 +256,22 @@ export default function PaymentSafetyPage() {
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
   const t = (text: string) => translatePaymentSafety(locale, text);
-  const countryOptions = useMemo(() => {
+  const [countryOptions, setCountryOptions] = useState<{ code: string; label: string }[]>(() => [
+    ...ISO_COUNTRY_CODES.map((code) => ({ code, label: code })),
+    { code: 'EU', label: 'EU' },
+    { code: 'OTHER', label: 'OTHER' },
+  ]);
+
+  useEffect(() => {
     const displayNames = new Intl.DisplayNames([locale, 'en'], { type: 'region' });
     const countries: { code: string; label: string }[] = ISO_COUNTRY_CODES
       .map((code) => ({ code, label: displayNames.of(code) || code }))
       .sort((a, b) => a.label.localeCompare(b.label, locale));
-    return [
+    setCountryOptions([
       ...countries,
-      { code: 'EU', label: locale === 'ru' ? 'Европейский союз' : 'European Union' },
-      { code: 'OTHER', label: locale === 'ru' ? 'Другая территория' : 'Other territory' },
-    ];
+      { code: 'EU', label: translatePaymentSafety(locale, 'European Union') },
+      { code: 'OTHER', label: translatePaymentSafety(locale, 'Other territory') },
+    ]);
   }, [locale]);
 
   const [mode, setMode] = useState<'check' | 'report'>('check');
@@ -285,6 +301,13 @@ export default function PaymentSafetyPage() {
   const [submittedRail, setSubmittedRail] = useState<PaymentRail>('zelle');
   const [reportFiles, setReportFiles] = useState<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [reportStep, setReportStep] = useState(0);
+  const [draftFields, setDraftFields] = useState<Record<string, string | boolean>>({});
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState('');
+  const [draftTouched, setDraftTouched] = useState(false);
+  const reportFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     fetch('/api/non-crypto-scam-database/search')
@@ -302,10 +325,37 @@ export default function PaymentSafetyPage() {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REPORT_DRAFT_STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved) as PaymentReportDraft;
+        if (draft?.fields && typeof draft.fields === 'object') {
+          setDraftFields(draft.fields);
+          setReportStep(Math.min(Math.max(Number(draft.step) || 0, 0), REPORT_STEP_COUNT - 1));
+          setReportCountry(String(draft.fields.country || 'US'));
+          setReportRail((draft.fields.rail as PaymentRail) || 'zelle');
+          setReportCategory((draft.fields.category as ScamCategory) || 'non_delivery_goods');
+          setReportSaleChannel((draft.fields.saleChannel as SaleChannel) || 'facebook_marketplace');
+          setReportCommunityLanguage((draft.fields.communityLanguage as CommunityLanguage) || 'english');
+          setRefundRequested(draft.fields.refundRequested === true);
+          setDraftSavedAt(draft.updatedAt || '');
+          setDraftTouched(true);
+          setShowDraftPrompt(true);
+        }
+      }
+    } catch {
+      localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
+    } finally {
+      setDraftLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('emailVerified') === '1') setVerificationNotice('verified');
     if (params.get('emailVerificationError') === '1') setVerificationNotice('error');
     if (params.get('mode') === 'report') setMode('report');
+    if (localStorage.getItem(REPORT_DRAFT_STORAGE_KEY)) return;
     const category = params.get('category') as ScamCategory | null;
     if (category && CATEGORIES.some((item) => item.value === category)) setReportCategory(category);
     const channel = params.get('channel') as SaleChannel | null;
@@ -313,6 +363,152 @@ export default function PaymentSafetyPage() {
     const language = params.get('language') as CommunityLanguage | null;
     if (language && COMMUNITY_LANGUAGE_OPTIONS.some((item) => item.value === language)) setReportCommunityLanguage(language);
   }, []);
+
+  useEffect(() => {
+    if (!draftLoaded || !draftTouched || showDraftPrompt || reportStatus === 'success') return;
+    const fields = {
+      ...draftFields,
+      country: reportCountry,
+      rail: reportRail,
+      category: reportCategory,
+      saleChannel: reportSaleChannel,
+      communityLanguage: reportCommunityLanguage,
+      refundRequested,
+    };
+    const updatedAt = new Date().toISOString();
+    const draft: PaymentReportDraft = { fields, step: reportStep, updatedAt };
+    localStorage.setItem(REPORT_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    setDraftSavedAt(updatedAt);
+  }, [
+    draftFields,
+    draftLoaded,
+    draftTouched,
+    refundRequested,
+    reportCategory,
+    reportCommunityLanguage,
+    reportCountry,
+    reportRail,
+    reportSaleChannel,
+    reportStatus,
+    reportStep,
+    showDraftPrompt,
+  ]);
+
+  function handleDraftFieldChange(event: FormEvent<HTMLFormElement>) {
+    const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+    if (!target.name || target instanceof HTMLInputElement && target.type === 'file') return;
+    const value = target instanceof HTMLInputElement && target.type === 'checkbox'
+      ? target.checked
+      : target.value;
+    setDraftFields((current) => ({ ...current, [target.name]: value }));
+    setDraftTouched(true);
+  }
+
+  function resetDraftToQueryDefaults() {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get('category') as ScamCategory | null;
+    const channel = params.get('channel') as SaleChannel | null;
+    const language = params.get('language') as CommunityLanguage | null;
+    setDraftFields({});
+    setReportStep(0);
+    setReportCountry('US');
+    setReportRail('zelle');
+    setReportCategory(category && CATEGORIES.some((item) => item.value === category) ? category : 'non_delivery_goods');
+    setReportSaleChannel(channel && SALE_CHANNEL_OPTIONS.some((item) => item.value === channel) ? channel : 'facebook_marketplace');
+    setReportCommunityLanguage(language && COMMUNITY_LANGUAGE_OPTIONS.some((item) => item.value === language) ? language : 'english');
+    setRefundRequested(false);
+    setReportFiles([]);
+    setDraftSavedAt('');
+    setDraftTouched(false);
+    setShowDraftPrompt(false);
+    localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
+    reportFormRef.current?.reset();
+  }
+
+  function moveToReportStep(step: number) {
+    setReportStep(Math.min(Math.max(step, 0), REPORT_STEP_COUNT - 1));
+    setDraftTouched(true);
+    setReportError('');
+    requestAnimationFrame(() => reportFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
+  function pauseReportDraft() {
+    const fields = {
+      ...draftFields,
+      country: reportCountry,
+      rail: reportRail,
+      category: reportCategory,
+      saleChannel: reportSaleChannel,
+      communityLanguage: reportCommunityLanguage,
+      refundRequested,
+    };
+    const updatedAt = new Date().toISOString();
+    localStorage.setItem(REPORT_DRAFT_STORAGE_KEY, JSON.stringify({ fields, step: reportStep, updatedAt } satisfies PaymentReportDraft));
+    setDraftSavedAt(updatedAt);
+    setDraftTouched(true);
+    setShowDraftPrompt(true);
+  }
+
+  function draftValue(name: string): string {
+    const value = draftFields[name];
+    return typeof value === 'string' ? value : '';
+  }
+
+  function draftChecked(name: string): boolean {
+    return draftFields[name] === true;
+  }
+
+  const requiredChecklist = [
+    { label: t('Country where it happened'), done: Boolean(reportCountry), step: 0 },
+    { label: t('What was promised'), done: draftValue('itemOrService').trim().length >= 3, step: 0 },
+    { label: t('Scam category'), done: Boolean(reportCategory), step: 0 },
+    { label: t('Payment method'), done: Boolean(reportRail), step: 1 },
+    { label: t('Recipient payment details'), done: draftValue('paymentIdentifier').trim().length >= 3, step: 1 },
+    { label: t('Where you found the seller'), done: Boolean(reportSaleChannel), step: 2 },
+    { label: t('Your story'), done: draftValue('description').trim().length >= 80, step: 3 },
+    { label: t('Email for private verification'), done: /^\S+@\S+\.\S+$/.test(draftValue('reporterEmail').trim()), step: 4 },
+    ...(reportRail === 'other'
+      ? [{ label: t('Payment method details'), done: draftValue('paymentMethodDetails').trim().length >= 3, step: 1 }]
+      : []),
+    ...(reportCategory === 'other'
+      ? [{ label: t('Category details'), done: draftValue('categoryDetails').trim().length >= 3, step: 0 }]
+      : []),
+    ...(reportSaleChannel === 'other'
+      ? [{ label: t('Sale channel details'), done: draftValue('saleChannelDetails').trim().length >= 3, step: 2 }]
+      : []),
+  ];
+  const requiredCompleted = requiredChecklist.filter((item) => item.done).length;
+  const reportCompletion = Math.round((requiredCompleted / requiredChecklist.length) * 100);
+  const optionalChecklist = [
+    { label: t('Seller profile, group, or listing link'), done: Boolean(draftValue('sellerProfile') || draftValue('communityName') || draftValue('listingUrl')), step: 2 },
+    { label: t('Incident or delivery dates'), done: Boolean(draftValue('incidentDate') || draftValue('promisedDeliveryDate')), step: 3 },
+    { label: t('Transaction reference'), done: Boolean(draftValue('transactionReference')), step: 1 },
+    { label: t('Evidence type selected'), done: draftChecked('payment_receipt') || draftChecked('chat_screenshot') || draftChecked('marketplace_listing'), step: 4 },
+  ];
+  const reportSteps = [
+    t('What happened'),
+    t('The payment'),
+    t('The seller'),
+    t('Tell your story'),
+    t('Evidence and contact'),
+    t('Review and send'),
+  ];
+  const paymentRecipientHint: Partial<Record<PaymentRail, string>> = {
+    zelle: 'Zelle email or phone number',
+    cashapp: 'Cash App $cashtag, phone, or email',
+    venmo: 'Venmo username, phone, or email',
+    paypal: 'PayPal email or username',
+    apple_cash: 'Apple Cash phone number or email',
+    chime: 'Chime $ChimeSign, phone, or email',
+    wise: 'Wise email, phone, or recipient account',
+    revolut: 'Revolut phone, email, or Revtag',
+    iban: 'IBAN or beneficiary account',
+    bank_account: 'Account number or beneficiary details',
+    phone: 'Recipient phone number',
+    email: 'Recipient email',
+    social_handle: 'Recipient social handle',
+    marketplace_profile: 'Recipient marketplace profile',
+  };
 
   async function handleCheck(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -338,12 +534,18 @@ export default function PaymentSafetyPage() {
 
   async function handleReport(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const missingRequired = requiredChecklist.filter((item) => !item.done);
+    if (missingRequired.length > 0) {
+      setReportStep(REPORT_STEP_COUNT - 1);
+      setReportError(t('Complete the highlighted answers before submitting. Your draft is saved.'));
+      return;
+    }
     setReportStatus('loading');
     setReportError('');
     setReportId('');
     setUploadStatus(reportFiles.length > 0 ? `Uploading ${reportFiles.length} evidence file(s)...` : '');
 
-    const data = new FormData(e.currentTarget);
     const evidenceTypes = [
       data.get('payment_receipt') ? 'payment_receipt' : '',
       data.get('chat_screenshot') ? 'chat_screenshot' : '',
@@ -425,6 +627,11 @@ export default function PaymentSafetyPage() {
       setReportSaleChannel('facebook_marketplace');
       setReportCommunityLanguage('english');
       setRefundRequested(false);
+      setDraftFields({});
+      setReportStep(0);
+      setDraftTouched(false);
+      setDraftSavedAt('');
+      localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
     } catch (err: any) {
       setReportError(err.message || 'Report failed');
       setReportStatus('error');
@@ -560,18 +767,72 @@ export default function PaymentSafetyPage() {
 
               <ResultPanel result={checkResult} />
             </div>
+          ) : !draftLoaded ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">
+              <Loader2 size={18} className="mx-auto mb-3 animate-spin" />
+              {t('Loading your private draft')}
+            </div>
+          ) : showDraftPrompt ? (
+            <div className="mx-auto max-w-2xl border border-brand-200 bg-white p-6 sm:p-8 shadow-sm rounded-lg">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700 mb-5">
+                <FileText size={21} />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-slate-950">{t('You have an unfinished private report')}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                {t('Continue where you stopped, or start a new report. The draft is stored only in this browser.')}
+              </p>
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full bg-brand-600" style={{ width: `${reportCompletion}%` }} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>{reportCompletion}% {t('complete')}</span>
+                {draftSavedAt && <span>{t('Saved')} {new Date(draftSavedAt).toLocaleString(locale)}</span>}
+              </div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button type="button" onClick={() => setShowDraftPrompt(false)} className="btn-primary justify-center">
+                  {t('Continue draft')} <ArrowRight size={16} />
+                </button>
+                <button type="button" onClick={resetDraftToQueryDefaults} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-700">
+                  {t('Start a new report')}
+                </button>
+              </div>
+            </div>
           ) : (
-            <form onSubmit={handleReport} className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-start justify-between gap-4 mb-6">
+            <form
+              ref={reportFormRef}
+              onSubmit={handleReport}
+              onChange={handleDraftFieldChange}
+              className="bg-white border border-slate-200 p-5 sm:p-8 shadow-sm rounded-lg scroll-mt-24"
+            >
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="font-display font-bold text-2xl text-slate-950">{t('Report a payment recipient')}</h2>
-                  <p className="text-sm text-slate-500 mt-1">{t('The report is private until enough independent reports match the same recipient.')}</p>
+                  <p className="text-xs font-bold uppercase text-brand-700">{t('Private report')}</p>
+                  <h2 className="font-display font-bold text-2xl text-slate-950 mt-1">{reportSteps[reportStep]}</h2>
+                  <p className="text-sm text-slate-500 mt-1">{t('Answer what you know. You can skip optional questions and return later.')}</p>
                 </div>
                 <ShieldCheck size={26} className="text-brand-600 shrink-0" />
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
-                <div>
+              <div className="mt-6 border-y border-slate-200 py-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500">
+                  <span>{t('Step')} {reportStep + 1} {t('of')} {REPORT_STEP_COUNT}</span>
+                  <span>{reportCompletion}% {t('complete')}</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full bg-brand-600 transition-all" style={{ width: `${Math.max(((reportStep + 1) / REPORT_STEP_COUNT) * 100, reportCompletion)}%` }} />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span className="text-xs text-emerald-700">
+                    {draftSavedAt ? `${t('Saved on this device')} · ${new Date(draftSavedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}` : t('Autosave is on')}
+                  </span>
+                  <button type="button" onClick={() => moveToReportStep(REPORT_STEP_COUNT - 1)} className="text-xs font-bold text-brand-700 hover:underline">
+                    {t('See what is missing')}
+                  </button>
+                </div>
+              </div>
+
+              <div className={reportStep === 0 || reportStep === 1 ? 'grid md:grid-cols-2 gap-4 mt-6 mb-4' : 'hidden'}>
+                <div className={reportStep === 0 ? '' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Country')}</label>
                   <select
                     name="country"
@@ -584,7 +845,7 @@ export default function PaymentSafetyPage() {
                     ))}
                   </select>
                 </div>
-                <div>
+                <div className={reportStep === 1 ? '' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Payment method')}</label>
                   <select
                     name="rail"
@@ -595,40 +856,58 @@ export default function PaymentSafetyPage() {
                     {RAILS.map((r) => <option key={r.value} value={r.value}>{t(r.label)}</option>)}
                   </select>
                 </div>
-                <div>
+                <div className={reportStep === 0 ? '' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Category')}</label>
-                  <select
-                    name="category"
-                    value={reportCategory}
-                    onChange={(e) => setReportCategory(e.target.value as ScamCategory)}
-                    className="input bg-white"
-                  >
-                    {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{t(c.label)}</option>)}
-                  </select>
+                  <input type="hidden" name="category" value={reportCategory} readOnly />
+                  <div className="grid grid-cols-2 gap-2">
+                    {CATEGORIES.map((category) => {
+                      const selected = reportCategory === category.value;
+                      return (
+                        <button
+                          key={category.value}
+                          type="button"
+                          onClick={() => {
+                            setReportCategory(category.value);
+                            setDraftTouched(true);
+                          }}
+                          className={`flex min-h-[52px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                            selected
+                              ? 'border-brand-500 bg-brand-50 text-brand-800'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300'
+                          }`}
+                        >
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300'}`}>
+                            {selected && <CheckCircle2 size={13} />}
+                          </span>
+                          {t(category.label)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
               {(reportRail === 'other' || reportCategory === 'other') && (
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div className={reportStep === 0 || reportStep === 1 ? 'grid md:grid-cols-2 gap-4 mb-4' : 'hidden'}>
                   {reportRail === 'other' && (
-                    <div>
+                    <div className={reportStep === 1 ? '' : 'hidden'}>
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Payment method details')}</label>
                       <input
                         name="paymentMethodDetails"
-                        required
                         minLength={3}
+                        defaultValue={draftValue('paymentMethodDetails')}
                         className="input"
                         placeholder={t('SEPA transfer, local wallet, courier deposit')}
                       />
                     </div>
                   )}
                   {reportCategory === 'other' && (
-                    <div>
+                    <div className={reportStep === 0 ? '' : 'hidden'}>
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Category details')}</label>
                       <input
                         name="categoryDetails"
-                        required
                         minLength={3}
+                        defaultValue={draftValue('categoryDetails')}
                         className="input"
                         placeholder={t('Cake order, repair service, pet deposit')}
                       />
@@ -637,40 +916,48 @@ export default function PaymentSafetyPage() {
                 </div>
               )}
 
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Recipient identifier')}</label>
-                  <input name="paymentIdentifier" required minLength={3} className="input" placeholder={t('Phone, email, $cashtag, account')} />
+              <div className={reportStep === 1 || reportStep === 4 ? 'grid md:grid-cols-2 gap-4 mb-4' : 'hidden'}>
+                <div className={reportStep === 1 ? '' : 'hidden'}>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Who did you send the money to?')}</label>
+                  <input
+                    name="paymentIdentifier"
+                    minLength={3}
+                    defaultValue={draftValue('paymentIdentifier')}
+                    className="input"
+                    placeholder={t(paymentRecipientHint[reportRail] || 'Phone, email, $cashtag, account')}
+                  />
                 </div>
-                <div>
+                <div className={reportStep === 4 ? '' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Your email')}</label>
-                  <input name="reporterEmail" type="email" required className="input" placeholder="you@example.com" />
+                  <input name="reporterEmail" type="email" defaultValue={draftValue('reporterEmail')} className="input" placeholder="you@example.com" />
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
+              <div className={reportStep === 2 ? 'grid md:grid-cols-3 gap-4 mt-6 mb-4' : 'hidden'}>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Recipient name')}</label>
-                  <input name="recipientName" className="input" placeholder={t('Name shown on payment')} />
+                  <input name="recipientName" defaultValue={draftValue('recipientName')} className="input" placeholder={t('Name shown on payment')} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Business name')}</label>
-                  <input name="businessName" className="input" placeholder={t('Shop, profile, company')} />
+                  <input name="businessName" defaultValue={draftValue('businessName')} className="input" placeholder={t('Shop, profile, company')} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Aliases')}</label>
-                  <input name="aliases" className="input" placeholder={t('Comma-separated names')} />
+                  <input name="aliases" defaultValue={draftValue('aliases')} className="input" placeholder={t('Comma-separated names')} />
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 pt-5 mt-5 mb-4">
-                <h3 className="font-display font-bold text-base text-slate-950 mb-4">{t('Sale details')}</h3>
+              <div className={reportStep === 0 || reportStep === 2 ? 'border-t border-slate-200 pt-5 mt-5 mb-4' : 'hidden'}>
+                <h3 className="font-display font-bold text-base text-slate-950 mb-4">
+                  {reportStep === 0 ? t('What did you pay for?') : t('How did you meet the seller?')}
+                </h3>
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div>
+                  <div className={reportStep === 0 ? '' : 'hidden'}>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Item or service')}</label>
-                    <input name="itemOrService" required minLength={3} maxLength={120} className="input" placeholder={t('Concert ticket, cake order, repair')} />
+                    <input name="itemOrService" minLength={3} maxLength={120} defaultValue={draftValue('itemOrService')} className="input" placeholder={t('Concert ticket, cake order, repair')} />
                   </div>
-                  <div>
+                  <div className={reportStep === 2 ? '' : 'hidden'}>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Where you found the seller')}</label>
                     <select
                       name="saleChannel"
@@ -686,17 +973,17 @@ export default function PaymentSafetyPage() {
                 </div>
 
                 {reportSaleChannel === 'other' && (
-                  <div className="mb-4">
+                  <div className={reportStep === 2 ? 'mb-4' : 'hidden'}>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Sale channel details')}</label>
-                    <input name="saleChannelDetails" required minLength={3} maxLength={120} className="input" placeholder={t('Local group, community board, messaging app')} />
+                    <input name="saleChannelDetails" minLength={3} maxLength={120} defaultValue={draftValue('saleChannelDetails')} className="input" placeholder={t('Local group, community board, messaging app')} />
                   </div>
                 )}
 
-                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                <div className={reportStep === 2 ? 'grid md:grid-cols-3 gap-4 mb-4' : 'hidden'}>
                   {reportCountry === 'US' ? (
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('US state')}</label>
-                      <select name="usState" defaultValue="" className="input bg-white">
+                      <select name="usState" defaultValue={draftValue('usState')} className="input bg-white">
                         <option value="">{t('Not specified')}</option>
                         {US_STATE_CODES.map((state) => <option key={state} value={state}>{state}</option>)}
                       </select>
@@ -717,49 +1004,49 @@ export default function PaymentSafetyPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Group or channel name')}</label>
-                    <input name="communityName" maxLength={160} className="input" placeholder={t('Kept private for moderation')} />
+                    <input name="communityName" maxLength={160} defaultValue={draftValue('communityName')} className="input" placeholder={t('Kept private for moderation')} />
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className={reportStep === 2 ? 'grid md:grid-cols-2 gap-4' : 'hidden'}>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Seller profile or handle')}</label>
-                    <input name="sellerProfile" maxLength={200} className="input" placeholder={t('@seller or profile name')} />
+                    <input name="sellerProfile" maxLength={200} defaultValue={draftValue('sellerProfile')} className="input" placeholder={t('@seller or profile name')} />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Listing URL')}</label>
-                    <input name="listingUrl" type="url" maxLength={500} className="input" placeholder="https://..." />
+                    <input name="listingUrl" type="url" maxLength={500} defaultValue={draftValue('listingUrl')} className="input" placeholder="https://..." />
                   </div>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-4 gap-4 mb-4">
+              <div className={reportStep === 1 ? 'grid md:grid-cols-4 gap-4 mt-5 mb-4' : 'hidden'}>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Amount')}</label>
-                  <input name="amount" type="number" min="0.01" step="0.01" className="input" placeholder="35" />
+                  <input name="amount" type="number" min="0.01" step="0.01" defaultValue={draftValue('amount')} className="input" placeholder="35" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Currency')}</label>
-                  <input name="currency" defaultValue="USD" className="input" />
+                  <input name="currency" defaultValue={draftValue('currency') || 'USD'} className="input" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Incident date')}</label>
-                  <input name="incidentDate" type="date" className="input" />
+                  <input name="incidentDate" type="date" defaultValue={draftValue('incidentDate')} className="input" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Transaction reference')}</label>
-                  <input name="transactionReference" maxLength={160} className="input" placeholder={t('From payment receipt')} />
+                  <input name="transactionReference" maxLength={160} defaultValue={draftValue('transactionReference')} className="input" placeholder={t('From payment receipt')} />
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
+              <div className={reportStep === 3 ? 'grid md:grid-cols-3 gap-4 mt-5 mb-4' : 'hidden'}>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Promised delivery date')}</label>
-                  <input name="promisedDeliveryDate" type="date" className="input" />
+                  <input name="promisedDeliveryDate" type="date" defaultValue={draftValue('promisedDeliveryDate')} className="input" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Last seller response')}</label>
-                  <input name="lastContactDate" type="date" className="input" />
+                  <input name="lastContactDate" type="date" defaultValue={draftValue('lastContactDate')} className="input" />
                 </div>
                 <div className="flex flex-col justify-end">
                   <label className="flex min-h-[46px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
@@ -776,13 +1063,13 @@ export default function PaymentSafetyPage() {
               </div>
 
               {refundRequested && (
-                <div className="mb-4 max-w-sm">
+                <div className={reportStep === 3 ? 'mb-4 max-w-sm' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Refund request date')}</label>
-                  <input name="refundRequestDate" type="date" className="input" />
+                  <input name="refundRequestDate" type="date" defaultValue={draftValue('refundRequestDate')} className="input" />
                 </div>
               )}
 
-              <div className="mb-4">
+              <div className={reportStep === 4 ? 'mt-6 mb-4' : 'hidden'}>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Evidence available')}</label>
                 <div className="grid sm:grid-cols-3 gap-2">
                   {[
@@ -791,14 +1078,14 @@ export default function PaymentSafetyPage() {
                     ['marketplace_listing', t('Listing/profile')],
                   ].map(([name, label]) => (
                     <label key={name} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" name={name} className="accent-brand-600" />
+                      <input type="checkbox" name={name} defaultChecked={draftChecked(name)} className="accent-brand-600" />
                       {label}
                     </label>
                   ))}
                 </div>
               </div>
 
-              <div className="mb-5">
+              <div className={reportStep === 4 ? 'mb-5' : 'hidden'}>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Upload evidence')}</label>
                 <input
                   type="file"
@@ -819,34 +1106,99 @@ export default function PaymentSafetyPage() {
                 )}
               </div>
 
-              <div className="border-t border-slate-200 pt-5 mt-5 mb-5">
-                <h3 className="font-display font-bold text-base text-slate-950 mb-1">{t('Reports already filed')}</h3>
-                <p className="text-xs text-slate-500 mb-3">{t('Select every organization you already contacted.')}</p>
+              <details className={reportStep === 4 ? 'border-t border-slate-200 pt-5 mt-5 mb-5' : 'hidden'}>
+                <summary className="cursor-pointer text-sm font-bold text-slate-700">
+                  {t('Did you report it anywhere else?')} <span className="font-normal text-slate-500">({t('optional')})</span>
+                </summary>
+                <p className="text-xs text-slate-500 mt-2 mb-3">
+                  {t('It is okay if you did not. Small scam reports often receive no response, and this does not block your report here.')}
+                </p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
                   {REPORT_DESTINATION_OPTIONS.map(({ value, label }) => (
                     <label key={value} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" name={`reportedTo_${value}`} className="accent-brand-600" />
+                      <input type="checkbox" name={`reportedTo_${value}`} defaultChecked={draftChecked(`reportedTo_${value}`)} className="accent-brand-600" />
                       {t(label)}
                     </label>
                   ))}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('External report number')}</label>
-                  <input name="externalReportReference" maxLength={160} className="input" placeholder={t('FTC, marketplace, bank, or provider case number')} />
+                  <input name="externalReportReference" maxLength={160} defaultValue={draftValue('externalReportReference')} className="input" placeholder={t('FTC, marketplace, bank, or provider case number')} />
                 </div>
-              </div>
+              </details>
 
-              <div className="mb-5">
+              <div className={reportStep === 3 ? 'mt-6 mb-5' : 'hidden'}>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('What happened?')}</label>
                 <textarea
                   name="description"
-                  required
                   minLength={80}
                   rows={6}
+                  defaultValue={draftValue('description')}
                   className="input resize-none"
                   placeholder={t('Include the product or service, promised delivery date, payment method, and what happened after payment.')}
                 />
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>{t('Write in your own words. You can edit it later.')}</span>
+                  <span>{draftValue('description').trim().length}/80</span>
+                </div>
               </div>
+
+              {reportStep === REPORT_STEP_COUNT - 1 && (
+                <div className="mt-6 space-y-6">
+                  <section>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h3 className="font-display text-lg font-bold text-slate-950">{t('Required before sending')}</h3>
+                      <span className={`text-xs font-bold ${requiredCompleted === requiredChecklist.length ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {requiredCompleted}/{requiredChecklist.length}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {requiredChecklist.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => moveToReportStep(item.step)}
+                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left text-sm ${
+                            item.done
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                              : 'border-amber-200 bg-amber-50 text-amber-900'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {item.done ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                            {item.label}
+                          </span>
+                          <ArrowRight size={15} />
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="font-display text-lg font-bold text-slate-950 mb-1">{t('Helpful, but you can add it later')}</h3>
+                    <p className="text-xs text-slate-500 mb-3">{t('These details can make matching and moderation stronger. They are not required to save your draft.')}</p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {optionalChecklist.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => moveToReportStep(item.step)}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm text-slate-700"
+                        >
+                          <span className="flex items-center gap-2">
+                            {item.done ? <CheckCircle2 size={16} className="text-emerald-600" /> : <span className="h-4 w-4 rounded-full border border-slate-300" />}
+                            {item.label}
+                          </span>
+                          <ArrowRight size={15} />
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      {t('Uploaded files cannot be kept in a browser draft. If you return later, choose those files again before sending.')}
+                    </p>
+                  </section>
+                </div>
+              )}
 
               {reportStatus === 'success' && (
                 <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
@@ -873,10 +1225,35 @@ export default function PaymentSafetyPage() {
                 </div>
               )}
 
-              <button type="submit" disabled={reportStatus === 'loading'} className="btn-primary w-full justify-center py-3 disabled:opacity-60">
-                {reportStatus === 'loading' ? <Loader2 size={17} className="animate-spin" /> : <FileText size={17} />}
-                {t('Submit private report')}
-              </button>
+              <div className="mt-7 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                  {reportStep > 0 && (
+                    <button type="button" onClick={() => moveToReportStep(reportStep - 1)} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-700">
+                      {t('Back')}
+                    </button>
+                  )}
+                  <button type="button" onClick={pauseReportDraft} className="inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-800">
+                    {t('Finish later')}
+                  </button>
+                </div>
+
+                {reportStep < REPORT_STEP_COUNT - 1 ? (
+                  <button type="button" onClick={() => moveToReportStep(reportStep + 1)} className="btn-primary justify-center">
+                    {t('Continue')} <ArrowRight size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={reportStatus === 'loading' || requiredCompleted !== requiredChecklist.length}
+                    className="btn-primary justify-center py-3 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reportStatus === 'loading' ? <Loader2 size={17} className="animate-spin" /> : <FileText size={17} />}
+                    {requiredCompleted === requiredChecklist.length
+                      ? t('Submit private report')
+                      : `${t('Complete required answers')} (${requiredChecklist.length - requiredCompleted})`}
+                  </button>
+                )}
+              </div>
             </form>
           )}
         </section>
