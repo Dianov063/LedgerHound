@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title>Quick scam report | LedgerHound</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ee;
+      --surface: #ffffff;
+      --page: #f4f7fb;
+      --blue: #1677e8;
+      --blue-dark: #0d5fc4;
+      --blue-soft: #eaf4ff;
+      --green: #087f5b;
+      --green-soft: #e9f8f1;
+      --amber: #a65a00;
+      --amber-soft: #fff5df;
+      --coral: #c2413b;
+      --coral-soft: #fff0ee;
+      --focus: 0 0 0 3px rgba(22, 119, 232, .2);
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: var(--page); }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--page);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input, select, textarea { font: inherit; letter-spacing: 0; }
+    button, select { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+    }
+
+    .topbar {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px max(18px, calc((100vw - 980px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.96);
+    }
+
+    .brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      color: #fff;
+      background: var(--blue);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .brand-name { font-weight: 850; white-space: nowrap; }
+    .brand-name span { color: var(--blue); }
+
+    .language {
+      width: auto;
+      min-width: 132px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px 32px 9px 11px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    main {
+      width: min(100% - 28px, 720px);
+      margin: 0 auto;
+      padding: 32px 0 44px;
+    }
+
+    .trail {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      align-items: center;
+      gap: 5px;
+      margin: 0 6px 18px;
+    }
+    .trail-step {
+      height: 7px;
+      border-radius: 2px;
+      background: #d7e0eb;
+      transition: background .2s ease, transform .2s ease;
+    }
+    .trail-step.done { background: var(--green); }
+    .trail-step.current { background: var(--blue); transform: scaleY(1.5); }
+
+    .case-panel {
+      min-height: 560px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 14px 40px rgba(27, 48, 78, .1);
+      overflow: hidden;
+    }
+
+    .case-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .case-strip span:last-child { color: #9cc8ff; }
+
+    .screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 30px clamp(20px, 6vw, 44px) 24px;
+      animation: enter .22s ease;
+    }
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-kicker {
+      margin: 0 0 8px;
+      color: var(--blue-dark);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+    h1, h2 {
+      margin: 0;
+      max-width: 620px;
+      font-size: clamp(26px, 5vw, 34px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+    .lead {
+      margin: 12px 0 0;
+      max-width: 590px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .answer {
+      margin-top: 28px;
+      flex: 1;
+    }
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .field, .text-area {
+      width: 100%;
+      border: 1px solid #cbd7e5;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .field { min-height: 52px; padding: 12px 14px; }
+    .text-area { min-height: 170px; resize: vertical; padding: 14px; line-height: 1.5; }
+    .field:hover, .text-area:hover { border-color: #9ab1c9; }
+
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .choice {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: #334155;
+      text-align: left;
+      font-weight: 750;
+    }
+    .choice:hover { border-color: #85b9ef; background: #f8fbff; }
+    .choice.selected { border-color: var(--blue); background: var(--blue-soft); color: #064f9e; }
+    .choice-marker {
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #b9c7d7;
+      border-radius: 50%;
+      color: transparent;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .choice.selected .choice-marker { border-color: var(--blue); background: var(--blue); color: #fff; }
+
+    .other-field { margin-top: 14px; }
+    .counter-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .counter-row strong.ready { color: var(--green); }
+
+    .error {
+      min-height: 22px;
+      margin-top: 14px;
+      color: var(--coral);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+    .button {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 7px;
+      padding: 11px 18px;
+      border: 1px solid transparent;
+      font-weight: 850;
+    }
+    .button-primary { background: var(--blue); color: #fff; }
+    .button-primary:hover { background: var(--blue-dark); }
+    .button-secondary { border-color: var(--line); background: #fff; color: #475569; }
+    .button-secondary:hover { border-color: #aebed1; color: var(--ink); }
+    .button-quiet { background: transparent; color: var(--muted); }
+
+    .status-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px solid #bce8d7;
+      border-radius: 7px;
+      background: var(--green-soft);
+      color: #075f45;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .status-mark {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--green);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .review-grid { display: grid; gap: 9px; }
+    .review-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f8fafc;
+    }
+    .review-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .review-value { margin-top: 3px; overflow-wrap: anywhere; font-size: 14px; font-weight: 750; }
+    .edit {
+      border: 0;
+      background: transparent;
+      color: var(--blue-dark);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .resume-box {
+      margin-top: 26px;
+      padding: 18px;
+      border: 1px solid #f1cf8f;
+      border-radius: 7px;
+      background: var(--amber-soft);
+      color: #754100;
+    }
+    .resume-box strong { display: block; margin-bottom: 5px; }
+    .resume-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+    .footer-note {
+      margin: 16px 4px 0;
+      color: #6b7e94;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 620px) {
+      .topbar { min-height: 58px; padding: 9px 14px; }
+      .brand-name { font-size: 15px; }
+      .language { min-width: 112px; max-width: 130px; }
+      main { width: min(100% - 18px, 720px); padding-top: 18px; }
+      .case-panel { min-height: calc(100vh - 118px); }
+      .case-strip { padding: 11px 15px; }
+      .screen { padding: 24px 18px 18px; }
+      .choices { grid-template-columns: 1fr; }
+      .actions { align-items: stretch; }
+      .button { flex: 1; }
+      .button-quiet { flex: 0 0 auto; padding-inline: 8px; }
+      .review-item { grid-template-columns: minmax(0, 1fr) auto; }
+    }
+
+    [dir="rtl"] .choice, [dir="rtl"] .review-item { text-align: right; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="LedgerHound">
+      <span class="brand-mark">LH</span>
+      <span class="brand-name">Ledger<span>Hound</span></span>
+    </div>
+    <select id="ui-language" class="language" aria-label="Language">
+      <option value="en">English</option>
+      <option value="ru">Русский</option>
+      <option value="es">Español</option>
+      <option value="zh">中文</option>
+      <option value="fr">Français</option>
+      <option value="ar">العربية</option>
+    </select>
+  </header>
+
+  <main>
+    <div id="trail" class="trail" aria-hidden="true"></div>
+    <section class="case-panel">
+      <div class="case-strip">
+        <span id="case-label">Quick report</span>
+        <span id="progress-label">Private draft</span>
+      </div>
+      <div id="screen" class="screen"></div>
+    </section>
+    <p id="footer-note" class="footer-note"></p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const LEDGERHOUND_ORIGIN = "https://www.ledgerhound.vip";
+      const STORAGE_KEY = "ledgerhound:standalone-intake:v1";
+      const SUPPORTED_LOCALES = ["en", "ru", "es", "zh", "fr", "ar"];
+      const TOTAL_STEPS = 9;
+
+      const copy = {
+        en: {
+          caseLabel: "Quick report", privateDraft: "Private draft", step: "Step {current} of {total}",
+          introTitle: "Let’s record what happened.", introText: "One short question at a time. You will review everything on LedgerHound before anything is submitted.",
+          start: "Start", resumeTitle: "You have an unfinished report", resumeText: "Continue where you stopped or begin again.", resume: "Continue", restart: "Start over",
+          back: "Back", next: "Continue", reviewButton: "Review on LedgerHound", edit: "Edit", required: "Please answer this question.",
+          countryTitle: "Where did this happen?", countryText: "Choose the country connected to the payment or seller.", countryLabel: "Country", chooseCountry: "Choose a country",
+          categoryTitle: "What kind of problem was it?", categoryText: "Pick the closest answer. You can clarify it in your story.", otherDetails: "Tell us what kind",
+          itemTitle: "What did you pay for?", itemText: "A few words are enough.", itemLabel: "Product or service", itemPlaceholder: "Cake order, ticket, repair, deposit",
+          railTitle: "How did you send the money?", railText: "Choose the payment app, bank method, or account type.", railLabel: "Payment method", chooseRail: "Choose a payment method", railOther: "Name the payment method",
+          recipientTitle: "Who received the money?", recipientText: "Enter the detail shown in the payment: email, phone, username, account, or recipient ID.", recipientLabel: "Recipient details", recipientPlaceholder: "Email, phone, username, or account",
+          channelTitle: "Where did you find the seller?", channelText: "Choose where the conversation or offer started.", channelOther: "Tell us where you found them",
+          storyTitle: "Tell us what happened.", storyText: "Include what was promised, what happened after payment, and whether the seller replied.", storyLabel: "Your story", storyPlaceholder: "I paid for… The seller promised… After payment…", characters: "{count} / 80 characters", storyError: "Please write at least 80 characters.",
+          emailTitle: "Where should we send the private confirmation?", emailText: "Your email is used to verify this report. It is not shown publicly.", emailLabel: "Your email", emailPlaceholder: "you@example.com", emailError: "Enter a valid email address.",
+          reviewTitle: "Your report is ready for a final check.", reviewText: "LedgerHound will open the private review screen. Nothing is submitted until you confirm it there.",
+          reviewCountry: "Country", reviewCategory: "Problem", reviewItem: "Paid for", reviewPayment: "Payment", reviewRecipient: "Recipient", reviewChannel: "Found seller", reviewStory: "Story", reviewEmail: "Email",
+          saved: "Saved on this device", privacy: "Your answers stay in this browser. They are transferred privately to LedgerHound only when you continue.",
+          redirecting: "Opening LedgerHound…",
+          categories: ["Goods not delivered", "Fake service", "Deposit or advance fee", "Rental scam", "Ticket scam", "Marketplace scam", "Employment scam", "Other"],
+          bankAccount: "Bank account", phone: "Phone", email: "Email", social: "Social profile", marketplace: "Marketplace profile", other: "Other",
+          website: "Website", textMessage: "Text message"
+        },
+        ru: {
+          caseLabel: "Быстрая жалоба", privateDraft: "Приватный черновик", step: "Шаг {current} из {total}",
+          introTitle: "Давайте спокойно запишем, что произошло.", introText: "По одному короткому вопросу. Перед отправкой вы всё проверите на LedgerHound.",
+          start: "Начать", resumeTitle: "У вас есть незавершённая жалоба", resumeText: "Продолжите с места остановки или начните заново.", resume: "Продолжить", restart: "Начать заново",
+          back: "Назад", next: "Продолжить", reviewButton: "Проверить на LedgerHound", edit: "Изменить", required: "Пожалуйста, ответьте на этот вопрос.",
+          countryTitle: "В какой стране это произошло?", countryText: "Выберите страну, связанную с платежом или продавцом.", countryLabel: "Страна", chooseCountry: "Выберите страну",
+          categoryTitle: "Что именно произошло?", categoryText: "Выберите ближайший вариант. Подробности можно написать позже.", otherDetails: "Напишите, какой это был обман",
+          itemTitle: "За что вы заплатили?", itemText: "Достаточно нескольких слов.", itemLabel: "Товар или услуга", itemPlaceholder: "Торт, билет, ремонт, залог",
+          railTitle: "Как вы отправили деньги?", railText: "Выберите приложение, банковский перевод или тип счёта.", railLabel: "Способ оплаты", chooseRail: "Выберите способ оплаты", railOther: "Напишите способ оплаты",
+          recipientTitle: "Кому ушли деньги?", recipientText: "Укажите данные из платежа: email, телефон, имя, счёт или ID получателя.", recipientLabel: "Данные получателя", recipientPlaceholder: "Email, телефон, имя или счёт",
+          channelTitle: "Где вы нашли продавца?", channelText: "Выберите место, где началось общение или появилось предложение.", channelOther: "Напишите, где вы его нашли",
+          storyTitle: "Расскажите, что случилось.", storyText: "Что обещали, что произошло после оплаты и отвечал ли продавец.", storyLabel: "Ваша история", storyPlaceholder: "Я заплатил за… Продавец обещал… После оплаты…", characters: "{count} / 80 знаков", storyError: "Напишите минимум 80 знаков.",
+          emailTitle: "Куда отправить приватное подтверждение?", emailText: "Email нужен для подтверждения жалобы. Публично он не показывается.", emailLabel: "Ваш email", emailPlaceholder: "you@example.com", emailError: "Введите корректный email.",
+          reviewTitle: "Жалоба готова к последней проверке.", reviewText: "Откроется приватный экран LedgerHound. Ничего не отправится, пока вы не подтвердите данные там.",
+          reviewCountry: "Страна", reviewCategory: "Тип обмана", reviewItem: "Оплачено", reviewPayment: "Платёж", reviewRecipient: "Получатель", reviewChannel: "Где найден", reviewStory: "История", reviewEmail: "Email",
+          saved: "Сохранено на этом устройстве", privacy: "Ответы остаются в этом браузере и передаются в LedgerHound только после вашего перехода.",
+          redirecting: "Открываем LedgerHound…",
+          categories: ["Товар не доставлен", "Фальшивая услуга", "Залог или предоплата", "Обман с арендой", "Обман с билетами", "Обман на маркетплейсе", "Обман с работой", "Другое"],
+          bankAccount: "Банковский счёт", phone: "Телефон", email: "Email", social: "Профиль в соцсети", marketplace: "Профиль маркетплейса", other: "Другое",
+          website: "Сайт", textMessage: "SMS или сообщение"
+        },
+        es: {
+          caseLabel: "Informe rápido", privateDraft: "Borrador privado", step: "Paso {current} de {total}",
+          introTitle: "Registremos lo que ocurrió.", introText: "Una pregunta corta cada vez. Revisarás todo en LedgerHound antes de enviarlo.",
+          start: "Empezar", resumeTitle: "Tienes un informe sin terminar", resumeText: "Continúa donde lo dejaste o empieza de nuevo.", resume: "Continuar", restart: "Empezar de nuevo",
+          back: "Atrás", next: "Continuar", reviewButton: "Revisar en LedgerHound", edit: "Editar", required: "Responde esta pregunta.",
+          countryTitle: "¿En qué país ocurrió?", countryText: "Elige el país relacionado con el pago o el vendedor.", countryLabel: "País", chooseCountry: "Elige un país",
+          categoryTitle: "¿Qué tipo de problema fue?", categoryText: "Elige la opción más cercana. Podrás aclararlo después.", otherDetails: "Describe el tipo de fraude",
+          itemTitle: "¿Por qué pagaste?", itemText: "Bastan unas pocas palabras.", itemLabel: "Producto o servicio", itemPlaceholder: "Pastel, entrada, reparación, depósito",
+          railTitle: "¿Cómo enviaste el dinero?", railText: "Elige la aplicación, transferencia o tipo de cuenta.", railLabel: "Método de pago", chooseRail: "Elige un método", railOther: "Escribe el método de pago",
+          recipientTitle: "¿Quién recibió el dinero?", recipientText: "Indica el dato que aparece en el pago: correo, teléfono, usuario, cuenta o ID.", recipientLabel: "Datos del destinatario", recipientPlaceholder: "Correo, teléfono, usuario o cuenta",
+          channelTitle: "¿Dónde encontraste al vendedor?", channelText: "Elige dónde comenzó la conversación o la oferta.", channelOther: "Indica dónde lo encontraste",
+          storyTitle: "Cuéntanos qué pasó.", storyText: "Incluye qué prometieron, qué ocurrió después del pago y si respondieron.", storyLabel: "Tu historia", storyPlaceholder: "Pagué por… El vendedor prometió… Después del pago…", characters: "{count} / 80 caracteres", storyError: "Escribe al menos 80 caracteres.",
+          emailTitle: "¿Dónde enviamos la confirmación privada?", emailText: "Tu correo verifica el informe y no se muestra públicamente.", emailLabel: "Tu correo", emailPlaceholder: "tu@ejemplo.com", emailError: "Introduce un correo válido.",
+          reviewTitle: "Tu informe está listo para la revisión final.", reviewText: "LedgerHound abrirá la pantalla privada. Nada se envía hasta que lo confirmes allí.",
+          reviewCountry: "País", reviewCategory: "Problema", reviewItem: "Pago por", reviewPayment: "Pago", reviewRecipient: "Destinatario", reviewChannel: "Vendedor encontrado", reviewStory: "Historia", reviewEmail: "Correo",
+          saved: "Guardado en este dispositivo", privacy: "Tus respuestas permanecen en este navegador y solo pasan a LedgerHound al continuar.",
+          redirecting: "Abriendo LedgerHound…",
+          categories: ["Producto no entregado", "Servicio falso", "Depósito o anticipo", "Fraude de alquiler", "Fraude de entradas", "Fraude de marketplace", "Fraude de empleo", "Otro"],
+          bankAccount: "Cuenta bancaria", phone: "Teléfono", email: "Correo", social: "Perfil social", marketplace: "Perfil de marketplace", other: "Otro",
+          website: "Sitio web", textMessage: "SMS o mensaje"
+        },
+        zh: {
+          caseLabel: "快速举报", privateDraft: "私密草稿", step: "第 {current} 步，共 {total} 步",
+          introTitle: "让我们记录发生的事情。", introText: "每次只回答一个简短问题。提交前可在 LedgerHound 检查全部内容。",
+          start: "开始", resumeTitle: "您有未完成的举报", resumeText: "从上次停止的位置继续，或重新开始。", resume: "继续", restart: "重新开始",
+          back: "返回", next: "继续", reviewButton: "在 LedgerHound 检查", edit: "修改", required: "请回答此问题。",
+          countryTitle: "事情发生在哪个国家？", countryText: "选择与付款或卖家相关的国家。", countryLabel: "国家", chooseCountry: "选择国家",
+          categoryTitle: "发生了哪类问题？", categoryText: "选择最接近的选项，之后可以补充说明。", otherDetails: "说明诈骗类型",
+          itemTitle: "您为什么付款？", itemText: "几个词即可。", itemLabel: "商品或服务", itemPlaceholder: "蛋糕、门票、维修、押金",
+          railTitle: "您如何转账？", railText: "选择付款应用、银行转账或账户类型。", railLabel: "付款方式", chooseRail: "选择付款方式", railOther: "填写付款方式",
+          recipientTitle: "谁收到了钱？", recipientText: "填写付款中显示的邮箱、电话、用户名、账户或收款人 ID。", recipientLabel: "收款人信息", recipientPlaceholder: "邮箱、电话、用户名或账户",
+          channelTitle: "您在哪里找到卖家？", channelText: "选择对话或交易信息开始的平台。", channelOther: "填写找到卖家的地方",
+          storyTitle: "请说明发生了什么。", storyText: "包括对方承诺的内容、付款后的情况以及卖家是否回复。", storyLabel: "事件经过", storyPlaceholder: "我为……付款。卖家承诺……付款后……", characters: "{count} / 80 个字符", storyError: "请至少填写 80 个字符。",
+          emailTitle: "私密确认发送到哪里？", emailText: "邮箱用于验证举报，不会公开显示。", emailLabel: "您的邮箱", emailPlaceholder: "you@example.com", emailError: "请输入有效邮箱。",
+          reviewTitle: "举报已准备好进行最终检查。", reviewText: "LedgerHound 将打开私密检查页面，只有在那里确认后才会提交。",
+          reviewCountry: "国家", reviewCategory: "问题", reviewItem: "付款内容", reviewPayment: "付款", reviewRecipient: "收款人", reviewChannel: "找到卖家", reviewStory: "经过", reviewEmail: "邮箱",
+          saved: "已保存在此设备", privacy: "回答保留在此浏览器中，只有继续后才会传给 LedgerHound。",
+          redirecting: "正在打开 LedgerHound…",
+          categories: ["商品未送达", "虚假服务", "押金或预付款", "租房诈骗", "门票诈骗", "市场诈骗", "招聘诈骗", "其他"],
+          bankAccount: "银行账户", phone: "电话", email: "邮箱", social: "社交账号", marketplace: "市场账号", other: "其他",
+          website: "网站", textMessage: "短信或消息"
+        },
+        fr: {
+          caseLabel: "Signalement rapide", privateDraft: "Brouillon privé", step: "Étape {current} sur {total}",
+          introTitle: "Notons calmement ce qui s’est passé.", introText: "Une question courte à la fois. Vous vérifierez tout sur LedgerHound avant l’envoi.",
+          start: "Commencer", resumeTitle: "Vous avez un signalement inachevé", resumeText: "Reprenez où vous vous êtes arrêté ou recommencez.", resume: "Continuer", restart: "Recommencer",
+          back: "Retour", next: "Continuer", reviewButton: "Vérifier sur LedgerHound", edit: "Modifier", required: "Veuillez répondre à cette question.",
+          countryTitle: "Dans quel pays cela s’est-il passé ?", countryText: "Choisissez le pays lié au paiement ou au vendeur.", countryLabel: "Pays", chooseCountry: "Choisissez un pays",
+          categoryTitle: "Quel type de problème avez-vous rencontré ?", categoryText: "Choisissez l’option la plus proche. Vous pourrez préciser ensuite.", otherDetails: "Précisez le type de fraude",
+          itemTitle: "Pour quoi avez-vous payé ?", itemText: "Quelques mots suffisent.", itemLabel: "Produit ou service", itemPlaceholder: "Gâteau, billet, réparation, dépôt",
+          railTitle: "Comment avez-vous envoyé l’argent ?", railText: "Choisissez l’application, le virement ou le type de compte.", railLabel: "Moyen de paiement", chooseRail: "Choisissez un moyen", railOther: "Indiquez le moyen de paiement",
+          recipientTitle: "Qui a reçu l’argent ?", recipientText: "Saisissez l’information affichée dans le paiement : e-mail, téléphone, identifiant ou compte.", recipientLabel: "Coordonnées du bénéficiaire", recipientPlaceholder: "E-mail, téléphone, identifiant ou compte",
+          channelTitle: "Où avez-vous trouvé le vendeur ?", channelText: "Choisissez où la conversation ou l’offre a commencé.", channelOther: "Indiquez où vous l’avez trouvé",
+          storyTitle: "Racontez ce qui s’est passé.", storyText: "Indiquez ce qui était promis, ce qui s’est passé après le paiement et si le vendeur a répondu.", storyLabel: "Votre récit", storyPlaceholder: "J’ai payé pour… Le vendeur a promis… Après le paiement…", characters: "{count} / 80 caractères", storyError: "Écrivez au moins 80 caractères.",
+          emailTitle: "Où envoyer la confirmation privée ?", emailText: "Votre e-mail sert à vérifier le signalement et n’est pas affiché publiquement.", emailLabel: "Votre e-mail", emailPlaceholder: "vous@exemple.com", emailError: "Saisissez une adresse e-mail valide.",
+          reviewTitle: "Votre signalement est prêt pour la vérification finale.", reviewText: "LedgerHound ouvrira l’écran privé. Rien ne sera envoyé avant votre confirmation.",
+          reviewCountry: "Pays", reviewCategory: "Problème", reviewItem: "Paiement pour", reviewPayment: "Paiement", reviewRecipient: "Bénéficiaire", reviewChannel: "Vendeur trouvé", reviewStory: "Récit", reviewEmail: "E-mail",
+          saved: "Enregistré sur cet appareil", privacy: "Vos réponses restent dans ce navigateur et ne passent à LedgerHound qu’après avoir continué.",
+          redirecting: "Ouverture de LedgerHound…",
+          categories: ["Produit non livré", "Faux service", "Dépôt ou avance", "Arnaque à la location", "Arnaque aux billets", "Arnaque de marketplace", "Arnaque à l’emploi", "Autre"],
+          bankAccount: "Compte bancaire", phone: "Téléphone", email: "E-mail", social: "Profil social", marketplace: "Profil marketplace", other: "Autre",
+          website: "Site web", textMessage: "SMS ou message"
+        },
+        ar: {
+          caseLabel: "بلاغ سريع", privateDraft: "مسودة خاصة", step: "الخطوة {current} من {total}",
+          introTitle: "دعنا نسجل ما حدث بهدوء.", introText: "سؤال قصير في كل مرة. ستراجع كل شيء على LedgerHound قبل الإرسال.",
+          start: "ابدأ", resumeTitle: "لديك بلاغ غير مكتمل", resumeText: "تابع من حيث توقفت أو ابدأ من جديد.", resume: "متابعة", restart: "البدء من جديد",
+          back: "رجوع", next: "متابعة", reviewButton: "المراجعة على LedgerHound", edit: "تعديل", required: "يرجى الإجابة عن هذا السؤال.",
+          countryTitle: "في أي بلد حدث ذلك؟", countryText: "اختر البلد المرتبط بالدفع أو البائع.", countryLabel: "البلد", chooseCountry: "اختر بلدًا",
+          categoryTitle: "ما نوع المشكلة؟", categoryText: "اختر أقرب إجابة ويمكنك التوضيح لاحقًا.", otherDetails: "اذكر نوع الاحتيال",
+          itemTitle: "مقابل ماذا دفعت؟", itemText: "تكفي بضع كلمات.", itemLabel: "المنتج أو الخدمة", itemPlaceholder: "طلب، تذكرة، إصلاح، عربون",
+          railTitle: "كيف أرسلت المال؟", railText: "اختر تطبيق الدفع أو التحويل أو نوع الحساب.", railLabel: "طريقة الدفع", chooseRail: "اختر طريقة الدفع", railOther: "اكتب طريقة الدفع",
+          recipientTitle: "من استلم المال؟", recipientText: "أدخل البيانات الظاهرة في الدفع: البريد أو الهاتف أو اسم المستخدم أو الحساب.", recipientLabel: "بيانات المستلم", recipientPlaceholder: "البريد أو الهاتف أو اسم المستخدم أو الحساب",
+          channelTitle: "أين وجدت البائع؟", channelText: "اختر المكان الذي بدأ فيه التواصل أو العرض.", channelOther: "اكتب أين وجدته",
+          storyTitle: "أخبرنا بما حدث.", storyText: "اذكر ما تم وعدك به وما حدث بعد الدفع وهل رد البائع.", storyLabel: "قصتك", storyPlaceholder: "دفعت مقابل… ووعد البائع… وبعد الدفع…", characters: "{count} / 80 حرفًا", storyError: "اكتب 80 حرفًا على الأقل.",
+          emailTitle: "أين نرسل التأكيد الخاص؟", emailText: "يُستخدم البريد للتحقق من البلاغ ولا يظهر للعامة.", emailLabel: "بريدك الإلكتروني", emailPlaceholder: "you@example.com", emailError: "أدخل بريدًا إلكترونيًا صحيحًا.",
+          reviewTitle: "بلاغك جاهز للمراجعة النهائية.", reviewText: "سيفتح LedgerHound شاشة المراجعة الخاصة ولن يُرسل شيء حتى تؤكده هناك.",
+          reviewCountry: "البلد", reviewCategory: "المشكلة", reviewItem: "تم الدفع مقابل", reviewPayment: "الدفع", reviewRecipient: "المستلم", reviewChannel: "مكان العثور", reviewStory: "القصة", reviewEmail: "البريد",
+          saved: "محفوظ على هذا الجهاز", privacy: "تبقى إجاباتك في هذا المتصفح ولا تنتقل إلى LedgerHound إلا عند المتابعة.",
+          redirecting: "جارٍ فتح LedgerHound…",
+          categories: ["سلعة لم تصل", "خدمة مزيفة", "عربون أو دفعة مقدمة", "احتيال إيجار", "احتيال تذاكر", "احتيال سوق", "احتيال توظيف", "أخرى"],
+          bankAccount: "حساب بنكي", phone: "هاتف", email: "بريد إلكتروني", social: "حساب اجتماعي", marketplace: "حساب سوق", other: "أخرى",
+          website: "موقع ويب", textMessage: "رسالة نصية"
+        }
+      };
+
+      const categoryValues = ["non_delivery_goods", "fake_service", "deposit_advance_fee", "rental_scam", "ticket_scam", "marketplace_scam", "employment_scam", "other"];
+      const rails = [
+        ["zelle", "Zelle"], ["cashapp", "Cash App"], ["venmo", "Venmo"], ["paypal", "PayPal"],
+        ["apple_cash", "Apple Cash"], ["chime", "Chime"], ["wise", "Wise"], ["revolut", "Revolut"],
+        ["iban", "IBAN"], ["bank_account", "bankAccount"], ["phone", "phone"], ["email", "email"],
+        ["social_handle", "social"], ["marketplace_profile", "marketplace"], ["other", "other"]
+      ];
+      const channels = [
+        ["facebook_marketplace", "Facebook Marketplace"], ["instagram", "Instagram"], ["tiktok", "TikTok"],
+        ["craigslist", "Craigslist"], ["offerup", "OfferUp"], ["nextdoor", "Nextdoor"],
+        ["telegram", "Telegram"], ["discord", "Discord"], ["direct_website", "website"],
+        ["text_message", "textMessage"], ["other", "other"]
+      ];
+      const countryCodes = ("AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW").split(" ");
+      const localeToCommunityLanguage = { en: "english", ru: "russian", es: "spanish", zh: "chinese", fr: "french", ar: "arabic" };
+
+      const screen = document.getElementById("screen");
+      const trail = document.getElementById("trail");
+      const languageSelect = document.getElementById("ui-language");
+      const caseLabel = document.getElementById("case-label");
+      const progressLabel = document.getElementById("progress-label");
+      const footerNote = document.getElementById("footer-note");
+
+      let locale = detectLocale();
+      let current = 0;
+      let fields = {
+        country: "", category: "", categoryDetails: "", itemOrService: "", rail: "",
+        paymentMethodDetails: "", paymentIdentifier: "", saleChannel: "", saleChannelDetails: "",
+        description: "", reporterEmail: "", communityLanguage: localeToCommunityLanguage[locale], currency: "USD"
+      };
+
+      function detectLocale() {
+        const candidate = (navigator.language || "en").toLowerCase().split("-")[0];
+        return SUPPORTED_LOCALES.includes(candidate) ? candidate : "en";
+      }
+
+      function t(key, vars = {}) {
+        let value = (copy[locale] && copy[locale][key]) || copy.en[key] || key;
+        Object.keys(vars).forEach((name) => { value = String(value).replaceAll(`{${name}}`, String(vars[name])); });
+        return value;
+      }
+
+      function esc(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+        })[character]);
+      }
+
+      function loadDraft() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+          if (saved && saved.fields && typeof saved.fields === "object") {
+            fields = { ...fields, ...saved.fields };
+            current = Math.min(Math.max(Number(saved.current) || 0, 0), TOTAL_STEPS - 1);
+            return true;
+          }
+        } catch (_) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+        return false;
+      }
+
+      function saveDraft() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ fields, current, updatedAt: new Date().toISOString() }));
+      }
+
+      function clearDraft() {
+        localStorage.removeItem(STORAGE_KEY);
+        current = 0;
+        fields = {
+          country: "", category: "", categoryDetails: "", itemOrService: "", rail: "",
+          paymentMethodDetails: "", paymentIdentifier: "", saleChannel: "", saleChannelDetails: "",
+          description: "", reporterEmail: "", communityLanguage: localeToCommunityLanguage[locale], currency: "USD"
+        };
+      }
+
+      function updateChrome() {
+        document.documentElement.lang = locale;
+        document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+        languageSelect.value = locale;
+        caseLabel.textContent = t("caseLabel");
+        progressLabel.textContent = t("step", { current: current + 1, total: TOTAL_STEPS });
+        footerNote.textContent = t("privacy");
+        trail.innerHTML = Array.from({ length: TOTAL_STEPS }, (_, index) =>
+          `<span class="trail-step ${index < current ? "done" : ""} ${index === current ? "current" : ""}"></span>`
+        ).join("");
+      }
+
+      function countryOptions() {
+        const names = new Intl.DisplayNames([locale, "en"], { type: "region" });
+        return countryCodes
+          .map((code) => ({ code, label: names.of(code) || code }))
+          .sort((a, b) => a.label.localeCompare(b.label, locale))
+          .map(({ code, label }) => `<option value="${code}" ${fields.country === code ? "selected" : ""}>${esc(label)} (${code})</option>`)
+          .join("");
+      }
+
+      function choiceGrid(values, selected, labels) {
+        return `<div class="choices">${values.map((value, index) => `
+          <button type="button" class="choice ${selected === value ? "selected" : ""}" data-choice="${esc(value)}">
+            <span class="choice-marker">✓</span><span>${esc(labels[index])}</span>
+          </button>`).join("")}</div>`;
+      }
+
+      function stepShell(kicker, title, text, answer, options = {}) {
+        screen.innerHTML = `
+          <p class="step-kicker">${esc(kicker)}</p>
+          <h2>${esc(title)}</h2>
+          <p class="lead">${esc(text)}</p>
+          <div class="answer">${answer}</div>
+          <div id="error" class="error" role="alert"></div>
+          <div class="actions">
+            <button type="button" class="button button-quiet" id="back" ${current === 0 ? "hidden" : ""}>${esc(t("back"))}</button>
+            <button type="button" class="button button-primary" id="next">${esc(options.final ? t("reviewButton") : t("next"))}</button>
+          </div>
+          <div class="status-note"><span class="status-mark">✓</span><span>${esc(t("saved"))}</span></div>`;
+        document.getElementById("back")?.addEventListener("click", () => go(-1));
+        document.getElementById("next")?.addEventListener("click", () => options.final ? finish() : go(1));
+        bindInputs();
+      }
+
+      function render() {
+        updateChrome();
+        const kicker = t("step", { current: current + 1, total: TOTAL_STEPS });
+        if (current === 0) {
+          stepShell(kicker, t("countryTitle"), t("countryText"), `
+            <label class="field-label" for="country">${esc(t("countryLabel"))}</label>
+            <select id="country" class="field" data-field="country">
+              <option value="">${esc(t("chooseCountry"))}</option>${countryOptions()}
+              <option value="OTHER" ${fields.country === "OTHER" ? "selected" : ""}>${esc(t("other"))}</option>
+            </select>`);
+        } else if (current === 1) {
+          stepShell(kicker, t("categoryTitle"), t("categoryText"), `
+            ${choiceGrid(categoryValues, fields.category, t("categories"))}
+            <div class="other-field" ${fields.category === "other" ? "" : "hidden"}>
+              <input class="field" data-field="categoryDetails" value="${esc(fields.categoryDetails)}" placeholder="${esc(t("otherDetails"))}" maxlength="120">
+            </div>`);
+        } else if (current === 2) {
+          stepShell(kicker, t("itemTitle"), t("itemText"), `
+            <label class="field-label" for="item">${esc(t("itemLabel"))}</label>
+            <input id="item" class="field" data-field="itemOrService" value="${esc(fields.itemOrService)}" placeholder="${esc(t("itemPlaceholder"))}" maxlength="120">`);
+        } else if (current === 3) {
+          stepShell(kicker, t("railTitle"), t("railText"), `
+            <label class="field-label" for="rail">${esc(t("railLabel"))}</label>
+            <select id="rail" class="field" data-field="rail">
+              <option value="">${esc(t("chooseRail"))}</option>
+              ${rails.map(([value, label]) => `<option value="${value}" ${fields.rail === value ? "selected" : ""}>${esc(copy.en[label] ? t(label) : label)}</option>`).join("")}
+            </select>
+            <div class="other-field" ${fields.rail === "other" ? "" : "hidden"}>
+              <input class="field" data-field="paymentMethodDetails" value="${esc(fields.paymentMethodDetails)}" placeholder="${esc(t("railOther"))}" maxlength="120">
+            </div>`);
+        } else if (current === 4) {
+          stepShell(kicker, t("recipientTitle"), t("recipientText"), `
+            <label class="field-label" for="recipient">${esc(t("recipientLabel"))}</label>
+            <input id="recipient" class="field" data-field="paymentIdentifier" value="${esc(fields.paymentIdentifier)}" placeholder="${esc(t("recipientPlaceholder"))}" maxlength="320">`);
+        } else if (current === 5) {
+          const labels = channels.map(([, label]) => copy.en[label] ? t(label) : label);
+          stepShell(kicker, t("channelTitle"), t("channelText"), `
+            ${choiceGrid(channels.map(([value]) => value), fields.saleChannel, labels)}
+            <div class="other-field" ${fields.saleChannel === "other" ? "" : "hidden"}>
+              <input class="field" data-field="saleChannelDetails" value="${esc(fields.saleChannelDetails)}" placeholder="${esc(t("channelOther"))}" maxlength="120">
+            </div>`);
+        } else if (current === 6) {
+          const count = fields.description.trim().length;
+          stepShell(kicker, t("storyTitle"), t("storyText"), `
+            <label class="field-label" for="story">${esc(t("storyLabel"))}</label>
+            <textarea id="story" class="text-area" data-field="description" placeholder="${esc(t("storyPlaceholder"))}" maxlength="3000">${esc(fields.description)}</textarea>
+            <div class="counter-row"><span>${esc(t("storyText"))}</span><strong id="counter" class="${count >= 80 ? "ready" : ""}">${esc(t("characters", { count }))}</strong></div>`);
+        } else if (current === 7) {
+          stepShell(kicker, t("emailTitle"), t("emailText"), `
+            <label class="field-label" for="email">${esc(t("emailLabel"))}</label>
+            <input id="email" type="email" class="field" data-field="reporterEmail" value="${esc(fields.reporterEmail)}" placeholder="${esc(t("emailPlaceholder"))}" maxlength="320" autocomplete="email">`);
+        } else {
+          const categoryIndex = categoryValues.indexOf(fields.category);
+          const railLabel = rails.find(([value]) => value === fields.rail)?.[1] || fields.rail;
+          const channelLabel = channels.find(([value]) => value === fields.saleChannel)?.[1] || fields.saleChannel;
+          const rows = [
+            [t("reviewCountry"), countryName(fields.country), 0],
+            [t("reviewCategory"), t("categories")[categoryIndex] || fields.categoryDetails, 1],
+            [t("reviewItem"), fields.itemOrService, 2],
+            [t("reviewPayment"), copy.en[railLabel] ? t(railLabel) : railLabel, 3],
+            [t("reviewRecipient"), fields.paymentIdentifier, 4],
+            [t("reviewChannel"), copy.en[channelLabel] ? t(channelLabel) : channelLabel, 5],
+            [t("reviewStory"), fields.description, 6],
+            [t("reviewEmail"), fields.reporterEmail, 7]
+          ];
+          stepShell(kicker, t("reviewTitle"), t("reviewText"), `
+            <div class="review-grid">${rows.map(([label, value, step]) => `
+              <div class="review-item">
+                <div><div class="review-label">${esc(label)}</div><div class="review-value">${esc(value)}</div></div>
+                <button type="button" class="edit" data-edit="${step}">${esc(t("edit"))}</button>
+              </div>`).join("")}</div>`, { final: true });
+          document.querySelectorAll("[data-edit]").forEach((button) => {
+            button.addEventListener("click", () => { current = Number(button.dataset.edit); saveDraft(); render(); });
+          });
+        }
+      }
+
+      function countryName(code) {
+        if (code === "OTHER") return t("other");
+        try { return new Intl.DisplayNames([locale, "en"], { type: "region" }).of(code) || code; }
+        catch (_) { return code; }
+      }
+
+      function bindInputs() {
+        document.querySelectorAll("[data-field]").forEach((input) => {
+          input.addEventListener("input", () => {
+            fields[input.dataset.field] = input.value;
+            saveDraft();
+            if (input.dataset.field === "description") {
+              const counter = document.getElementById("counter");
+              const count = input.value.trim().length;
+              if (counter) {
+                counter.textContent = t("characters", { count });
+                counter.classList.toggle("ready", count >= 80);
+              }
+            }
+          });
+          input.addEventListener("change", () => {
+            fields[input.dataset.field] = input.value;
+            saveDraft();
+            if (["rail"].includes(input.dataset.field)) render();
+          });
+        });
+        document.querySelectorAll("[data-choice]").forEach((button) => {
+          button.addEventListener("click", () => {
+            if (current === 1) fields.category = button.dataset.choice;
+            if (current === 5) fields.saleChannel = button.dataset.choice;
+            saveDraft();
+            render();
+          });
+        });
+        screen.querySelector("input, select, textarea")?.focus({ preventScroll: true });
+      }
+
+      function validate() {
+        if (current === 0 && !fields.country) return t("required");
+        if (current === 1 && (!fields.category || (fields.category === "other" && fields.categoryDetails.trim().length < 3))) return t("required");
+        if (current === 2 && fields.itemOrService.trim().length < 3) return t("required");
+        if (current === 3 && (!fields.rail || (fields.rail === "other" && fields.paymentMethodDetails.trim().length < 3))) return t("required");
+        if (current === 4 && fields.paymentIdentifier.trim().length < 3) return t("required");
+        if (current === 5 && (!fields.saleChannel || (fields.saleChannel === "other" && fields.saleChannelDetails.trim().length < 3))) return t("required");
+        if (current === 6 && fields.description.trim().length < 80) return t("storyError");
+        if (current === 7 && !/^\S+@\S+\.\S+$/.test(fields.reporterEmail.trim())) return t("emailError");
+        return "";
+      }
+
+      function go(direction) {
+        if (direction > 0) {
+          const error = validate();
+          if (error) {
+            const element = document.getElementById("error");
+            if (element) element.textContent = error;
+            return;
+          }
+        }
+        current = Math.min(Math.max(current + direction, 0), TOTAL_STEPS - 1);
+        saveDraft();
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function encodePayload(payload) {
+        const bytes = new TextEncoder().encode(JSON.stringify(payload));
+        let binary = "";
+        bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      function finish() {
+        const button = document.getElementById("next");
+        if (button) {
+          button.disabled = true;
+          button.textContent = t("redirecting");
+        }
+        const encoded = encodePayload({ v: 1, fields });
+        const basePath = locale === "en" ? "" : `/${locale}`;
+        const query = new URLSearchParams({
+          mode: "report",
+          quick: "1",
+          category: fields.category,
+          channel: fields.saleChannel,
+          language: fields.communityLanguage
+        });
+        localStorage.removeItem(STORAGE_KEY);
+        window.location.assign(`${LEDGERHOUND_ORIGIN}${basePath}/payment-safety?${query.toString()}#intake=${encoded}`);
+      }
+
+      function intro(hasDraft) {
+        updateChrome();
+        progressLabel.textContent = t("privateDraft");
+        trail.innerHTML = Array.from({ length: TOTAL_STEPS }, (_, index) => `<span class="trail-step ${index === 0 ? "current" : ""}"></span>`).join("");
+        screen.innerHTML = `
+          <p class="step-kicker">${esc(t("caseLabel"))}</p>
+          <h1>${esc(t("introTitle"))}</h1>
+          <p class="lead">${esc(t("introText"))}</p>
+          ${hasDraft ? `<div class="resume-box"><strong>${esc(t("resumeTitle"))}</strong><span>${esc(t("resumeText"))}</span>
+            <div class="resume-actions"><button class="button button-primary" id="resume">${esc(t("resume"))}</button>
+            <button class="button button-secondary" id="restart">${esc(t("restart"))}</button></div></div>` : ""}
+          <div class="answer"></div>
+          <div class="actions"><span></span><button class="button button-primary" id="start">${esc(t("start"))}</button></div>
+          <div class="status-note"><span class="status-mark">✓</span><span>${esc(t("privacy"))}</span></div>`;
+        document.getElementById("start")?.addEventListener("click", () => { if (!hasDraft) clearDraft(); render(); });
+        document.getElementById("resume")?.addEventListener("click", render);
+        document.getElementById("restart")?.addEventListener("click", () => { clearDraft(); render(); });
+      }
+
+      languageSelect.addEventListener("change", () => {
+        locale = languageSelect.value;
+        fields.communityLanguage = localeToCommunityLanguage[locale];
+        saveDraft();
+        intro(Boolean(localStorage.getItem(STORAGE_KEY)));
+      });
+
+      const hasDraft = loadDraft();
+      languageSelect.value = locale;
+      intro(hasDraft);
+    })();
+  </script>
+</body>
+</html>

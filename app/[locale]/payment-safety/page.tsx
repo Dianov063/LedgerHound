@@ -221,6 +221,66 @@ interface PaymentReportDraft {
   updatedAt: string;
 }
 
+function decodeQuickIntake(hash: string): Record<string, string | boolean> | null {
+  const prefix = '#intake=';
+  if (!hash.startsWith(prefix)) return null;
+  const encoded = hash.slice(prefix.length);
+  if (!encoded || encoded.length > 16000) return null;
+
+  try {
+    const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as {
+      v?: number;
+      fields?: Record<string, unknown>;
+    };
+    if (payload.v !== 1 || !payload.fields || typeof payload.fields !== 'object') return null;
+
+    const text = (name: string, maxLength: number) => {
+      const value = payload.fields?.[name];
+      return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+    };
+    const countryValue = text('country', 8).toUpperCase();
+    const country = ISO_COUNTRY_CODES.includes(countryValue as typeof ISO_COUNTRY_CODES[number])
+      ? countryValue
+      : 'OTHER';
+    const railValue = text('rail', 40) as PaymentRail;
+    const rail = RAILS.some((option) => option.value === railValue) ? railValue : 'other';
+    const categoryValue = text('category', 60) as ScamCategory;
+    const category = CATEGORIES.some((option) => option.value === categoryValue)
+      ? categoryValue
+      : 'other';
+    const channelValue = text('saleChannel', 60) as SaleChannel;
+    const saleChannel = SALE_CHANNEL_OPTIONS.some((option) => option.value === channelValue)
+      ? channelValue
+      : 'other';
+    const communityLanguageValue = text('communityLanguage', 40);
+
+    return {
+      country,
+      rail,
+      category,
+      saleChannel,
+      communityLanguage: isCommunityLanguage(communityLanguageValue)
+        ? communityLanguageValue
+        : 'english',
+      paymentMethodDetails: text('paymentMethodDetails', 120),
+      categoryDetails: text('categoryDetails', 120),
+      saleChannelDetails: text('saleChannelDetails', 120),
+      paymentIdentifier: text('paymentIdentifier', 320),
+      itemOrService: text('itemOrService', 120),
+      description: text('description', 3000),
+      reporterEmail: text('reporterEmail', 320),
+      currency: text('currency', 8) || 'USD',
+      refundRequested: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function formatAmount(amount: number, currency: string) {
   if (!amount) return '$0';
   return `${currency || 'USD'} ${amount.toLocaleString()}`;
@@ -322,6 +382,8 @@ export default function PaymentSafetyPage() {
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState('');
   const [draftTouched, setDraftTouched] = useState(false);
+  const [quickIntakeImported, setQuickIntakeImported] = useState(false);
+  const draftInitializationStarted = useRef(false);
   const reportFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -340,7 +402,42 @@ export default function PaymentSafetyPage() {
   }, []);
 
   useEffect(() => {
+    if (draftInitializationStarted.current) return;
+    draftInitializationStarted.current = true;
+
     try {
+      const quickFields = decodeQuickIntake(window.location.hash);
+      if (window.location.hash.startsWith('#intake=')) {
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      }
+      if (quickFields) {
+        const updatedAt = new Date().toISOString();
+        const draft: PaymentReportDraft = {
+          fields: quickFields,
+          step: REPORT_STEP_COUNT - 1,
+          updatedAt,
+        };
+        localStorage.setItem(REPORT_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        setDraftFields(quickFields);
+        setReportStep(REPORT_STEP_COUNT - 1);
+        setReportCountry(String(quickFields.country || 'US'));
+        setReportRail(quickFields.rail as PaymentRail);
+        setReportCategory(quickFields.category as ScamCategory);
+        setReportSaleChannel(quickFields.saleChannel as SaleChannel);
+        setReportCommunityLanguage(
+          isCommunityLanguage(quickFields.communityLanguage)
+            ? quickFields.communityLanguage
+            : 'english',
+        );
+        setRefundRequested(false);
+        setDraftSavedAt(updatedAt);
+        setDraftTouched(true);
+        setShowDraftPrompt(false);
+        setQuickIntakeImported(true);
+        setMode('report');
+        return;
+      }
+
       const saved = localStorage.getItem(REPORT_DRAFT_STORAGE_KEY);
       if (saved) {
         const draft = JSON.parse(saved) as PaymentReportDraft;
@@ -849,6 +946,15 @@ export default function PaymentSafetyPage() {
                   </button>
                 </div>
               </div>
+
+              {quickIntakeImported && (
+                <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  <p className="font-bold">{t('Your quick report is ready to review')}</p>
+                  <p className="mt-1 text-emerald-800">
+                    {t('Check the answers below, add anything useful, and submit when you are ready.')}
+                  </p>
+                </div>
+              )}
 
               <div className={reportStep === 0 || reportStep === 1 ? 'grid md:grid-cols-2 gap-4 mt-6 mb-4' : 'hidden'}>
                 <div className={reportStep === 0 ? '' : 'hidden'}>

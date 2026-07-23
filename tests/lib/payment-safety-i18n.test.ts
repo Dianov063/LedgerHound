@@ -19,6 +19,8 @@ const REQUIRED_TRANSLATIONS = [
   'What happened?',
   'Who did you send the money to?',
   'Wise email, phone, or recipient account',
+  'Your quick report is ready to review',
+  'Check the answers below, add anything useful, and submit when you are ready.',
   'Review and send',
   'Finish later',
   'Did you report it anywhere else?',
