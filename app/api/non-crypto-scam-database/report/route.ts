@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import {
   createNonCryptoEmailVerification,
   COMMUNITY_LANGUAGES,
+  normalizePaymentIdentifier,
   saveNonCryptoReport,
   REPORT_DESTINATIONS,
   SALE_CHANNELS,
@@ -12,8 +13,14 @@ import {
   type ReportDestination,
   type SaleChannel,
 } from '@/lib/non-crypto-scam-db';
-import { checkRateLimit } from '@/lib/rate-limit';
 import { sendPaymentReportVerification } from '@/lib/payment-safety-emails';
+import {
+  abuseErrorResponse,
+  authorizeReportSubmission,
+  enforceReportLimits,
+  getClientIp,
+  verifySubmissionSession,
+} from '@/lib/payment-report-abuse';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -58,12 +65,13 @@ const VALID_EVIDENCE: EvidenceType[] = [
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const rl = await checkRateLimit(ip, { name: 'non-crypto-scam-report', limit: 5, windowSec: 3600 });
-    if (!rl.success) {
-      return Response.json({ error: 'Too many reports. Try again in 1 hour.' }, { status: 429 });
+    const ip = getClientIp(req.headers);
+    const contentLength = Number(req.headers.get('content-length') || 0);
+    if (contentLength > 100_000) {
+      return Response.json({ error: 'Report payload is too large.' }, { status: 413 });
     }
-
+    const submissionToken = req.headers.get('x-submission-token') || '';
+    verifySubmissionSession(submissionToken, ip);
     const body = await req.json();
     const {
       country,
@@ -103,10 +111,20 @@ export async function POST(req: NextRequest) {
     if (!rail || !VALID_RAILS.includes(rail)) {
       return Response.json({ error: `Invalid payment rail. Must be one of: ${VALID_RAILS.join(', ')}` }, { status: 400 });
     }
-    if (!paymentIdentifier || typeof paymentIdentifier !== 'string' || paymentIdentifier.trim().length < 3) {
+    const cleanPaymentIdentifier = typeof paymentIdentifier === 'string'
+      ? paymentIdentifier.trim().slice(0, 320)
+      : '';
+    const cleanReporterEmail = typeof reporterEmail === 'string'
+      ? reporterEmail.trim().toLowerCase().slice(0, 320)
+      : '';
+    const cleanDescription = typeof description === 'string'
+      ? description.trim().slice(0, 5000)
+      : '';
+
+    if (cleanPaymentIdentifier.length < 3) {
       return Response.json({ error: 'Payment identifier is required.' }, { status: 400 });
     }
-    if (!reporterEmail || typeof reporterEmail !== 'string' || !/^\S+@\S+\.\S+$/.test(reporterEmail.trim())) {
+    if (!/^\S+@\S+\.\S+$/.test(cleanReporterEmail)) {
       return Response.json({ error: 'A valid email is required for report verification.' }, { status: 400 });
     }
     if (!category || !VALID_CATEGORIES.includes(category)) {
@@ -138,7 +156,7 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Listing URL must be a valid http or https URL.' }, { status: 400 });
       }
     }
-    if (!description || typeof description !== 'string' || description.trim().length < 80) {
+    if (cleanDescription.length < 80) {
       return Response.json({ error: 'Description is required (minimum 80 characters).' }, { status: 400 });
     }
 
@@ -155,11 +173,19 @@ export async function POST(req: NextRequest) {
       ? reportedTo.filter((destination: ReportDestination) => REPORT_DESTINATIONS.includes(destination))
       : [];
 
+    const identity = normalizePaymentIdentifier(rail, cleanPaymentIdentifier, country);
+    await authorizeReportSubmission(submissionToken, ip);
+    await enforceReportLimits({
+      ip,
+      reporterEmail: cleanReporterEmail,
+      identityHash: identity.hash,
+    });
+
     const result = await saveNonCryptoReport({
       country,
       rail,
       paymentMethodDetails,
-      paymentIdentifier,
+      paymentIdentifier: cleanPaymentIdentifier,
       recipientName,
       businessName,
       aliases: Array.isArray(aliases) ? aliases : [],
@@ -183,8 +209,8 @@ export async function POST(req: NextRequest) {
       transactionReference,
       reportedTo: cleanReportedTo,
       externalReportReference,
-      description,
-      reporterEmail,
+      description: cleanDescription,
+      reporterEmail: cleanReporterEmail,
       evidenceTypes: cleanEvidence,
       evidenceFiles: cleanEvidenceFiles,
       ip,
@@ -192,9 +218,9 @@ export async function POST(req: NextRequest) {
 
     let verificationEmailSent = false;
     try {
-      const verification = await createNonCryptoEmailVerification(result.id, reporterEmail, locale);
+      const verification = await createNonCryptoEmailVerification(result.id, cleanReporterEmail, locale);
       await sendPaymentReportVerification({
-        to: reporterEmail.trim(),
+        to: cleanReporterEmail,
         reportId: result.id,
         token: verification.token,
       });
@@ -213,6 +239,11 @@ export async function POST(req: NextRequest) {
         : 'Report received, but the verification email could not be sent. Use resend verification.',
     });
   } catch (err: any) {
+    const abuseResponse = abuseErrorResponse(err);
+    if (abuseResponse) return abuseResponse;
+    if (err instanceof SyntaxError) {
+      return Response.json({ error: 'Report payload must be valid JSON.' }, { status: 400 });
+    }
     console.error('[non-crypto-scam-database/report]', err);
     return Response.json({ error: 'Failed to submit report' }, { status: 500 });
   }

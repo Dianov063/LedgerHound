@@ -14,12 +14,12 @@ const CSP_DIRECTIVES = [
   // Google Analytics 4 (@next/third-parties): tag is loaded from googletagmanager
   // and beacons go to *.google-analytics.com (region-prefixed: region1.*, etc.)
   // plus analytics.google.com. Wildcard kept so non-US regions also report.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self' https://api.stripe.com https://*.alchemy.com https://*.etherscan.io https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com",
-  "frame-src https://js.stripe.com",
+  "connect-src 'self' https://api.stripe.com https://challenges.cloudflare.com https://*.alchemy.com https://*.etherscan.io https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com",
+  "frame-src https://js.stripe.com https://challenges.cloudflare.com",
 ].join('; ');
 
 function addSecurityHeaders(response: NextResponse) {
@@ -32,7 +32,7 @@ function addSecurityHeaders(response: NextResponse) {
 function addCorsHeaders(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', 'https://www.ledgerhound.vip');
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-key');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-key, x-submission-token');
 }
 
 export default function middleware(request: NextRequest) {

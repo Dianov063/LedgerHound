@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from 'crypto';
-import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import {
   COMMUNITY_LANGUAGES,
   isCommunityLanguage,
@@ -492,8 +498,8 @@ async function s3Put(key: string, data: unknown): Promise<void> {
   }));
 }
 
-async function s3ListJson<T>(prefix: string): Promise<T[]> {
-  const out: T[] = [];
+async function s3ListJsonEntries<T>(prefix: string): Promise<{ key: string; value: T }[]> {
+  const out: { key: string; value: T }[] = [];
   let continuationToken: string | undefined;
 
   do {
@@ -507,7 +513,7 @@ async function s3ListJson<T>(prefix: string): Promise<T[]> {
       .filter((key): key is string => !!key && key.endsWith('.json'));
     const settled = await Promise.allSettled(keys.map(async (key) => {
       const data = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
-      return JSON.parse(await streamToString(data.Body)) as T;
+      return { key, value: JSON.parse(await streamToString(data.Body)) as T };
     }));
 
     for (const item of settled) {
@@ -517,6 +523,45 @@ async function s3ListJson<T>(prefix: string): Promise<T[]> {
   } while (continuationToken);
 
   return out;
+}
+
+async function s3ListJson<T>(prefix: string): Promise<T[]> {
+  return (await s3ListJsonEntries<T>(prefix)).map((entry) => entry.value);
+}
+
+async function s3ListObjects(prefix: string): Promise<{ key: string; lastModified?: Date }[]> {
+  const out: { key: string; lastModified?: Date }[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const response = await getS3().send(new ListObjectsV2Command({
+      Bucket: bucket(),
+      Prefix: `${PREFIX}/${prefix}`,
+      ContinuationToken: continuationToken,
+    }));
+    for (const item of response.Contents || []) {
+      if (item.Key) out.push({ key: item.Key, lastModified: item.LastModified });
+    }
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return out;
+}
+
+async function s3DeleteAbsoluteKeys(keys: string[]): Promise<void> {
+  const unique = Array.from(new Set(keys));
+  for (let index = 0; index < unique.length; index += 1000) {
+    const chunk = unique.slice(index, index + 1000);
+    if (chunk.length === 0) continue;
+    const result = await getS3().send(new DeleteObjectsCommand({
+      Bucket: bucket(),
+      Delete: {
+        Quiet: true,
+        Objects: chunk.map((Key) => ({ Key })),
+      },
+    }));
+    if (result.Errors?.length) {
+      throw new Error(`Failed to delete ${result.Errors.length} payment-safety object(s).`);
+    }
+  }
 }
 
 function defaultStats(): NonCryptoStats {
@@ -621,7 +666,7 @@ export async function saveNonCryptoReport(input: {
 
   const now = new Date().toISOString();
   const id = generateId();
-  const evidenceTypes = input.evidenceTypes || [];
+  const evidenceTypes = (input.evidenceTypes || []).slice(0, 6);
   const evidenceFiles = input.evidenceFiles
     ?.map((file) => file.trim())
     .filter((file) => file.startsWith(`${PREFIX}/evidence/`))
@@ -647,13 +692,13 @@ export async function saveNonCryptoReport(input: {
     identityHash: identity.hash,
     identityMask: identity.mask,
     privateIdentifier: identity.normalized,
-    recipientName: input.recipientName?.trim() || undefined,
-    businessName: input.businessName?.trim() || undefined,
-    aliases: input.aliases?.map(a => a.trim()).filter(Boolean) || [],
+    recipientName: cleanShortText(input.recipientName, 120),
+    businessName: cleanShortText(input.businessName, 160),
+    aliases: input.aliases?.map((alias) => cleanShortText(alias, 80)).filter((alias): alias is string => !!alias).slice(0, 10) || [],
     category: input.category,
     categoryDetails,
     amount: typeof input.amount === 'number' ? input.amount : undefined,
-    currency: input.currency || 'USD',
+    currency: collapseSpaces(input.currency || 'USD').slice(0, 8) || 'USD',
     incidentDate: cleanDate(input.incidentDate),
     saleChannel,
     saleChannelDetails,
@@ -673,8 +718,8 @@ export async function saveNonCryptoReport(input: {
     transactionReferenceHash: transactionReference.hash,
     reportedTo,
     externalReportReference: cleanShortText(input.externalReportReference, 160),
-    description: input.description.trim(),
-    reporterEmail: input.reporterEmail?.trim() || undefined,
+    description: input.description.trim().slice(0, 5000),
+    reporterEmail: input.reporterEmail?.trim().toLowerCase().slice(0, 320) || undefined,
     reporterFingerprint: reporterKey,
     reporterNetworkFingerprint: reporterNetworkKey,
     evidenceTypes,
@@ -684,7 +729,6 @@ export async function saveNonCryptoReport(input: {
   };
 
   await s3Put(`reports/${id}.json`, report);
-  await refreshNonCryptoIndexes();
 
   const acceptedSummary = await s3Get<PaymentIdentitySummary>(`identities/${identity.hash}.json`);
   const pendingView: PaymentIdentitySummary = acceptedSummary || {
@@ -760,7 +804,6 @@ export async function verifyNonCryptoEmailToken(token: string): Promise<{ report
     s3Put(`reports/${report.id}.json`, report),
     s3Put(`email-verifications/${tokenHash}.json`, record),
   ]);
-  await refreshNonCryptoIndexes();
   return { reportId: report.id, locale: record.locale };
 }
 
@@ -846,6 +889,14 @@ export async function getNonCryptoStats(): Promise<NonCryptoStats> {
 export async function getPublicPaymentIdentityIndex(): Promise<PaymentIdentityPublicView[]> {
   const index = (await s3Get<PaymentIdentityPublicView[]>('index/identities.json')) || [];
   return index.filter((i) => i.publicEligible);
+}
+
+export function countAcceptedVerifiedReports(
+  reports: Pick<NonCryptoScamReport, 'status' | 'reporterEmailVerifiedAt'>[],
+): number {
+  return reports.filter(
+    (report) => report.status === 'accepted' && !!report.reporterEmailVerifiedAt,
+  ).length;
 }
 
 export async function getNonCryptoAdminSnapshot(): Promise<NonCryptoAdminSnapshot> {
@@ -1078,7 +1129,7 @@ async function refreshNonCryptoIndexes(): Promise<void> {
   await s3Put('index/identities.json', safe);
 
   const stats: NonCryptoStats = {
-    totalReports: reports.length,
+    totalReports: countAcceptedVerifiedReports(reports),
     totalIdentities: rebuilt.length,
     publicEligibleIdentities: safe.filter((i) => i.publicEligible).length,
     indexedEligibleIdentities: safe.filter((i) => i.indexedEligible).length,
@@ -1086,4 +1137,58 @@ async function refreshNonCryptoIndexes(): Promise<void> {
     updatedAt: new Date().toISOString(),
   };
   await s3Put('index/stats.json', stats);
+}
+
+export function isExpiredUnverifiedReport(
+  report: Pick<NonCryptoScamReport, 'createdAt' | 'reporterEmailVerifiedAt'>,
+  now = Date.now(),
+  maxAgeMs = 48 * 60 * 60 * 1000,
+): boolean {
+  const createdAt = new Date(report.createdAt).getTime();
+  return !report.reporterEmailVerifiedAt
+    && Number.isFinite(createdAt)
+    && createdAt <= now - maxAgeMs;
+}
+
+export async function cleanupExpiredNonCryptoIntake(now = Date.now()): Promise<{
+  reportsDeleted: number;
+  verificationRecordsDeleted: number;
+  evidenceFilesDeleted: number;
+}> {
+  const [reportEntries, verificationEntries, evidenceObjects] = await Promise.all([
+    s3ListJsonEntries<NonCryptoScamReport>('reports/'),
+    s3ListJsonEntries<EmailVerificationRecord>('email-verifications/'),
+    s3ListObjects('evidence/'),
+  ]);
+  const expiredReports = reportEntries.filter((entry) => isExpiredUnverifiedReport(entry.value, now));
+  const expiredReportIds = new Set(expiredReports.map((entry) => entry.value.id));
+  const activeEvidence = new Set(
+    reportEntries
+      .filter((entry) => !expiredReportIds.has(entry.value.id))
+      .flatMap((entry) => entry.value.evidenceFiles || []),
+  );
+  const cutoff = now - 48 * 60 * 60 * 1000;
+  const expiredVerificationEntries = verificationEntries.filter((entry) => {
+    const expiresAt = new Date(entry.value.expiresAt).getTime();
+    return expiredReportIds.has(entry.value.reportId)
+      || (Number.isFinite(expiresAt) && expiresAt <= now);
+  });
+  const orphanEvidence = evidenceObjects.filter((object) => {
+    const relativeKey = object.key;
+    const modifiedAt = object.lastModified?.getTime() || 0;
+    return modifiedAt > 0 && modifiedAt <= cutoff && !activeEvidence.has(relativeKey);
+  });
+
+  await s3DeleteAbsoluteKeys([
+    ...expiredReports.map((entry) => entry.key),
+    ...expiredVerificationEntries.map((entry) => entry.key),
+    ...orphanEvidence.map((object) => object.key),
+  ]);
+  await refreshNonCryptoIndexes();
+
+  return {
+    reportsDeleted: expiredReports.length,
+    verificationRecordsDeleted: expiredVerificationEntries.length,
+    evidenceFilesDeleted: orphanEvidence.length,
+  };
 }

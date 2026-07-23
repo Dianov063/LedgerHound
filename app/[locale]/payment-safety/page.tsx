@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import TurnstileWidget from '@/components/TurnstileWidget';
 import {
   COMMUNITY_LANGUAGE_OPTIONS,
   isCommunityLanguage,
@@ -383,6 +384,9 @@ export default function PaymentSafetyPage() {
   const [draftSavedAt, setDraftSavedAt] = useState('');
   const [draftTouched, setDraftTouched] = useState(false);
   const [quickIntakeImported, setQuickIntakeImported] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [turnstileUnavailable, setTurnstileUnavailable] = useState(false);
   const draftInitializationStarted = useRef(false);
   const reportFormRef = useRef<HTMLFormElement>(null);
 
@@ -537,6 +541,9 @@ export default function PaymentSafetyPage() {
     setDraftSavedAt('');
     setDraftTouched(false);
     setShowDraftPrompt(false);
+    setTurnstileToken('');
+    setTurnstileResetKey((current) => current + 1);
+    setTurnstileUnavailable(false);
     localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
     reportFormRef.current?.reset();
   }
@@ -658,6 +665,10 @@ export default function PaymentSafetyPage() {
       setReportError(t('Complete the highlighted answers before submitting. Your draft is saved.'));
       return;
     }
+    if (!turnstileToken) {
+      setReportError(t('Complete the security check before submitting.'));
+      return;
+    }
     setReportStatus('loading');
     setReportError('');
     setReportId('');
@@ -673,12 +684,24 @@ export default function PaymentSafetyPage() {
       .map(({ value }) => value);
 
     try {
+      const challengeRes = await fetch('/api/non-crypto-scam-database/challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: turnstileToken }),
+      });
+      const challenge = await challengeRes.json();
+      if (!challengeRes.ok || !challenge.submissionToken) {
+        throw new Error(challenge.error || t('Security check expired. Please try again.'));
+      }
+      const submissionToken = String(challenge.submissionToken);
+
       const evidenceFiles: string[] = [];
       for (const file of reportFiles.slice(0, 5)) {
         const uploadData = new FormData();
         uploadData.append('file', file);
         const uploadRes = await fetch('/api/non-crypto-scam-database/upload', {
           method: 'POST',
+          headers: { 'x-submission-token': submissionToken },
           body: uploadData,
         });
         const uploaded = await uploadRes.json();
@@ -689,7 +712,10 @@ export default function PaymentSafetyPage() {
 
       const res = await fetch('/api/non-crypto-scam-database/report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-submission-token': submissionToken,
+        },
         body: JSON.stringify({
           country: data.get('country'),
           rail: data.get('rail'),
@@ -735,6 +761,7 @@ export default function PaymentSafetyPage() {
       setVerificationEmailSent(body.verificationEmailSent === true);
       setReportId(body.reportId);
       setReportStatus('success');
+      setTurnstileToken('');
       form.reset();
       setReportFiles([]);
       setUploadStatus('');
@@ -753,6 +780,8 @@ export default function PaymentSafetyPage() {
       setReportError(err.message || 'Report failed');
       setReportStatus('error');
       setUploadStatus('');
+      setTurnstileToken('');
+      setTurnstileResetKey((current) => current + 1);
     }
   }
 
@@ -1351,6 +1380,21 @@ export default function PaymentSafetyPage() {
                   <RecoveryActions rail={submittedRail} />
                 </div>
               )}
+              {reportStep === REPORT_STEP_COUNT - 1 && reportStatus !== 'success' && (
+                <section className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="mb-3 text-sm font-bold text-slate-800">{t('Security check')}</p>
+                  <TurnstileWidget
+                    key={turnstileResetKey}
+                    locale={locale}
+                    onToken={(token) => {
+                      setTurnstileToken(token);
+                      if (token) setTurnstileUnavailable(false);
+                    }}
+                    onUnavailable={() => setTurnstileUnavailable(true)}
+                    unavailableLabel={t('Security check unavailable. Refresh the page and try again.')}
+                  />
+                </section>
+              )}
               {uploadStatus && (
                 <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                   {uploadStatus}
@@ -1381,7 +1425,12 @@ export default function PaymentSafetyPage() {
                 ) : (
                   <button
                     type="submit"
-                    disabled={reportStatus === 'loading' || requiredCompleted !== requiredChecklist.length}
+                    disabled={
+                      reportStatus === 'loading'
+                      || requiredCompleted !== requiredChecklist.length
+                      || !turnstileToken
+                      || turnstileUnavailable
+                    }
                     className="btn-primary justify-center py-3 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {reportStatus === 'loading' ? <Loader2 size={17} className="animate-spin" /> : <FileText size={17} />}

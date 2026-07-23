@@ -4,6 +4,10 @@ type TranslationTable = Record<string, string>;
 
 const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTable> = {
   ru: {
+    'Security check': 'Проверка безопасности',
+    'Complete the security check before submitting.': 'Пройдите проверку безопасности перед отправкой.',
+    'Security check expired. Please try again.': 'Проверка безопасности истекла. Пройдите её ещё раз.',
+    'Security check unavailable. Refresh the page and try again.': 'Проверка безопасности недоступна. Обновите страницу и попробуйте снова.',
     'Loading your private draft': 'Загружаем ваш приватный черновик',
     'You have an unfinished private report': 'У вас есть незавершённая приватная жалоба',
     'Continue where you stopped, or start a new report. The draft is stored only in this browser.': 'Продолжите с того места, где остановились, или начните новую жалобу. Черновик хранится только в этом браузере.',
@@ -205,6 +209,10 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Reported amount': 'Заявленная сумма',
   },
   es: {
+    'Security check': 'Comprobación de seguridad',
+    'Complete the security check before submitting.': 'Completa la comprobación de seguridad antes de enviar.',
+    'Security check expired. Please try again.': 'La comprobación de seguridad caducó. Inténtalo de nuevo.',
+    'Security check unavailable. Refresh the page and try again.': 'La comprobación de seguridad no está disponible. Actualiza la página e inténtalo de nuevo.',
     'Loading your private draft': 'Cargando tu borrador privado',
     'You have an unfinished private report': 'Tienes una denuncia privada sin terminar',
     'Continue where you stopped, or start a new report. The draft is stored only in this browser.': 'Continúa donde lo dejaste o inicia una denuncia nueva. El borrador solo se guarda en este navegador.',
@@ -391,6 +399,10 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Reported amount': 'Importe denunciado',
   },
   zh: {
+    'Security check': '安全验证',
+    'Complete the security check before submitting.': '请先完成安全验证再提交。',
+    'Security check expired. Please try again.': '安全验证已过期，请重试。',
+    'Security check unavailable. Refresh the page and try again.': '安全验证暂不可用，请刷新页面后重试。',
     'Loading your private draft': '正在加载私密草稿',
     'You have an unfinished private report': '您有一份未完成的私密举报',
     'Continue where you stopped, or start a new report. The draft is stored only in this browser.': '您可以继续上次的进度，或开始新的举报。草稿仅保存在此浏览器中。',
@@ -578,6 +590,10 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Reported amount': '举报金额',
   },
   fr: {
+    'Security check': 'Vérification de sécurité',
+    'Complete the security check before submitting.': 'Effectuez la vérification de sécurité avant l’envoi.',
+    'Security check expired. Please try again.': 'La vérification de sécurité a expiré. Réessayez.',
+    'Security check unavailable. Refresh the page and try again.': 'La vérification de sécurité est indisponible. Actualisez la page et réessayez.',
     'Loading your private draft': 'Chargement de votre brouillon privé',
     'You have an unfinished private report': 'Vous avez un signalement privé inachevé',
     'Continue where you stopped, or start a new report. The draft is stored only in this browser.': 'Reprenez où vous vous êtes arrêté ou commencez un nouveau signalement. Le brouillon est conservé uniquement dans ce navigateur.',
@@ -764,6 +780,10 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Reported amount': 'Montant signalé',
   },
   ar: {
+    'Security check': 'فحص الأمان',
+    'Complete the security check before submitting.': 'أكمل فحص الأمان قبل الإرسال.',
+    'Security check expired. Please try again.': 'انتهت صلاحية فحص الأمان. حاول مرة أخرى.',
+    'Security check unavailable. Refresh the page and try again.': 'فحص الأمان غير متاح. حدّث الصفحة وحاول مرة أخرى.',
     'Loading your private draft': 'جارٍ تحميل المسودة الخاصة',
     'You have an unfinished private report': 'لديك بلاغ خاص غير مكتمل',
     'Continue where you stopped, or start a new report. The draft is stored only in this browser.': 'تابع من حيث توقفت أو ابدأ بلاغًا جديدًا. تُحفظ المسودة في هذا المتصفح فقط.',

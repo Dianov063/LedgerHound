@@ -2,6 +2,11 @@ import { NextRequest } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createHash } from 'crypto';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  abuseErrorResponse,
+  authorizeEvidenceUpload,
+  getClientIp,
+} from '@/lib/payment-report-abuse';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +30,8 @@ const MAX_SIZE = 10 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const ip = getClientIp(req.headers);
+    await authorizeEvidenceUpload(req.headers.get('x-submission-token') || '', ip);
     const rl = await checkRateLimit(ip, { name: 'non-crypto-evidence-upload', limit: 10, windowSec: 3600 });
     if (!rl.success) {
       return Response.json({ error: 'Upload rate limit exceeded.' }, { status: 429 });
@@ -59,6 +65,8 @@ export async function POST(req: NextRequest) {
 
     return Response.json({ key, fileName: file.name, fileHash });
   } catch (err) {
+    const abuseResponse = abuseErrorResponse(err);
+    if (abuseResponse) return abuseResponse;
     console.error('[non-crypto-scam-database/upload]', err);
     return Response.json({ error: 'Upload failed.' }, { status: 500 });
   }

@@ -45,9 +45,11 @@ function getUpstashLimiter(name: string, limit: number, windowSec: number): Rate
 
 // ── In-memory fallback (process-local fixed window) ──
 const memStore = new Map<string, { count: number; reset: number }>();
+const memClaims = new Map<string, number>();
 setInterval(() => {
   const now = Date.now();
   Array.from(memStore.entries()).forEach(([k, v]) => { if (v.reset <= now) memStore.delete(k); });
+  Array.from(memClaims.entries()).forEach(([k, expiresAt]) => { if (expiresAt <= now) memClaims.delete(k); });
 }, 600000).unref?.();
 
 function checkMemory(key: string, limit: number, windowSec: number): { success: boolean; remaining: number } {
@@ -92,4 +94,30 @@ export async function checkRateLimit(
     }
   }
   return { ...checkMemory(`${name}:${identifier}`, limit, windowSec), backend: 'memory' };
+}
+
+/**
+ * Atomically claim an identifier for an exact TTL. This is useful for
+ * deduplication windows where fixed-window rate limiting can admit a request
+ * immediately before and after a bucket boundary.
+ */
+export async function claimOnce(
+  identifier: string,
+  config: { name: string; ttlSec: number },
+): Promise<{ success: boolean; backend: 'upstash' | 'memory' }> {
+  const key = `claim:${config.name}:${identifier}`;
+  if (redis) {
+    try {
+      const result = await redis.set(key, '1', { nx: true, ex: config.ttlSec });
+      return { success: result === 'OK', backend: 'upstash' };
+    } catch (err) {
+      console.warn(`[rate-limit] Upstash error for claim "${config.name}", falling back to in-memory:`, err);
+    }
+  }
+
+  const now = Date.now();
+  const expiresAt = memClaims.get(key);
+  if (expiresAt && expiresAt > now) return { success: false, backend: 'memory' };
+  memClaims.set(key, now + config.ttlSec * 1000);
+  return { success: true, backend: 'memory' };
 }

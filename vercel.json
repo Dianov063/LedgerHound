@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/refresh-ofac",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/admin/cleanup-payment-safety",
+      "schedule": "20 4 * * *"
     }
   ]
 }

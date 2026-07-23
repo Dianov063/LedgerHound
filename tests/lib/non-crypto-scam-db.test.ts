@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   derivePublicLevel,
+  countAcceptedVerifiedReports,
+  isExpiredUnverifiedReport,
   evidenceFingerprint,
   hasUploadedPaymentProof,
   independentReportIds,
@@ -214,7 +216,7 @@ describe('publicView', () => {
       indexedEligible: false,
     };
 
-    const view = publicView(summary) as Record<string, unknown>;
+    const view = publicView(summary) as unknown as Record<string, unknown>;
     expect(view.reportIds).toBeUndefined();
     expect(view.independentReporterKeys).toBeUndefined();
     expect(view.identityMask).toBe('zelle phone ending 1234');
@@ -244,5 +246,32 @@ describe('publicView', () => {
 
     expect(publicView(summary).paymentMethodDetails).toEqual([]);
     expect(publicView(summary).categoryDetails).toEqual([]);
+  });
+});
+
+describe('payment report retention and public statistics', () => {
+  it('expires only unverified reports older than 48 hours', () => {
+    const now = new Date('2026-07-23T12:00:00.000Z').getTime();
+    expect(isExpiredUnverifiedReport({
+      createdAt: '2026-07-21T11:59:59.000Z',
+      reporterEmailVerifiedAt: undefined,
+    }, now)).toBe(true);
+    expect(isExpiredUnverifiedReport({
+      createdAt: '2026-07-21T11:59:59.000Z',
+      reporterEmailVerifiedAt: '2026-07-21T12:30:00.000Z',
+    }, now)).toBe(false);
+    expect(isExpiredUnverifiedReport({
+      createdAt: '2026-07-22T12:00:00.000Z',
+      reporterEmailVerifiedAt: undefined,
+    }, now)).toBe(false);
+  });
+
+  it('counts only accepted reports with verified email', () => {
+    expect(countAcceptedVerifiedReports([
+      { status: 'accepted', reporterEmailVerifiedAt: '2026-07-23T00:00:00.000Z' },
+      { status: 'accepted', reporterEmailVerifiedAt: undefined },
+      { status: 'pending', reporterEmailVerifiedAt: '2026-07-23T00:00:00.000Z' },
+      { status: 'rejected', reporterEmailVerifiedAt: '2026-07-23T00:00:00.000Z' },
+    ])).toBe(1);
   });
 });
