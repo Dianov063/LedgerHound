@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ reports: enriched, total: enriched.length });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to fetch reports' }, { status: 500 });
+    console.error('[admin/reports]', err);
+    return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 });
   }
 }

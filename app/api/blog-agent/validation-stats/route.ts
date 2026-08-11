@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     const stats = await getValidationStats(days);
     return Response.json({ ok: true, stats });
   } catch (err: any) {
-    return Response.json({ error: err.message || 'Failed to compute stats' }, { status: 500 });
+    console.error('[blog-agent/validation-stats]', err);
+    return Response.json({ error: 'Failed to compute stats' }, { status: 500 });
   }
 }

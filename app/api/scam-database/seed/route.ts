@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[seed/route] Error:', error)
-    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
+    return Response.json({ error: 'Internal error' }, { status: 500 })
   }
 }
 
@@ -55,7 +55,7 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ success: true, ...result })
   } catch (error: any) {
     console.error('[seed/route] DELETE error:', error)
-    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
+    return Response.json({ error: 'Internal error' }, { status: 500 })
   }
 }
 
@@ -94,6 +94,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[seed/route] Error:', error)
-    return Response.json({ error: error.message || 'Internal error' }, { status: 500 })
+    return Response.json({ error: 'Internal error' }, { status: 500 })
   }
 }

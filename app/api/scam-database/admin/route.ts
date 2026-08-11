@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ reports, disputes });
   } catch (err: any) {
     console.error('[scam-database/admin]', err);
-    return Response.json({ error: err.message || 'Failed' }, { status: 500 });
+    return Response.json({ error: 'Failed' }, { status: 500 });
   }
 }
 
@@ -78,6 +78,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: any) {
     console.error('[scam-database/admin]', err);
-    return Response.json({ error: err.message || 'Failed' }, { status: 500 });
+    return Response.json({ error: 'Failed' }, { status: 500 });
   }
 }

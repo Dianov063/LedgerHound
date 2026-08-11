@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[emergency/join-group] Error:', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to join group' },
+      { error: 'Failed to join group' },
       { status: 500 },
     );
   }

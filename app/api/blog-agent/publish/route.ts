@@ -159,6 +159,6 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     logger.error({ err: err.message, stack: err.stack }, '[blog-publish] Failed');
-    return Response.json({ error: err.message || 'Publish failed' }, { status: 500 });
+    return Response.json({ error: 'Publish failed' }, { status: 500 });
   }
 }

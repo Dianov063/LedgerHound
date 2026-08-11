@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
   } catch (err: any) {
     console.error('[legal-packs GET]', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -133,6 +133,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     console.error('[legal-packs POST]', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

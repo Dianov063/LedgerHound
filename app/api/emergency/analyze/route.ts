@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[emergency/analyze] Error:', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to analyze emergency case' },
+      { error: 'Failed to analyze emergency case' },
       { status: 500 },
     );
   }

@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ items: approved, total: approved.length });
   } catch (err: any) {
     logger.error({ err }, '[investigators/admin] GET failed');
-    return Response.json({ error: err.message || 'Failed to list' }, { status: 500 });
+    return Response.json({ error: 'Failed to list' }, { status: 500 });
   }
 }
 
@@ -105,6 +105,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
     logger.error({ err, action, id }, '[investigators/admin] POST failed');
-    return Response.json({ error: err.message || 'Action failed' }, { status: 500 });
+    return Response.json({ error: 'Action failed' }, { status: 500 });
   }
 }
