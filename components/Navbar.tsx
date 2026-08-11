@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { Menu, X, Globe, ChevronDown } from 'lucide-react';
@@ -66,19 +67,35 @@ export default function Navbar() {
     { href: `${prefix}/tools/exchange-letter`, label: t('exchange_letter'), badge: 'NEW' },
   ];
 
+  /* The payment side wears the warm palette, the crypto side keeps the blue.
+   * Same bar, two skins — so the visitor can tell which product they are in
+   * without reading the heading. */
+  const warm = !showToolLinks;
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b shadow-sm ${
+        warm ? 'bg-paper/95 border-clay-600/15' : 'bg-white/95 border-slate-100'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top row: logo + pages + CTA */}
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <Link href={locale === 'en' ? '/' : `/${locale}`} className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-display font-bold text-sm">LH</span>
-            </div>
-            <span className="font-display font-bold text-slate-900 text-lg">
-              Ledger<span className="text-brand-600">Hound</span>
-            </span>
+          {/* Logo — the artwork carries its own cream background, so it sits in a
+              matching card instead of showing as a pale rectangle on white. */}
+          <Link
+            href={locale === 'en' ? '/' : `/${locale}`}
+            aria-label="LedgerHound"
+            className="flex items-center shrink-0 rounded-2xl border border-clay-600/20 bg-paper px-3 py-1 shadow-sm"
+          >
+            <Image
+              src="/logo.png"
+              alt="LedgerHound"
+              width={1693}
+              height={929}
+              priority
+              className="h-9 w-[110px] object-cover object-center"
+            />
           </Link>
 
           {/* Desktop Nav - pages */}
@@ -87,7 +104,11 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className="px-3 py-1.5 text-base font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
+                className={`px-3 py-1.5 text-base font-medium rounded-lg transition-colors ${
+                  warm
+                    ? 'text-ink-muted hover:text-ink hover:bg-clay-50'
+                    : 'text-slate-600 hover:text-brand-600 hover:bg-brand-50'
+                }`}
               >
                 {link.label}
               </Link>
@@ -140,10 +161,18 @@ export default function Navbar() {
             </div>
 
             <Link
-              href={`/${locale === 'en' ? '' : locale + '/'}free-evaluation`.replace(/\/$/, '') || '/free-evaluation'}
-              className="btn-primary text-sm py-2 px-4"
+              href={
+                warm
+                  ? `${prefix}/payment-safety`
+                  : `/${locale === 'en' ? '' : locale + '/'}free-evaluation`.replace(/\/$/, '') || '/free-evaluation'
+              }
+              className={
+                warm
+                  ? 'inline-flex items-center gap-2 bg-clay-600 hover:bg-clay-700 text-white font-semibold text-sm py-2.5 px-5 rounded-full transition-colors'
+                  : 'btn-primary text-sm py-2 px-4'
+              }
             >
-              {t('cta')}
+              {warm ? t('report_scam') : t('cta')}
             </Link>
           </div>
 

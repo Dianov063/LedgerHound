@@ -36,10 +36,10 @@ export default function PaymentsHomePage() {
   const base = locale === 'en' ? '' : `/${locale}`;
 
   const rungs = [
-    { n: t('r1_n'), h: t('r1_h'), p: t('r1_p'), cls: 'bg-white border-slate-200', nCls: 'text-slate-500' },
-    { n: t('r2_n'), h: t('r2_h'), p: t('r2_p'), cls: 'bg-orange-50 border-orange-200', nCls: 'text-orange-700' },
-    { n: t('r3_n'), h: t('r3_h'), p: t('r3_p'), cls: 'bg-orange-100 border-orange-300', nCls: 'text-orange-800' },
-    { n: t('r4_n'), h: t('r4_h'), p: t('r4_p'), cls: 'bg-slate-900 border-slate-900 text-white', nCls: 'text-orange-300' },
+    { n: t('r1_n'), h: t('r1_h'), p: t('r1_p'), cls: 'bg-white border-clay-200', nCls: 'text-ink-faint' },
+    { n: t('r2_n'), h: t('r2_h'), p: t('r2_p'), cls: 'bg-clay-50 border-clay-200', nCls: 'text-clay-700' },
+    { n: t('r3_n'), h: t('r3_h'), p: t('r3_p'), cls: 'bg-clay-100 border-clay-200', nCls: 'text-clay-800' },
+    { n: t('r4_n'), h: t('r4_h'), p: t('r4_p'), cls: 'bg-ink border-ink text-white', nCls: 'text-clay-300' },
   ];
 
   const weigh = [
@@ -70,40 +70,40 @@ export default function PaymentsHomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-paper text-ink">
       <Navbar />
 
       {/* ─── HERO — the ask is a report, not a search ─── */}
-      <section className="pt-28 pb-16 lg:pt-32 lg:pb-20 bg-gradient-to-b from-orange-50/60 to-white">
+      <section className="pt-28 pb-16 lg:pt-32 lg:pb-20 bg-gradient-to-b from-clay-50 to-paper">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="inline-block text-[11px] font-bold tracking-[0.13em] text-orange-700 bg-orange-100 rounded-full px-4 py-1.5 mb-6">
+          <p className="inline-block text-[11px] font-bold tracking-[0.13em] text-clay-700 bg-clay-100 rounded-full px-4 py-1.5 mb-6">
             {t('kicker')}
           </p>
-          <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-slate-900 leading-[1.06] tracking-tight mb-5">
+          <h1 className="font-serif font-semibold text-4xl sm:text-5xl lg:text-6xl text-ink leading-[1.06] tracking-tight mb-5">
             {t('title')}
           </h1>
-          <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto mb-9">{t('lede')}</p>
+          <p className="text-lg text-ink-muted leading-relaxed max-w-2xl mx-auto mb-9">{t('lede')}</p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-7">
             <Link
               href={`${base}/payment-safety`}
-              className="bg-orange-700 hover:bg-orange-800 text-white font-semibold rounded-full px-10 py-4 transition-colors shadow-lg shadow-orange-700/25 text-center"
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-10 py-4 transition-colors shadow-lg shadow-clay-600/25 text-center"
             >
               <span className="flex items-center justify-center gap-2 text-lg">
                 {t('cta')} <ArrowRight size={19} />
               </span>
-              <span className="block text-sm font-medium text-orange-100 mt-0.5">{t('cta_sub')}</span>
+              <span className="block text-sm font-medium text-clay-50 mt-0.5">{t('cta_sub')}</span>
             </Link>
             <Link
               href="#check"
-              className="border border-slate-300 text-slate-800 font-semibold rounded-full px-8 py-4 hover:bg-slate-50 transition-colors"
+              className="border border-ink/25 text-ink font-semibold rounded-full px-8 py-4 hover:bg-sand transition-colors"
             >
               {t('secondary')}
             </Link>
           </div>
 
-          <p className="text-[15px] text-slate-500 max-w-2xl mx-auto">
-            {t('note_plain')} <span className="text-slate-900 font-semibold">{t('note_bold')}</span>
+          <p className="text-[15px] text-ink-faint max-w-2xl mx-auto">
+            {t('note_plain')} <span className="text-ink font-semibold">{t('note_bold')}</span>
           </p>
         </div>
       </section>
@@ -111,15 +111,15 @@ export default function PaymentsHomePage() {
       {/* ─── ESCALATION LADDER ─── */}
       <section className="py-16 lg:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="section-title text-3xl lg:text-4xl mb-3">{t('ladder_title')}</h2>
-          <p className="text-slate-600 max-w-2xl mb-9">{t('ladder_sub')}</p>
+          <h2 className="font-serif font-semibold text-ink text-3xl lg:text-4xl leading-tight mb-3">{t('ladder_title')}</h2>
+          <p className="text-ink-muted max-w-2xl mb-9">{t('ladder_sub')}</p>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {rungs.map((r) => (
               <div key={r.n} className={`rounded-2xl border p-6 ${r.cls}`}>
                 <span className={`block text-xs font-bold tracking-[0.1em] mb-3 ${r.nCls}`}>{r.n}</span>
                 <h3 className="font-bold text-lg mb-2 leading-snug">{r.h}</h3>
-                <p className={`text-[15px] leading-relaxed ${r.cls.includes('slate-900') ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-[15px] leading-relaxed ${r.cls.includes('bg-ink') ? 'text-clay-50/70' : 'text-ink-muted'}`}>
                   {r.p}
                 </p>
               </div>
@@ -131,45 +131,45 @@ export default function PaymentsHomePage() {
       {/* ─── LAW FIRM ESCALATION ─── */}
       <section className="pb-16 lg:pb-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 lg:p-12 shadow-sm grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-14 items-start">
+          <div className="bg-white border border-clay-200 rounded-3xl p-8 lg:p-12 shadow-sm grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-14 items-start">
             <div>
-              <h2 className="section-title text-3xl mb-4">{t('legal_title')}</h2>
-              <p className="text-slate-600 leading-relaxed mb-4">{t('legal_p1')}</p>
-              <p className="text-slate-600 leading-relaxed mb-6">
-                <span className="text-slate-900 font-semibold">{t('legal_p2_bold')}</span> {t('legal_p2')}
+              <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-4">{t('legal_title')}</h2>
+              <p className="text-ink-muted leading-relaxed mb-4">{t('legal_p1')}</p>
+              <p className="text-ink-muted leading-relaxed mb-6">
+                <span className="text-ink font-semibold">{t('legal_p2_bold')}</span> {t('legal_p2')}
               </p>
 
               <div className="grid sm:grid-cols-2 gap-3 mb-6">
                 {weigh.map((w) => (
-                  <div key={w.t} className="bg-slate-50 rounded-xl px-4 py-3">
-                    <b className="block text-[15px] text-slate-900">{w.t}</b>
-                    <span className="text-sm text-slate-500">{w.d}</span>
+                  <div key={w.t} className="bg-sand rounded-xl px-4 py-3">
+                    <b className="block text-[15px] text-ink">{w.t}</b>
+                    <span className="text-sm text-ink-faint">{w.d}</span>
                   </div>
                 ))}
               </div>
 
-              <p className="text-slate-600 leading-relaxed mb-6">{t('legal_p3')}</p>
+              <p className="text-ink-muted leading-relaxed mb-6">{t('legal_p3')}</p>
 
               <ul className="space-y-3">
                 {rules.map((r) => (
                   <li key={r.b} className="flex gap-3 text-[15px] leading-relaxed">
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-orange-700 shrink-0" />
-                    <span className="text-slate-600">
-                      <b className="text-slate-900">{r.b}</b> {r.p}
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-clay-600 shrink-0" />
+                    <span className="text-ink-muted">
+                      <b className="text-ink">{r.b}</b> {r.p}
                     </span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-6 lg:p-7">
+            <div className="bg-sand rounded-2xl p-6 lg:p-7">
               <div className="flex gap-3 items-start">
-                <span className="mt-0.5 h-6 w-6 rounded-md bg-orange-700 text-white grid place-items-center shrink-0">
+                <span className="mt-0.5 h-6 w-6 rounded-md bg-clay-600 text-white grid place-items-center shrink-0">
                   <Check size={15} strokeWidth={3} />
                 </span>
-                <span className="text-[15px] text-slate-800 leading-relaxed">{t('consent')}</span>
+                <span className="text-[15px] text-ink leading-relaxed">{t('consent')}</span>
               </div>
-              <p className="text-[13.5px] text-slate-500 leading-relaxed mt-5 pt-5 border-t border-slate-200">
+              <p className="text-[13.5px] text-ink-faint leading-relaxed mt-5 pt-5 border-t border-clay-200">
                 {t('fine')}
               </p>
             </div>
@@ -180,18 +180,18 @@ export default function PaymentsHomePage() {
       {/* ─── THE OBJECTION, ANSWERED ─── */}
       <section className="pb-16 lg:pb-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl border-l-4 border-orange-700 pl-7 py-1">
-            <p className="font-display font-semibold text-2xl text-slate-900 leading-snug mb-3">{t('objection_q')}</p>
-            <p className="text-slate-600 leading-relaxed">{t('objection_a')}</p>
+          <div className="max-w-3xl border-l-4 border-clay-600 pl-7 py-1">
+            <p className="font-serif font-semibold text-2xl text-ink leading-snug mb-3">{t('objection_q')}</p>
+            <p className="text-ink-muted leading-relaxed">{t('objection_a')}</p>
           </div>
         </div>
       </section>
 
       {/* ─── SEARCH, DEMOTED BUT PRESENT ─── */}
-      <section id="check" className="py-16 lg:py-20 bg-slate-50 scroll-mt-20">
+      <section id="check" className="py-16 lg:py-20 bg-sand scroll-mt-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="section-title text-3xl mb-3">{t('search_title')}</h2>
-          <p className="text-slate-600 mb-8">{t('search_sub')}</p>
+          <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-3">{t('search_title')}</h2>
+          <p className="text-ink-muted mb-8">{t('search_sub')}</p>
 
           <form action={`${base}/payment-safety`} className="flex flex-col sm:flex-row gap-3">
             <input
@@ -203,21 +203,21 @@ export default function PaymentsHomePage() {
             />
             <button
               type="submit"
-              className="bg-orange-700 hover:bg-orange-800 text-white font-semibold rounded-lg px-8 py-4 transition-colors whitespace-nowrap inline-flex items-center justify-center gap-2"
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-lg px-8 py-4 transition-colors whitespace-nowrap inline-flex items-center justify-center gap-2"
             >
               <Search size={17} /> {t('search_button')}
             </button>
           </form>
 
-          <p className="text-sm text-slate-400 mt-5">{RAILS.join(' · ')}</p>
+          <p className="text-sm text-ink-faint mt-5">{RAILS.join(' · ')}</p>
         </div>
       </section>
 
       {/* ─── PARTNERS: LAWYERS, BANKS, LAW ENFORCEMENT ─── */}
-      <section className="py-16 lg:py-20 bg-[#241A14] text-white">
+      <section className="py-16 lg:py-20 bg-espresso text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-bold tracking-[0.14em] text-orange-300 mb-4">{t('partners_kicker')}</p>
-          <h2 className="font-display font-bold text-3xl lg:text-4xl leading-tight max-w-3xl mb-4">
+          <p className="text-xs font-bold tracking-[0.14em] text-clay-300 mb-4">{t('partners_kicker')}</p>
+          <h2 className="font-serif font-semibold text-3xl lg:text-4xl leading-tight max-w-3xl mb-4">
             {t('partners_title')}
           </h2>
           <p className="text-[#BCAA9D] text-lg leading-relaxed max-w-3xl mb-10">{t('partners_lede')}</p>
@@ -225,7 +225,7 @@ export default function PaymentsHomePage() {
           <div className="grid md:grid-cols-3 gap-4 mb-11">
             {who.map(({ icon: Icon, t: title, d }) => (
               <div key={title} className="border border-white/15 rounded-2xl p-6">
-                <Icon size={20} className="text-orange-300 mb-3" />
+                <Icon size={20} className="text-clay-300 mb-3" />
                 <h3 className="font-bold text-lg mb-2">{title}</h3>
                 <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{d}</p>
               </div>
@@ -234,11 +234,11 @@ export default function PaymentsHomePage() {
 
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 border-t border-white/15 pt-11">
             <div>
-              <h3 className="font-display font-semibold text-2xl mb-3">{t('gate_title')}</h3>
+              <h3 className="font-serif font-semibold text-2xl mb-3">{t('gate_title')}</h3>
               <p className="text-[#BCAA9D] leading-relaxed mb-6">{t('gate_p')}</p>
-              <div className="flex gap-3 bg-orange-500/10 border border-orange-400/30 rounded-xl p-5">
-                <Info size={18} className="text-orange-300 shrink-0 mt-0.5" />
-                <span className="text-[15px] text-orange-50/90 leading-relaxed">{t('gate_warn')}</span>
+              <div className="flex gap-3 bg-clay-300/15 border border-clay-300/35 rounded-xl p-5">
+                <Info size={18} className="text-clay-300 shrink-0 mt-0.5" />
+                <span className="text-[15px] text-clay-50/90 leading-relaxed">{t('gate_warn')}</span>
               </div>
             </div>
 
@@ -248,7 +248,7 @@ export default function PaymentsHomePage() {
                   key={s.b}
                   className={`flex gap-4 py-4 ${i < vsteps.length - 1 ? 'border-b border-white/10' : ''}`}
                 >
-                  <span className="h-7 w-7 rounded-full bg-orange-700 text-white grid place-items-center text-sm font-bold shrink-0">
+                  <span className="h-7 w-7 rounded-full bg-clay-600 text-white grid place-items-center text-sm font-bold shrink-0">
                     {i + 1}
                   </span>
                   <span>
@@ -262,12 +262,12 @@ export default function PaymentsHomePage() {
 
           <div className="grid md:grid-cols-2 gap-4 border-t border-white/15 mt-11 pt-11">
             <div className="border border-white/15 rounded-2xl p-6">
-              <span className="block text-xs font-bold tracking-[0.11em] text-orange-300 mb-3">{t('tier1_lvl')}</span>
+              <span className="block text-xs font-bold tracking-[0.11em] text-clay-300 mb-3">{t('tier1_lvl')}</span>
               <h4 className="font-bold text-lg mb-2">{t('tier1_h')}</h4>
               <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{t('tier1_p')}</p>
             </div>
             <div className="border border-white/15 rounded-2xl p-6">
-              <span className="block text-xs font-bold tracking-[0.11em] text-orange-300 mb-3">{t('tier2_lvl')}</span>
+              <span className="block text-xs font-bold tracking-[0.11em] text-clay-300 mb-3">{t('tier2_lvl')}</span>
               <h4 className="font-bold text-lg mb-2">{t('tier2_h')}</h4>
               <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{t('tier2_p')}</p>
             </div>
@@ -276,7 +276,7 @@ export default function PaymentsHomePage() {
           <div className="flex flex-wrap items-center gap-5 border-t border-white/15 mt-11 pt-9">
             <Link
               href={`${base}/contact`}
-              className="bg-orange-700 hover:bg-orange-800 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2"
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2"
             >
               {t('partners_cta')} <ArrowRight size={18} />
             </Link>
@@ -291,7 +291,7 @@ export default function PaymentsHomePage() {
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-brand-300 mb-3">{t('fork_kicker')}</p>
             <h2 className="font-display font-bold text-3xl lg:text-4xl mb-3">{t('fork_title')}</h2>
-            <p className="text-slate-400 text-lg leading-relaxed max-w-2xl">{t('fork_p')}</p>
+            <p className="text-ink-faint text-lg leading-relaxed max-w-2xl">{t('fork_p')}</p>
           </div>
           <Link
             href={`${base}/crypto`}
@@ -305,20 +305,20 @@ export default function PaymentsHomePage() {
       {/* ─── FINAL CTA ─── */}
       <section className="py-16 lg:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-orange-50 border border-orange-100 rounded-3xl p-8 lg:p-12 flex flex-wrap gap-8 items-center justify-between">
+          <div className="bg-sand border border-clay-200 rounded-3xl p-8 lg:p-12 flex flex-wrap gap-8 items-center justify-between">
             <div>
-              <h2 className="section-title text-3xl mb-2">{t('final_title')}</h2>
-              <p className="text-slate-600 max-w-xl leading-relaxed">{t('final_p')}</p>
+              <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-2">{t('final_title')}</h2>
+              <p className="text-ink-muted max-w-xl leading-relaxed">{t('final_p')}</p>
             </div>
             <Link
               href={`${base}/payment-safety`}
-              className="bg-orange-700 hover:bg-orange-800 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
             >
               {t('cta')} <ArrowRight size={18} />
             </Link>
           </div>
 
-          <p className="flex items-center justify-center gap-2 text-sm text-slate-400 mt-8">
+          <p className="flex items-center justify-center gap-2 text-sm text-ink-faint mt-8">
             <Lock size={13} /> <ShieldCheck size={13} /> {t('note_plain')}
           </p>
         </div>

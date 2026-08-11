@@ -11,8 +11,32 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         display: ['var(--font-manrope)', 'sans-serif'],
+        // Editorial serif — headlines on the payment side only. Crypto keeps `display`.
+        serif: ['var(--font-lora)', 'Georgia', 'serif'],
       },
       colors: {
+        /* ── Payment product palette ──
+         * A second, warmer scale that lives beside `brand` rather than replacing
+         * it. Crypto pages keep the blue; the payment front door uses these. Two
+         * products, two palettes, one brand — and no need to touch the ~1345
+         * existing brand-* utilities to introduce it. */
+        paper: '#F6F2EA',
+        sand: '#EFE9DE',
+        espresso: '#241A14',
+        ink: {
+          DEFAULT: '#2B2019',
+          muted: '#6E6154',
+          faint: '#9C8F82',
+        },
+        clay: {
+          50: '#FBF1EC',
+          100: '#F6E3DC',
+          200: '#EBD6CB',
+          300: '#E0916A',
+          600: '#B4552F',
+          700: '#9E4826',
+          800: '#8E3A18',
+        },
         brand: {
           50: '#eff8ff',
           100: '#dbeffe',
