@@ -38,13 +38,21 @@ export default function Navbar() {
   };
 
   const prefix = locale === 'en' ? '' : `/${locale}`;
+  /* The first two links are the visitor's two states — hasn't paid yet, already
+   * paid. The third is the other product. Everything else is one level down. */
   const navLinks = [
-    { href: `${prefix}/services`, label: t('services') },
-    { href: `${prefix}/cases`, label: t('cases') },
+    { href: `${prefix}/payment-safety`, label: t('report_scam') },
+    { href: `${prefix}/payment-safety#check`, label: t('check_recipient') },
+    { href: `${prefix}/crypto`, label: t('crypto_recovery') },
     { href: `${prefix}/pricing`, label: t('pricing') },
-    { href: `${prefix}/about`, label: t('about') },
     { href: `${prefix}/blog`, label: t('blog') },
   ];
+
+  /* The tools row is crypto-side furniture. Hiding it on the payment pages keeps
+   * the front door to a single row, and showing it everywhere else means no tool
+   * is orphaned — they are still the only navigation those pages have. */
+  const pathNoLocale = pathname.replace(/^\/(ru|es|zh|fr|ar)(?=\/|$)/, '') || '/';
+  const showToolLinks = pathNoLocale !== '/' && !pathNoLocale.startsWith('/payment-');
   const toolLinks = [
     { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: undefined },
     { href: `${prefix}/graph-tracer`, label: t('graph'), badge: undefined },
@@ -150,8 +158,8 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Bottom row: tools (compact) */}
-        <div className="hidden md:flex items-center justify-center gap-1 border-t border-slate-100 py-1.5">
+        {/* Bottom row: tools (compact) — crypto side only */}
+        <div className={`${showToolLinks ? 'hidden md:flex' : 'hidden'} items-center justify-center gap-1 border-t border-slate-100 py-1.5`}>
           {toolLinks.map((link) => (
             <Link
               key={link.href}

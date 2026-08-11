@@ -7,6 +7,9 @@ const baseUrl = 'https://www.ledgerhound.vip';
 
 const pages = [
   { path: '', priority: 1.0, changeFreq: 'weekly' },
+  /* The crypto landing page. Same content that used to sit at '/', now on its
+   * own URL so the payment product can own the front door. */
+  { path: '/crypto', priority: 0.9, changeFreq: 'weekly' },
   { path: '/services', priority: 0.9, changeFreq: 'weekly' },
   { path: '/services/crypto-tracing', priority: 0.9, changeFreq: 'weekly' },
   { path: '/services/romance-scams', priority: 0.9, changeFreq: 'weekly' },
