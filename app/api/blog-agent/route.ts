@@ -1,6 +1,7 @@
 import { getValidPathsForPrompt, getValidBlogSlugs } from '@/lib/blog/valid-internal-paths';
 import { validateAndCleanArticle } from '@/lib/blog/validate-article';
 import { logValidationEvent } from '@/lib/blog/validation-log';
+import { requireAdmin } from '@/lib/admin-auth';
 
 /**
  * Build the system prompt. Whitelist sections are computed at request time
@@ -334,6 +335,11 @@ async function callDeepSeek(systemPrompt: string, userPrompt: string, maxTokens 
 }
 
 export async function POST(request: Request) {
+  // Admin-only: every mode calls a paid LLM (DeepSeek) and/or Tavily research.
+  // Without this gate anyone could drain those API budgets.
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   if (!process.env.DEEPSEEK_API_KEY) {
     return Response.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 });
   }

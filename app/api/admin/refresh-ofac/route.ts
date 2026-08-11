@@ -14,7 +14,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+/** Constant-time equality; false on length mismatch without leaking via timing. */
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 const ASSETS = ['ETH', 'XBT', 'TRX', 'SOL', 'USDC', 'USDT'] as const;
 type Asset = (typeof ASSETS)[number];
@@ -44,13 +53,13 @@ async function fetchAssetList(asset: Asset): Promise<string[]> {
 function isAuthorized(req: NextRequest): boolean {
   // Vercel Cron sends the secret in the Authorization header.
   const cronSecret = process.env.CRON_SECRET;
-  const auth = req.headers.get('Authorization');
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
+  const auth = req.headers.get('Authorization') || '';
+  if (cronSecret && safeEqual(auth, `Bearer ${cronSecret}`)) return true;
 
   // Manual admin fallback.
   const adminPw = process.env.ADMIN_PASSWORD;
-  const adminToken = req.headers.get('X-Admin-Token');
-  if (adminPw && adminToken === adminPw) return true;
+  const adminToken = req.headers.get('X-Admin-Token') || '';
+  if (adminPw && safeEqual(adminToken, adminPw)) return true;
 
   return false;
 }

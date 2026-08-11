@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getResearch, getPipelineStatus, getGeneratedPdfUrl } from '@/lib/legal-packs/s3';
 import { COUNTRIES } from '@/lib/legal-packs/countries';
 import type { CountryStatus } from '@/lib/legal-packs/types';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
   // It MUST require the same admin auth as POST — otherwise anyone can pull
   // signed URLs and research data. The admin UI already sends x-admin-key on
   // every GET call, so this does not break it.
-  const authError = checkAdmin(req);
+  const authError = await requireAdmin(req);
   if (authError) return authError;
 
   try {
@@ -82,16 +83,8 @@ export async function GET(req: NextRequest) {
 
 // ── POST /api/legal-packs ──
 
-function checkAdmin(req: NextRequest): NextResponse | null {
-  const key = req.headers.get('x-admin-key');
-  if (!key || key !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
-
 export async function POST(req: NextRequest) {
-  const authError = checkAdmin(req);
+  const authError = await requireAdmin(req);
   if (authError) return authError;
 
   try {

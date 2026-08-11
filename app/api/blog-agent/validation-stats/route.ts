@@ -14,15 +14,14 @@
 
 import { NextRequest } from 'next/server';
 import { getValidationStats } from '@/lib/blog/validation-log';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  const adminKey = req.headers.get('x-admin-key');
-  if (!process.env.ADMIN_PASSWORD || adminKey !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const daysParam = url.searchParams.get('days');

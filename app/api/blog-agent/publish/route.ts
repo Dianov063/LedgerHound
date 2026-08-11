@@ -13,6 +13,7 @@ import { renderContentFile, contentComponentName } from '@/lib/blog-render/rende
 import { renderPageFile, renderLayoutFile } from '@/lib/blog-render/templates';
 import { updateBlogIndex } from '@/lib/blog-render/updaters';
 import { commitFiles, getFileContent } from '@/lib/github/commit';
+import { requireAdmin } from '@/lib/admin-auth';
 import type { BlogArticle, BlogArticleTranslations, BlogLocale } from '@/lib/blog-render/schema';
 
 export const maxDuration = 60;
@@ -43,11 +44,8 @@ function pascalCaseFromSlug(slug: string): string {
 }
 
 export async function POST(request: Request) {
-  // Auth
-  const adminKey = request.headers.get('x-admin-key');
-  if (!process.env.ADMIN_PASSWORD || adminKey !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
 
   // Required env
   if (!process.env.GITHUB_TOKEN) {
