@@ -61,6 +61,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('[investigators/list] error:', err);
-    return Response.json({ error: err.message || 'Failed to list investigators' }, { status: 500 });
+    return Response.json({ error: 'Failed to list investigators' }, { status: 500 });
   }
 }

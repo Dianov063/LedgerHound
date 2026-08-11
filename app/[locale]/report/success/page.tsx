@@ -54,6 +54,20 @@ function ReportSuccessContent() {
   });
   const [pollCount, setPollCount] = useState(0);
 
+  // Strip sensitive query params (session_id, email) from the address bar after
+  // they are captured into state above. Keeps them out of browser history, the
+  // Referer header, and analytics page_location. Polling still uses the captured
+  // `sessionId` const, so this does not interrupt status checks.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+    for (const p of ['session_id', 'email', 'download', 'caseId']) {
+      if (url.searchParams.has(p)) { url.searchParams.delete(p); changed = true; }
+    }
+    if (changed) window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }, []);
+
   const checkStatus = useCallback(async () => {
     if (!sessionId || reportStatus.status === 'ready') return;
     try {

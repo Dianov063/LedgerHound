@@ -1,4 +1,5 @@
 import React from 'react';
+import { randomBytes } from 'crypto';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { sendReport } from './sendReport';
 import { backfillBlockTimestamps } from './backfill-timestamps';
@@ -1066,7 +1067,9 @@ export async function generateReport(
   const nativeCurrency = NATIVE_CURRENCY[network] || 'ETH';
   // Only lowercase for EVM addresses
   const address = ['btc', 'sol', 'trx'].includes(network) ? walletAddress : walletAddress.toLowerCase();
-  const caseId = `LH-${Date.now().toString(36).toUpperCase()}`;
+  // Unguessable caseId: report download URLs are keyed on it, so a timestamp-only
+  // id would be enumerable. 64-bit random suffix prevents brute-force.
+  const caseId = `LH-${Date.now().toString(36).toUpperCase()}-${randomBytes(8).toString('hex')}`;
   const date = new Date().toISOString().split('T')[0];
 
   logger.info({ network, address }, '[generateReport] Starting report');

@@ -633,6 +633,7 @@ export async function POST(req: NextRequest) {
       activeNetworks,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Trace failed' }, { status: 500 });
+    console.error('[trace-graph] Trace error:', err);
+    return NextResponse.json({ error: 'Trace failed' }, { status: 500 });
   }
 }
