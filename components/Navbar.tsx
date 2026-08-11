@@ -67,34 +67,27 @@ export default function Navbar() {
     { href: `${prefix}/tools/exchange-letter`, label: t('exchange_letter'), badge: 'NEW' },
   ];
 
-  /* The payment side wears the warm palette, the crypto side keeps the blue.
-   * Same bar, two skins — so the visitor can tell which product they are in
-   * without reading the heading. */
-  const warm = !showToolLinks;
+  /* One palette site-wide now, so the bar no longer changes skin by route.
+   * `onPaymentSide` only decides which call to action belongs here. */
+  const onPaymentSide = !showToolLinks;
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b shadow-sm ${
-        warm ? 'bg-paper/95 border-clay-600/15' : 'bg-white/95 border-slate-100'
-      }`}
-    >
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b shadow-sm bg-paper/95 border-clay-600/15">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top row: logo + pages + CTA */}
-        <div className="flex items-center justify-between h-14">
-          {/* Logo — the artwork carries its own cream background, so it sits in a
-              matching card instead of showing as a pale rectangle on white. */}
+        <div className="flex items-center justify-between h-16">
           <Link
             href={locale === 'en' ? '/' : `/${locale}`}
             aria-label="LedgerHound"
-            className="flex items-center shrink-0 rounded-2xl border border-clay-600/20 bg-paper px-3 py-1 shadow-sm"
+            className="flex items-center shrink-0"
           >
             <Image
-              src="/logo.png"
+              src="/logo-transparent.png"
               alt="LedgerHound"
-              width={1693}
-              height={929}
+              width={1497}
+              height={545}
               priority
-              className="h-9 w-[110px] object-cover object-center"
+              className="h-12 w-[132px] object-contain sm:h-14 sm:w-[154px]"
             />
           </Link>
 
@@ -104,11 +97,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className={`px-3 py-1.5 text-base font-medium rounded-lg transition-colors ${
-                  warm
-                    ? 'text-ink-muted hover:text-ink hover:bg-clay-50'
-                    : 'text-slate-600 hover:text-brand-600 hover:bg-brand-50'
-                }`}
+                className="px-3 py-1.5 text-base font-medium rounded-lg transition-colors text-ink-muted hover:text-ink hover:bg-clay-50"
               >
                 {link.label}
               </Link>
@@ -162,17 +151,13 @@ export default function Navbar() {
 
             <Link
               href={
-                warm
+                onPaymentSide
                   ? `${prefix}/payment-safety`
                   : `/${locale === 'en' ? '' : locale + '/'}free-evaluation`.replace(/\/$/, '') || '/free-evaluation'
               }
-              className={
-                warm
-                  ? 'inline-flex items-center gap-2 bg-clay-600 hover:bg-clay-700 text-white font-semibold text-sm py-2.5 px-5 rounded-full transition-colors'
-                  : 'btn-primary text-sm py-2 px-4'
-              }
+              className="inline-flex items-center gap-2 bg-clay-600 hover:bg-clay-700 text-white font-semibold text-sm py-2.5 px-5 rounded-full transition-colors"
             >
-              {warm ? t('report_scam') : t('cta')}
+              {onPaymentSide ? t('report_scam') : t('cta')}
             </Link>
           </div>
 

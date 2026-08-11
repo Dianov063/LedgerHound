@@ -89,7 +89,7 @@ export default async function LocaleLayout({
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`${inter.variable} ${manrope.variable} ${lora.variable}`}
     >
-      <body className="font-sans antialiased bg-white text-slate-900">
+      <body className="font-sans antialiased bg-paper text-ink">
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

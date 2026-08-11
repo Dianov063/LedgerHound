@@ -285,17 +285,20 @@ export default function PaymentsHomePage() {
         </div>
       </section>
 
-      {/* ─── CRYPTO FORK — a different world on purpose ─── */}
-      <section className="py-16 bg-slate-950 text-white">
+      {/* ─── CRYPTO FORK ───
+          Colour no longer separates the two products — the site is one palette
+          now — so the fork leans on contrast instead: the only dark band on an
+          otherwise light page. */}
+      <section className="py-16 bg-espresso text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-8 items-center justify-between">
           <div>
-            <p className="text-xs font-bold tracking-[0.14em] text-brand-300 mb-3">{t('fork_kicker')}</p>
-            <h2 className="font-display font-bold text-3xl lg:text-4xl mb-3">{t('fork_title')}</h2>
-            <p className="text-ink-faint text-lg leading-relaxed max-w-2xl">{t('fork_p')}</p>
+            <p className="text-xs font-bold tracking-[0.14em] text-clay-300 mb-3">{t('fork_kicker')}</p>
+            <h2 className="font-serif font-semibold text-3xl lg:text-4xl mb-3">{t('fork_title')}</h2>
+            <p className="text-[#BCAA9D] text-lg leading-relaxed max-w-2xl">{t('fork_p')}</p>
           </div>
           <Link
             href={`${base}/crypto`}
-            className="bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-full px-8 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+            className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-8 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
           >
             {t('fork_button')} <ArrowRight size={18} />
           </Link>

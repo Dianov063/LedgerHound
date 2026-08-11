@@ -15,11 +15,17 @@ const config: Config = {
         serif: ['var(--font-lora)', 'Georgia', 'serif'],
       },
       colors: {
-        /* ── Payment product palette ──
-         * A second, warmer scale that lives beside `brand` rather than replacing
-         * it. Crypto pages keep the blue; the payment front door uses these. Two
-         * products, two palettes, one brand — and no need to touch the ~1345
-         * existing brand-* utilities to introduce it. */
+        /* ── One palette for the whole site ──
+         *
+         * `brand` and `slate` are remapped in place rather than replaced at the
+         * call site. Every existing utility — roughly 1345 brand-* and 3387
+         * slate-* across 104 files — turns warm without a single one of them
+         * being edited, and any page written before this change inherits it.
+         *
+         * That means the ramps have to stay complete and monotonic: pages use
+         * brand-50 tints, brand-600 fills, brand-200 text on brand-800 panels
+         * and 600→800 gradients, so every step has to keep working in the role
+         * its blue counterpart played. */
         paper: '#F6F2EA',
         sand: '#EFE9DE',
         espresso: '#241A14',
@@ -28,30 +34,48 @@ const config: Config = {
           muted: '#6E6154',
           faint: '#9C8F82',
         },
+        // Terracotta, the single accent. `clay` and `brand` are the same ramp —
+        // `clay` reads clearer in new code, `brand` keeps the old code working.
         clay: {
           50: '#FBF1EC',
           100: '#F6E3DC',
           200: '#EBD6CB',
           300: '#E0916A',
+          400: '#CE7048',
+          500: '#C05F35',
           600: '#B4552F',
           700: '#9E4826',
           800: '#8E3A18',
+          900: '#6F2E14',
+          950: '#40190B',
         },
         brand: {
-          50: '#eff8ff',
-          100: '#dbeffe',
-          200: '#bfe3fd',
-          300: '#93d1fb',
-          400: '#60b8f8',
-          500: '#3b9bf4',
-          600: '#1a7de9',
-          700: '#1565d6',
-          800: '#1751ad',
-          900: '#194588',
-          950: '#142b54',
+          50: '#FBF1EC',
+          100: '#F6E3DC',
+          200: '#EBD6CB',
+          300: '#E0916A',
+          400: '#CE7048',
+          500: '#C05F35',
+          600: '#B4552F',
+          700: '#9E4826',
+          800: '#8E3A18',
+          900: '#6F2E14',
+          950: '#40190B',
         },
+        // Warm neutrals in place of Tailwind's blue-grey slate. Without this the
+        // accent would be terracotta while every paragraph stayed cold.
         slate: {
-          950: '#0a0f1e',
+          50: '#FAF7F2',
+          100: '#F3EEE6',
+          200: '#E7DFD3',
+          300: '#D5C9B9',
+          400: '#A99B8A',
+          500: '#857868',
+          600: '#6E6154',
+          700: '#574C41',
+          800: '#3D352C',
+          900: '#2B2019',
+          950: '#1A130E',
         },
       },
       animation: {
