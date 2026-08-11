@@ -1,29 +1,19 @@
 import { NextRequest } from 'next/server';
 import { getAddressIndex } from '@/lib/scam-db';
 import { getScamCheckView } from '@/lib/known-entities';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // 2026-05-20: Local KNOWN_ENTITIES removed. Source of truth is now
 // `lib/known-entities.ts` — accessed via `getScamCheckView()` which
 // returns { label, type, category }. See that file's header for the
 // fabricated-entry cleanup audit trail (docs/removed-fabricated-entries.md).
 
-/* ── Rate limiting ── */
-const RATE_LIMIT_WINDOW = 3600000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
-
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 30) {
-        return Response.json({ error: 'Rate limit exceeded' }, { status: 429 });
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    const rl = await checkRateLimit(ip, { name: 'scam-check', limit: 30, windowSec: 3600 });
+    if (!rl.success) {
+      return Response.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
     const { address } = await req.json();
@@ -176,6 +166,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('[scam-check]', err);
-    return Response.json({ error: err.message || 'Check failed' }, { status: 500 });
+    return Response.json({ error: 'Check failed' }, { status: 500 });
   }
 }

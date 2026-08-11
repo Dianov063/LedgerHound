@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -70,25 +71,13 @@ async function s3Put(key: string, data: any): Promise<void> {
   );
 }
 
-/* ── Rate limiter: 3/hour per IP ── */
-const rateLimit = new Map<string, { count: number; reset: number }>();
-
 export async function POST(req: NextRequest) {
   try {
-    /* ── Rate limiting ── */
+    /* ── Rate limiting (distributed via Upstash) ── */
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 3) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded. Try again later.' },
-          { status: 429 },
-        );
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+    const rl = await checkRateLimit(ip, { name: 'emergency-join-group', limit: 3, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
     }
 
     /* ── Parse body ── */

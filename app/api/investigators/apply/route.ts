@@ -18,16 +18,9 @@ import {
   type Specialization,
 } from '@/lib/investigators/schema';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const maxDuration = 30;
-
-/* Rate limit: 3 applications/hour per IP */
-const RATE_LIMIT_WINDOW = 3_600_000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => {
-  const now = Date.now();
-  Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); });
-}, 600_000);
 
 function isEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
@@ -41,17 +34,11 @@ const VALID_CERTS = new Set(CERTIFICATIONS.map((c) => c.value));
 const VALID_SPECS = new Set(SPECIALIZATIONS);
 
 export async function POST(req: NextRequest) {
-  /* Rate limit */
+  /* Rate limit: 3 applications/hour per IP (distributed via Upstash) */
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-  const now = Date.now();
-  const entry = rateLimit.get(ip);
-  if (entry && entry.reset > now) {
-    if (entry.count >= 3) {
-      return Response.json({ error: 'Too many applications. Try again later.' }, { status: 429 });
-    }
-    entry.count++;
-  } else {
-    rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+  const rl = await checkRateLimit(ip, { name: 'investigator-apply', limit: 3, windowSec: 3600 });
+  if (!rl.success) {
+    return Response.json({ error: 'Too many applications. Try again later.' }, { status: 429 });
   }
 
   let body: InvestigatorApplication;

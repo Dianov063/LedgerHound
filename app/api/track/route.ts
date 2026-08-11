@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { fetchBtcTransfers } from '@/lib/bitcoin-tracker';
 import { fetchSolTransfers } from '@/lib/solana-tracker';
 import { fetchTronTransfers } from '@/lib/tron-tracker';
@@ -181,6 +182,12 @@ async function fetchTransfersForNetwork(
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const rl = await checkRateLimit(ip, { name: 'track', limit: 30, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+    }
+
     const body = await req.json();
     const { addresses: rawAddresses, network: rawNetwork } = body;
     const network: Network = rawNetwork || 'eth';

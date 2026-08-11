@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getPlatformIndex, slugify } from '@/lib/scam-db';
 import type { PlatformIndexEntry } from '@/lib/scam-db';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,9 +19,6 @@ const getS3 = () =>
   });
 
 const bucket = () => process.env.AWS_S3_BUCKET!;
-
-/* ── Rate limiter: 5/hour per IP ── */
-const rateLimit = new Map<string, { count: number; reset: number }>();
 
 /* ── Known exchange addresses for destination detection ── */
 const KNOWN_EXCHANGES: Record<string, string> = {
@@ -40,21 +39,13 @@ const MIXER_KEYWORDS = ['tornado', 'mixer', 'blender', 'wasabi', 'chipmixer', 's
 
 export async function POST(req: NextRequest) {
   try {
-    /* ── Rate limiting ── */
+    /* ── Rate limiting (distributed via Upstash) ── */
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 5) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded. Try again later.' },
-          { status: 429 },
-        );
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + 3600000 });
+    const rl = await checkRateLimit(ip, { name: 'emergency-analyze', limit: 5, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
     }
+    const now = Date.now();
 
     /* ── Parse body ── */
     const {
@@ -166,7 +157,10 @@ export async function POST(req: NextRequest) {
           : 'Limited recovery potential';
 
     /* ── Generate case ID and save to S3 ── */
-    const caseId = `ER-${Date.now().toString(36).toUpperCase()}`;
+    // caseId must be UNGUESSABLE: it is the sole access token for /api/emergency/status,
+    // which returns presigned PDF links + the victim's email. A timestamp-only id was
+    // enumerable. The random suffix (64 bits) makes brute-force infeasible.
+    const caseId = `ER-${Date.now().toString(36).toUpperCase()}-${randomBytes(8).toString('hex')}`;
 
     const caseData = {
       caseId,

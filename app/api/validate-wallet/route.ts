@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { checkRateLimit } from '@/lib/rate-limit';
 import logger from '@/lib/logger';
 
 function getAlchemyKey(): string {
@@ -142,6 +143,12 @@ async function validateTRON(address: string) {
 /* ── Route handler ── */
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const rl = await checkRateLimit(ip, { name: 'validate-wallet', limit: 60, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+    }
+
     const { address, network } = await req.json();
 
     if (!address || typeof address !== 'string') {

@@ -1,26 +1,17 @@
 import { NextRequest } from 'next/server';
 import { saveDispute } from '@/lib/scam-db';
 import { sendDisputeEmails } from '@/lib/dispute-emails';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const RATE_LIMIT_WINDOW = 3600000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); }); }, 600000);
-
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const now = Date.now();
-    const entry = rateLimit.get(ip);
-    if (entry && entry.reset > now) {
-      if (entry.count >= 5) {
-        return Response.json({ error: 'Rate limit exceeded. Try again in 1 hour.' }, { status: 429 });
-      }
-      entry.count++;
-    } else {
-      rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+    const rl = await checkRateLimit(ip, { name: 'scam-dispute', limit: 5, windowSec: 3600 });
+    if (!rl.success) {
+      return Response.json({ error: 'Rate limit exceeded. Try again in 1 hour.' }, { status: 429 });
     }
 
     const body = await req.json();
@@ -66,6 +57,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('[scam-database/dispute]', err);
-    return Response.json({ error: err.message || 'Failed to submit dispute' }, { status: 500 });
+    return Response.json({ error: 'Failed to submit dispute' }, { status: 500 });
   }
 }
