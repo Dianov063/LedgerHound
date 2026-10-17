@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { CASE_ID_RE, verifyCaseSecret } from '@/lib/emergency-case-access';
 
 const getS3 = () =>
   new S3Client({
@@ -23,7 +24,6 @@ const getStripe = () => {
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 
-/* ── Rate limiter: 5/hour per IP ── */
 /* ── Product definitions ── */
 const PRODUCTS = {
   emergency_pack: {
@@ -39,6 +39,29 @@ const PRODUCTS = {
 } as const;
 
 type ProductKey = keyof typeof PRODUCTS;
+
+/** Loads the case written by emergency/analyze; null when it does not exist. */
+async function loadCase(caseId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const resp = await getS3().send(
+      new GetObjectCommand({ Bucket: s3Bucket(), Key: `emergency-cases/${caseId}.json` }),
+    );
+    const body = await resp.Body?.transformToString();
+    return body ? JSON.parse(body) : null;
+  } catch (err: unknown) {
+    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) return null;
+    throw err;
+  }
+}
+
+/** True once the webhook has generated documents for this case (it is paid). */
+async function hasGeneratedPack(caseId: string): Promise<boolean> {
+  const list = await getS3().send(
+    new ListObjectsV2Command({ Bucket: s3Bucket(), Prefix: `legal-packs/cases/${caseId}/`, MaxKeys: 1 }),
+  );
+  return (list.KeyCount ?? list.Contents?.length ?? 0) > 0;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +80,7 @@ export async function POST(req: NextRequest) {
     const {
       product,
       caseId,
+      caseSecret,
       email,
       country,
       walletAddress,
@@ -90,8 +114,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing caseId' }, { status: 400 });
     }
 
+    // Only cases created by the current emergency/analyze can be checked out.
+    // This rejects legacy, enumerable timestamp-only ids outright.
+    if (typeof caseId !== 'string' || !CASE_ID_RE.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+    }
+
+    /* ── Ownership: only the browser that created the case may write to it ── */
+    const existing = await loadCase(caseId);
+    if (!existing || !verifyCaseSecret(caseSecret, existing.ownerSecretHash)) {
+      logger.warn({ caseId, exists: !!existing }, '[emergency/checkout] Case ownership check failed');
+      return NextResponse.json({ error: 'Case not found or access denied' }, { status: 403 });
+    }
+
+    // A paid case is immutable: its documents were generated from this data.
+    if (await hasGeneratedPack(caseId)) {
+      return NextResponse.json({ error: 'This case has already been completed.' }, { status: 409 });
     }
 
     const productDef = PRODUCTS[product as ProductKey];
@@ -99,7 +141,10 @@ export async function POST(req: NextRequest) {
     /* ── Save full case data to S3 for webhook retrieval ── */
     try {
       const casePayload = {
+        // Keep analyze's fields (analysis, createdAt, ...) and its owner hash.
+        ...existing,
         caseId,
+        ownerSecretHash: existing.ownerSecretHash,
         product,
         email,
         country: country || '',
@@ -178,9 +223,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     logger.error({ err }, '[emergency/checkout] Error');
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to create checkout session' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
   }
 }

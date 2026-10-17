@@ -69,25 +69,42 @@ export default function EmergencySuccessPage() {
 function EmergencySuccessContent() {
   const t = useTranslations('emergency_success');
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id') || '';
-  const caseId = searchParams.get('case_id') || '';
   const product = searchParams.get('product') || '';
   const victims = searchParams.get('victims') || '';
   const totalLoss = searchParams.get('total_loss') || '';
   const platformSlug = searchParams.get('platform_slug') || '';
+  const [access, setAccess] = useState({
+    sessionId: searchParams.get('session_id') || '',
+    caseId: searchParams.get('case_id') || '',
+  });
+  const { sessionId, caseId } = access;
 
-  // Strip the sensitive bearer params (session_id, case_id) from the address bar
-  // after capture. case_id grants access to the pack's presigned PDF links via
-  // /api/emergency/status, so it must not linger in history / Referer / analytics.
-  // Child components already received `caseId` as a prop, so polling is unaffected.
+  // /api/emergency/status only answers for the PAID Stripe session that bought
+  // the case, so the session id travels with the case id. Keep both in
+  // sessionStorage (this tab only) so a reload still works, then strip them
+  // from the address bar to keep them out of history / Referer / analytics.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const KEY = 'lh_emergency_access';
+    try {
+      if (access.sessionId && access.caseId) {
+        sessionStorage.setItem(KEY, JSON.stringify(access));
+      } else {
+        const stored = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+        if (stored && typeof stored.caseId === 'string' && typeof stored.sessionId === 'string') {
+          setAccess({ caseId: stored.caseId, sessionId: stored.sessionId });
+        }
+      }
+    } catch {
+      // Storage unavailable (private mode): the current page load still works.
+    }
     const url = new URL(window.location.href);
     let changed = false;
     for (const p of ['session_id', 'case_id']) {
       if (url.searchParams.has(p)) { url.searchParams.delete(p); changed = true; }
     }
     if (changed) window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -96,7 +113,7 @@ function EmergencySuccessContent() {
 
       <main className="pt-32 pb-20 px-4">
         <div className="max-w-2xl mx-auto">
-          {product === 'emergency_pack' && <EmergencyPackSuccess caseId={caseId} />}
+          {product === 'emergency_pack' && <EmergencyPackSuccess caseId={caseId} sessionId={sessionId} />}
           {product === 'summary_report' && (
             <SummaryReportSuccess caseId={caseId} platformSlug={platformSlug} />
           )}
@@ -115,16 +132,24 @@ function EmergencySuccessContent() {
 /* ══════════════════════════════════════════════════════════════
    EMERGENCY PACK SUCCESS — polling + downloads + upsell
    ══════════════════════════════════════════════════════════════ */
-function EmergencyPackSuccess({ caseId }: { caseId: string }) {
+function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId: string }) {
   const t = useTranslations('emergency_success');
   const [pack, setPack] = useState<PackStatus | null>(null);
   const [polling, setPolling] = useState(true);
   const [elapsed, setElapsed] = useState(0);
 
   const fetchStatus = useCallback(async () => {
-    if (!caseId) return;
+    if (!caseId || !sessionId) return;
     try {
-      const res = await fetch(`/api/emergency/status?case_id=${encodeURIComponent(caseId)}`);
+      const res = await fetch(
+        `/api/emergency/status?case_id=${encodeURIComponent(caseId)}&session_id=${encodeURIComponent(sessionId)}`,
+      );
+      if (res.status === 403) {
+        // Not the paying session (e.g. opened in another tab): the pack email
+        // still carries the download links, so stop polling.
+        setPolling(false);
+        return;
+      }
       if (!res.ok) return;
       const data: PackStatus = await res.json();
       setPack(data);
@@ -134,7 +159,7 @@ function EmergencyPackSuccess({ caseId }: { caseId: string }) {
     } catch {
       // retry silently
     }
-  }, [caseId]);
+  }, [caseId, sessionId]);
 
   // Poll every 5s until ready (max 5 minutes)
   useEffect(() => {
