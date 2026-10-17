@@ -1,18 +1,23 @@
-import { S3Client, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+import { createReportCaseId } from '@/lib/report-delivery';
 import { getReports } from '@/lib/reports-log';
-import { paymentIdOf, type WebhookJob } from '@/lib/webhook-jobs';
+import { paymentIdOf, putJob, type WebhookJob } from '@/lib/webhook-jobs';
 import logger from '@/lib/logger';
 
 /**
  * Generates what a paid checkout bought: the forensic report, the summary
  * report, or the Emergency Pack (forensic report + legal PDFs).
  *
- * Throws when generation fails so the job runner can retry it. Returns
- * 'invalid' for checkouts that can never succeed (no retry), and
- * 'already-done' when a resumed job finds its output already exists, so a
- * recovery run never emails the customer twice.
+ * Throws when generation or delivery fails so the job runner can retry it.
+ * Returns 'invalid' for checkouts that can never succeed (no retry), and
+ * 'already-done' when a job finds its purchase already delivered.
+ *
+ * Retrying is safe at any point of a failed attempt: the forensic report keeps
+ * the case id stored in the job (same S3 object, same log entry), and both
+ * emails carry a per-payment Resend idempotency key, so a retry that finds
+ * an email already sent does not send it again.
  */
 export type CheckoutOutcome = 'done' | 'already-done' | 'invalid';
 
@@ -45,18 +50,49 @@ async function loadCaseData(caseId: string): Promise<Record<string, any> | null>
   }
 }
 
-async function hasGeneratedPack(caseId: string): Promise<boolean> {
+/**
+ * Written only after every document of the pack was saved AND the email with
+ * the links went out. A partial set of PDFs (generation interrupted) has no
+ * marker, so the pack is rebuilt instead of being treated as delivered.
+ */
+const packCompleteKey = (caseId: string) => `legal-packs/cases/${caseId}/complete.json`;
+
+async function isPackComplete(caseId: string): Promise<boolean> {
   if (!caseId) return false;
-  const list = await getS3().send(
-    new ListObjectsV2Command({ Bucket: s3Bucket(), Prefix: `legal-packs/cases/${caseId}/`, MaxKeys: 1 }),
-  );
-  return (list.KeyCount ?? list.Contents?.length ?? 0) > 0;
+  try {
+    await getS3().send(new HeadObjectCommand({ Bucket: s3Bucket(), Key: packCompleteKey(caseId) }));
+    return true;
+  } catch (err: unknown) {
+    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (e.$metadata?.httpStatusCode === 404 || e.name === 'NotFound' || e.name === 'NoSuchKey') return false;
+    throw err;
+  }
 }
 
-async function reportExistsFor(paymentId: string): Promise<boolean> {
+async function markPackComplete(caseId: string, job: WebhookJob, templates: string[]): Promise<void> {
+  await getS3().send(new PutObjectCommand({
+    Bucket: s3Bucket(),
+    Key: packCompleteKey(caseId),
+    Body: JSON.stringify({ completedAt: new Date().toISOString(), eventId: job.eventId, paymentId: paymentIdOf(job.session), templates }),
+    ContentType: 'application/json',
+    ServerSideEncryption: 'aws:kms',
+  }));
+}
+
+/** A report counts as delivered once logged with its email sent (legacy entries predate the flag). */
+async function reportDeliveredFor(paymentId: string): Promise<boolean> {
   if (!paymentId) return false;
   const reports = await getReports();
-  return reports.some((r) => r.stripePaymentId === paymentId);
+  return reports.some((r) => r.stripePaymentId === paymentId && r.emailed !== false);
+}
+
+/** Fixes the report case id in the job before the first attempt, so every retry reuses it. */
+async function ensureReportCaseId(job: WebhookJob): Promise<string> {
+  if (!job.reportCaseId) {
+    job.reportCaseId = createReportCaseId();
+    await putJob(job);
+  }
+  return job.reportCaseId;
 }
 
 export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boolean }): Promise<CheckoutOutcome> {
@@ -82,8 +118,8 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
 
   if (product === 'emergency_pack') {
     /* ── Emergency Pack: 4 legal PDFs + Forensic Report ── */
-    if (opts.resumed && await hasGeneratedPack(caseId)) {
-      logger.info({ eventId, caseId }, '[webhook] Resumed job: pack already generated, skipping');
+    if (await isPackComplete(caseId)) {
+      logger.info({ eventId, caseId }, '[webhook] Pack already delivered, skipping');
       return 'already-done';
     }
     const saved = await loadCaseData(caseId);
@@ -111,11 +147,13 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
     logger.info({ caseId, country, lossAmount, eventId }, '[webhook] Generating Emergency Pack');
 
     // 1. Generate Forensic Report FIRST to get enrichment data. A resumed job
-    //    whose report was already emailed skips it rather than sending twice.
+    //    whose report was already delivered skips it.
     let enrichment: Record<string, unknown> = {};
-    if (walletAddress && !(opts.resumed && await reportExistsFor(paymentId))) {
+    if (walletAddress && !(opts.resumed && await reportDeliveredFor(paymentId))) {
       try {
         const reportResult = await generateReport(walletAddress, email, {
+          caseId: await ensureReportCaseId(job),
+          idempotencyKey: `ledgerhound:report:${paymentId}`,
           stripePaymentId: paymentId,
           amount: session.amount_total || 7900,
           network: detectedNetwork,
@@ -167,7 +205,10 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
       victimPhone,
       victimState,
       enrichment,
+      idempotencyKey: `ledgerhound:pack:${paymentId}`,
     });
+    // Reached only when every document was saved and the email went out.
+    await markPackComplete(caseId, job, packResult.templates.map((t) => t.type));
     logger.info({ templateCount: packResult.templates?.length, eventId }, '[webhook] Emergency Pack generated');
     return 'done';
   }
@@ -177,11 +218,14 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
     logger.error({ eventId, product }, '[webhook] Missing walletAddress for report');
     return 'invalid';
   }
-  if (opts.resumed && await reportExistsFor(paymentId)) {
-    logger.info({ eventId }, '[webhook] Resumed job: report already generated, skipping');
+  if (opts.resumed && await reportDeliveredFor(paymentId)) {
+    logger.info({ eventId }, '[webhook] Resumed job: report already delivered, skipping');
     return 'already-done';
   }
+  // Throws unless the report was uploaded, emailed and logged (lib/report-delivery.ts).
   const result = await generateReport(walletAddress, email, {
+    caseId: await ensureReportCaseId(job),
+    idempotencyKey: `ledgerhound:report:${paymentId}`,
     stripePaymentId: paymentId,
     amount: session.amount_total || (product === 'summary_report' ? 1900 : 4900),
     network,

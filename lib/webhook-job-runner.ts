@@ -2,6 +2,7 @@ import { isInFlight, runInBackground } from '@/lib/background-tasks';
 import { processCheckoutJob, type CheckoutOutcome } from '@/lib/checkout-processor';
 import {
   MAX_ATTEMPTS,
+  claimPaymentLock,
   classifyJob,
   deleteJob,
   listPendingJobs,
@@ -100,13 +101,19 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
       summary.expired++;
       continue;
     }
-    if (decision === 'check-claim' && !(await paymentLockExists(paymentIdOf(job.session)))) {
-      // Not claimed yet: the delivery that wrote it died before claiming, and
-      // Stripe will redeliver. Leave it for that delivery (it may expire).
-      summary.waiting++;
-      continue;
-    }
     if (summary.resumed >= limit) { summary.waiting++; continue; }
+    if (decision === 'check-claim') {
+      // Its delivery died before starting it: after writing the job, after the
+      // event lock, or after the payment lock. Run it if the payment lock is
+      // held, or take the lock now. A Stripe redelivery racing us competes for
+      // the same atomic lock, so exactly one of us runs it.
+      const paymentId = paymentIdOf(job.session);
+      const held = await paymentLockExists(paymentId);
+      if (!held && !(await claimPaymentLock(paymentId, job.eventId))) {
+        summary.waiting++;
+        continue;
+      }
+    }
 
     summary.resumed++;
     const run = runJob(job, { resumed: true });

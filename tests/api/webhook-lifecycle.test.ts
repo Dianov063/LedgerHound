@@ -4,8 +4,9 @@ import { getJson, putJson, resetS3, s3Faults, s3Store } from './helpers/aws-s3-m
 import { resetStripe } from './helpers/stripe-mock';
 import { POST as webhook } from '@/app/api/webhook/route';
 import { GET as sweep } from '@/app/api/admin/resume-webhook-jobs/route';
-import { drainBackgroundTasks, runInBackground } from '@/lib/background-tasks';
-import { MAX_ATTEMPTS, RETRY_BACKOFF_MS, STALE_RUNNING_MS, type WebhookJob } from '@/lib/webhook-jobs';
+import { GET as health } from '@/app/api/health/route';
+import { __resetBackgroundTasksForTests, beginDrain, drainBackgroundTasks, runInBackground } from '@/lib/background-tasks';
+import { MAX_ATTEMPTS, RETRY_BACKOFF_MS, STALE_RUNNING_MS, jobFromEvent, type WebhookJob } from '@/lib/webhook-jobs';
 import { resumeStaleJobs } from '@/lib/webhook-job-runner';
 
 vi.mock('@aws-sdk/client-s3', () => import('./helpers/aws-s3-mock'));
@@ -15,13 +16,13 @@ vi.mock('@/lib/rate-limit', () => ({
   hasUpstash: false,
 }));
 const gen = vi.hoisted(() => ({
-  report: vi.fn(async () => ({ caseId: 'LH-TEST', identifiedEntities: [] })),
-  pack: vi.fn(async () => ({ templates: [] })),
-  reports: vi.fn(async () => [] as { stripePaymentId: string }[]),
+  report: vi.fn(async (..._args: unknown[]) => ({ caseId: 'LH-TEST', identifiedEntities: [] as unknown[] })),
+  pack: vi.fn(async (_input: Record<string, unknown>) => ({ templates: [] as { type: string; label: string; url: string }[] })),
+  reports: vi.fn(async () => [] as { stripePaymentId: string; emailed?: boolean }[]),
 }));
 vi.mock('@/lib/generateReport', () => ({ generateReport: gen.report }));
 vi.mock('@/lib/generateEmergencyPack', () => ({ generateEmergencyPack: gen.pack }));
-vi.mock('@/lib/reports-log', () => ({ getReports: gen.reports }));
+vi.mock('@/lib/reports-log', () => ({ getReports: gen.reports, logReport: vi.fn() }));
 
 const EVENT_ID = 'evt_test_0001';
 const PAYMENT = 'pi_test_0001';
@@ -72,11 +73,13 @@ function seedJob(over: Partial<WebhookJob>) {
 beforeEach(() => {
   resetS3();
   resetStripe();
+  __resetBackgroundTasksForTests();
   gen.report.mockReset().mockResolvedValue({ caseId: 'LH-TEST', identifiedEntities: [] });
   gen.pack.mockReset().mockResolvedValue({ templates: [] });
   gen.reports.mockReset().mockResolvedValue([]);
   process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
   process.env.CRON_SECRET = 'cron-secret-for-tests';
+  for (const k of ['STRIPE_SECRET_KEY', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_S3_BUCKET', 'RESEND_API_KEY', 'ADMIN_PASSWORD']) process.env[k] = 'test';
 });
 
 const settle = () => drainBackgroundTasks(5_000);
@@ -158,12 +161,11 @@ describe('recovery sweep', () => {
     expect(s3Store.has(jobKey())).toBe(false);
   });
 
-  it('leaves a never-started, unclaimed job to Stripe redelivery', async () => {
-    seedJob({}); // attempts 0, created an hour ago, no payment lock
+  it('leaves a just-written, unclaimed job alone (its delivery may still be running)', async () => {
+    seedJob({ createdAt: new Date().toISOString() });
     const summary = await resumeStaleJobs();
     expect(summary.waiting).toBe(1);
     expect(gen.report).not.toHaveBeenCalled();
-    expect(s3Store.has(jobKey())).toBe(true);
   });
 
   it('resumes a never-started job that this deployment did claim', async () => {
@@ -186,6 +188,167 @@ describe('recovery sweep', () => {
     release();
     await settle();
     expect(gen.report).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('crash between the event lock and the payment lock', () => {
+  const eventLock = () => putJson(`webhook-events/${EVENT_ID}`, { claimedAt: 'earlier' });
+  const paymentLock = `webhook-payment-locks/${PAYMENT}`;
+
+  it('the Stripe redelivery completes it once', async () => {
+    seedJob({ createdAt: new Date().toISOString() });
+    eventLock(); // payment lock missing: the first delivery died in between
+    const res = await deliver();
+    expect(res.status).toBe(200);
+    await settle();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(s3Store.has(jobKey())).toBe(false);
+    expect(s3Store.has(paymentLock)).toBe(true);
+  });
+
+  it('without a redelivery, the sweep takes the payment lock and completes it once', async () => {
+    seedJob({}); // written an hour ago, never started
+    eventLock();
+    const summary = await resumeStaleJobs();
+    expect(summary.resumed).toBe(1);
+    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(getJson<{ by?: string }>(paymentLock)?.by).toBe('recovery-sweep');
+    expect(s3Store.has(jobKey())).toBe(false);
+
+    // A late Stripe redelivery afterwards changes nothing.
+    expect((await deliver()).status).toBe(200);
+    await settle();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(s3Store.has(jobKey())).toBe(false);
+  });
+
+  it('a sweep and a redelivery racing for it run it exactly once', async () => {
+    seedJob({});
+    eventLock();
+    let release: () => void = () => {};
+    gen.report.mockImplementationOnce(() => new Promise((r) => { release = () => r({ caseId: 'LH', identifiedEntities: [] }); }));
+    const sweeping = resumeStaleJobs();
+    await vi.waitFor(() => expect(gen.report).toHaveBeenCalledTimes(1));
+    expect((await deliver()).status).toBe(200); // loses the payment lock
+    release();
+    await sweeping;
+    await settle();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('emergency pack completeness', () => {
+  const CASE = 'ER-MGK1Z2AB-0123456789abcdef';
+  const DOCS = ['police-complaint', 'regulator-complaint', 'action-guide', 'preservation-letter'];
+  const pdf = (doc: string) => `legal-packs/cases/${CASE}/${doc}.pdf`;
+  const marker = `legal-packs/cases/${CASE}/complete.json`;
+  const packEvent = () => {
+    const e = event();
+    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US' } as never;
+    return e;
+  };
+  const writeAll = async () => {
+    for (const d of DOCS) putJson(pdf(d), { pdf: d });
+    return { templates: DOCS.map((type) => ({ type, label: type, url: `https://signed/${type}` })) };
+  };
+  const staleRunning = () => ({
+    status: 'running' as const,
+    attempts: 1,
+    startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString(),
+    session: { ...jobFromEvent(packEvent()).session },
+  });
+
+  it('an interruption after the first PDF keeps the job until every document exists', async () => {
+    gen.pack
+      .mockImplementationOnce(async () => { putJson(pdf(DOCS[0]), { pdf: DOCS[0] }); throw new Error('renderer crashed'); })
+      .mockImplementationOnce(writeAll);
+    await deliver(packEvent());
+    await settle();
+    expect(s3Store.has(pdf(DOCS[0]))).toBe(true);
+    expect(s3Store.has(marker)).toBe(false);
+    const job = getJson<WebhookJob>(jobKey())!;
+    expect(job.attempts).toBe(1); // kept, not deleted
+
+    putJson(jobKey(), { ...job, lastAttemptAt: new Date(Date.now() - RETRY_BACKOFF_MS - 60_000).toISOString() });
+    await resumeStaleJobs();
+    expect(gen.pack).toHaveBeenCalledTimes(2);
+    for (const d of DOCS) expect(s3Store.has(pdf(d))).toBe(true);
+    expect(getJson<{ templates: string[] }>(marker)?.templates).toEqual(DOCS);
+    expect(s3Store.has(jobKey())).toBe(false);
+  });
+
+  it('a stray PDF without the completion marker is not taken for a delivered pack', async () => {
+    putJson(pdf(DOCS[0]), { pdf: DOCS[0] });
+    gen.pack.mockImplementationOnce(writeAll);
+    seedJob(staleRunning());
+    await resumeStaleJobs();
+    expect(gen.pack).toHaveBeenCalledTimes(1);
+    expect(s3Store.has(marker)).toBe(true);
+  });
+
+  it('a completed pack is not regenerated', async () => {
+    putJson(marker, { completedAt: 'earlier' });
+    seedJob(staleRunning());
+    await resumeStaleJobs();
+    expect(gen.pack).not.toHaveBeenCalled();
+    expect(s3Store.has(jobKey())).toBe(false);
+  });
+
+  it('passes a per-payment idempotency key, so a retry cannot email twice', async () => {
+    gen.pack.mockImplementationOnce(writeAll);
+    await deliver(packEvent());
+    await settle();
+    expect(gen.pack.mock.calls[0][0]).toMatchObject({ idempotencyKey: `ledgerhound:pack:${PAYMENT}` });
+  });
+});
+
+describe('forensic report retries', () => {
+  it('reuses one report case id and idempotency key across attempts', async () => {
+    gen.report.mockRejectedValueOnce(new Error('Report not delivered (uploaded=true, emailed=false)'));
+    await deliver();
+    await settle();
+    const job = getJson<WebhookJob>(jobKey())!;
+    expect(job.reportCaseId).toMatch(/^LH-[0-9A-Z]+-[0-9a-f]{16}$/);
+    putJson(jobKey(), { ...job, lastAttemptAt: new Date(Date.now() - RETRY_BACKOFF_MS - 60_000).toISOString() });
+    await resumeStaleJobs();
+    const [first, second] = gen.report.mock.calls.map((c) => c[2] as { caseId: string; idempotencyKey: string });
+    expect(second.caseId).toBe(first.caseId);
+    expect(second.idempotencyKey).toBe(`ledgerhound:report:${PAYMENT}`);
+    expect(first.caseId).toBe(job.reportCaseId);
+  });
+
+  it('a logged report whose email did not go out is not treated as delivered', async () => {
+    gen.reports.mockResolvedValue([{ stripePaymentId: PAYMENT, emailed: false }]);
+    seedJob({ status: 'running', attempts: 1, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
+    await resumeStaleJobs();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('shutdown (draining)', () => {
+  it('refuses new webhooks with 503 while running work finishes; health reports draining', async () => {
+    let release: () => void = () => {};
+    gen.report.mockImplementationOnce(() => new Promise((r) => { release = () => r({ caseId: 'LH', identifiedEntities: [] }); }));
+    await deliver();
+    await vi.waitFor(() => expect(gen.report).toHaveBeenCalledTimes(1));
+
+    beginDrain();
+    const before = s3Store.size;
+    const late = await deliver(event('evt_test_late', 'pi_test_late'));
+    expect(late.status).toBe(503); // Stripe redelivers to the next process
+    expect(s3Store.size).toBe(before); // nothing written: no job, no locks
+    expect(s3Store.has(jobKey('evt_test_late'))).toBe(false);
+
+    const h = await health();
+    expect(h.status).toBe(503);
+    expect((await h.json()).status).toBe('draining');
+
+    const sweepRes = await sweep(new Request('https://x/api/admin/resume-webhook-jobs', { headers: { authorization: 'Bearer cron-secret-for-tests' } }) as never);
+    expect(sweepRes.status).toBe(503);
+
+    release();
+    expect(await drainBackgroundTasks(5_000)).toEqual({ drained: true, remaining: 0 });
+    expect(s3Store.has(jobKey())).toBe(false); // the in-flight job still completed
   });
 });
 

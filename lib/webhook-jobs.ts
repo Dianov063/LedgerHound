@@ -33,8 +33,12 @@ export const STALE_RUNNING_MS = 15 * 60 * 1000;
 export const NEVER_STARTED_MS = 10 * 60 * 1000;
 /** Wait between attempts of a job that failed. */
 export const RETRY_BACKOFF_MS = 10 * 60 * 1000;
-/** Jobs older than this are parked in failed/ instead of being retried. */
-export const EXPIRE_MS = 48 * 60 * 60 * 1000;
+/**
+ * Jobs older than this are parked in failed/ instead of being retried. Kept
+ * inside Resend's 24 h idempotency window, so a retry can never send a
+ * customer a second copy of an email an earlier attempt already sent.
+ */
+export const EXPIRE_MS = 23 * 60 * 60 * 1000;
 
 /** The subset of the Stripe checkout session the processor reads. */
 export interface JobSession {
@@ -53,6 +57,8 @@ export interface WebhookJob {
   startedAt?: string;
   lastAttemptAt?: string;
   lastError?: string;
+  /** Forensic report case id, fixed before the first attempt so retries reuse it. */
+  reportCaseId?: string;
   session: JobSession;
 }
 
@@ -82,8 +88,11 @@ export type JobDecision = 'skip-in-flight' | 'expire' | 'resume' | 'wait' | 'che
 
 /**
  * What the recovery sweep should do with a pending job. Pure: no I/O.
- *  - 'check-claim': never started; resume only if this deployment won the
- *    payment lock (otherwise Stripe is still retrying the delivery).
+ *  - 'check-claim': written long ago but never started. Its delivery died
+ *    somewhere between writing the job and starting it (possibly between the
+ *    event and the payment lock). The sweep resumes it if the payment lock is
+ *    held, or if it can take the payment lock itself; the lock is atomic, so
+ *    a concurrent Stripe redelivery and the sweep never both run it.
  */
 export function classifyJob(job: WebhookJob, now: number, inFlight: boolean): JobDecision {
   if (inFlight) return 'skip-in-flight';
@@ -175,6 +184,29 @@ export async function paymentLockExists(paymentId: string): Promise<boolean> {
     return true;
   } catch (err) {
     if (isStatus(err, [404], ['NotFound', 'NoSuchKey'])) return false;
+    throw err;
+  }
+}
+
+/**
+ * Atomically takes the payment lock (same object the webhook writes).
+ * true: this caller owns the payment now. false: someone already holds it.
+ * Other S3 errors throw, so the sweep simply tries again later.
+ */
+export async function claimPaymentLock(paymentId: string, eventId: string): Promise<boolean> {
+  if (!paymentId) return false;
+  try {
+    await getS3().send(new PutObjectCommand({
+      Bucket: bucket(),
+      Key: `${PAYMENT_LOCK_PREFIX}${paymentId}`,
+      Body: JSON.stringify({ claimedAt: new Date().toISOString(), eventId, by: 'recovery-sweep' }),
+      ContentType: 'application/json',
+      ServerSideEncryption: 'aws:kms',
+      IfNoneMatch: '*',
+    }));
+    return true;
+  } catch (err) {
+    if (isStatus(err, [412], ['PreconditionFailed', 'ConditionalCheckFailed'])) return false;
     throw err;
   }
 }

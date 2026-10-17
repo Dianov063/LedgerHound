@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { requireCronOrAdmin } from '@/lib/admin-auth';
 import { ALREADY_RUNNING, withRunLock } from '@/lib/run-lock';
+import { isDraining } from '@/lib/background-tasks';
 import { resumeStaleJobs } from '@/lib/webhook-job-runner';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest) {
   const denied = await requireCronOrAdmin(req);
   if (denied) return denied;
+  if (isDraining()) return Response.json({ error: 'Shutting down' }, { status: 503 });
 
   try {
     const summary = await withRunLock('resume-webhook-jobs', () => resumeStaleJobs({ limit: 5 }));

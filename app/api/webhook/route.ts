@@ -2,7 +2,7 @@ export const maxDuration = 120; // Vercel: waitUntil keeps the function alive wh
 
 import Stripe from 'stripe';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { runInBackground } from '@/lib/background-tasks';
+import { isDraining, runInBackground } from '@/lib/background-tasks';
 import { deleteJob, jobFromEvent, saveJob } from '@/lib/webhook-jobs';
 import { startJobInBackground } from '@/lib/webhook-job-runner';
 import logger from '@/lib/logger';
@@ -157,6 +157,12 @@ export async function GET() {
 export async function POST(request: Request) {
   logger.info('[webhook] POST received');
 
+  if (isDraining()) {
+    // Shutting down: do not start new work in a process that is about to exit.
+    // Stripe redelivers on non-2xx, to the next process.
+    return Response.json({ error: 'Shutting down, retry later' }, { status: 503 });
+  }
+
   const rawBody = await request.text();
   const sig = request.headers.get('stripe-signature');
 
@@ -211,12 +217,16 @@ export async function POST(request: Request) {
 
   // ── LAYER 1: Atomic event-level idempotency ──
   const claimed = await claimEvent(event.id);
-  if (!claimed) {
-    // A previous delivery owns this event. If it already finished it deleted
-    // its job, so the record we just created is a stray duplicate.
+  if (!claimed && created === 'created') {
+    // The event was handled before and its job is gone (finished or parked in
+    // failed/), so the record we just created is a stray duplicate.
     await dropDuplicate();
     return Response.json({ received: true });
   }
+  // Either we claimed the event, or this redelivers an event whose job is
+  // still pending (an earlier delivery took the event lock and may have died
+  // before the payment lock). In both cases the atomic payment lock decides
+  // who runs it.
 
   // ── LAYER 2: Payment-level deduplication ──
   const session = event.data.object;
@@ -229,8 +239,8 @@ export async function POST(request: Request) {
   }
 
   if (created === 'exists') {
-    // An earlier delivery wrote the job but died before claiming; we hold the
-    // claims now, so we run it. (Release nothing: the job is ours.)
+    // An earlier delivery wrote the job but died before taking the payment
+    // lock; we hold it now, so we run it.
     logger.info({ eventId: event.id }, '[webhook] Resuming job written by an earlier delivery');
   }
 

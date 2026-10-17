@@ -15,13 +15,14 @@ import { waitUntil } from '@vercel/functions';
 interface Registry {
   tasks: Set<Promise<unknown>>;
   labels: Set<string>;
+  draining: boolean;
 }
 
 const KEY = Symbol.for('ledgerhound.backgroundTasks');
 
 function registry(): Registry {
   const g = globalThis as unknown as Record<symbol, Registry | undefined>;
-  if (!g[KEY]) g[KEY] = { tasks: new Set(), labels: new Set() };
+  if (!g[KEY]) g[KEY] = { tasks: new Set(), labels: new Set(), draining: false };
   return g[KEY]!;
 }
 
@@ -42,6 +43,27 @@ export function runInBackground(task: Promise<unknown>, label?: string): void {
     });
   reg.tasks.add(tracked);
   waitUntil(tracked);
+}
+
+/**
+ * Shutdown state. Once draining, routes that start new work (Stripe webhook,
+ * recovery sweep) answer 503 so the work is redelivered to the next process,
+ * and /api/health reports 'draining'. Work already running continues.
+ */
+export function beginDrain(): void {
+  registry().draining = true;
+}
+
+export function isDraining(): boolean {
+  return registry().draining;
+}
+
+/** Test hook: forget all state. */
+export function __resetBackgroundTasksForTests(): void {
+  const reg = registry();
+  reg.tasks.clear();
+  reg.labels.clear();
+  reg.draining = false;
 }
 
 export function isInFlight(label: string): boolean {

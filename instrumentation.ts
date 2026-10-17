@@ -4,15 +4,18 @@
  *
  * Next's own SIGTERM handler closes the server and exits without waiting for
  * work that continues after a response (report / pack generation). The image
- * sets NEXT_MANUAL_SIG_HANDLE=true so Next leaves the signals to us; we wait
- * for in-flight background work, bounded by LEDGERHOUND_DRAIN_TIMEOUT_MS
- * (keep it below compose's stop_grace_period). Anything still unfinished is
- * resumed after restart by /api/admin/resume-webhook-jobs.
+ * sets NEXT_MANUAL_SIG_HANDLE=true so Next leaves the signals to us. On a
+ * signal we enter the draining state (new webhooks and sweeps get 503 so
+ * Stripe and the cron redeliver to the next process; health reports
+ * 'draining'), wait for in-flight background work bounded by
+ * LEDGERHOUND_DRAIN_TIMEOUT_MS (keep it below compose's stop_grace_period),
+ * then exit. Anything still unfinished is resumed after restart by
+ * /api/admin/resume-webhook-jobs. Pages keep being served until exit.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs' || process.env.LEDGERHOUND_SELF_HOST !== '1') return;
 
-  const { drainBackgroundTasks, inFlightCount } = await import('@/lib/background-tasks');
+  const { beginDrain, drainBackgroundTasks, inFlightCount } = await import('@/lib/background-tasks');
   const { hasUpstash } = await import('@/lib/rate-limit');
 
   if (!hasUpstash) {
@@ -25,6 +28,8 @@ export async function register() {
   const shutdown = async (signal: string) => {
     if (stopping) return;
     stopping = true;
+    // From here new work is refused (webhook / sweep → 503, health → draining).
+    beginDrain();
     console.log(`[shutdown] ${signal}: waiting for ${inFlightCount()} background task(s), up to ${timeoutMs} ms`);
     const { drained, remaining } = await drainBackgroundTasks(timeoutMs);
     console.log(drained

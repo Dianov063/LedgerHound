@@ -13,6 +13,23 @@ External services stay external: AWS S3 (eu-central-1, KMS), Stripe, Resend,
 Upstash, Cloudflare Turnstile, blockchain APIs, DeepSeek/Tavily, GitHub, GA4.
 This moves hosting only; it is not "fully self-hosted".
 
+## Release order (what Vercel must be running)
+
+1. **Security release** (`merge/security-hardening`) goes to `main` first and
+   Vercel deploys it. It contains no job queue: it keeps Vercel's `waitUntil`
+   behaviour and does not know `webhook-jobs/` or `/api/admin/resume-webhook-jobs`.
+   It is therefore **not** a rollback target once the server has taken traffic.
+2. **Migration commit** (`feature/self-host-appplatform`) is merged to `main`
+   before cutover, so Vercel deploys the *same commit* the server runs. On
+   Vercel that build behaves as before (no standalone output, no
+   instrumentation hook, Vercel Cron for the two jobs) but it writes and
+   understands the job queue and serves `/api/admin/resume-webhook-jobs`.
+   Note this Vercel deployment's URL as the rollback target.
+3. Deploy that commit to the server, run the shadow checks, then cut DNS.
+
+Only after step 2 is a DNS rollback safe: both origins run identical code over
+the same S3 state.
+
 ## Layout on the host
 
 ```
@@ -91,21 +108,47 @@ Stripe reaches.
 ## After cutover
 
 - Verify certificates, `/api/health`, a test checkout, cron logs.
-- Keep the Vercel project as rollback during the observation window, but
-  disconnect its Git integration so commits stop deploying there.
+- Keep the Vercel deployment from release step 2 as the rollback target during
+  the observation window, but disconnect the project's Git integration so new
+  commits stop deploying there (the rollback target stays as it is).
 - Blog auto-publish (`/api/blog-agent/publish`) commits to GitHub; until a CI
   deploy exists, published posts go live only after a manual release here.
 
 ## Background work and recovery
 
-Paid checkouts are recorded as `webhook-jobs/pending/<eventId>.json` before the
-idempotency locks, then generated in the background. On `SIGTERM` the web
-container waits up to `LEDGERHOUND_DRAIN_TIMEOUT_MS` (100 s; `stop_grace_period`
-is 120 s) for running reports. Anything interrupted is resumed by the cron
-runner every 5 minutes (`/api/admin/resume-webhook-jobs`): stale running jobs
-after 15 min, failed attempts after a 10 min backoff, at most 3 attempts.
-Jobs that cannot succeed or run out of attempts are parked in
-`webhook-jobs/failed/` and logged at error level; they need manual follow-up.
+Paid checkouts are recorded as `webhook-jobs/pending/<eventId>.json` **before**
+the event and payment locks; failing to write it answers 500 so Stripe
+redelivers. The payment lock decides who runs a job: a redelivery of an event
+whose job is still pending competes for it again, so a delivery that died
+between the two locks is finished by the redelivery. Generation runs in the
+background, tracked for shutdown.
+
+A purchase counts as delivered only when the customer can use it:
+- forensic / summary report: PDF uploaded **and** email sent **and** the
+  reports-log entry saved (the success page finds the report through it);
+- Emergency Pack: every document saved **and** the email with the links sent,
+  then `legal-packs/cases/<caseId>/complete.json` is written. PDFs without that
+  marker are an interrupted pack and are rebuilt.
+
+Anything short of that throws and the job is retried. Retries are safe: the
+report case id is stored in the job before the first attempt (same S3 object,
+log entry updated in place via conditional writes), and both emails carry a
+per-payment Resend idempotency key, so a retry that finds an email already
+sent does not send it again. Resend keeps keys for 24 h, so jobs expire after
+23 h into `webhook-jobs/failed/` instead of being retried later.
+
+The cron runner calls `/api/admin/resume-webhook-jobs` every 5 minutes: jobs
+never started after 10 min (it takes the payment lock if nobody holds it),
+running jobs stale after 15 min, failed attempts after a 10 min backoff, at
+most 3 attempts. Exhausted or invalid jobs go to `webhook-jobs/failed/`,
+logged at error level, for manual follow-up.
+
+Shutdown: on `SIGTERM` the web container enters a draining state. New Stripe
+webhooks and sweeps get 503 (Stripe redelivers to the next process),
+`/api/health` reports `draining` (503), running reports continue for up to
+`LEDGERHOUND_DRAIN_TIMEOUT_MS` (100 s; `stop_grace_period` is 120 s), then the
+process exits. Pages are still served until exit; with one container a
+restart is a short outage, not a zero-downtime switch.
 
 ## Operations
 
@@ -122,11 +165,21 @@ heap cap 768 MiB; cron 96 MiB / 0.1 CPU.
 
 ## Rollback
 
-1. Restore the two DNS records above to the Vercel values (TTL 300 s).
-2. If only the release is bad: `up -d --no-build` with the previous tag.
-3. Remove only the LedgerHound blocks from the Caddyfile (or restore the
-   backup), validate, `SIGUSR1`. Do not touch other AppPlatform sites.
-4. Keep `webhook-jobs/` in S3. Vercel has no cron for the recovery sweep, so
-   after a rollback check `webhook-jobs/pending/` and, if needed, call
-   `GET /api/admin/resume-webhook-jobs` with the admin key (the route exists
-   on Vercel too).
+Target: the Vercel deployment of the **same commit** the server runs (release
+step 2). Never roll back to the security-only release: it ignores
+`webhook-jobs/` and would leave interrupted purchases unprocessed.
+
+1. In Vercel, make sure that deployment is the production one (promote it if
+   needed).
+2. Restore the two DNS records above to the Vercel values (TTL 300 s).
+3. Queue: Vercel processes new purchases itself (`waitUntil`), but it has no
+   cron for the recovery sweep (only the two `vercel.json` jobs; adding one may
+   exceed the plan). Until `webhook-jobs/pending/` is empty, call the sweep by
+   hand every few minutes:
+   `curl -H "x-admin-key: $ADMIN_PASSWORD" https://www.ledgerhound.vip/api/admin/resume-webhook-jobs`
+   Check `webhook-jobs/failed/` afterwards.
+4. Server side, if only the release is bad: `up -d --no-build` with the
+   previous image tag. To take the server out entirely, remove only the
+   LedgerHound blocks from the shared Caddyfile (or restore the backup),
+   validate, `SIGUSR1`. Do not touch other AppPlatform sites.
+

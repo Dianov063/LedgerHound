@@ -1,4 +1,4 @@
-import { inFlightCount } from '@/lib/background-tasks';
+import { inFlightCount, isDraining } from '@/lib/background-tasks';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,10 +16,14 @@ const REQUIRED_ENV = [
 
 /**
  * GET /api/health — readiness for the container health check and deploys.
- * 503 when required configuration is missing (names are logged server-side,
- * never returned). No external calls, so a provider outage cannot flap it.
+ * 503 while shutting down ('draining') or when required configuration is
+ * missing (names are logged server-side, never returned). No external calls,
+ * so a provider outage cannot flap it.
  */
 export async function GET() {
+  if (isDraining()) {
+    return Response.json({ status: 'draining', backgroundTasks: inFlightCount() }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     console.error('[health] Missing required env:', missing.join(', '));

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Self-hosted replacement for Vercel Cron.
  *
