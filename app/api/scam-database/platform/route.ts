@@ -40,6 +40,6 @@ export async function GET(req: NextRequest) {
     return Response.json({ platform, reports: safeReports });
   } catch (err: any) {
     console.error('[scam-database/platform]', err);
-    return Response.json({ error: err.message || 'Failed to fetch platform' }, { status: 500 });
+    return Response.json({ error: 'Failed to fetch platform' }, { status: 500 });
   }
 }

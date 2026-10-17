@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return Response.json(snapshot);
   } catch (err: any) {
     console.error('[non-crypto-scam-database/admin GET]', err);
-    return Response.json({ error: err.message || 'Failed to load admin data' }, { status: 500 });
+    return Response.json({ error: 'Failed to load admin data' }, { status: 500 });
   }
 }
 
@@ -62,6 +62,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Unknown admin action' }, { status: 400 });
   } catch (err: any) {
     console.error('[non-crypto-scam-database/admin POST]', err);
-    return Response.json({ error: err.message || 'Admin action failed' }, { status: 500 });
+    return Response.json({ error: 'Admin action failed' }, { status: 500 });
   }
 }

@@ -26,6 +26,6 @@ export async function GET(req: NextRequest) {
     return Response.json({ platforms: safe, total: safe.length });
   } catch (err: any) {
     console.error('[scam-database/search]', err);
-    return Response.json({ error: err.message || 'Search failed' }, { status: 500 });
+    return Response.json({ error: 'Search failed' }, { status: 500 });
   }
 }

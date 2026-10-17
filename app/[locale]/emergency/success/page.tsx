@@ -76,6 +76,20 @@ function EmergencySuccessContent() {
   const totalLoss = searchParams.get('total_loss') || '';
   const platformSlug = searchParams.get('platform_slug') || '';
 
+  // Strip the sensitive bearer params (session_id, case_id) from the address bar
+  // after capture. case_id grants access to the pack's presigned PDF links via
+  // /api/emergency/status, so it must not linger in history / Referer / analytics.
+  // Child components already received `caseId` as a prop, so polling is unaffected.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+    for (const p of ['session_id', 'case_id']) {
+      if (url.searchParams.has(p)) { url.searchParams.delete(p); changed = true; }
+    }
+    if (changed) window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />

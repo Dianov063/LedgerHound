@@ -64,6 +64,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     logger.error({ err: err.message, sessionId }, '[report-status] Error');
-    return NextResponse.json({ error: err.message || 'Failed to check status' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to check status' }, { status: 500 });
   }
 }

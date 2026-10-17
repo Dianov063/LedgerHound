@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { getAddressIndex } from '@/lib/scam-db';
 import { fetchWithTimeout } from '@/lib/fetch-timeout';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { getKnownEntity } from '@/lib/known-entities';
 
 type NetworkType = 'btc' | 'eth' | 'sol' | 'trx' | 'bnb' | 'polygon' | 'base' | 'arb' | 'op' | 'avax' | 'linea' | 'zksync' | 'scroll' | 'mantle';
@@ -467,6 +468,14 @@ async function detectActiveEVMNetworks(address: string): Promise<{ best: Network
 
 export async function POST(req: NextRequest) {
   try {
+    // A single trace fans out into many paid RPC/explorer calls, and depth
+    // multiplies that. Same budget class as /api/track, so same limit.
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rl = await checkRateLimit(ip, { name: 'trace-graph', limit: 30, windowSec: 3600 });
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+    }
+
     const { address, depth = 1, network = 'eth' } = await req.json();
 
     let net: NetworkType;
@@ -633,6 +642,7 @@ export async function POST(req: NextRequest) {
       activeNetworks,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Trace failed' }, { status: 500 });
+    console.error('[trace-graph] Trace error:', err);
+    return NextResponse.json({ error: 'Trace failed' }, { status: 500 });
   }
 }

@@ -9,6 +9,6 @@ export async function GET() {
     return Response.json(stats);
   } catch (err: any) {
     console.error('[non-crypto-scam-database/stats]', err);
-    return Response.json({ error: err.message || 'Failed to fetch stats' }, { status: 500 });
+    return Response.json({ error: 'Failed to fetch stats' }, { status: 500 });
   }
 }

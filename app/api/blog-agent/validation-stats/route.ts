@@ -14,15 +14,14 @@
 
 import { NextRequest } from 'next/server';
 import { getValidationStats } from '@/lib/blog/validation-log';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  const adminKey = req.headers.get('x-admin-key');
-  if (!process.env.ADMIN_PASSWORD || adminKey !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const daysParam = url.searchParams.get('days');
@@ -32,6 +31,7 @@ export async function GET(req: NextRequest) {
     const stats = await getValidationStats(days);
     return Response.json({ ok: true, stats });
   } catch (err: any) {
-    return Response.json({ error: err.message || 'Failed to compute stats' }, { status: 500 });
+    console.error('[blog-agent/validation-stats]', err);
+    return Response.json({ error: 'Failed to compute stats' }, { status: 500 });
   }
 }

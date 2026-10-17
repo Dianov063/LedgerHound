@@ -1,6 +1,7 @@
 import { getValidPathsForPrompt, getValidBlogSlugs } from '@/lib/blog/valid-internal-paths';
 import { validateAndCleanArticle } from '@/lib/blog/validate-article';
 import { logValidationEvent } from '@/lib/blog/validation-log';
+import { requireAdmin } from '@/lib/admin-auth';
 
 /**
  * Build the system prompt. Whitelist sections are computed at request time
@@ -334,6 +335,11 @@ async function callDeepSeek(systemPrompt: string, userPrompt: string, maxTokens 
 }
 
 export async function POST(request: Request) {
+  // Admin-only: every mode calls a paid LLM (DeepSeek) and/or Tavily research.
+  // Without this gate anyone could drain those API budgets.
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   if (!process.env.DEEPSEEK_API_KEY) {
     return Response.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 });
   }
@@ -365,14 +371,16 @@ export async function POST(request: Request) {
         return Response.json({ query: seedQuery, results });
       } catch (err: any) {
         const msg = err.message || 'Research failed';
-        // Surface Tavily-specific errors clearly
+        console.error('[blog-agent] Research error:', err);
+        // The two branches below are hand-written operator hints, not the raw
+        // upstream message, so they are safe to return.
         if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
           return Response.json({ error: 'Tavily API key is invalid. Check TAVILY_API_KEY env var on Vercel.' }, { status: 401 });
         }
         if (msg.includes('429')) {
           return Response.json({ error: 'Tavily rate limit hit (free tier = 1000/mo). Wait or upgrade.' }, { status: 429 });
         }
-        return Response.json({ error: msg }, { status: 502 });
+        return Response.json({ error: 'Research failed' }, { status: 502 });
       }
     }
 
@@ -588,6 +596,6 @@ Return the humanized JSON.`;
     return Response.json({ content });
   } catch (err: any) {
     console.error('[blog-agent] Error:', err);
-    return Response.json({ error: err.message || 'Failed to call DeepSeek' }, { status: 500 });
+    return Response.json({ error: 'Failed to call DeepSeek' }, { status: 500 });
   }
 }

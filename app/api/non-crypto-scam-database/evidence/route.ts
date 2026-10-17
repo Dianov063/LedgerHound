@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,15 +14,9 @@ const getS3 = () =>
     },
   });
 
-function checkAdmin(req: NextRequest): boolean {
-  const key = req.headers.get('x-admin-key');
-  return !!process.env.ADMIN_PASSWORD && key === process.env.ADMIN_PASSWORD;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAdmin(req)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key') || '';

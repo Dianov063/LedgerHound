@@ -10,31 +10,18 @@ import { NextRequest } from 'next/server';
 import { Resend } from 'resend';
 import { getApproved, saveContactRequest, type ContactRequest } from '@/lib/investigators/storage';
 import logger from '@/lib/logger';
-
-/* Rate limit: 3 requests/min per IP (low because each one emails) */
-const RATE_LIMIT_WINDOW = 60_000;
-const rateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => {
-  const now = Date.now();
-  Array.from(rateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) rateLimit.delete(k); });
-}, 60_000);
+import { checkRateLimit } from '@/lib/rate-limit';
 
 function isEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
 export async function POST(req: NextRequest) {
-  /* Rate limit */
+  /* Rate limit: 3 requests/min per IP (low because each one emails; distributed via Upstash) */
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-  const now = Date.now();
-  const entry = rateLimit.get(ip);
-  if (entry && entry.reset > now) {
-    if (entry.count >= 3) {
-      return Response.json({ error: 'Too many requests. Please wait a minute.' }, { status: 429 });
-    }
-    entry.count++;
-  } else {
-    rateLimit.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW });
+  const rl = await checkRateLimit(ip, { name: 'investigator-contact', limit: 3, windowSec: 60 });
+  if (!rl.success) {
+    return Response.json({ error: 'Too many requests. Please wait a minute.' }, { status: 429 });
   }
 
   let body: any;

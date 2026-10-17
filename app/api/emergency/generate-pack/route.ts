@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+import { requireAdmin } from '@/lib/admin-auth';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const maxDuration = 60; // PDF rendering can be slow
 
+// SECURITY: the real, paid Emergency Pack is generated from the Stripe webhook
+// (lib/generateEmergencyPack) AFTER payment. This HTTP route is an admin/ops-only
+// manual regeneration tool — it must NOT be publicly callable, otherwise anyone
+// could generate the $79 product for free, overwrite another buyer's case PDFs,
+// or spam arbitrary emails with download links via our Resend account.
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const {

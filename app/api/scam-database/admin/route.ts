@@ -1,33 +1,10 @@
 import { NextRequest } from 'next/server';
 import { listAllReports, updateReportStatus, listDisputes, deleteReportAndPlatform, updateDisputeStatus, getDispute } from '@/lib/scam-db';
 import { sendDisputeResolution } from '@/lib/dispute-emails';
-
-/* ── Admin auth rate limiting: 5 attempts/min per IP ── */
-const authRateLimit = new Map<string, { count: number; reset: number }>();
-setInterval(() => { const now = Date.now(); Array.from(authRateLimit.entries()).forEach(([k, v]) => { if (v.reset <= now) authRateLimit.delete(k); }); }, 60000);
-
-function checkAdmin(req: NextRequest): Response | null {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-  const now = Date.now();
-  const entry = authRateLimit.get(ip);
-  if (entry && entry.reset > now) {
-    if (entry.count >= 5) {
-      return Response.json({ error: 'Too many auth attempts. Try again later.' }, { status: 429 });
-    }
-    entry.count++;
-  } else {
-    authRateLimit.set(ip, { count: 1, reset: now + 60000 });
-  }
-
-  const authHeader = req.headers.get('x-admin-key');
-  if (!authHeader || authHeader !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function GET(req: NextRequest) {
-  const denied = checkAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   try {
@@ -39,12 +16,12 @@ export async function GET(req: NextRequest) {
     return Response.json({ reports, disputes });
   } catch (err: any) {
     console.error('[scam-database/admin]', err);
-    return Response.json({ error: err.message || 'Failed' }, { status: 500 });
+    return Response.json({ error: 'Failed' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const denied = checkAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   try {
@@ -101,6 +78,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: any) {
     console.error('[scam-database/admin]', err);
-    return Response.json({ error: err.message || 'Failed' }, { status: 500 });
+    return Response.json({ error: 'Failed' }, { status: 500 });
   }
 }

@@ -18,19 +18,14 @@ import {
   getApproved,
 } from '@/lib/investigators/storage';
 import type { Investigator } from '@/lib/investigators/schema';
+import { requireAdmin } from '@/lib/admin-auth';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
-function checkAdmin(req: NextRequest): boolean {
-  const key = req.headers.get('x-admin-key');
-  return !!process.env.ADMIN_PASSWORD && key === process.env.ADMIN_PASSWORD;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAdmin(req)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type') || 'approved';
@@ -44,14 +39,13 @@ export async function GET(req: NextRequest) {
     return Response.json({ items: approved, total: approved.length });
   } catch (err: any) {
     logger.error({ err }, '[investigators/admin] GET failed');
-    return Response.json({ error: err.message || 'Failed to list' }, { status: 500 });
+    return Response.json({ error: 'Failed to list' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAdmin(req)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
 
   let body: any;
   try {
@@ -111,6 +105,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
     logger.error({ err, action, id }, '[investigators/admin] POST failed');
-    return Response.json({ error: err.message || 'Action failed' }, { status: 500 });
+    return Response.json({ error: 'Action failed' }, { status: 500 });
   }
 }
