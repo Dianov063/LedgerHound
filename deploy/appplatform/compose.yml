@@ -1,0 +1,104 @@
+# LedgerHound on the AppPlatform production host (deploy@40.160.88.230).
+# Same conventions as TowHub: immutable image tag, non-root, read-only root FS,
+# no published ports (the shared Caddy reaches the app on appplatform_prod_public).
+# Runbook: deploy/appplatform/README.md
+name: ledgerhound
+
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GA_ID: G-4WQ7GDS9FP
+        LEDGERHOUND_GIT_SHA: ${LEDGERHOUND_IMAGE_TAG:?Set an immutable image tag}
+    image: ledgerhound-web:${LEDGERHOUND_IMAGE_TAG:?Set an immutable image tag}
+    container_name: ledgerhound-web
+    restart: unless-stopped
+    env_file:
+      - ${LEDGERHOUND_ENV_FILE:-/opt/ledgerhound/secrets/ledgerhound.env}
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      # Measured 2026-10-17: idle 60 MiB, page load ~120 MiB, +70 MiB per large
+      # report render, 3 concurrent large reports +227 MiB. Heap cap keeps V8
+      # collecting well before the container limit.
+      NODE_OPTIONS: --max-old-space-size=768
+      # Must stay below stop_grace_period so in-flight reports can finish.
+      LEDGERHOUND_DRAIN_TIMEOUT_MS: "100000"
+    networks:
+      - ingress
+      - internal
+    expose:
+      - "3000"
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    volumes:
+      # Verified 2026-10-17: Next writes nothing at runtime (no ISR, images
+      # unoptimized); the volume only keeps .next/cache writable for safety.
+      - next-cache:/app/.next/cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: "1.50"
+    stop_grace_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Replaces Vercel Cron (vercel.json) and runs the webhook recovery sweep.
+  # Only the cron secret is given to this container.
+  cron:
+    image: ledgerhound-web:${LEDGERHOUND_IMAGE_TAG:?Set an immutable image tag}
+    container_name: ledgerhound-cron
+    restart: unless-stopped
+    command: ["node", "scripts/cron-runner.mjs"]
+    env_file:
+      - ${LEDGERHOUND_CRON_ENV_FILE:-/opt/ledgerhound/secrets/cron.env}
+    environment:
+      NODE_ENV: production
+      TZ: UTC
+      LEDGERHOUND_INTERNAL_URL: http://ledgerhound-web:3000
+    networks:
+      - internal
+    depends_on:
+      web:
+        condition: service_healthy
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 96m
+    cpus: "0.10"
+    stop_grace_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+
+networks:
+  ingress:
+    external: true
+    name: appplatform_prod_public
+  internal:
+    name: ledgerhound_internal
+    internal: true
+
+volumes:
+  next-cache:

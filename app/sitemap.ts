@@ -5,6 +5,11 @@ import { PAYMENT_SCAM_SCENARIOS } from '@/lib/payment-scam-scenarios';
 
 const baseUrl = 'https://www.ledgerhound.vip';
 
+// Rendered per request, not at build: investigators and scam-db platforms come
+// from S3, and an image built without secrets would otherwise freeze the seed /
+// empty fallback into the sitemap until the next build.
+export const dynamic = 'force-dynamic';
+
 const pages = [
   { path: '', priority: 1.0, changeFreq: 'weekly' },
   { path: '/services', priority: 0.9, changeFreq: 'weekly' },
@@ -57,7 +62,7 @@ const blogPosts = BLOG_POSTS.map((p) => `/blog/${p.slug}`);
  */
 const seedPlatformSlugs: string[] = [];
 
-/* Try to fetch dynamic platforms from S3 at build time */
+/* Fetch platforms from S3 at request time */
 async function getDynamicPlatforms(): Promise<{ slug: string; lastReported?: string }[]> {
   try {
     const { getPlatformIndex } = await import('@/lib/scam-db');
@@ -66,7 +71,7 @@ async function getDynamicPlatforms(): Promise<{ slug: string; lastReported?: str
       return platforms.map(p => ({ slug: p.slug, lastReported: p.lastReported }));
     }
   } catch {
-    // S3 not available at build time — fall back to seed list
+    // S3 unavailable — fall back to seed list
   }
   return seedPlatformSlugs.map(slug => ({ slug }));
 }
