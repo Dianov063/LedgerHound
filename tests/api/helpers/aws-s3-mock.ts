@@ -8,7 +8,11 @@ export interface StoredObject {
   body: string;
   modified: Date;
   input: Record<string, unknown>;
+  etag?: string;
 }
+
+let etagCounter = 0;
+const nextEtag = () => `"etag-${++etagCounter}"`;
 
 export const s3Store = new Map<string, StoredObject>();
 export const s3Calls: { command: string; input: Record<string, unknown> }[] = [];
@@ -23,7 +27,7 @@ export function resetS3(): void {
 }
 
 export function putJson(key: string, value: unknown, modified = new Date()): void {
-  s3Store.set(key, { body: JSON.stringify(value), modified, input: {} });
+  s3Store.set(key, { body: JSON.stringify(value), modified, input: {}, etag: nextEtag() });
 }
 
 export function getJson<T = Record<string, unknown>>(key: string): T | null {
@@ -58,19 +62,24 @@ export class S3Client {
 
     if (cmd instanceof PutObjectCommand) {
       if (input.IfNoneMatch === '*' && s3Store.has(key)) throw s3Error('PreconditionFailed', 412);
+      if (input.IfMatch !== undefined) {
+        const current = s3Store.get(key);
+        if (!current || current.etag !== input.IfMatch) throw s3Error('PreconditionFailed', 412);
+      }
       const body = typeof input.Body === 'string' ? input.Body : String(input.Body ?? '');
-      s3Store.set(key, { body, modified: new Date(), input });
-      return {};
+      const etag = nextEtag();
+      s3Store.set(key, { body, modified: new Date(), input, etag });
+      return { ETag: etag, $metadata: { httpStatusCode: 200 } };
     }
     if (cmd instanceof GetObjectCommand) {
       const o = s3Store.get(key);
       if (!o) throw s3Error('NoSuchKey', 404);
-      return { Body: { transformToString: async () => o.body }, LastModified: o.modified };
+      return { Body: { transformToString: async () => o.body }, LastModified: o.modified, ETag: o.etag, $metadata: { httpStatusCode: 200 } };
     }
     if (cmd instanceof HeadObjectCommand) {
       const o = s3Store.get(key);
       if (!o) throw s3Error('NotFound', 404);
-      return { LastModified: o.modified };
+      return { LastModified: o.modified, ETag: o.etag, $metadata: { httpStatusCode: 200 } };
     }
     if (cmd instanceof DeleteObjectCommand) {
       s3Store.delete(key);

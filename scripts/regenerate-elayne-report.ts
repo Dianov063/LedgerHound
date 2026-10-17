@@ -3,8 +3,8 @@
  * post-cleanup state (no "CryptoYield" / no Binance-as-scam / no broken pages).
  *
  * What this script does:
- *   1. Calls generateReport() with an invalid email so Resend rejects
- *      (sendReport throws, generateReport catches it and continues).
+ *   1. Calls generateReport() with skipEmail (no email is sent; the
+ *      address below is a placeholder that is never used).
  *   2. PDF uploads to S3 as usual (caseId = LH-...).
  *   3. Download the PDF from S3 to ./test-reports/elayne-cleanup-verify.pdf
  *   4. Delete the S3 object + report log entry to keep prod clean.
@@ -24,8 +24,7 @@ import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 
 const WALLET = '0xbc8996a9a5ff12ebf8702e857cc0faa451dc9569';
 const NETWORK = 'eth';
-// Invalid TLD → Resend rejects → sendReport throws → generateReport catches.
-// PDF still renders + uploads to S3.
+// Placeholder only: skipEmail means nothing is sent. PDF renders + uploads to S3.
 const TEST_EMAIL = 'noreply@local.invalid';
 
 async function main() {
@@ -35,11 +34,11 @@ async function main() {
   console.log('═'.repeat(70));
   console.log(`  wallet:   ${WALLET}`);
   console.log(`  network:  ${NETWORK}`);
-  console.log(`  email:    ${TEST_EMAIL}  (intentionally invalid — no real send)`);
+  console.log(`  email:    ${TEST_EMAIL}  (placeholder — skipEmail, no send)`);
   console.log();
 
   console.log('Calling generateReport()... (30-90s for Alchemy fetch + PDF render)');
-  const result = await generateReport(WALLET, TEST_EMAIL, { network: NETWORK });
+  const result = await generateReport(WALLET, TEST_EMAIL, { network: NETWORK, skipEmail: true });
   console.log();
   console.log('✓ generateReport returned');
   console.log(`  caseId:        ${result.caseId}`);

@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Resend } from 'resend';
+import { sendEmailOnce } from '@/lib/idempotent-email';
 import { getResearch } from '@/lib/legal-packs/s3';
 import {
   PoliceComplaintDoc,
@@ -107,6 +107,8 @@ export interface GeneratePackInput {
   victimPhone?: string;
   victimState?: string;
   enrichment?: EnrichmentData;
+  /** Same key on every retry of one purchase, so the pack email goes out once. */
+  idempotencyKey?: string;
 }
 
 export interface GeneratePackResult {
@@ -119,6 +121,9 @@ export interface GeneratePackResult {
 /**
  * Generate Emergency Pack (4 legal PDFs), save to S3, email download links.
  * Can be called from webhook or API route.
+ *
+ * Throws if any document cannot be rendered or saved, or if the email with
+ * the links is not sent: the pack is delivered only when both happened.
  */
 export async function generateEmergencyPack(input: GeneratePackInput): Promise<GeneratePackResult> {
   const {
@@ -288,14 +293,13 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
   }
 
   // Send email with download links
-  try {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
+  // (throws when not sent: the documents are useless to a buyer who never gets the links)
+  {
     const downloadLinks = templates
       .map((t) => `- ${t.label}: ${t.url}`)
       .join('\n');
 
-    await resend.emails.send({
+    const sent = await sendEmailOnce({
       from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
       to: email,
       subject: `Your LedgerHound Legal Pack is Ready — Case ${caseId}`,
@@ -317,10 +321,8 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
         </div>
       `,
       text: `LedgerHound Emergency Pack\n\nHi ${victimName || 'there'},\n\nYour legal documents for case ${caseId} (${research.name}) are ready.\n\nDownload your documents (links expire in 24 hours):\n${downloadLinks}\n\nLedgerHound by USPROJECT LLC\ncontact@ledgerhound.vip`,
-    });
-    logger.info({ email }, '[generateEmergencyPack] Email sent');
-  } catch (emailErr: any) {
-    logger.error({ err: emailErr }, '[generateEmergencyPack] Email send failed');
+    }, input.idempotencyKey);
+    logger.info({ caseId, result: sent }, '[generateEmergencyPack] Email delivered');
   }
 
   return {

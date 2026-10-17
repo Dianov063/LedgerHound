@@ -1,12 +1,9 @@
 import React from 'react';
-import { randomBytes } from 'crypto';
 import { renderToBuffer } from '@react-pdf/renderer';
-import { sendReport } from './sendReport';
+import { REPORT_CASE_ID_RE, createReportCaseId, deliverReport } from './report-delivery';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
 import { getReportTranslations, type TimelineT, type EntityId, type Recovery } from './report-i18n';
-import { uploadReport, getReportDownloadUrl } from './s3-storage';
-import { logReport } from './reports-log';
 import { fetchBtcTransfers } from './bitcoin-tracker';
 import { fetchSolTransfers } from './solana-tracker';
 import { fetchTronTransfers } from './tron-tracker';
@@ -1051,7 +1048,15 @@ function generateRecoveryScenarios(
 export async function generateReport(
   walletAddress: string,
   email: string,
-  options?: { stripePaymentId?: string; amount?: number; network?: string; locale?: string; country?: string },
+  options?: {
+    stripePaymentId?: string; amount?: number; network?: string; locale?: string; country?: string;
+    /** Reuse the case id across retries of one purchase (see lib/report-delivery.ts). */
+    caseId?: string;
+    /** Resend idempotency key for the report email. */
+    idempotencyKey?: string;
+    /** Only for tools that regenerate a PDF; a paid order always emails. */
+    skipEmail?: boolean;
+  },
 ) {
   const network = (options?.network || 'eth').toLowerCase();
   // Phase 3: report locale (en|es; others fall back to en in getReportTranslations).
@@ -1068,8 +1073,9 @@ export async function generateReport(
   // Only lowercase for EVM addresses
   const address = ['btc', 'sol', 'trx'].includes(network) ? walletAddress : walletAddress.toLowerCase();
   // Unguessable caseId: report download URLs are keyed on it, so a timestamp-only
-  // id would be enumerable. 64-bit random suffix prevents brute-force.
-  const caseId = `LH-${Date.now().toString(36).toUpperCase()}-${randomBytes(8).toString('hex')}`;
+  // id would be enumerable. 64-bit random suffix prevents brute-force. A retry
+  // of the same purchase passes its earlier id so it overwrites, not duplicates.
+  const caseId = options?.caseId && REPORT_CASE_ID_RE.test(options.caseId) ? options.caseId : createReportCaseId();
   const date = new Date().toISOString().split('T')[0];
 
   logger.info({ network, address }, '[generateReport] Starting report');
@@ -2204,43 +2210,21 @@ export async function generateReport(
   const buf = Buffer.from(await renderToBuffer(doc2));
   logger.info({ caseId, pdfSha256 }, '[generateReport] PDF SHA256 computed (two-pass, embedded)');
 
-  // Upload to S3 and get presigned download URL
-  let downloadUrl = '';
-  let s3Key = '';
-  try {
-    logger.info({ pdfBytes: buf.length }, '[generateReport] Uploading to S3');
-    s3Key = await uploadReport(buf, caseId);
-    logger.info({ s3Key }, '[generateReport] S3 upload OK');
-    downloadUrl = await getReportDownloadUrl(caseId);
-    logger.info('[generateReport] Presigned URL generated');
-  } catch (err: unknown) {
-    logger.error({ err }, '[generateReport] S3 upload failed (continuing with email only)');
-  }
-
-  // Send email with download link
-  try {
-    await sendReport(email, address, buf, caseId, downloadUrl, reportLocale, reportCountry, pdfSha256);
-    logger.info({ email, caseId }, '[generateReport] Email sent');
-  } catch (emailErr: unknown) {
-    logger.error({ err: emailErr, email }, '[generateReport] Email send failed (report still saved to S3)');
-  }
-
-  // Log report to S3 (non-blocking — don't fail if this errors)
-  try {
-    await logReport({
-      caseId,
-      walletAddress: address,
-      email,
-      network,
-      s3Key,
-      downloadUrl,
-      stripePaymentId: options?.stripePaymentId || '',
-      createdAt: new Date().toISOString(),
-      amount: options?.amount || 4900,
-    });
-  } catch (err) {
-    logger.error({ err }, '[generateReport] Failed to log report');
-  }
+  // Upload, email and log; throws unless the customer can actually get it.
+  const { downloadUrl, s3Key } = await deliverReport({
+    buf,
+    caseId,
+    email,
+    walletAddress: address,
+    network,
+    locale: reportLocale,
+    country: reportCountry,
+    pdfSha256,
+    stripePaymentId: options?.stripePaymentId || '',
+    amount: options?.amount || 4900,
+    idempotencyKey: options?.idempotencyKey,
+    skipEmail: options?.skipEmail,
+  });
 
   return { ...reportData, downloadUrl, s3Key };
 }

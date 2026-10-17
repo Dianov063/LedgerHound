@@ -1,8 +1,6 @@
-import { Resend } from 'resend';
 import { EMAIL_TEMPLATES_ES } from './email-templates/templates';
+import { sendEmailOnce, type SendResult } from './idempotent-email';
 import logger from './logger';
-
-const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
 export async function sendReport(
   email: string,
@@ -13,7 +11,9 @@ export async function sendReport(
   locale?: string,
   country?: string,
   pdfSha256?: string,
-) {
+  /** Same key on every retry of one purchase, so the customer gets one email. */
+  idempotencyKey?: string,
+): Promise<SendResult> {
   const shortAddr = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
   const isEs = locale === 'es';
 
@@ -50,7 +50,7 @@ export async function sendReport(
     .map((t) => `<li><strong>${t.filename}</strong> — ${TEMPLATE_DESC_ES[t.id] ?? t.label}</li>`)
     .join('');
 
-  await getResend().emails.send({
+  return sendEmailOnce({
     from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
     to: email,
     subject: `Your LedgerHound Forensic Report is Ready — ${caseId}`,
@@ -162,5 +162,5 @@ export async function sendReport(
       },
       ...templateAttachments,
     ],
-  });
+  }, idempotencyKey);
 }
