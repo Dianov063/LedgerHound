@@ -55,12 +55,45 @@ async function loadCase(caseId: string): Promise<Record<string, unknown> | null>
   }
 }
 
-/** True once the webhook has generated documents for this case (it is paid). */
-async function hasGeneratedPack(caseId: string): Promise<boolean> {
+/** Every Checkout Session ever created for a case, one object each (no read-modify-write race). */
+const SESSIONS_PREFIX = 'emergency-case-sessions/';
+
+async function listCaseSessionIds(caseId: string): Promise<string[]> {
   const list = await getS3().send(
+    new ListObjectsV2Command({ Bucket: s3Bucket(), Prefix: `${SESSIONS_PREFIX}${caseId}/` }),
+  );
+  return (list.Contents ?? [])
+    .map((o) => o.Key?.split('/').pop()?.replace(/\.json$/, '') || '')
+    .filter(Boolean);
+}
+
+async function recordCaseSession(caseId: string, sessionId: string, product: string): Promise<void> {
+  await getS3().send(
+    new PutObjectCommand({
+      Bucket: s3Bucket(),
+      Key: `${SESSIONS_PREFIX}${caseId}/${sessionId}.json`,
+      Body: JSON.stringify({ sessionId, product, createdAt: new Date().toISOString() }),
+      ContentType: 'application/json',
+      ServerSideEncryption: 'aws:kms',
+    }),
+  );
+}
+
+/**
+ * True once any Checkout Session of this case has been paid (asked to Stripe,
+ * so it holds for every product and before any document exists), or once
+ * documents were generated (cases paid before sessions were recorded).
+ */
+async function caseIsPaid(caseId: string): Promise<boolean> {
+  const stripe = getStripe();
+  for (const id of await listCaseSessionIds(caseId)) {
+    const session = await stripe.checkout.sessions.retrieve(id);
+    if (session.payment_status === 'paid') return true;
+  }
+  const docs = await getS3().send(
     new ListObjectsV2Command({ Bucket: s3Bucket(), Prefix: `legal-packs/cases/${caseId}/`, MaxKeys: 1 }),
   );
-  return (list.KeyCount ?? list.Contents?.length ?? 0) > 0;
+  return (docs.KeyCount ?? docs.Contents?.length ?? 0) > 0;
 }
 
 export async function POST(req: NextRequest) {
@@ -131,9 +164,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Case not found or access denied' }, { status: 403 });
     }
 
-    // A paid case is immutable: its documents were generated from this data.
-    if (await hasGeneratedPack(caseId)) {
-      return NextResponse.json({ error: 'This case has already been completed.' }, { status: 409 });
+    // A paid case is immutable: the webhook generates the purchase from this data.
+    if (await caseIsPaid(caseId)) {
+      return NextResponse.json({ error: 'This case has already been paid. Start a new case for a new purchase.' }, { status: 409 });
     }
 
     const productDef = PRODUCTS[product as ProductKey];
@@ -217,6 +250,21 @@ export async function POST(req: NextRequest) {
       success_url: `${req.nextUrl.origin}/emergency/success?session_id={CHECKOUT_SESSION_ID}&case_id=${encodeURIComponent(caseId)}&product=${encodeURIComponent(product)}`,
       cancel_url: `${req.nextUrl.origin}/emergency`,
     });
+
+    // Record the session before handing out its URL: the paid check above can
+    // only see sessions it knows about. If recording fails, the session is
+    // expired so it can never be paid unrecorded.
+    try {
+      await recordCaseSession(caseId, session.id, product);
+    } catch (recordErr: unknown) {
+      logger.error({ err: recordErr, caseId }, '[emergency/checkout] Could not record session; expiring it');
+      try {
+        await getStripe().checkout.sessions.expire(session.id);
+      } catch (expireErr: unknown) {
+        logger.error({ err: expireErr, sessionId: session.id }, '[emergency/checkout] Could not expire unrecorded session');
+      }
+      return NextResponse.json({ error: 'Unable to start checkout. Please try again.' }, { status: 500 });
+    }
 
     logger.info({ sessionId: session.id, caseId, product }, '[emergency/checkout] Session created');
 

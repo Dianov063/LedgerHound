@@ -19,19 +19,25 @@ export const retrieveSession = vi.fn(async (id: string) => {
   return s;
 });
 
-export const createSession = vi.fn(async (params: { metadata?: Record<string, string> }) => ({
-  id: 'cs_test_created0001',
-  url: 'https://checkout.stripe.test/pay/cs_test_created0001',
-  metadata: params.metadata,
-}));
+let created = 0;
+export const createSession = vi.fn(async (params: { metadata?: Record<string, string> }) => {
+  created += 1;
+  const id = `cs_test_created${String(created).padStart(4, '0')}`;
+  stripeSessions.set(id, { id, payment_status: 'unpaid', metadata: params.metadata ?? {} });
+  return { id, url: `https://checkout.stripe.test/pay/${id}`, metadata: params.metadata };
+});
+
+export const expireSession = vi.fn(async (id: string) => ({ id, status: 'expired' }));
 
 export function resetStripe(): void {
   stripeSessions.clear();
   retrieveSession.mockClear();
   createSession.mockClear();
+  expireSession.mockClear();
+  created = 0;
 }
 
 export default class Stripe {
-  checkout = { sessions: { retrieve: retrieveSession, create: createSession } };
+  checkout = { sessions: { retrieve: retrieveSession, create: createSession, expire: expireSession } };
   constructor(_key?: string) {}
 }

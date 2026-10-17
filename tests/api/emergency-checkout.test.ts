@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { getJson, putJson, resetS3, s3Calls, s3Store } from './helpers/aws-s3-mock';
-import { createSession, resetStripe } from './helpers/stripe-mock';
+import { getJson, putJson, resetS3, s3Calls, s3Faults, s3Store } from './helpers/aws-s3-mock';
+import { createSession, expireSession, resetStripe, stripeSessions } from './helpers/stripe-mock';
 import { CASE_ID_RE, createCaseSecret, verifyCaseSecret } from '@/lib/emergency-case-access';
 import { POST as checkout } from '@/app/api/emergency/checkout/route';
 import { POST as analyze } from '@/app/api/emergency/analyze/route';
@@ -106,6 +106,40 @@ describe('POST /api/emergency/checkout ownership', () => {
     const res = await post(checkout, validBody());
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).not.toContain('internal detail');
+  });
+});
+
+describe('POST /api/emergency/checkout once the case is paid', () => {
+  const recordSession = (id: string, paid: boolean) => {
+    stripeSessions.set(id, { id, payment_status: paid ? 'paid' : 'unpaid', metadata: { caseId: CASE } });
+    putJson(`emergency-case-sessions/${CASE}/${id}.json`, { sessionId: id });
+  };
+
+  it.each(['emergency_pack', 'summary_report'])('refuses to rewrite a paid %s case before any document exists', async (product) => {
+    recordSession('cs_test_paid000000001', true);
+    const before = caseBody();
+    const res = await post(checkout, validBody({ product, description: 'changed after payment' }));
+    expect(res.status).toBe(409);
+    expect(caseBody()).toBe(before);
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it('still lets the owner retry while earlier sessions are unpaid, and records every session', async () => {
+    recordSession('cs_test_abandoned0001', false);
+    const res = await post(checkout, validBody({ description: 'edited before paying' }));
+    expect(res.status).toBe(200);
+    expect(getJson<Record<string, unknown>>(`emergency-cases/${CASE}.json`)!.description).toBe('edited before paying');
+    const created = createSession.mock.results[0].value as Promise<{ id: string }>;
+    expect(s3Store.has(`emergency-case-sessions/${CASE}/${(await created).id}.json`)).toBe(true);
+  });
+
+  it('does not hand out a payment link it could not record, and expires it', async () => {
+    s3Faults.push((cmd, input) => (cmd === 'PutObjectCommand' && String(input.Key).startsWith('emergency-case-sessions/')
+      ? new Error('S3 down') : null));
+    const res = await post(checkout, validBody());
+    expect(res.status).toBe(500);
+    expect((await res.json()).url).toBeUndefined();
+    expect(expireSession).toHaveBeenCalledTimes(1);
   });
 });
 

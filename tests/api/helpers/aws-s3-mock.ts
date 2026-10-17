@@ -13,9 +13,13 @@ export interface StoredObject {
 export const s3Store = new Map<string, StoredObject>();
 export const s3Calls: { command: string; input: Record<string, unknown> }[] = [];
 
+/** Fault injection: return an Error to make that command fail. */
+export const s3Faults: ((command: string, input: Record<string, unknown>) => Error | null)[] = [];
+
 export function resetS3(): void {
   s3Store.clear();
   s3Calls.length = 0;
+  s3Faults.length = 0;
 }
 
 export function putJson(key: string, value: unknown, modified = new Date()): void {
@@ -47,6 +51,10 @@ export class S3Client {
     const input = cmd.input;
     const key = String(input.Key ?? '');
     s3Calls.push({ command: cmd.constructor.name, input });
+    for (const fault of s3Faults) {
+      const err = fault(cmd.constructor.name, input);
+      if (err) throw err;
+    }
 
     if (cmd instanceof PutObjectCommand) {
       if (input.IfNoneMatch === '*' && s3Store.has(key)) throw s3Error('PreconditionFailed', 412);
