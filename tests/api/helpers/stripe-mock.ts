@@ -35,9 +35,17 @@ export function resetStripe(): void {
   createSession.mockClear();
   expireSession.mockClear();
   created = 0;
+  constructEvent.mockClear();
 }
+
+/** Signature check stand-in: the header must be the literal 'valid-signature'. */
+export const constructEvent = vi.fn((raw: string, sig: string) => {
+  if (sig !== 'valid-signature') throw new Error('No signatures found matching the expected signature');
+  return JSON.parse(raw);
+});
 
 export default class Stripe {
   checkout = { sessions: { retrieve: retrieveSession, create: createSession, expire: expireSession } };
+  webhooks = { constructEvent };
   constructor(_key?: string) {}
 }

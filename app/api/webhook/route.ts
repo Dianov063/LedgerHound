@@ -1,10 +1,10 @@
-export const maxDuration = 120; // waitUntil background work: report generation takes 30-60s
+export const maxDuration = 120; // Vercel: waitUntil keeps the function alive while a report generates (30-60s)
 
 import Stripe from 'stripe';
-import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { waitUntil } from '@vercel/functions';
-import { generateReport } from '@/lib/generateReport';
-import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
+import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { runInBackground } from '@/lib/background-tasks';
+import { deleteJob, jobFromEvent, saveJob } from '@/lib/webhook-jobs';
+import { startJobInBackground } from '@/lib/webhook-job-runner';
 import logger from '@/lib/logger';
 
 const getS3 = () =>
@@ -126,23 +126,6 @@ async function logWebhookEvent(event: { id: string; type: string; data?: { objec
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadCaseData(caseId: string): Promise<Record<string, any> | null> {
-  try {
-    const resp = await getS3().send(
-      new GetObjectCommand({
-        Bucket: s3Bucket(),
-        Key: `emergency-cases/${caseId}.json`,
-      }),
-    );
-    const body = await resp.Body?.transformToString();
-    return body ? JSON.parse(body) : null;
-  } catch (err: unknown) {
-    logger.error({ err }, '[webhook] Failed to load case data from S3');
-    return null;
-  }
-}
-
 const getStripe = () => {
   // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -159,10 +142,17 @@ export async function GET() {
  * Architecture:
  * 1. Verify Stripe signature
  * 2. Log event for debugging (non-blocking)
- * 3. Claim event atomically via S3 conditional write (prevents race conditions)
- * 4. Claim payment atomically (prevents duplicates from old retries with different event IDs)
- * 5. Return 200 IMMEDIATELY to Stripe (prevents retries)
- * 6. Process report generation in background via waitUntil()
+ * 3. checkout.session.completed: write a durable job record FIRST
+ *    (webhook-jobs/pending/<eventId>.json). Failing that, answer 500 so
+ *    Stripe redelivers; nothing has been claimed yet.
+ * 4. Claim event atomically via S3 conditional write (prevents race conditions)
+ * 5. Claim payment atomically (prevents duplicates from old retries with different event IDs)
+ *    Whoever wins both claims owns the job; a losing delivery removes the
+ *    job record it just created (it is a duplicate).
+ * 6. Return 200 IMMEDIATELY to Stripe (prevents retries)
+ * 7. Generate in the background, tracked for graceful shutdown. The job
+ *    record is removed on success; if the process dies first, the recovery
+ *    sweep (/api/admin/resume-webhook-jobs) resumes it.
  */
 export async function POST(request: Request) {
   logger.info('[webhook] POST received');
@@ -171,7 +161,7 @@ export async function POST(request: Request) {
   const sig = request.headers.get('stripe-signature');
 
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    logger.error('[webhook] STRIPE_WEBHOOK_SECRET is not set — add it to Vercel env vars');
+    logger.error('[webhook] STRIPE_WEBHOOK_SECRET is not set');
     return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
   }
 
@@ -193,180 +183,58 @@ export async function POST(request: Request) {
   logger.info({ type: event.type, eventId: event.id }, '[webhook] Event verified');
 
   // ── Debug: log every event to S3 ──
-  waitUntil(logWebhookEvent(event));
+  runInBackground(logWebhookEvent(event));
+
+  if (event.type !== 'checkout.session.completed') {
+    // Nothing to generate; keep the event-level idempotency record as before.
+    await claimEvent(event.id);
+    return Response.json({ received: true });
+  }
+
+  // ── Durable job record before any lock is taken ──
+  const job = jobFromEvent(event);
+  let created: 'created' | 'exists';
+  try {
+    created = await saveJob(job);
+  } catch (err) {
+    logger.error({ err, eventId: event.id }, '[webhook] Could not persist job; asking Stripe to retry');
+    return Response.json({ error: 'Temporary failure' }, { status: 500 });
+  }
+
+  const dropDuplicate = async () => {
+    if (created === 'created') {
+      try { await deleteJob(job.eventId); } catch (err) {
+        logger.warn({ err, eventId: job.eventId }, '[webhook] Could not remove duplicate job record');
+      }
+    }
+  };
 
   // ── LAYER 1: Atomic event-level idempotency ──
-  // Uses S3 conditional write (IfNoneMatch: '*') — only the first writer wins.
   const claimed = await claimEvent(event.id);
   if (!claimed) {
+    // A previous delivery owns this event. If it already finished it deleted
+    // its job, so the record we just created is a stray duplicate.
+    await dropDuplicate();
     return Response.json({ received: true });
   }
 
   // ── LAYER 2: Payment-level deduplication ──
-  // Even if Stripe sends a NEW event ID for the same payment (rare, but possible
-  // with old retries from before idempotency was deployed), this blocks it.
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const paymentId = session.payment_intent || session.id || '';
-
-    const paymentClaimed = await claimPayment(paymentId);
-    if (!paymentClaimed) {
-      logger.warn({ eventId: event.id, paymentId }, '[webhook] Event passed event-level check but BLOCKED by payment-level check');
-      return Response.json({ received: true });
-    }
-
-    // ── Return 200 immediately, process in background ──
-    waitUntil(processCheckout(event));
-  }
-
-  return Response.json({ received: true });
-}
-
-/**
- * Background processing of checkout.session.completed events.
- * Runs via waitUntil() — does NOT block the HTTP response.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function processCheckout(event: any): Promise<void> {
   const session = event.data.object;
-  const product = session.metadata?.product || 'forensic_report';
-  const walletAddress = session.metadata?.walletAddress;
-  const email = session.metadata?.email;
-  const network = session.metadata?.network || 'eth';
-  const caseId = session.metadata?.caseId || '';
-  // Phase 3: report language (en|es). Falls back to en if absent/unsupported.
-  const reportLocale = session.metadata?.locale || 'en';
-  // Phase 3: victim's country (ISO-ish code, e.g. PE). Unlocks country-specific
-  // recovery guidance. Empty string → generic guidance.
-  const reportCountry = session.metadata?.country || '';
-
-  logger.info({ product, walletAddress, email, eventId: event.id }, '[webhook] Processing checkout (background)');
-
-  if (!email) {
-    logger.error({ eventId: event.id }, '[webhook] Missing email in metadata');
-    return;
+  const paymentId = session.payment_intent || session.id || '';
+  const paymentClaimed = await claimPayment(paymentId);
+  if (!paymentClaimed) {
+    logger.warn({ eventId: event.id, paymentId }, '[webhook] Event passed event-level check but BLOCKED by payment-level check');
+    await dropDuplicate();
+    return Response.json({ received: true });
   }
 
-  try {
-    if (product === 'emergency_pack') {
-      /* ── Emergency Pack: 4 legal PDFs + Forensic Report ── */
-      const saved = await loadCaseData(caseId);
-
-      const country = saved?.country || session.metadata?.country || 'US';
-      const scamType = saved?.scamType || session.metadata?.scamType || '';
-      const platformName = saved?.platformName || session.metadata?.platformName || '';
-      const description = saved?.description || '';
-      const txid = saved?.txid || session.metadata?.txid || '';
-      const txDate = saved?.txDate || '';
-      const detectedNetwork = saved?.detectedNetwork || session.metadata?.network || 'eth';
-      const contactMethod = saved?.contactMethod || '';
-      const victimPhone = saved?.victimPhone || '';
-      const victimState = saved?.victimState || '';
-      const platformUrl = saved?.platformUrl || '';
-      const victimWallet = saved?.victimWallet || '';
-      const lossCurrency = saved?.lossCurrency || 'USD';
-      const userLossAmount = saved?.lossAmount
-        ? parseFloat(String(saved.lossAmount))
-        : session.metadata?.lossAmount
-          ? parseFloat(session.metadata.lossAmount)
-          : NaN;
-      const lossAmount = !isNaN(userLossAmount) ? userLossAmount : (session.amount_total || 7900) / 100;
-
-      logger.info({ caseId, country, lossAmount, eventId: event.id }, '[webhook] Generating Emergency Pack');
-
-      // 1. Generate Forensic Report FIRST to get enrichment data
-      let enrichment: Record<string, unknown> = {};
-      if (walletAddress) {
-        try {
-          const paymentId = session.payment_intent || session.id || '';
-          const reportResult = await generateReport(walletAddress, email, {
-            stripePaymentId: paymentId,
-            amount: session.amount_total || 7900,
-            network: detectedNetwork,
-            locale: reportLocale,
-            country: reportCountry,
-          });
-          logger.info({ caseId: reportResult.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
-
-          // Extract enrichment data for legal pack
-          const entities = reportResult.identifiedEntities || [];
-          const exchanges = entities.filter((e: { type: string }) => e.type === 'exchange');
-          enrichment = {
-            forensicCaseId: reportResult.caseId,
-            riskScore: reportResult.riskScore,
-            recoveryScore: reportResult.recoveryScore,
-            recoveryLabel: reportResult.recoveryLabel,
-            identifiedExchanges: exchanges.map((e: { label: string; address: string }) => ({
-              name: e.label,
-              address: e.address,
-            })),
-            mixerDetected: entities.some((e: { type: string }) => e.type === 'mixer'),
-            ofacWarning: reportResult.ofacWarning,
-            hops: reportResult.graphData?.nodes?.length || 0,
-            keyFindings: reportResult.keyFindings || [],
-          };
-        } catch (err) {
-          logger.error({ err, eventId: event.id }, '[webhook] Forensic Report failed, continuing with legal pack');
-        }
-      }
-
-      // 2. Generate Emergency Pack with enrichment
-      const packResult = await generateEmergencyPack({
-        caseId,
-        countryCode: country,
-        email,
-        victimName: session.customer_details?.name || '',
-        lossAmount,
-        lossCurrency,
-        scamType,
-        walletAddress: walletAddress || '',
-        victimWallet,
-        txHashes: txid ? [txid] : [],
-        description,
-        txDate,
-        platformName,
-        platformUrl,
-        network: detectedNetwork,
-        contactMethod,
-        victimPhone,
-        victimState,
-        enrichment,
-      });
-      logger.info({ templateCount: packResult.templates?.length, eventId: event.id }, '[webhook] Emergency Pack generated');
-
-    } else if (product === 'summary_report') {
-      /* ── Summary Report: just the Forensic Report ── */
-      if (walletAddress) {
-        const paymentId = session.payment_intent || session.id || '';
-        const result = await generateReport(walletAddress, email, {
-          stripePaymentId: paymentId,
-          amount: session.amount_total || 1900,
-          network,
-          locale: reportLocale,
-          country: reportCountry,
-        });
-        logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Summary Report generated');
-      } else {
-        logger.error({ eventId: event.id }, '[webhook] Summary Report: missing walletAddress');
-      }
-
-    } else {
-      /* ── Default: Forensic Report ($49) ── */
-      if (walletAddress) {
-        const paymentId = session.payment_intent || session.id || '';
-        const result = await generateReport(walletAddress, email, {
-          stripePaymentId: paymentId,
-          amount: session.amount_total || 4900,
-          network,
-          locale: reportLocale,
-          country: reportCountry,
-        });
-        logger.info({ caseId: result.caseId, eventId: event.id }, '[webhook] Forensic Report generated');
-      } else {
-        logger.error({ eventId: event.id }, '[webhook] Missing walletAddress for forensic report');
-      }
-    }
-  } catch (err) {
-    logger.error({ err, product, eventId: event.id }, '[webhook] Generation failed');
+  if (created === 'exists') {
+    // An earlier delivery wrote the job but died before claiming; we hold the
+    // claims now, so we run it. (Release nothing: the job is ours.)
+    logger.info({ eventId: event.id }, '[webhook] Resuming job written by an earlier delivery');
   }
+
+  // ── Return 200 immediately, process in background ──
+  startJobInBackground(job);
+  return Response.json({ received: true });
 }

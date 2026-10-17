@@ -26,6 +26,17 @@ export async function requireAdmin(req: Request): Promise<Response | null> {
   return Response.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
+/**
+ * Gate for scheduled jobs: accepts the cron secret as `Authorization: Bearer`
+ * (what Vercel Cron and the self-hosted cron runner send) or the admin key.
+ */
+export async function requireCronOrAdmin(req: Request): Promise<Response | null> {
+  const cronSecret = process.env.CRON_SECRET || '';
+  const auth = req.headers.get('authorization') || '';
+  if (cronSecret && safeEqual(auth, `Bearer ${cronSecret}`)) return null;
+  return requireAdmin(req);
+}
+
 /** Constant-time string comparison that does not leak length via early return. */
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a, 'utf8');

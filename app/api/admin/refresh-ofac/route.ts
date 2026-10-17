@@ -14,6 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ALREADY_RUNNING, withRunLock } from '@/lib/run-lock';
 import { timingSafeEqual } from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
@@ -64,7 +65,7 @@ function isAuthorized(req: NextRequest): boolean {
   return false;
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest): Promise<Response> {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -130,4 +131,12 @@ export async function GET(req: NextRequest) {
     console.error('[refresh-ofac] failed:', e);
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
+}
+
+/** One run at a time: the cron runner and manual calls cannot overlap. */
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return (await withRunLock('refresh-ofac', () => handle(req))) ?? ALREADY_RUNNING();
 }
