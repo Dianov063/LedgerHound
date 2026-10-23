@@ -3,6 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { sendEmailOnce } from '@/lib/idempotent-email';
+import { readPackManifest, writePackManifestOnce, type PackManifest } from '@/lib/legal-packs/manifest';
 import { getResearch } from '@/lib/legal-packs/s3';
 import {
   PoliceComplaintDoc,
@@ -51,19 +52,46 @@ function getDocumentElement(
   }
 }
 
+/**
+ * Stores a pack document once. If an interrupted earlier attempt already
+ * stored this document, that version is kept: a document is never replaced
+ * by a different rendering.
+ */
 async function saveCasePdf(caseId: string, templateType: string, pdfBuffer: Buffer): Promise<string> {
   const key = `${PREFIX}/cases/${caseId}/${templateType}.pdf`;
-  await getS3().send(
-    new PutObjectCommand({
-      Bucket: bucket(),
-      Key: key,
-      Body: pdfBuffer,
-      ContentType: 'application/pdf',
-      ServerSideEncryption: 'aws:kms',
-      Metadata: { 'generated-at': new Date().toISOString() },
-    }),
-  );
+  try {
+    await getS3().send(
+      new PutObjectCommand({
+        Bucket: bucket(),
+        Key: key,
+        Body: pdfBuffer,
+        ContentType: 'application/pdf',
+        ServerSideEncryption: 'aws:kms',
+        Metadata: { 'generated-at': new Date().toISOString() },
+        IfNoneMatch: '*',
+      }),
+    );
+  } catch (err: unknown) {
+    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (e.$metadata?.httpStatusCode !== 412 && e.name !== 'PreconditionFailed') throw err;
+    logger.info({ key }, '[generateEmergencyPack] Keeping document stored by an earlier attempt');
+  }
   return key;
+}
+
+function resultFrom(manifest: PackManifest, country: string): GeneratePackResult {
+  return {
+    success: true,
+    caseId: manifest.caseId,
+    country,
+    templates: manifest.documents.map((d) => ({ type: d.type as TemplateType, label: d.label, url: d.url })),
+  };
+}
+
+/** Sends the frozen pack email; throws when it is not sent. */
+async function sendPackEmail(manifest: PackManifest, idempotencyKey?: string): Promise<void> {
+  const sent = await sendEmailOnce(manifest.email, idempotencyKey);
+  logger.info({ caseId: manifest.caseId, result: sent }, '[generateEmergencyPack] Email delivered');
 }
 
 async function getPresignedUrl(key: string): Promise<string> {
@@ -124,8 +152,17 @@ export interface GeneratePackResult {
  *
  * Throws if any document cannot be rendered or saved, or if the email with
  * the links is not sent: the pack is delivered only when both happened.
+ *
+ * Retries deliver the frozen pack: once the manifest exists (all documents
+ * stored, email payload fixed) a retry only re-sends that exact email.
  */
 export async function generateEmergencyPack(input: GeneratePackInput): Promise<GeneratePackResult> {
+  const frozen = await readPackManifest(input.caseId);
+  if (frozen) {
+    await sendPackEmail(frozen, input.idempotencyKey);
+    return resultFrom(frozen, input.countryCode.toUpperCase());
+  }
+
   const {
     caseId,
     countryCode,
@@ -293,13 +330,14 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
   }
 
   // Send email with download links
-  // (throws when not sent: the documents are useless to a buyer who never gets the links)
+  // Freeze the complete set and the email, then send (throws when not sent:
+  // the documents are useless to a buyer who never gets the links).
   {
     const downloadLinks = templates
       .map((t) => `- ${t.label}: ${t.url}`)
       .join('\n');
 
-    const sent = await sendEmailOnce({
+    const packEmail = {
       from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
       to: email,
       subject: `Your LedgerHound Legal Pack is Ready — Case ${caseId}`,
@@ -321,18 +359,15 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
         </div>
       `,
       text: `LedgerHound Emergency Pack\n\nHi ${victimName || 'there'},\n\nYour legal documents for case ${caseId} (${research.name}) are ready.\n\nDownload your documents (links expire in 24 hours):\n${downloadLinks}\n\nLedgerHound by USPROJECT LLC\ncontact@ledgerhound.vip`,
-    }, input.idempotencyKey);
-    logger.info({ caseId, result: sent }, '[generateEmergencyPack] Email delivered');
+    };
+    const manifest = await writePackManifestOnce({
+      caseId,
+      createdAt: new Date().toISOString(),
+      documents: templates.map((t) => ({ type: t.type, label: t.label, key: t.key, url: t.url })),
+      email: packEmail,
+    });
+    await sendPackEmail(manifest, input.idempotencyKey);
+    return resultFrom(manifest, code);
   }
-
-  return {
-    success: true,
-    caseId,
-    country: code,
-    templates: templates.map((t) => ({
-      type: t.type,
-      label: t.label,
-      url: t.url,
-    })),
-  };
 }
+

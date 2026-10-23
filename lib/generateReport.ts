@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
-import { REPORT_CASE_ID_RE, createReportCaseId, deliverReport } from './report-delivery';
+import { REPORT_CASE_ID_RE, createReportCaseId, deliverReport, summarizeReport } from './report-delivery';
 import { backfillBlockTimestamps } from './backfill-timestamps';
 import { ReportDocument } from './reportPdf';
 import { getReportTranslations, type TimelineT, type EntityId, type Recovery } from './report-i18n';
@@ -2224,6 +2224,7 @@ export async function generateReport(
     amount: options?.amount || 4900,
     idempotencyKey: options?.idempotencyKey,
     skipEmail: options?.skipEmail,
+    summary: summarizeReport(reportData),
   });
 
   return { ...reportData, downloadUrl, s3Key };

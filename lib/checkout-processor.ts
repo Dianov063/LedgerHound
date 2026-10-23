@@ -1,9 +1,8 @@
 import { S3Client, GetObjectCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
-import { createReportCaseId } from '@/lib/report-delivery';
-import { getReports } from '@/lib/reports-log';
-import { paymentIdOf, putJob, type WebhookJob } from '@/lib/webhook-jobs';
+import { deliverFrozenReport, getFrozenReport, summarizeReport, type ReportSummary } from '@/lib/report-delivery';
+import { paymentIdOf, type WebhookJob } from '@/lib/webhook-jobs';
 import logger from '@/lib/logger';
 
 /**
@@ -14,10 +13,12 @@ import logger from '@/lib/logger';
  * Returns 'invalid' for checkouts that can never succeed (no retry), and
  * 'already-done' when a job finds its purchase already delivered.
  *
- * Retrying is safe at any point of a failed attempt: the forensic report keeps
- * the case id stored in the job (same S3 object, same log entry), and both
- * emails carry a per-payment Resend idempotency key, so a retry that finds
- * an email already sent does not send it again.
+ * Retrying is safe at any point of a failed attempt. The forensic report is
+ * frozen (PDF, hash, email payload, summary) before its first email under the
+ * case id stored in the job; a retry delivers that frozen version instead of
+ * rendering a new one. The pack freezes its document set and email the same
+ * way (lib/generateEmergencyPack.ts). Both emails carry a per-payment Resend
+ * idempotency key over an identical body, so Resend never sends twice.
  */
 export type CheckoutOutcome = 'done' | 'already-done' | 'invalid';
 
@@ -79,20 +80,35 @@ async function markPackComplete(caseId: string, job: WebhookJob, templates: stri
   }));
 }
 
-/** A report counts as delivered once logged with its email sent (legacy entries predate the flag). */
-async function reportDeliveredFor(paymentId: string): Promise<boolean> {
-  if (!paymentId) return false;
-  const reports = await getReports();
-  return reports.some((r) => r.stripePaymentId === paymentId && r.emailed !== false);
-}
+/**
+ * Delivers the forensic report of this purchase and returns its summary.
+ * If an earlier attempt froze it, that exact report is delivered again
+ * (idempotent); otherwise it is generated, frozen and delivered. Throws
+ * unless the customer has it (uploaded, emailed, logged).
+ */
+async function deliverForensicReport(
+  job: WebhookJob,
+  args: { walletAddress: string; email: string; amount: number; network: string; locale: string; country: string },
+): Promise<{ summary: ReportSummary; reused: boolean }> {
+  const caseId = job.reportCaseId;
+  if (!caseId) throw new Error('Job has no reportCaseId (it must be acquired through acquireJob)');
+  const paymentId = paymentIdOf(job.session);
 
-/** Fixes the report case id in the job before the first attempt, so every retry reuses it. */
-async function ensureReportCaseId(job: WebhookJob): Promise<string> {
-  if (!job.reportCaseId) {
-    job.reportCaseId = createReportCaseId();
-    await putJob(job);
+  const frozen = await getFrozenReport(caseId);
+  if (frozen) {
+    await deliverFrozenReport(frozen);
+    return { summary: frozen.summary ?? summarizeReport({}), reused: true };
   }
-  return job.reportCaseId;
+  const result = await generateReport(args.walletAddress, args.email, {
+    caseId,
+    idempotencyKey: `ledgerhound:report:${paymentId}`,
+    stripePaymentId: paymentId,
+    amount: args.amount,
+    network: args.network,
+    locale: args.locale,
+    country: args.country,
+  });
+  return { summary: summarizeReport(result), reused: false };
 }
 
 export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boolean }): Promise<CheckoutOutcome> {
@@ -146,42 +162,28 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
 
     logger.info({ caseId, country, lossAmount, eventId }, '[webhook] Generating Emergency Pack');
 
-    // 1. Generate Forensic Report FIRST to get enrichment data. A resumed job
-    //    whose report was already delivered skips it.
+    // 1. The forensic report is part of the pack: it must be delivered before
+    //    the legal documents, and a failure fails the attempt (the job is
+    //    retried) instead of shipping the pack without it. Its frozen summary
+    //    provides the enrichment, so every attempt builds the same documents.
     let enrichment: Record<string, unknown> = {};
-    if (walletAddress && !(opts.resumed && await reportDeliveredFor(paymentId))) {
-      try {
-        const reportResult = await generateReport(walletAddress, email, {
-          caseId: await ensureReportCaseId(job),
-          idempotencyKey: `ledgerhound:report:${paymentId}`,
-          stripePaymentId: paymentId,
-          amount: session.amount_total || 7900,
-          network: detectedNetwork,
-          locale: reportLocale,
-          country: reportCountry,
-        });
-        logger.info({ caseId: reportResult.caseId, eventId }, '[webhook] Forensic Report generated');
-
-        // Extract enrichment data for legal pack
-        const entities = reportResult.identifiedEntities || [];
-        const exchanges = entities.filter((e: { type: string }) => e.type === 'exchange');
-        enrichment = {
-          forensicCaseId: reportResult.caseId,
-          riskScore: reportResult.riskScore,
-          recoveryScore: reportResult.recoveryScore,
-          recoveryLabel: reportResult.recoveryLabel,
-          identifiedExchanges: exchanges.map((e: { label: string; address: string }) => ({
-            name: e.label,
-            address: e.address,
-          })),
-          mixerDetected: entities.some((e: { type: string }) => e.type === 'mixer'),
-          ofacWarning: reportResult.ofacWarning,
-          hops: reportResult.graphData?.nodes?.length || 0,
-          keyFindings: reportResult.keyFindings || [],
-        };
-      } catch (err) {
-        logger.error({ err, eventId }, '[webhook] Forensic Report failed, continuing with legal pack');
-      }
+    if (walletAddress) {
+      const { summary } = await deliverForensicReport(job, {
+        walletAddress, email, amount: session.amount_total || 7900, network: detectedNetwork, locale: reportLocale, country: reportCountry,
+      });
+      const exchanges = summary.identifiedEntities.filter((e) => e.type === 'exchange');
+      enrichment = {
+        forensicCaseId: job.reportCaseId,
+        riskScore: summary.riskScore,
+        recoveryScore: summary.recoveryScore,
+        recoveryLabel: summary.recoveryLabel,
+        identifiedExchanges: exchanges.map((e) => ({ name: e.label, address: e.address })),
+        mixerDetected: summary.identifiedEntities.some((e) => e.type === 'mixer'),
+        ofacWarning: summary.ofacWarning,
+        hops: summary.hops,
+        keyFindings: summary.keyFindings,
+      };
+      logger.info({ caseId: job.reportCaseId, eventId }, '[webhook] Forensic Report delivered');
     }
 
     // 2. Generate Emergency Pack with enrichment (throws → job is retried)
@@ -218,20 +220,11 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
     logger.error({ eventId, product }, '[webhook] Missing walletAddress for report');
     return 'invalid';
   }
-  if (opts.resumed && await reportDeliveredFor(paymentId)) {
-    logger.info({ eventId }, '[webhook] Resumed job: report already delivered, skipping');
-    return 'already-done';
-  }
   // Throws unless the report was uploaded, emailed and logged (lib/report-delivery.ts).
-  const result = await generateReport(walletAddress, email, {
-    caseId: await ensureReportCaseId(job),
-    idempotencyKey: `ledgerhound:report:${paymentId}`,
-    stripePaymentId: paymentId,
-    amount: session.amount_total || (product === 'summary_report' ? 1900 : 4900),
-    network,
-    locale: reportLocale,
-    country: reportCountry,
+  const { reused } = await deliverForensicReport(job, {
+    walletAddress, email, amount: session.amount_total || (product === 'summary_report' ? 1900 : 4900), network, locale: reportLocale, country: reportCountry,
   });
-  logger.info({ caseId: result.caseId, eventId, product }, '[webhook] Report generated');
+  logger.info({ caseId: job.reportCaseId, eventId, product, reused }, '[webhook] Report delivered');
+  if (reused) return 'already-done';
   return 'done';
 }

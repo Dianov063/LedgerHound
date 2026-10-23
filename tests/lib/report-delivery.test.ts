@@ -74,15 +74,40 @@ describe('deliverReport success criterion', () => {
     expect(entries()[0].emailed).toBe(true);
   });
 
-  it('email ok but upload failed: the retry uploads without emailing again', async () => {
+  it('storage down: nothing is sent; the retry stores and sends exactly once', async () => {
     failUpload();
-    await expect(deliverReport(input())).rejects.toMatchObject({ uploaded: false, emailed: true });
+    await expect(deliverReport(input())).rejects.toMatchObject({ uploaded: false, emailed: false });
+    expect(sentEmails).toHaveLength(0);
     expect(entries()).toHaveLength(0);
     s3Faults.length = 0;
     await deliverReport(input());
     expect(sentEmails).toHaveLength(1);
     expect(s3Store.has(`reports/${input().caseId}.pdf`)).toBe(true);
     expect(entries()).toHaveLength(1);
+  });
+
+  it('a retry never replaces the stored PDF, hash or email with a new rendering', async () => {
+    resendFailures.push({ name: 'application_error', message: 'down' });
+    await expect(deliverReport(input({ buf: Buffer.from('%PDF-FIRST'), pdfSha256: 'sha-first' }))).rejects.toBeInstanceOf(ReportDeliveryError);
+    await deliverReport(input({ buf: Buffer.from('%PDF-SECOND'), pdfSha256: 'sha-second' }));
+    expect(s3Store.get(`reports/${input().caseId}.pdf`)?.body).toBe('%PDF-FIRST');
+    const sent = sentEmails[0] as { attachments: { content: Buffer }[]; html: string };
+    expect(sent.attachments[0].content.toString()).toBe('%PDF-FIRST');
+    expect(sent.html).toContain('sha-first');
+    expect(sent.html).not.toContain('sha-second');
+  });
+
+  it('a crash between storing the PDF and freezing keeps that PDF', async () => {
+    let failed = false;
+    s3Faults.push((cmd, i) => {
+      if (failed || cmd !== 'PutObjectCommand' || !String(i.Key).endsWith('.delivery.json')) return null;
+      failed = true;
+      return new Error('crash');
+    });
+    await expect(deliverReport(input({ buf: Buffer.from('%PDF-STORED') }))).rejects.toBeInstanceOf(ReportDeliveryError);
+    expect(sentEmails).toHaveLength(0);
+    await deliverReport(input({ buf: Buffer.from('%PDF-RERENDERED') }));
+    expect((sentEmails[0] as { attachments: { content: Buffer }[] }).attachments[0].content.toString()).toBe('%PDF-STORED');
   });
 
   it('email sent but the result record not saved: the retry neither re-sends nor duplicates the record', async () => {

@@ -9,6 +9,7 @@ export interface StoredObject {
   modified: Date;
   input: Record<string, unknown>;
   etag?: string;
+  bytes?: Buffer;
 }
 
 let etagCounter = 0;
@@ -66,15 +67,25 @@ export class S3Client {
         const current = s3Store.get(key);
         if (!current || current.etag !== input.IfMatch) throw s3Error('PreconditionFailed', 412);
       }
-      const body = typeof input.Body === 'string' ? input.Body : String(input.Body ?? '');
+      const bytes = Buffer.isBuffer(input.Body) ? Buffer.from(input.Body) : Buffer.from(String(input.Body ?? ''), 'utf8');
+      const body = bytes.toString('utf8');
       const etag = nextEtag();
-      s3Store.set(key, { body, modified: new Date(), input, etag });
+      s3Store.set(key, { body, modified: new Date(), input, etag, bytes });
       return { ETag: etag, $metadata: { httpStatusCode: 200 } };
     }
     if (cmd instanceof GetObjectCommand) {
       const o = s3Store.get(key);
       if (!o) throw s3Error('NoSuchKey', 404);
-      return { Body: { transformToString: async () => o.body }, LastModified: o.modified, ETag: o.etag, $metadata: { httpStatusCode: 200 } };
+      return {
+        Body: {
+          transformToString: async () => o.body,
+          transformToByteArray: async () => new Uint8Array(o.bytes ?? Buffer.from(o.body, 'utf8')),
+        },
+        LastModified: o.modified,
+        ETag: o.etag,
+        Metadata: o.input.Metadata,
+        $metadata: { httpStatusCode: 200 },
+      };
     }
     if (cmd instanceof HeadObjectCommand) {
       const o = s3Store.get(key);

@@ -5,6 +5,14 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { requireAdmin } from '@/lib/admin-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { ANY_CASE_ID_RE, verifyPaidSessionForCase } from '@/lib/emergency-case-access';
+import { readPackManifest } from '@/lib/legal-packs/manifest';
+
+/**
+ * Packs generated before manifests existed have PDFs only. Anything the job
+ * queue is still working on is younger than its 23 h expiry, so PDFs older
+ * than this without a manifest are a finished legacy pack.
+ */
+const LEGACY_PACK_AGE_MS = 48 * 60 * 60 * 1000;
 
 export const dynamic = 'force-dynamic';
 
@@ -84,7 +92,16 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    const objects = (list.Contents || []).filter((o) => o.Key?.endsWith('.pdf'));
+    const pdfs = (list.Contents || []).filter((o) => o.Key?.endsWith('.pdf'));
+
+    // 'ready' only for the complete set: the manifest is written after every
+    // document is stored. A partial set (generation still running or being
+    // retried) reports 'generating', so the success page keeps polling.
+    const manifest = await readPackManifest(caseId);
+    const newest = Math.max(0, ...pdfs.map((o) => o.LastModified?.getTime() ?? 0));
+    const legacyComplete = !manifest && pdfs.length > 0 && Date.now() - newest > LEGACY_PACK_AGE_MS;
+    const manifestKeys = new Set(manifest?.documents.map((d) => d.key) ?? []);
+    const objects = manifest ? pdfs.filter((o) => manifestKeys.has(o.Key!)) : legacyComplete ? pdfs : [];
 
     if (objects.length === 0) {
       // Also check if case data exists (payment was made but generation hasn't finished)
@@ -102,7 +119,7 @@ export async function GET(req: NextRequest) {
       }
 
       return NextResponse.json({
-        status: caseExists ? 'generating' : 'not_found',
+        status: caseExists || pdfs.length > 0 ? 'generating' : 'not_found',
         caseId,
         documents: [],
       });

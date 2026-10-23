@@ -1,9 +1,9 @@
 export const maxDuration = 120; // Vercel: waitUntil keeps the function alive while a report generates (30-60s)
 
 import Stripe from 'stripe';
-import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { isDraining, runInBackground } from '@/lib/background-tasks';
-import { deleteJob, jobFromEvent, saveJob } from '@/lib/webhook-jobs';
+import { acquireJob, claimPaymentFor, deleteJob, jobFromEvent, saveJob } from '@/lib/webhook-jobs';
 import { startJobInBackground } from '@/lib/webhook-job-runner';
 import logger from '@/lib/logger';
 
@@ -19,7 +19,6 @@ const getS3 = () =>
 const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
 const IDEMPOTENCY_PREFIX = 'webhook-events/';
-const PAYMENT_LOCK_PREFIX = 'webhook-payment-locks/';
 
 /**
  * Atomic idempotency: try to claim the event using S3 conditional write.
@@ -48,53 +47,6 @@ async function claimEvent(eventId: string): Promise<boolean> {
     }
     // Unexpected S3 error — log but allow processing (better one duplicate than zero)
     logger.error({ err, eventId }, '[webhook] S3 claimEvent failed unexpectedly — proceeding anyway');
-    return true;
-  }
-}
-
-/**
- * SECOND level of deduplication: by payment_intent ID.
- * Even if Stripe sends DIFFERENT event IDs for the same payment
- * (e.g., retries from before idempotency was deployed), this prevents duplicates.
- * Uses HeadObject for fast existence check, then atomic PutObject.
- */
-async function claimPayment(paymentId: string): Promise<boolean> {
-  if (!paymentId) return true; // If no payment ID, skip this check
-  const key = `${PAYMENT_LOCK_PREFIX}${paymentId}`;
-
-  // Fast check if payment was already processed
-  try {
-    await getS3().send(new HeadObjectCommand({
-      Bucket: s3Bucket(),
-      Key: key,
-    }));
-    // Object exists = payment already processed
-    logger.info({ paymentId }, '[webhook] Payment already processed — skipping');
-    return false;
-  } catch {
-    // Object doesn't exist — try to claim it
-  }
-
-  // Atomic claim
-  try {
-    await getS3().send(new PutObjectCommand({
-      Bucket: s3Bucket(),
-      Key: key,
-      Body: JSON.stringify({ claimedAt: new Date().toISOString() }),
-      ContentType: 'application/json',
-      ServerSideEncryption: 'aws:kms',
-      IfNoneMatch: '*',
-    }));
-    logger.info({ paymentId }, '[webhook] Payment claimed for processing');
-    return true;
-  } catch (err: unknown) {
-    const statusCode = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-    const errName = (err as { name?: string }).name;
-    if (statusCode === 412 || errName === 'PreconditionFailed' || errName === 'ConditionalCheckFailed') {
-      logger.info({ paymentId }, '[webhook] Payment already claimed — skipping (race)');
-      return false;
-    }
-    logger.error({ err, paymentId }, '[webhook] S3 claimPayment failed — proceeding anyway');
     return true;
   }
 }
@@ -146,9 +98,10 @@ export async function GET() {
  *    (webhook-jobs/pending/<eventId>.json). Failing that, answer 500 so
  *    Stripe redelivers; nothing has been claimed yet.
  * 4. Claim event atomically via S3 conditional write (prevents race conditions)
- * 5. Claim payment atomically (prevents duplicates from old retries with different event IDs)
- *    Whoever wins both claims owns the job; a losing delivery removes the
- *    job record it just created (it is a duplicate).
+ * 5. Payment ownership: the payment lock records the owning event; another
+ *    event for the same payment is a duplicate and its job record is removed.
+ *    Then the right to run is taken by an atomic CAS on the job record
+ *    (acquireJob); a sweep or another delivery racing us cannot also run it.
  * 6. Return 200 IMMEDIATELY to Stripe (prevents retries)
  * 7. Generate in the background, tracked for graceful shutdown. The job
  *    record is removed on success; if the process dies first, the recovery
@@ -229,22 +182,42 @@ export async function POST(request: Request) {
   // who runs it.
 
   // ── LAYER 2: Payment-level deduplication ──
+  // The payment lock records which event owns the payment. A different event
+  // for the same payment is a duplicate. Owning it is not the right to run.
   const session = event.data.object;
   const paymentId = session.payment_intent || session.id || '';
-  const paymentClaimed = await claimPayment(paymentId);
-  if (!paymentClaimed) {
-    logger.warn({ eventId: event.id, paymentId }, '[webhook] Event passed event-level check but BLOCKED by payment-level check');
+  let owner: 'owner' | 'other';
+  try {
+    owner = await claimPaymentFor(paymentId, event.id, 'webhook');
+  } catch (err) {
+    logger.error({ err, eventId: event.id }, '[webhook] Could not verify payment ownership; asking Stripe to retry');
+    return Response.json({ error: 'Temporary failure' }, { status: 500 });
+  }
+  if (owner === 'other') {
+    logger.warn({ eventId: event.id, paymentId }, '[webhook] Payment owned by another event; duplicate dropped');
     await dropDuplicate();
     return Response.json({ received: true });
   }
 
+  // ── LAYER 3: the right to run this attempt (atomic CAS on the job record) ──
+  // A sweep or another delivery may be racing us for the same job; exactly
+  // one acquire succeeds. Losing means someone else runs (or ran) it.
+  let acquired;
+  try {
+    acquired = await acquireJob(job.eventId);
+  } catch (err) {
+    logger.error({ err, eventId: event.id }, '[webhook] Could not acquire job; asking Stripe to retry');
+    return Response.json({ error: 'Temporary failure' }, { status: 500 });
+  }
+  if (!acquired) {
+    logger.info({ eventId: event.id }, '[webhook] Job already running or finished elsewhere');
+    return Response.json({ received: true });
+  }
   if (created === 'exists') {
-    // An earlier delivery wrote the job but died before taking the payment
-    // lock; we hold it now, so we run it.
     logger.info({ eventId: event.id }, '[webhook] Resuming job written by an earlier delivery');
   }
 
   // ── Return 200 immediately, process in background ──
-  startJobInBackground(job);
+  startJobInBackground(acquired);
   return Response.json({ received: true });
 }

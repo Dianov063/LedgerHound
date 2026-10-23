@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getJson, putJson, resetS3, s3Faults, s3Store } from './helpers/aws-s3-mock';
+import { resetResend, sentEmails } from './helpers/resend-mock';
 import { resetStripe } from './helpers/stripe-mock';
 import { POST as webhook } from '@/app/api/webhook/route';
 import { GET as sweep } from '@/app/api/admin/resume-webhook-jobs/route';
@@ -23,6 +24,8 @@ const gen = vi.hoisted(() => ({
 vi.mock('@/lib/generateReport', () => ({ generateReport: gen.report }));
 vi.mock('@/lib/generateEmergencyPack', () => ({ generateEmergencyPack: gen.pack }));
 vi.mock('@/lib/reports-log', () => ({ getReports: gen.reports, logReport: vi.fn() }));
+vi.mock('resend', () => import('./helpers/resend-mock'));
+vi.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: async () => 'https://signed.example/x' }));
 
 const EVENT_ID = 'evt_test_0001';
 const PAYMENT = 'pi_test_0001';
@@ -70,9 +73,22 @@ function seedJob(over: Partial<WebhookJob>) {
   return job;
 }
 
+const REPORT_CASE = 'LH-MGK1Z2AB-0123456789abcdef';
+/** What lib/report-delivery.ts writes before the first email of a report. */
+function seedFrozenReport(caseId: string, summary: Record<string, unknown> = { identifiedEntities: [], hops: 0, keyFindings: [] }) {
+  s3Store.set(`reports/${caseId}.pdf`, { body: '%PDF-FROZEN', bytes: Buffer.from('%PDF-FROZEN'), modified: new Date(), input: { Metadata: { sha256: 'sha' } } });
+  putJson(`reports/${caseId}.delivery.json`, {
+    caseId, pdfKey: `reports/${caseId}.pdf`, pdfSha256: 'sha', downloadUrl: 'https://signed.example/x', frozenAt: 'earlier',
+    email: { payload: { from: 'a@x.test', to: 'buyer@example.com', subject: 'Report', html: '<p>r</p>' }, attachments: [{ filename: 'r.pdf', pdf: true }], idempotencyKey: `ledgerhound:report:${PAYMENT}` },
+    log: { walletAddress: '0xabc', email: 'buyer@example.com', network: 'eth', stripePaymentId: PAYMENT, amount: 4900 },
+    summary,
+  });
+}
+
 beforeEach(() => {
   resetS3();
   resetStripe();
+  resetResend();
   __resetBackgroundTasksForTests();
   gen.report.mockReset().mockResolvedValue({ caseId: 'LH-TEST', identifiedEntities: [] });
   gen.pack.mockReset().mockResolvedValue({ templates: [] });
@@ -152,12 +168,14 @@ describe('recovery sweep', () => {
     expect(s3Store.has(jobKey())).toBe(false);
   });
 
-  it('does not email twice when the interrupted run had already produced the report', async () => {
-    gen.reports.mockResolvedValue([{ stripePaymentId: PAYMENT }]);
-    seedJob({ status: 'running', attempts: 1, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
+  it('an interrupted run that already froze its report: the frozen report is delivered, not regenerated', async () => {
+    seedFrozenReport(REPORT_CASE);
+    seedJob({ reportCaseId: REPORT_CASE, status: 'running', attempts: 1, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
     const summary = await resumeStaleJobs();
     expect(summary.succeeded).toBe(1);
     expect(gen.report).not.toHaveBeenCalled();
+    expect(sentEmails).toHaveLength(1);
+    expect((sentEmails[0] as { attachments: { content: Buffer }[] }).attachments[0].content.toString()).toBe('%PDF-FROZEN');
     expect(s3Store.has(jobKey())).toBe(false);
   });
 
@@ -168,12 +186,21 @@ describe('recovery sweep', () => {
     expect(gen.report).not.toHaveBeenCalled();
   });
 
-  it('resumes a never-started job that this deployment did claim', async () => {
-    putJson(`webhook-payment-locks/${PAYMENT}`, { claimedAt: 'earlier' });
+  it('resumes a never-started job whose event already owns the payment', async () => {
+    putJson(`webhook-payment-locks/${PAYMENT}`, { claimedAt: 'earlier', eventId: EVENT_ID });
     seedJob({});
     const summary = await resumeStaleJobs();
     expect(summary.resumed).toBe(1);
     expect(gen.report).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes a never-started job whose payment is owned by a different event', async () => {
+    putJson(`webhook-payment-locks/${PAYMENT}`, { claimedAt: 'earlier', eventId: 'evt_other' });
+    seedJob({});
+    const summary = await resumeStaleJobs();
+    expect(summary.duplicates).toBe(1);
+    expect(gen.report).not.toHaveBeenCalled();
+    expect(s3Store.has(jobKey())).toBe(false);
   });
 
   it('does not touch a job that is running in this process', async () => {
@@ -302,6 +329,92 @@ describe('emergency pack completeness', () => {
   });
 });
 
+describe('emergency pack with its mandatory forensic report', () => {
+  const CASE = 'ER-MGK1Z2AB-0123456789abcdef';
+  const marker = `legal-packs/cases/${CASE}/complete.json`;
+  const packWithWallet = () => {
+    const e = event();
+    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US', walletAddress: '0xabc' } as never;
+    return e;
+  };
+  const summary = {
+    riskScore: 77, recoveryScore: 40, recoveryLabel: 'Moderate', hops: 5, keyFindings: ['k'],
+    identifiedEntities: [{ type: 'exchange', label: 'Binance', address: '0xb1' }, { type: 'mixer', label: 'Tornado', address: '0xm' }],
+  };
+  /** Stand-in for generateReport: freezes like the real one, then succeeds. */
+  const freezingReport = async (...args: unknown[]) => {
+    const opts = args[2] as { caseId: string };
+    seedFrozenReport(opts.caseId, summary);
+    return { caseId: opts.caseId, identifiedEntities: summary.identifiedEntities, riskScore: 77, recoveryScore: 40, recoveryLabel: 'Moderate', graphData: { nodes: [1, 2, 3, 4, 5] }, keyFindings: ['k'] };
+  };
+  const backoffPassed = () => {
+    const job = getJson<WebhookJob>(jobKey())!;
+    putJson(jobKey(), { ...job, lastAttemptAt: new Date(Date.now() - RETRY_BACKOFF_MS - 60_000).toISOString() });
+  };
+
+  it('a failed forensic report fails the attempt: no legal documents, no completion, job kept', async () => {
+    gen.report.mockRejectedValueOnce(new Error('Report not delivered (uploaded=false, emailed=false)'));
+    await deliver(packWithWallet());
+    await settle();
+    expect(gen.pack).not.toHaveBeenCalled();
+    expect(s3Store.has(marker)).toBe(false);
+    expect(getJson<WebhookJob>(jobKey())?.lastError).toContain('Report not delivered');
+  });
+
+  it('a retry after the pack failed reuses the frozen report and builds the same enrichment', async () => {
+    gen.report.mockImplementationOnce(freezingReport);
+    gen.pack.mockRejectedValueOnce(new Error('renderer crashed'));
+    await deliver(packWithWallet());
+    await settle();
+    backoffPassed();
+    gen.pack.mockResolvedValueOnce({ templates: [{ type: 'police-complaint', label: 'p', url: 'u' }] });
+    await resumeStaleJobs();
+
+    expect(gen.report).toHaveBeenCalledTimes(1); // not regenerated on retry
+    const [first, second] = gen.pack.mock.calls.map((c) => (c[0] as { enrichment: Record<string, unknown> }).enrichment);
+    expect(second).toEqual(first);
+    expect(first).toMatchObject({
+      riskScore: 77, recoveryScore: 40, hops: 5, mixerDetected: true,
+      identifiedExchanges: [{ name: 'Binance', address: '0xb1' }],
+    });
+    expect(s3Store.has(marker)).toBe(true);
+    expect(s3Store.has(jobKey())).toBe(false);
+  });
+});
+
+describe('payment owner is not the right to run', () => {
+  it('a redelivery for a job already running elsewhere does not start a second runner', async () => {
+    // Another process acquired the job a minute ago and is still generating.
+    putJson(`webhook-payment-locks/${PAYMENT}`, { claimedAt: 'earlier', eventId: EVENT_ID });
+    putJson(`webhook-events/${EVENT_ID}`, { claimedAt: 'earlier' });
+    seedJob({ status: 'running', attempts: 1, startedAt: new Date(Date.now() - 60_000).toISOString() });
+    expect((await deliver()).status).toBe(200);
+    await settle();
+    expect(gen.report).not.toHaveBeenCalled();
+  });
+
+  it('a stale runner that was taken over cannot overwrite the new runner state', async () => {
+    let release: (v?: unknown) => void = () => {};
+    gen.report.mockImplementationOnce(() => new Promise((_r, reject) => { release = () => reject(new Error('old runner failed late')); }));
+    await deliver(); // runner A acquires
+    await vi.waitFor(() => expect(gen.report).toHaveBeenCalledTimes(1));
+    // A goes silent; much later the sweep takes the job over (runner B).
+    const job = getJson<WebhookJob>(jobKey())!;
+    putJson(jobKey(), { ...job, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
+    __resetBackgroundTasksForTests(); // A's process is "gone" for the sweep's in-flight check
+    let releaseB: () => void = () => {};
+    gen.report.mockImplementationOnce(() => new Promise((r) => { releaseB = () => r({ caseId: 'LH', identifiedEntities: [] }); }));
+    const sweeping = resumeStaleJobs();
+    await vi.waitFor(() => expect(gen.report).toHaveBeenCalledTimes(2));
+    release(); // A finally fails: must not put the job back to pending under B
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getJson<WebhookJob>(jobKey())?.status).toBe('running');
+    releaseB();
+    await sweeping;
+    expect(s3Store.has(jobKey())).toBe(false);
+  });
+});
+
 describe('forensic report retries', () => {
   it('reuses one report case id and idempotency key across attempts', async () => {
     gen.report.mockRejectedValueOnce(new Error('Report not delivered (uploaded=true, emailed=false)'));
@@ -317,11 +430,18 @@ describe('forensic report retries', () => {
     expect(first.caseId).toBe(job.reportCaseId);
   });
 
-  it('a logged report whose email did not go out is not treated as delivered', async () => {
-    gen.reports.mockResolvedValue([{ stripePaymentId: PAYMENT, emailed: false }]);
-    seedJob({ status: 'running', attempts: 1, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
+  it('a frozen report whose email failed is re-sent from the frozen version on retry', async () => {
+    seedFrozenReport(REPORT_CASE);
+    const { resendFailures } = await import('./helpers/resend-mock');
+    resendFailures.push({ name: 'application_error', message: 'down' });
+    seedJob({ reportCaseId: REPORT_CASE, status: 'running', attempts: 1, startedAt: new Date(Date.now() - STALE_RUNNING_MS - 60_000).toISOString() });
     await resumeStaleJobs();
-    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(sentEmails).toHaveLength(0);
+    const job = getJson<WebhookJob>(jobKey())!;
+    putJson(jobKey(), { ...job, lastAttemptAt: new Date(Date.now() - RETRY_BACKOFF_MS - 60_000).toISOString() });
+    await resumeStaleJobs();
+    expect(gen.report).not.toHaveBeenCalled();
+    expect(sentEmails).toHaveLength(1);
   });
 });
 

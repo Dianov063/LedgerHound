@@ -22,7 +22,13 @@ const LEGACY_CASE = 'ER-MGK1Z2AB'; // pre-2026-10 timestamp-only id (enumerable)
 
 function seedPack(caseId: string, email: string) {
   putJson(`emergency-cases/${caseId}.json`, { caseId, email });
-  s3Store.set(`legal-packs/cases/${caseId}/police-complaint.pdf`, { body: '%PDF', modified: new Date(), input: {} });
+  const key = `legal-packs/cases/${caseId}/police-complaint.pdf`;
+  s3Store.set(key, { body: '%PDF', modified: new Date(), input: {} });
+  // Complete set: the manifest is written after every document is stored.
+  putJson(`legal-packs/cases/${caseId}/manifest.json`, {
+    caseId, createdAt: new Date().toISOString(),
+    documents: [{ type: 'police-complaint', label: 'Police Complaint', key, url: 'x' }], email: {},
+  });
 }
 
 function seedSession(id: string, caseId: string, paid = true) {
@@ -47,6 +53,43 @@ beforeEach(() => {
   seedPack(NEW_CASE, 'victim@example.com');
   seedPack(OTHER_CASE, 'other@example.com');
   seedPack(LEGACY_CASE, 'legacy@example.com');
+});
+
+describe('GET /api/emergency/status completeness', () => {
+  const CASE = 'ER-MGK1Z2AD-1111111111111111';
+  const pdf = (doc: string) => `legal-packs/cases/${CASE}/${doc}.pdf`;
+  beforeEach(() => {
+    putJson(`emergency-cases/${CASE}.json`, { caseId: CASE, email: 'p@example.com' });
+    seedSession('cs_test_partial000001', CASE);
+  });
+  const status = () => call({ case_id: CASE, session_id: 'cs_test_partial000001' });
+
+  it('reports generating (no documents) while only part of the pack exists', async () => {
+    s3Store.set(pdf('police-complaint'), { body: '%PDF', modified: new Date(), input: {} });
+    const { status: code, body } = await status();
+    expect(code).toBe(200);
+    expect(body.status).toBe('generating');
+    expect(body.documents).toEqual([]);
+  });
+
+  it('reports ready with exactly the documents of the complete set', async () => {
+    for (const d of ['police-complaint', 'regulator-complaint']) s3Store.set(pdf(d), { body: '%PDF', modified: new Date(), input: {} });
+    putJson(`legal-packs/cases/${CASE}/manifest.json`, {
+      caseId: CASE, createdAt: 'now', email: {},
+      documents: ['police-complaint', 'regulator-complaint'].map((d) => ({ type: d, label: d, key: pdf(d), url: 'x' })),
+    });
+    const { body } = await status();
+    expect(body.status).toBe('ready');
+    expect(body.documents.map((d: { type: string }) => d.type).sort()).toEqual(['police-complaint', 'regulator-complaint']);
+  });
+
+  it('treats an old pack without a manifest (generated before manifests) as ready', async () => {
+    const old = new Date(Date.now() - 72 * 3600 * 1000);
+    s3Store.set(pdf('police-complaint'), { body: '%PDF', modified: old, input: {} });
+    const { body } = await status();
+    expect(body.status).toBe('ready');
+    expect(body.documents).toHaveLength(1);
+  });
 });
 
 describe('GET /api/emergency/status access control', () => {

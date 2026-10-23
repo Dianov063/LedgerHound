@@ -2,59 +2,49 @@ import { isInFlight, runInBackground } from '@/lib/background-tasks';
 import { processCheckoutJob, type CheckoutOutcome } from '@/lib/checkout-processor';
 import {
   MAX_ATTEMPTS,
-  claimPaymentLock,
+  acquireJob,
+  claimPaymentFor,
   classifyJob,
   deleteJob,
   listPendingJobs,
   moveToFailed,
   paymentIdOf,
-  paymentLockExists,
-  putJob,
-  type WebhookJob,
+  putJobIfOwned,
+  type StoredJob,
 } from '@/lib/webhook-jobs';
 import logger from '@/lib/logger';
 
 export type RunResult = CheckoutOutcome | 'failed';
 
 /**
- * Runs one job: marks it running, generates, then removes it (success),
- * parks it in failed/ (invalid or out of attempts), or puts it back as
- * pending with the error for a later retry. Never throws.
+ * Runs one attempt of a job that this caller has ACQUIRED (acquireJob: the
+ * record is already marked running with attempts incremented). Removes the
+ * job on success, parks it in failed/ (invalid or out of attempts), or puts
+ * it back as pending for a later retry. Failure writes are conditional on the
+ * ETag from acquiring, so a runner that was taken over cannot clobber the new
+ * runner's state. Never throws.
  */
-export async function runJob(job: WebhookJob, opts: { resumed: boolean }): Promise<RunResult> {
-  const now = new Date().toISOString();
-  const running: WebhookJob = {
-    ...job,
-    status: 'running',
-    attempts: job.attempts + 1,
-    startedAt: now,
-    lastAttemptAt: now,
-  };
+export async function runJob(acquired: StoredJob, opts: { resumed: boolean }): Promise<RunResult> {
+  const { job, etag } = acquired;
   try {
-    await putJob(running);
-  } catch (err) {
-    // The record still exists from saveJob; recovery just sees older timestamps.
-    logger.warn({ err, eventId: job.eventId }, '[webhook-jobs] Could not mark job running');
-  }
-
-  try {
-    const outcome = await processCheckoutJob(running, opts);
+    const outcome = await processCheckoutJob(job, opts);
     if (outcome === 'invalid') {
-      await moveToFailed(running, 'invalid checkout metadata');
+      await moveToFailed(job, 'invalid checkout metadata');
       logger.error({ eventId: job.eventId }, '[webhook-jobs] Invalid checkout parked in webhook-jobs/failed/');
     } else {
-      await deleteJob(running.eventId);
+      await deleteJob(job.eventId);
     }
     return outcome;
   } catch (err) {
     const reason = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
     try {
-      if (running.attempts >= MAX_ATTEMPTS) {
-        await moveToFailed(running, reason);
-        logger.error({ eventId: job.eventId, attempts: running.attempts }, '[webhook-jobs] Job failed permanently; manual follow-up needed (webhook-jobs/failed/)');
+      if (job.attempts >= MAX_ATTEMPTS) {
+        await moveToFailed(job, reason);
+        logger.error({ eventId: job.eventId, attempts: job.attempts }, '[webhook-jobs] Job failed permanently; manual follow-up needed (webhook-jobs/failed/)');
+      } else if (await putJobIfOwned({ ...job, status: 'pending', lastError: reason }, etag)) {
+        logger.warn({ eventId: job.eventId, attempts: job.attempts }, '[webhook-jobs] Job failed; will retry');
       } else {
-        await putJob({ ...running, status: 'pending', lastError: reason });
-        logger.warn({ eventId: job.eventId, attempts: running.attempts }, '[webhook-jobs] Job failed; will retry');
+        logger.warn({ eventId: job.eventId }, '[webhook-jobs] Job failed after another runner took it over; leaving its state alone');
       }
     } catch (storeErr) {
       logger.error({ err: storeErr, eventId: job.eventId }, '[webhook-jobs] Could not record job failure');
@@ -63,9 +53,9 @@ export async function runJob(job: WebhookJob, opts: { resumed: boolean }): Promi
   }
 }
 
-/** Starts a job after the HTTP response, tracked for graceful shutdown. */
-export function startJobInBackground(job: WebhookJob): void {
-  runInBackground(runJob(job, { resumed: false }), job.eventId);
+/** Runs an acquired job after the HTTP response, tracked for graceful shutdown. */
+export function startJobInBackground(acquired: StoredJob): void {
+  runInBackground(runJob(acquired, { resumed: false }), acquired.job.eventId);
 }
 
 export interface SweepSummary {
@@ -76,11 +66,17 @@ export interface SweepSummary {
   expired: number;
   waiting: number;
   skippedInFlight: number;
+  /** Lost the acquire race (another runner started it) or found it changed. */
+  skippedTaken: number;
+  /** Jobs whose payment is owned by a different event (duplicates), removed. */
+  duplicates: number;
 }
 
 /**
  * Recovery sweep: resumes jobs whose runner went away (crash, OOM kill,
  * container restart, deploy) and retries failed attempts after a backoff.
+ * Every start goes through acquireJob() on the exact version classified, so a
+ * concurrent webhook redelivery and the sweep never both run an attempt.
  * Runs jobs one at a time to keep peak memory bounded.
  */
 export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {}): Promise<SweepSummary> {
@@ -88,10 +84,10 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
   const now = opts.now ?? Date.now();
   const jobs = await listPendingJobs();
   const summary: SweepSummary = {
-    pending: jobs.length, resumed: 0, succeeded: 0, failed: 0, expired: 0, waiting: 0, skippedInFlight: 0,
+    pending: jobs.length, resumed: 0, succeeded: 0, failed: 0, expired: 0, waiting: 0, skippedInFlight: 0, skippedTaken: 0, duplicates: 0,
   };
 
-  for (const job of jobs) {
+  for (const { job, etag } of jobs) {
     const decision = classifyJob(job, now, isInFlight(job.eventId));
     if (decision === 'skip-in-flight') { summary.skippedInFlight++; continue; }
     if (decision === 'wait') { summary.waiting++; continue; }
@@ -103,20 +99,22 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
     }
     if (summary.resumed >= limit) { summary.waiting++; continue; }
     if (decision === 'check-claim') {
-      // Its delivery died before starting it: after writing the job, after the
-      // event lock, or after the payment lock. Run it if the payment lock is
-      // held, or take the lock now. A Stripe redelivery racing us competes for
-      // the same atomic lock, so exactly one of us runs it.
-      const paymentId = paymentIdOf(job.session);
-      const held = await paymentLockExists(paymentId);
-      if (!held && !(await claimPaymentLock(paymentId, job.eventId))) {
-        summary.waiting++;
+      // Never started: its delivery died after writing the job (possibly
+      // between the event and the payment lock). Make sure this event owns
+      // the payment; a different event owning it means this job is a duplicate.
+      if (await claimPaymentFor(paymentIdOf(job.session), job.eventId, 'recovery-sweep') === 'other') {
+        await deleteJob(job.eventId);
+        logger.warn({ eventId: job.eventId }, '[webhook-jobs] Payment owned by another event; duplicate job removed');
+        summary.duplicates++;
         continue;
       }
     }
 
+    const acquired = await acquireJob(job.eventId, { now, expectEtag: etag });
+    if (!acquired) { summary.skippedTaken++; continue; }
+
     summary.resumed++;
-    const run = runJob(job, { resumed: true });
+    const run = runJob(acquired, { resumed: true });
     runInBackground(run, job.eventId); // tracked so SIGTERM drains it too
     const result = await run;
     if (result === 'failed') summary.failed++;

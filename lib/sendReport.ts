@@ -1,8 +1,14 @@
+import type { CreateEmailOptions } from 'resend';
 import { EMAIL_TEMPLATES_ES } from './email-templates/templates';
-import { sendEmailOnce, type SendResult } from './idempotent-email';
 import logger from './logger';
 
-export async function sendReport(
+/**
+ * Builds the report delivery email (subject, html, text, attachments: the PDF
+ * first, then any ES recovery templates). Pure: the caller freezes the result
+ * before the first send so every retry sends byte-identical content
+ * (lib/report-delivery.ts).
+ */
+export function buildReportEmail(
   email: string,
   walletAddress: string,
   pdfBuffer: Buffer,
@@ -11,9 +17,7 @@ export async function sendReport(
   locale?: string,
   country?: string,
   pdfSha256?: string,
-  /** Same key on every retry of one purchase, so the customer gets one email. */
-  idempotencyKey?: string,
-): Promise<SendResult> {
+): CreateEmailOptions {
   const shortAddr = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
   const isEs = locale === 'es';
 
@@ -50,7 +54,7 @@ export async function sendReport(
     .map((t) => `<li><strong>${t.filename}</strong> — ${TEMPLATE_DESC_ES[t.id] ?? t.label}</li>`)
     .join('');
 
-  return sendEmailOnce({
+  return {
     from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
     to: email,
     subject: `Your LedgerHound Forensic Report is Ready — ${caseId}`,
@@ -162,5 +166,5 @@ export async function sendReport(
       },
       ...templateAttachments,
     ],
-  }, idempotencyKey);
+  };
 }
