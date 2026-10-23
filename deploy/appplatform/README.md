@@ -130,12 +130,23 @@ A purchase counts as delivered only when the customer can use it:
   then `legal-packs/cases/<caseId>/complete.json` is written. PDFs without that
   marker are an interrupted pack and are rebuilt.
 
-Anything short of that throws and the job is retried. Retries are safe: the
-report case id is stored in the job before the first attempt (same S3 object,
-log entry updated in place via conditional writes), and both emails carry a
-per-payment Resend idempotency key, so a retry that finds an email already
-sent does not send it again. Resend keeps keys for 24 h, so jobs expire after
-23 h into `webhook-jobs/failed/` instead of being retried later.
+Anything short of that throws and the job is retried. Who runs an attempt is
+decided by an atomic compare-and-swap on the job record (If-Match on its
+ETag), used by the webhook and the sweep alike; the payment lock only records
+which Stripe event owns the payment. For the Emergency Pack the forensic
+report is mandatory and delivered first.
+
+Retries never produce a different document. Before the first email the report
+is frozen in `reports/<caseId>.delivery.json` (write-once PDF, its hash, the
+exact email payload and the summary the pack uses); pack documents are
+write-once and the pack email is frozen in `legal-packs/cases/<caseId>/manifest.json`,
+written after every document is stored. A retry re-sends the identical frozen
+email under the same per-payment Resend idempotency key, which Resend dedupes.
+Resend keeps keys for 24 h, so jobs expire after 23 h into
+`webhook-jobs/failed/` instead of being retried later.
+
+`/api/emergency/status` reports `ready` only when the manifest exists (the
+complete set); packs generated before manifests count as complete after 48 h.
 
 The cron runner calls `/api/admin/resume-webhook-jobs` every 5 minutes: jobs
 never started after 10 min (it takes the payment lock if nobody holds it),
