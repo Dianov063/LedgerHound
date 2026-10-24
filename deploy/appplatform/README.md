@@ -62,6 +62,12 @@ existing idempotency key is terminal (`already-sent`). If attachments exceed
 MailHub's 10 MiB limit, report emails omit them only when the exact stored
 download URL is still present; otherwise the send is rejected.
 
+Rollback to Resend changes only `EMAIL_TRANSPORT`. Keep `MAILHUB_API_KEY`
+available for at least 23 hours after the switch: reports and Emergency Packs
+that were frozen on MailHub remain pinned to MailHub for their remaining retry
+window. Removing the key early would turn those safe retries into permanent
+delivery failures.
+
 ## Build and start a release
 
 ```sh
