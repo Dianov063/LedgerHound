@@ -45,6 +45,15 @@ Secrets come from Vercel → Settings → Environment Variables (Production), co
 by name per `ledgerhound.env.example`. Never copy `VERCEL_*`, `TURBO_*`, `NX_*`
 or `VERCEL_OIDC_TOKEN`. Never print or commit the files.
 
+Until LedgerHound is first deployed on OVH, its production MailHub key is staged
+outside the application tree at `/opt/mailhub/secrets/ledgerhound-prod.key`
+(`root:root`, `0600`). During the first deployment, copy that value into
+`/opt/ledgerhound/secrets/ledgerhound.env` as `MAILHUB_API_KEY` without printing
+it, preserve `EMAIL_TRANSPORT=resend`, and verify the new file is `root:root`
+`0600`. Remove the staged copy only after the deployed backend can authenticate
+to MailHub and the application secret file has been backed up through the normal
+server-secret procedure.
+
 ### Email transport
 
 `EMAIL_TRANSPORT` is `resend` by default, so deploying this code does not
