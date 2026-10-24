@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetResend, sentEmails } from '../api/helpers/resend-mock';
-import { EmailNotSentError, sendEmail } from '@/lib/idempotent-email';
+import { GET as health } from '@/app/api/health/route';
+import { EmailNotSentError, getEmailTransport, isEmailDeliveryConfigured, sendEmail } from '@/lib/idempotent-email';
 
 vi.mock('resend', () => import('../api/helpers/resend-mock'));
 
@@ -29,9 +30,13 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   delete process.env.MAILHUB_API_URL;
   delete process.env.MAILHUB_API_KEY;
   delete process.env.MAILHUB_TIMEOUT_MS;
+  delete process.env.APP_ENV;
+  delete process.env.PLATFORM_ENV;
   process.env.EMAIL_TRANSPORT = 'resend';
 });
 
@@ -72,11 +77,24 @@ describe('MailHub transport', () => {
     await sendEmail({
       ...message,
       attachments: [{ filename: 'large.pdf', content: Buffer.alloc(10 * 1024 * 1024 + 1), contentType: 'application/pdf' }],
-    }, 'ledgerhound:report:large');
+    }, 'ledgerhound:report:large', { requiredLink: 'https://signed.example/report.pdf' });
 
     const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
     expect(body.attachments).toBeUndefined();
     expect(body.html).toContain('https://signed.example/report.pdf');
+  });
+
+  it('does not mistake an unrelated footer URL for the required download link', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(sendEmail({
+      ...message,
+      attachments: [{ filename: 'large.pdf', content: Buffer.alloc(10 * 1024 * 1024 + 1) }],
+    }, 'ledgerhound:report:no-link', { requiredLink: 'https://signed.example/different-report.pdf' })).rejects.toMatchObject({
+      code: 'attachment_too_large_no_download_link',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('treats a suppressed recipient as terminal without a provider fallback', async () => {
@@ -89,15 +107,13 @@ describe('MailHub transport', () => {
     expect(sentEmails).toHaveLength(0);
   });
 
-  it('rejects a reused key with a different body', async () => {
+  it('treats a 409 idempotency conflict as already sent', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mailHubResponse(409, {
       code: 'idempotency_key_conflict',
       message: 'Idempotency-Key was already used with a different request body',
     })));
 
-    await expect(sendEmail(message, 'ledgerhound:report:conflict')).rejects.toMatchObject({
-      code: 'idempotency_key_conflict',
-    });
+    await expect(sendEmail(message, 'ledgerhound:report:conflict')).resolves.toBe('already-sent');
     expect(sentEmails).toHaveLength(0);
   });
 
@@ -133,5 +149,25 @@ describe('transport selection', () => {
     await expect(sendEmail(message, 'ledgerhound:report:log')).resolves.toBe('logged');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sentEmails).toHaveLength(0);
+  });
+
+  it('forbids log mode in production and makes health not ready', async () => {
+    process.env.EMAIL_TRANSPORT = 'log';
+    vi.stubEnv('NODE_ENV', 'production');
+    for (const name of [
+      'STRIPE_SECRET_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+      'AWS_ACCESS_KEY_ID',
+      'AWS_SECRET_ACCESS_KEY',
+      'AWS_S3_BUCKET',
+      'ADMIN_PASSWORD',
+    ]) process.env[name] = 'test';
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() => getEmailTransport()).toThrowError(EmailNotSentError);
+    expect(isEmailDeliveryConfigured()).toBe(false);
+    const response = await health();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ status: 'misconfigured' });
   });
 });

@@ -3,6 +3,12 @@ import logger from './logger';
 
 export type EmailTransport = 'resend' | 'mailhub' | 'log';
 export type SendResult = 'sent' | 'already-sent' | 'suppressed' | 'logged';
+export type SendEmailOptions = {
+  /** Pin retries to the provider recorded with the frozen email. */
+  transport?: EmailTransport;
+  /** Exact download URL that must remain in a link-only oversized message. */
+  requiredLink?: string;
+};
 
 const MAILHUB_ATTACHMENT_LIMIT = 10 * 1024 * 1024;
 const MAILHUB_ATTACHMENT_COUNT_LIMIT = 10;
@@ -16,17 +22,29 @@ export class EmailNotSentError extends Error {
   }
 }
 
-export function getEmailTransport(): EmailTransport {
-  const configured = (process.env.EMAIL_TRANSPORT || 'resend').toLowerCase();
+function isProductionEnvironment(): boolean {
+  return [process.env.NODE_ENV, process.env.APP_ENV, process.env.PLATFORM_ENV]
+    .some((value) => value?.toLowerCase() === 'production');
+}
+
+export function getEmailTransport(override?: EmailTransport): EmailTransport {
+  const configured = (override || process.env.EMAIL_TRANSPORT || 'resend').toLowerCase();
+  if (configured === 'log' && isProductionEnvironment()) {
+    throw new EmailNotSentError('log_transport_forbidden', 'EMAIL_TRANSPORT=log is forbidden in production');
+  }
   if (configured === 'resend' || configured === 'mailhub' || configured === 'log') return configured;
   throw new EmailNotSentError('invalid_email_transport', `Unsupported EMAIL_TRANSPORT: ${configured}`);
 }
 
 export function isEmailDeliveryConfigured(): boolean {
-  const transport = getEmailTransport();
-  if (transport === 'log') return true;
-  if (transport === 'mailhub') return Boolean(process.env.MAILHUB_API_KEY);
-  return Boolean(process.env.RESEND_API_KEY);
+  try {
+    const transport = getEmailTransport();
+    if (transport === 'log') return true;
+    if (transport === 'mailhub') return Boolean(process.env.MAILHUB_API_KEY);
+    return Boolean(process.env.RESEND_API_KEY);
+  } catch {
+    return false;
+  }
 }
 
 function asArray(value?: string | string[]): string[] | undefined {
@@ -58,7 +76,7 @@ function attachmentType(filename: string, declared?: string): string {
 
 type MailHubAttachment = { filename: string; content: string; contentType: string };
 
-function mailHubAttachments(payload: CreateEmailOptions): MailHubAttachment[] | undefined {
+function mailHubAttachments(payload: CreateEmailOptions, requiredLink?: string): MailHubAttachment[] | undefined {
   const attachments = payload.attachments || [];
   if (!attachments.length) return undefined;
   if (attachments.length > MAILHUB_ATTACHMENT_COUNT_LIMIT) {
@@ -83,8 +101,8 @@ function mailHubAttachments(payload: CreateEmailOptions): MailHubAttachment[] | 
   const totalBytes = encoded.reduce((sum, attachment) => sum + attachment.size, 0);
   if (totalBytes > MAILHUB_ATTACHMENT_LIMIT) {
     const content = `${'html' in payload ? payload.html || '' : ''}\n${'text' in payload ? payload.text || '' : ''}`;
-    if (!/https?:\/\//i.test(content)) {
-      throw new EmailNotSentError('attachment_too_large_no_link', 'Attachments exceed 10 MB and the message has no download link');
+    if (!requiredLink || !content.includes(requiredLink)) {
+      throw new EmailNotSentError('attachment_too_large_no_download_link', 'Attachments exceed 10 MB and the required download link is missing');
     }
     logger.warn(
       { attachmentCount: encoded.length, attachmentBytes: totalBytes },
@@ -118,10 +136,25 @@ function timeoutMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-async function sendViaMailHub(payload: CreateEmailOptions, idempotencyKey?: string): Promise<SendResult> {
+async function sendViaMailHub(payload: CreateEmailOptions, idempotencyKey?: string, options: SendEmailOptions = {}): Promise<SendResult> {
   const apiKey = process.env.MAILHUB_API_KEY;
   if (!apiKey) throw new EmailNotSentError('mailhub_not_configured', 'MAILHUB_API_KEY is not configured');
   assertMailHubCompatible(payload);
+
+  // Validate and encode locally before the network error boundary, so a bad
+  // payload is never mislabeled as a retryable MailHub connection failure.
+  const requestBody = JSON.stringify({
+    from: mailboxAddress(payload.from),
+    to: asArray(payload.to),
+    cc: asArray(payload.cc),
+    bcc: asArray(payload.bcc),
+    replyTo: oneReplyTo(payload.replyTo),
+    subject: payload.subject,
+    html: 'html' in payload ? payload.html : undefined,
+    text: 'text' in payload ? payload.text : undefined,
+    attachments: mailHubAttachments(payload, options.requiredLink),
+    messageCategory: 'transactional',
+  });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs());
@@ -134,18 +167,7 @@ async function sendViaMailHub(payload: CreateEmailOptions, idempotencyKey?: stri
         'Content-Type': 'application/json',
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
       },
-      body: JSON.stringify({
-        from: mailboxAddress(payload.from),
-        to: asArray(payload.to),
-        cc: asArray(payload.cc),
-        bcc: asArray(payload.bcc),
-        replyTo: oneReplyTo(payload.replyTo),
-        subject: payload.subject,
-        html: 'html' in payload ? payload.html : undefined,
-        text: 'text' in payload ? payload.text : undefined,
-        attachments: mailHubAttachments(payload),
-        messageCategory: 'transactional',
-      }),
+      body: requestBody,
       signal: controller.signal,
     });
   } catch (error) {
@@ -171,6 +193,10 @@ async function sendViaMailHub(payload: CreateEmailOptions, idempotencyKey?: stri
     logger.warn({ transport: 'mailhub', code }, '[email] Recipient is suppressed; no retry');
     return 'suppressed';
   }
+  if (response.status === 409 && code === 'idempotency_key_conflict') {
+    logger.warn({ transport: 'mailhub', code }, '[email] MailHub already accepted this idempotency key');
+    return 'already-sent';
+  }
   throw new EmailNotSentError(code, body.message || `MailHub returned HTTP ${response.status}`);
 }
 
@@ -188,9 +214,9 @@ async function sendViaResend(payload: CreateEmailOptions, idempotencyKey?: strin
  * provider fallback: after a timeout the first provider may already have
  * accepted the message, so falling back could send a duplicate.
  */
-export async function sendEmail(payload: CreateEmailOptions, idempotencyKey?: string): Promise<SendResult> {
-  const transport = getEmailTransport();
-  if (transport === 'mailhub') return sendViaMailHub(payload, idempotencyKey);
+export async function sendEmail(payload: CreateEmailOptions, idempotencyKey?: string, options: SendEmailOptions = {}): Promise<SendResult> {
+  const transport = getEmailTransport(options.transport);
+  if (transport === 'mailhub') return sendViaMailHub(payload, idempotencyKey, options);
   if (transport === 'resend') return sendViaResend(payload, idempotencyKey);
   logger.info(
     { transport: 'log', idempotency: Boolean(idempotencyKey), attachmentCount: payload.attachments?.length || 0 },

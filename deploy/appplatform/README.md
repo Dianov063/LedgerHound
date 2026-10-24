@@ -49,15 +49,18 @@ or `VERCEL_OIDC_TOKEN`. Never print or commit the files.
 
 `EMAIL_TRANSPORT` is `resend` by default, so deploying this code does not
 switch delivery providers. Supported values are `resend`, `mailhub`, and
-`log`. MailHub uses `MAILHUB_API_URL`, `MAILHUB_API_KEY`, and
+`log`; `log` is development/test-only and makes production health fail.
+MailHub uses `MAILHUB_API_URL`, `MAILHUB_API_KEY`, and
 `MAILHUB_TIMEOUT_MS`; the key remains server-only in `ledgerhound.env`.
 
 There is no automatic MailHub-to-Resend fallback. A timeout can happen after
-MailHub accepted a message, so a fallback could create a duplicate. Retry the
-same frozen payload with the same idempotency key, or switch the transport
-manually. If attachments exceed MailHub's 10 MiB limit, report emails keep the
-download link and omit the attachments; a large attachment without a link is
-rejected rather than silently discarded.
+MailHub accepted a message, so a fallback could create a duplicate. Reports
+and Emergency Packs freeze the selected transport with their payload; later
+retries keep using that provider even if the environment setting changes.
+Legacy frozen records without a transport use Resend. A MailHub 409 for an
+existing idempotency key is terminal (`already-sent`). If attachments exceed
+MailHub's 10 MiB limit, report emails omit them only when the exact stored
+download URL is still present; otherwise the send is rejected.
 
 ## Build and start a release
 

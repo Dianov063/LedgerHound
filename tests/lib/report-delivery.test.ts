@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getJson, resetS3, s3Faults, s3Store } from '../api/helpers/aws-s3-mock';
 import { resendFailures, resetResend, sentEmails } from '../api/helpers/resend-mock';
 import { ReportDeliveryError, createReportCaseId, deliverReport, type DeliverReportInput } from '@/lib/report-delivery';
@@ -45,6 +45,15 @@ const failLogOnce = () => {
 beforeEach(() => {
   resetS3();
   resetResend();
+  process.env.EMAIL_TRANSPORT = 'resend';
+  process.env.RESEND_API_KEY = 're_test';
+  process.env.MAILHUB_API_KEY = 'mh_test';
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  process.env.EMAIL_TRANSPORT = 'resend';
+  delete process.env.MAILHUB_API_URL;
 });
 
 describe('deliverReport success criterion', () => {
@@ -161,5 +170,38 @@ describe('sendEmailOnce', () => {
     await sendEmailOnce(mail('same'));
     await sendEmailOnce(mail('same'));
     expect(sentEmails).toHaveLength(2);
+  });
+});
+
+describe('frozen email transport', () => {
+  it('keeps a report on Resend when env switches to MailHub before retry', async () => {
+    resendFailures.push({ name: 'application_error', message: 'temporary failure' });
+    await expect(deliverReport(input())).rejects.toBeInstanceOf(ReportDeliveryError);
+
+    process.env.EMAIL_TRANSPORT = 'mailhub';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await deliverReport(input());
+
+    expect(sentEmails).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getJson<{ email: { transport?: string } }>(`reports/${input().caseId}.delivery.json`)?.email.transport).toBe('resend');
+  });
+
+  it('keeps a report on MailHub when env switches to Resend before retry', async () => {
+    process.env.EMAIL_TRANSPORT = 'mailhub';
+    process.env.MAILHUB_API_URL = 'https://mailhub.example';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'temporarily_unavailable' }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'email_retry', status: 'QUEUED' }), { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deliverReport(input())).rejects.toBeInstanceOf(ReportDeliveryError);
+    process.env.EMAIL_TRANSPORT = 'resend';
+    await deliverReport(input());
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentEmails).toHaveLength(0);
+    expect(getJson<{ email: { transport?: string } }>(`reports/${input().caseId}.delivery.json`)?.email.transport).toBe('mailhub');
   });
 });

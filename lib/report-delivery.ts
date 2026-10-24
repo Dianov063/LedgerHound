@@ -3,7 +3,7 @@ import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3
 import type { CreateEmailOptions } from 'resend';
 import { getReportDownloadUrl } from './s3-storage';
 import { buildReportEmail } from './sendReport';
-import { sendEmailOnce } from './idempotent-email';
+import { getEmailTransport, sendEmailOnce, type EmailTransport } from './idempotent-email';
 import { logReport } from './reports-log';
 import logger from './logger';
 
@@ -83,7 +83,13 @@ export interface FrozenReport {
   pdfSha256: string;
   downloadUrl: string;
   frozenAt: string;
-  email: null | { payload: Omit<CreateEmailOptions, 'attachments'>; attachments: FrozenAttachment[]; idempotencyKey?: string };
+  email: null | {
+    payload: Omit<CreateEmailOptions, 'attachments'>;
+    attachments: FrozenAttachment[];
+    idempotencyKey?: string;
+    /** Missing only on reports frozen before selectable transports existed. */
+    transport?: EmailTransport;
+  };
   log: { walletAddress: string; email: string; network: string; stripePaymentId: string; amount: number };
   summary?: ReportSummary;
 }
@@ -163,6 +169,7 @@ async function freezeReport(input: DeliverReportInput): Promise<FrozenReport> {
     email = {
       payload,
       idempotencyKey: input.idempotencyKey,
+      transport: getEmailTransport(),
       attachments: attachments.map((a, i) => (i === 0
         ? { filename: String(a.filename), pdf: true as const, contentType: a.contentType || 'application/pdf' }
         : {
@@ -223,7 +230,14 @@ export async function deliverFrozenReport(frozen: FrozenReport): Promise<{ downl
             content: Buffer.from(a.base64, 'base64'),
             contentType: a.contentType || (a.filename.toLowerCase().endsWith('.md') ? 'text/markdown' : undefined),
           }));
-      const result = await sendEmailOnce({ ...frozen.email.payload, attachments } as CreateEmailOptions, frozen.email.idempotencyKey);
+      const result = await sendEmailOnce(
+        { ...frozen.email.payload, attachments } as CreateEmailOptions,
+        frozen.email.idempotencyKey,
+        {
+          transport: frozen.email.transport ?? 'resend',
+          requiredLink: frozen.downloadUrl,
+        },
+      );
       emailComplete = true;
       emailed = result === 'sent' || result === 'already-sent';
       logger.info({ caseId: frozen.caseId, result }, '[generateReport] Email processing complete');

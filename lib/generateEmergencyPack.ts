@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { sendEmailOnce } from '@/lib/idempotent-email';
+import { getEmailTransport, sendEmailOnce } from '@/lib/idempotent-email';
 import { readPackManifest, writePackManifestOnce, type PackManifest } from '@/lib/legal-packs/manifest';
 import { getResearch } from '@/lib/legal-packs/s3';
 import {
@@ -90,7 +90,9 @@ function resultFrom(manifest: PackManifest, country: string): GeneratePackResult
 
 /** Sends the frozen pack email; throws when it is not sent. */
 async function sendPackEmail(manifest: PackManifest, idempotencyKey?: string): Promise<void> {
-  const sent = await sendEmailOnce(manifest.email, idempotencyKey);
+  const sent = await sendEmailOnce(manifest.email, idempotencyKey, {
+    transport: manifest.emailTransport ?? 'resend',
+  });
   logger.info({ caseId: manifest.caseId, result: sent }, '[generateEmergencyPack] Email processing complete');
 }
 
@@ -365,6 +367,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
       createdAt: new Date().toISOString(),
       documents: templates.map((t) => ({ type: t.type, label: t.label, key: t.key, url: t.url })),
       email: packEmail,
+      emailTransport: getEmailTransport(),
     });
     await sendPackEmail(manifest, input.idempotencyKey);
     return resultFrom(manifest, code);

@@ -1,4 +1,5 @@
 import { inFlightCount, isDraining } from '@/lib/background-tasks';
+import { isEmailDeliveryConfigured } from '@/lib/idempotent-email';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,9 +16,9 @@ const REQUIRED_ENV = [
 
 function missingEmailConfiguration(): string[] {
   const transport = (process.env.EMAIL_TRANSPORT || 'resend').toLowerCase();
-  if (transport === 'resend') return process.env.RESEND_API_KEY ? [] : ['RESEND_API_KEY'];
-  if (transport === 'mailhub') return process.env.MAILHUB_API_KEY ? [] : ['MAILHUB_API_KEY'];
-  if (transport === 'log') return [];
+  if (transport === 'resend') return isEmailDeliveryConfigured() ? [] : ['RESEND_API_KEY'];
+  if (transport === 'mailhub') return isEmailDeliveryConfigured() ? [] : ['MAILHUB_API_KEY'];
+  if (transport === 'log') return isEmailDeliveryConfigured() ? [] : ['EMAIL_TRANSPORT'];
   return ['EMAIL_TRANSPORT'];
 }
 

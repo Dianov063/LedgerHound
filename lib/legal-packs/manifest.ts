@@ -1,5 +1,6 @@
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import type { CreateEmailOptions } from 'resend';
+import type { EmailTransport } from '@/lib/idempotent-email';
 
 /**
  * The Emergency Pack manifest: written once (If-None-Match) after EVERY
@@ -14,6 +15,8 @@ export interface PackManifest {
   createdAt: string;
   documents: { type: string; label: string; key: string; url: string }[];
   email: CreateEmailOptions;
+  /** Missing only on manifests written before selectable transports existed. */
+  emailTransport?: EmailTransport;
 }
 
 export const packManifestKey = (caseId: string) => `legal-packs/cases/${caseId}/manifest.json`;
