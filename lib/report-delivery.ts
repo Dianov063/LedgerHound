@@ -66,13 +66,15 @@ export interface DeliverReportInput {
   summary?: ReportSummary;
 }
 
-type FrozenAttachment = { filename: string; pdf: true } | { filename: string; base64: string };
+type FrozenAttachment =
+  | { filename: string; pdf: true; contentType?: string }
+  | { filename: string; base64: string; contentType?: string };
 
 /**
  * The canonical result of a report, written once (If-None-Match) BEFORE the
  * first email is sent. Every later attempt delivers exactly this: the same PDF
  * bytes (the object is write-once too), the same hash and the same email
- * payload, so Resend recognises a retry as the same request and the
+ * payload, so the selected transport recognises a retry as the same request and the
  * attachment always matches the file behind the download link.
  */
 export interface FrozenReport {
@@ -162,8 +164,12 @@ async function freezeReport(input: DeliverReportInput): Promise<FrozenReport> {
       payload,
       idempotencyKey: input.idempotencyKey,
       attachments: attachments.map((a, i) => (i === 0
-        ? { filename: String(a.filename), pdf: true as const }
-        : { filename: String(a.filename), base64: Buffer.from(a.content as Buffer).toString('base64') })),
+        ? { filename: String(a.filename), pdf: true as const, contentType: a.contentType || 'application/pdf' }
+        : {
+            filename: String(a.filename),
+            base64: Buffer.from(a.content as Buffer).toString('base64'),
+            contentType: a.contentType || (String(a.filename).toLowerCase().endsWith('.md') ? 'text/markdown' : undefined),
+          })),
     };
   }
 
@@ -200,21 +206,27 @@ async function freezeReport(input: DeliverReportInput): Promise<FrozenReport> {
 }
 
 /**
- * Delivers a frozen report: sends the frozen email (Resend dedupes the
- * identical request) and records the report in the log. Throws unless the
- * email went out (or was already sent) and the log entry is saved.
+ * Delivers a frozen report: sends the frozen email (the transport dedupes the
+ * identical request) and records the report in the log. Throws unless email
+ * processing reached a terminal result and the log entry is saved.
  */
 export async function deliverFrozenReport(frozen: FrozenReport): Promise<{ downloadUrl: string; s3Key: string }> {
   let emailed = false;
+  let emailComplete = false;
   if (frozen.email) {
     try {
       const { bytes } = await readPdf(frozen.pdfKey);
       const attachments = frozen.email.attachments.map((a) => ('pdf' in a
-        ? { filename: a.filename, content: bytes }
-        : { filename: a.filename, content: Buffer.from(a.base64, 'base64') }));
+        ? { filename: a.filename, content: bytes, contentType: a.contentType || 'application/pdf' }
+        : {
+            filename: a.filename,
+            content: Buffer.from(a.base64, 'base64'),
+            contentType: a.contentType || (a.filename.toLowerCase().endsWith('.md') ? 'text/markdown' : undefined),
+          }));
       const result = await sendEmailOnce({ ...frozen.email.payload, attachments } as CreateEmailOptions, frozen.email.idempotencyKey);
-      emailed = true;
-      logger.info({ caseId: frozen.caseId, result }, '[generateReport] Email delivered');
+      emailComplete = true;
+      emailed = result === 'sent' || result === 'already-sent';
+      logger.info({ caseId: frozen.caseId, result }, '[generateReport] Email processing complete');
     } catch (err) {
       logger.error({ err, caseId: frozen.caseId }, '[generateReport] Email send failed');
     }
@@ -230,7 +242,7 @@ export async function deliverFrozenReport(frozen: FrozenReport): Promise<{ downl
     emailed,
   });
 
-  if (frozen.email && !emailed) throw new ReportDeliveryError(true, false);
+  if (frozen.email && !emailComplete) throw new ReportDeliveryError(true, false);
   return { downloadUrl: frozen.downloadUrl, s3Key: frozen.pdfKey };
 }
 

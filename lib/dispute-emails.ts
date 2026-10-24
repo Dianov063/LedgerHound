@@ -1,6 +1,4 @@
-import { Resend } from 'resend';
-
-const getResend = () => new Resend(process.env.RESEND_API_KEY);
+import { sendEmail } from '@/lib/idempotent-email';
 
 const ADMIN_EMAIL = 'contact@ledgerhound.vip';
 const FROM = 'LedgerHound <disputes@ledgerhound.vip>';
@@ -9,10 +7,8 @@ const FROM = 'LedgerHound <disputes@ledgerhound.vip>';
  * Send dispute notification to admin + confirmation to submitter.
  */
 export async function sendDisputeEmails(disputeId: string, platformSlug: string, submitterEmail: string) {
-  const resend = getResend();
-
   // 1. Confirmation to submitter
-  await resend.emails.send({
+  await sendEmail({
     from: FROM,
     to: submitterEmail,
     subject: `Dispute Received — ${disputeId}`,
@@ -55,10 +51,10 @@ export async function sendDisputeEmails(disputeId: string, platformSlug: string,
         </p>
       </div>
     `,
-  });
+  }, `dispute:${disputeId}:submitter`);
 
   // 2. Admin notification
-  await resend.emails.send({
+  await sendEmail({
     from: FROM,
     to: ADMIN_EMAIL,
     subject: `[ACTION] New Dispute: ${disputeId} — ${platformSlug}`,
@@ -76,7 +72,7 @@ export async function sendDisputeEmails(disputeId: string, platformSlug: string,
         </p>
       </div>
     `,
-  });
+  }, `dispute:${disputeId}:admin`);
 }
 
 /**
@@ -89,14 +85,12 @@ export async function sendDisputeResolution(
   resolution: 'resolved' | 'rejected',
   message: string
 ) {
-  const resend = getResend();
-
   const isResolved = resolution === 'resolved';
   const subject = isResolved
     ? `Dispute Resolved — ${disputeId}`
     : `Dispute Decision — ${disputeId}`;
 
-  await resend.emails.send({
+  await sendEmail({
     from: FROM,
     to: submitterEmail,
     subject,
@@ -147,5 +141,5 @@ export async function sendDisputeResolution(
         </p>
       </div>
     `,
-  });
+  }, `dispute:${disputeId}:resolution:${resolution}`);
 }

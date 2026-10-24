@@ -42,8 +42,8 @@ export const NEVER_STARTED_MS = 10 * 60 * 1000;
 export const RETRY_BACKOFF_MS = 10 * 60 * 1000;
 /**
  * Jobs older than this are parked in failed/ instead of being retried. Kept
- * inside Resend's 24 h idempotency window, so a retry can never send a
- * customer a second copy of an email an earlier attempt already sent.
+ * inside the shortest supported idempotency window (Resend's 24 h window),
+ * so a retry can never send a second copy of an accepted email.
  */
 export const EXPIRE_MS = 23 * 60 * 60 * 1000;
 

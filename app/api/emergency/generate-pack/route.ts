@@ -11,7 +11,7 @@ export const maxDuration = 60; // PDF rendering can be slow
 // (lib/generateEmergencyPack) AFTER payment. This HTTP route is an admin/ops-only
 // manual regeneration tool — it must NOT be publicly callable, otherwise anyone
 // could generate the $79 product for free, overwrite another buyer's case PDFs,
-// or spam arbitrary emails with download links via our Resend account.
+// or spam arbitrary emails with download links via our email provider.
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin(req);
   if (denied) return denied;

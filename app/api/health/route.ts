@@ -10,9 +10,16 @@ const REQUIRED_ENV = [
   'AWS_ACCESS_KEY_ID',
   'AWS_SECRET_ACCESS_KEY',
   'AWS_S3_BUCKET',
-  'RESEND_API_KEY',
   'ADMIN_PASSWORD',
 ] as const;
+
+function missingEmailConfiguration(): string[] {
+  const transport = (process.env.EMAIL_TRANSPORT || 'resend').toLowerCase();
+  if (transport === 'resend') return process.env.RESEND_API_KEY ? [] : ['RESEND_API_KEY'];
+  if (transport === 'mailhub') return process.env.MAILHUB_API_KEY ? [] : ['MAILHUB_API_KEY'];
+  if (transport === 'log') return [];
+  return ['EMAIL_TRANSPORT'];
+}
 
 /**
  * GET /api/health — readiness for the container health check and deploys.
@@ -24,7 +31,7 @@ export async function GET() {
   if (isDraining()) {
     return Response.json({ status: 'draining', backgroundTasks: inFlightCount() }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
-  const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
+  const missing = [...REQUIRED_ENV.filter((name) => !process.env[name]), ...missingEmailConfiguration()];
   if (missing.length > 0) {
     console.error('[health] Missing required env:', missing.join(', '));
     return Response.json({ status: 'misconfigured' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });

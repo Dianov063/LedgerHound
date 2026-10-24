@@ -6,8 +6,8 @@ import type { CreateEmailOptions } from 'resend';
  * document of the pack is stored and before its email is sent. It is:
  *  - the "complete set" signal for /api/emergency/status (partial sets of
  *    PDFs from an interrupted run have no manifest);
- *  - the frozen email, so a retry sends the identical request (Resend
- *    dedupes it) with links to the same documents.
+ *  - the frozen email, so a retry sends the identical idempotent request with
+ *    links to the same documents.
  */
 export interface PackManifest {
   caseId: string;

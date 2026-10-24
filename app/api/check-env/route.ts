@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
       hasSecretKey: !!process.env.STRIPE_SECRET_KEY,
       hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
     },
-    resend: {
+    email: {
+      transport: process.env.EMAIL_TRANSPORT || 'resend',
       hasApiKey: !!process.env.RESEND_API_KEY,
+      hasMailHubApiKey: !!process.env.MAILHUB_API_KEY,
     },
     admin: {
       hasPassword: !!process.env.ADMIN_PASSWORD,

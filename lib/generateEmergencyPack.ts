@@ -91,7 +91,7 @@ function resultFrom(manifest: PackManifest, country: string): GeneratePackResult
 /** Sends the frozen pack email; throws when it is not sent. */
 async function sendPackEmail(manifest: PackManifest, idempotencyKey?: string): Promise<void> {
   const sent = await sendEmailOnce(manifest.email, idempotencyKey);
-  logger.info({ caseId: manifest.caseId, result: sent }, '[generateEmergencyPack] Email delivered');
+  logger.info({ caseId: manifest.caseId, result: sent }, '[generateEmergencyPack] Email processing complete');
 }
 
 async function getPresignedUrl(key: string): Promise<string> {

@@ -9,7 +9,8 @@ Target: move `www.ledgerhound.vip` from Vercel to the AppPlatform production hos
 | `ledgerhound-cron` | same image | `ledgerhound_internal` only (no egress) | Replaces Vercel Cron, runs the webhook recovery sweep |
 
 Nothing else on the host changes except one additive Caddy site block.
-External services stay external: AWS S3 (eu-central-1, KMS), Stripe, Resend,
+External services stay external: AWS S3 (eu-central-1, KMS), Stripe, the
+selected email transport (Resend or MailHub),
 Upstash, Cloudflare Turnstile, blockchain APIs, DeepSeek/Tavily, GitHub, GA4.
 This moves hosting only; it is not "fully self-hosted".
 
@@ -43,6 +44,20 @@ the same S3 state.
 Secrets come from Vercel → Settings → Environment Variables (Production), copied
 by name per `ledgerhound.env.example`. Never copy `VERCEL_*`, `TURBO_*`, `NX_*`
 or `VERCEL_OIDC_TOKEN`. Never print or commit the files.
+
+### Email transport
+
+`EMAIL_TRANSPORT` is `resend` by default, so deploying this code does not
+switch delivery providers. Supported values are `resend`, `mailhub`, and
+`log`. MailHub uses `MAILHUB_API_URL`, `MAILHUB_API_KEY`, and
+`MAILHUB_TIMEOUT_MS`; the key remains server-only in `ledgerhound.env`.
+
+There is no automatic MailHub-to-Resend fallback. A timeout can happen after
+MailHub accepted a message, so a fallback could create a duplicate. Retry the
+same frozen payload with the same idempotency key, or switch the transport
+manually. If attachments exceed MailHub's 10 MiB limit, report emails keep the
+download link and omit the attachments; a large attachment without a link is
+rejected rather than silently discarded.
 
 ## Build and start a release
 
@@ -141,8 +156,8 @@ is frozen in `reports/<caseId>.delivery.json` (write-once PDF, its hash, the
 exact email payload and the summary the pack uses); pack documents are
 write-once and the pack email is frozen in `legal-packs/cases/<caseId>/manifest.json`,
 written after every document is stored. A retry re-sends the identical frozen
-email under the same per-payment Resend idempotency key, which Resend dedupes.
-Resend keeps keys for 24 h, so jobs expire after 23 h into
+email under the same provider-independent idempotency key. The shortest
+supported retention is Resend's 24 h window, so jobs expire after 23 h into
 `webhook-jobs/failed/` instead of being retried later.
 
 `/api/emergency/status` reports `ready` only when the manifest exists (the

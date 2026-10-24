@@ -17,8 +17,9 @@ import logger from '@/lib/logger';
  * frozen (PDF, hash, email payload, summary) before its first email under the
  * case id stored in the job; a retry delivers that frozen version instead of
  * rendering a new one. The pack freezes its document set and email the same
- * way (lib/generateEmergencyPack.ts). Both emails carry a per-payment Resend
- * idempotency key over an identical body, so Resend never sends twice.
+ * way (lib/generateEmergencyPack.ts). Both emails carry a per-payment
+ * idempotency key over an identical body, so the selected transport never
+ * sends twice.
  */
 export type CheckoutOutcome = 'done' | 'already-done' | 'invalid';
 

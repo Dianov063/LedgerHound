@@ -6,7 +6,6 @@
  */
 
 import { NextRequest } from 'next/server';
-import { Resend } from 'resend';
 import { saveApplication, saveResume, generateInvestigatorId } from '@/lib/investigators/storage';
 import {
   CERTIFICATIONS,
@@ -19,6 +18,7 @@ import {
 } from '@/lib/investigators/schema';
 import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isEmailDeliveryConfigured, sendEmail } from '@/lib/idempotent-email';
 
 export const maxDuration = 30;
 
@@ -139,13 +139,12 @@ export async function POST(req: NextRequest) {
   }
 
   /* Notify admins + send confirmation */
-  if (process.env.RESEND_API_KEY) {
+  if (isEmailDeliveryConfigured()) {
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const escape = (s: string) => s.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] || c));
 
       // 1. Notification to LedgerHound team
-      await resend.emails.send({
+      await sendEmail({
         from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
         to: 'contact@ledgerhound.vip',
         replyTo: body.email,
@@ -173,7 +172,7 @@ export async function POST(req: NextRequest) {
       });
 
       // 2. Confirmation to applicant
-      await resend.emails.send({
+      await sendEmail({
         from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
         to: body.email,
         subject: 'Your application has been received — LedgerHound Network',

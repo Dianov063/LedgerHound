@@ -1052,7 +1052,7 @@ export async function generateReport(
     stripePaymentId?: string; amount?: number; network?: string; locale?: string; country?: string;
     /** Reuse the case id across retries of one purchase (see lib/report-delivery.ts). */
     caseId?: string;
-    /** Resend idempotency key for the report email. */
+    /** Provider-independent idempotency key for the report email. */
     idempotencyKey?: string;
     /** Only for tools that regenerate a PDF; a paid order always emails. */
     skipEmail?: boolean;

@@ -3,14 +3,14 @@
  *
  * Receives a contact request for a specific investigator.
  * Investigator's email is NEVER returned to the public — we forward
- * the request via Resend and save it to S3 for admin tracking.
+ * the request through the configured email transport and save it to S3.
  */
 
 import { NextRequest } from 'next/server';
-import { Resend } from 'resend';
 import { getApproved, saveContactRequest, type ContactRequest } from '@/lib/investigators/storage';
 import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isEmailDeliveryConfigured, sendEmail } from '@/lib/idempotent-email';
 
 function isEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
@@ -75,10 +75,9 @@ export async function POST(req: NextRequest) {
     // Still try to send email
   }
 
-  /* Forward via Resend (best effort) */
-  if (process.env.RESEND_API_KEY) {
+  /* Forward through the configured email transport (best effort). */
+  if (isEmailDeliveryConfigured()) {
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const escape = (s: string) => s.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] || c));
       const urgencyLabel = urgency === 'urgent' ? 'URGENT' : urgency === 'consultation' ? 'Consultation only' : 'Normal';
 
@@ -100,7 +99,7 @@ export async function POST(req: NextRequest) {
 </div>`;
 
       // 1. Email to LedgerHound (admin / matching team)
-      await resend.emails.send({
+      await sendEmail({
         from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
         to: 'contact@ledgerhound.vip',
         replyTo: fromEmail,
@@ -123,7 +122,7 @@ export async function POST(req: NextRequest) {
   <p style="font-size: 11px; color: #64748b;">Reminder: cases booked through LedgerHound network are subject to a 15% referral fee. Please coordinate billing through LedgerHound. Reply directly to the client to accept or decline.</p>
 </div>`;
 
-        await resend.emails.send({
+        await sendEmail({
           from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
           to: inv.email,
           replyTo: fromEmail,
@@ -133,7 +132,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 3. Confirmation to the client
-      await resend.emails.send({
+      await sendEmail({
         from: process.env.RESEND_FROM_EMAIL || 'LedgerHound <noreply@ledgerhound.vip>',
         to: fromEmail,
         subject: 'Your request has been received — LedgerHound',

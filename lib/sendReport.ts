@@ -31,6 +31,7 @@ export function buildReportEmail(
     : [];
   const templateAttachments = selectedTemplates.map((t) => ({
     filename: t.filename,
+    contentType: 'text/markdown',
     // Auto-fill the case ID; leave all other [bracket] fields for the user.
     content: Buffer.from(
       t.content.replace(/\[\{caseId\}\]/g, caseId).replace(/\{caseId\}/g, caseId),
@@ -163,6 +164,7 @@ export function buildReportEmail(
       {
         filename: `LedgerHound-Report-${caseId}.pdf`,
         content: pdfBuffer,
+        contentType: 'application/pdf',
       },
       ...templateAttachments,
     ],
