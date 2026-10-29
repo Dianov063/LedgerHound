@@ -131,9 +131,12 @@ export async function GET(req: NextRequest) {
         const key = obj.Key!;
         const filename = key.split('/').pop()!.replace('.pdf', '');
 
-        // Determine label — handle per-exchange preservation letters
+        // Determine label — the manifest has it; legacy packs parse the file name
         let label: string;
-        if (filename.startsWith('preservation-letter-')) {
+        const frozenLabel = manifest?.documents.find((d) => d.key === key)?.label;
+        if (frozenLabel) {
+          label = frozenLabel;
+        } else if (filename.startsWith('preservation-letter-')) {
           const exchangeSlug = filename.replace('preservation-letter-', '');
           const exchangeName = exchangeSlug
             .split('-')

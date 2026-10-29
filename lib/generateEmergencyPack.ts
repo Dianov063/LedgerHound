@@ -79,6 +79,38 @@ async function saveCasePdf(caseId: string, templateType: string, pdfBuffer: Buff
   return key;
 }
 
+/**
+ * One letter per address: the same exchange label often covers several hot
+ * wallets. Entries that would map to the same document are dropped, so every
+ * manifest entry points to its own PDF.
+ */
+function uniqueExchangeAddresses(exchanges: { name: string; address: string }[]): { name: string; address: string }[] {
+  const seen = new Set<string>();
+  return exchanges.filter((e) => {
+    const id = preservationLetterName(e);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * Document name of a preservation letter. It includes the address, so letters
+ * for different addresses of one exchange never share an S3 key (saveCasePdf
+ * keeps the first document stored under a key).
+ */
+export function preservationLetterName(exchange: { name: string; address: string }): string {
+  const slug = exchange.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'exchange';
+  // EVM hex addresses are case-insensitive; base58 ones (Tron, Solana, BTC) are not.
+  const raw = /^0x[0-9a-f]+$/i.test(exchange.address) ? exchange.address.toLowerCase() : exchange.address;
+  const address = raw.replace(/[^A-Za-z0-9]/g, '');
+  return address ? `preservation-letter-${slug}-${address}` : `preservation-letter-${slug}`;
+}
+
+function shortAddress(address: string): string {
+  return address.length > 14 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
+}
+
 function resultFrom(manifest: PackManifest, country: string): GeneratePackResult {
   return {
     success: true,
@@ -294,9 +326,9 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     templates.push({ type: templateType, label: TEMPLATE_LABELS[templateType], key, url });
   }
 
-  // Preservation Letters — one per identified exchange + one generic
+  // Preservation Letters — one per identified exchange address + one generic
   if (identifiedExchanges.length > 0) {
-    for (const exchange of identifiedExchanges) {
+    for (const exchange of uniqueExchangeAddresses(identifiedExchanges)) {
       // Look up compliance email from research data
       const exchangeContact = research.exchangeContacts?.find(
         (c) => c.name.toLowerCase() === exchange.name.toLowerCase()
@@ -311,12 +343,11 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
       const doc = getDocumentElement('preservation-letter', research, exchangeCaseData);
       const buffer = await renderToBuffer(doc);
       const pdfBuffer = Buffer.from(buffer);
-      const slug = exchange.name.toLowerCase().replace(/\s+/g, '-');
-      const key = await saveCasePdf(caseId, `preservation-letter-${slug}`, pdfBuffer);
+      const key = await saveCasePdf(caseId, preservationLetterName(exchange), pdfBuffer);
       const url = await getPresignedUrl(key);
       templates.push({
         type: 'preservation-letter' as TemplateType,
-        label: `Preservation Letter — ${exchange.name}`,
+        label: `Preservation Letter — ${exchange.name}${exchange.address ? ` (${shortAddress(exchange.address)})` : ''}`,
         key,
         url,
       });
