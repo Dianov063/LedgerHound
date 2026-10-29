@@ -3,553 +3,327 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import {
-  Search, Scale, Heart, Shield, Building2, Users,
-  ArrowRight, CheckCircle2, ChevronRight, Star,
-  Clock, FileText, Phone, Lock, BarChart3, Download,
+  ArrowRight, Search, ShieldCheck, Scale, Landmark, Building2,
+  Check, Info, Lock,
 } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
-import { getAllBlogPosts } from '@/lib/blog/posts';
-import { formatBlogDate, categoryKey } from '@/lib/blog/format-blog-meta';
-
-// Active-investigation banner (DZHLWK). Inline per-locale to avoid threading new
-// keys through all six messages/*.json files; matches the site's 6 locales.
-const DZHLWK_BANNER: Record<string, { text: string; cta: string }> = {
-  en: { text: 'Active investigation: are you a DZHLWK crypto-fraud victim?', cta: 'Join the coordinated case' },
-  es: { text: 'Investigación activa: ¿es víctima del fraude cripto DZHLWK?', cta: 'Únase al caso coordinado' },
-  ru: { text: 'Активное расследование: вы пострадали от криптомошенничества DZHLWK?', cta: 'Присоединиться к делу' },
-  zh: { text: '正在进行的调查：您是 DZHLWK 加密货币诈骗的受害者吗？', cta: '加入协同案件' },
-  fr: { text: "Enquête en cours : êtes-vous victime de l'arnaque crypto DZHLWK ?", cta: 'Rejoindre le dossier coordonné' },
-  ar: { text: 'تحقيق جارٍ: هل أنت ضحية لاحتيال DZHLWK للعملات الرقمية؟', cta: 'انضم إلى القضية المنسّقة' },
-};
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
   return await makeMetadata({
     locale,
     path: '',
-    metadataKey: 'home',
-});
+    metadataKey: 'paymentsHome',
+  });
 }
 
-export default function HomePage() {
-  const t = useTranslations();
+const RAILS = ['Zelle', 'Cash App', 'Venmo', 'PayPal', 'Apple Cash', 'Chime', 'Bank transfer', 'Marketplace'];
+
+/**
+ * The payment-scam product is the site's front door.
+ *
+ * The database is young, so the hero asks for a report rather than offering a
+ * search: an empty search result reads as "this service is broken", while a
+ * report is the thing that makes every future search work. Search is still
+ * here, further down, for people who arrive before they pay.
+ *
+ * Crypto forensics is not gone — it moved to /crypto and is reached from the
+ * fork near the bottom, styled deliberately unlike the rest of the page so it
+ * reads as a separate product rather than another menu item.
+ */
+export default function PaymentsHomePage() {
+  const t = useTranslations('payments_home');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 
-  const services = [
-    { icon: Search, key: 'tracing', href: `${base}/services/crypto-tracing` },
-    { icon: Scale, key: 'litigation', href: `${base}/services/litigation` },
-    { icon: Heart, key: 'romance', href: `${base}/services/romance-scams` },
-    { icon: Shield, key: 'law_enforcement', href: `${base}/services/litigation` },
-    { icon: Building2, key: 'corporate', href: `${base}/services/corporate-fraud` },
-    { icon: Users, key: 'divorce', href: `${base}/services/divorce-crypto` },
+  const rungs = [
+    { n: t('r1_n'), h: t('r1_h'), p: t('r1_p'), cls: 'bg-white border-clay-200', nCls: 'text-ink-faint' },
+    { n: t('r2_n'), h: t('r2_h'), p: t('r2_p'), cls: 'bg-clay-50 border-clay-200', nCls: 'text-clay-700' },
+    { n: t('r3_n'), h: t('r3_h'), p: t('r3_p'), cls: 'bg-clay-100 border-clay-200', nCls: 'text-clay-800' },
+    { n: t('r4_n'), h: t('r4_h'), p: t('r4_p'), cls: 'bg-ink border-ink text-white', nCls: 'text-clay-300' },
   ];
 
-  const howSteps = ['step1', 'step2', 'step3', 'step4'];
-  const whyItems = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'];
-  const whyIcons = ['💰', '⚡', '🌐', '📋', '🔗', '🤝'];
-
-  const cases = [
-    { key: 'case1', colorClass: 'bg-blue-50 border-blue-100', amountClass: 'text-blue-700' },
-    { key: 'case2', colorClass: 'bg-emerald-50 border-emerald-100', amountClass: 'text-emerald-700' },
-    { key: 'case3', colorClass: 'bg-violet-50 border-violet-100', amountClass: 'text-violet-700' },
+  const weigh = [
+    { t: t('weigh1_t'), d: t('weigh1_d') },
+    { t: t('weigh2_t'), d: t('weigh2_d') },
+    { t: t('weigh3_t'), d: t('weigh3_d') },
+    { t: t('weigh4_t'), d: t('weigh4_d') },
   ];
 
-  // 3 latest posts from the single source of truth — no dead links
-  const blogPosts = getAllBlogPosts(locale).slice(0, 3);
+  const rules = [
+    { b: t('rule1_b'), p: t('rule1') },
+    { b: t('rule2_b'), p: t('rule2') },
+    { b: t('rule3_b'), p: t('rule3') },
+    { b: t('rule4_b'), p: t('rule4') },
+  ];
+
+  const who = [
+    { icon: Scale, t: t('who1_t'), d: t('who1_d') },
+    { icon: Landmark, t: t('who2_t'), d: t('who2_d') },
+    { icon: Building2, t: t('who3_t'), d: t('who3_d') },
+  ];
+
+  const vsteps = [
+    { b: t('vs1_b'), p: t('vs1') },
+    { b: t('vs2_b'), p: t('vs2') },
+    { b: t('vs3_b'), p: t('vs3') },
+    { b: t('vs4_b'), p: t('vs4') },
+  ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-paper text-ink">
       <Navbar />
 
-      {/* ─── HERO ─── */}
-      <section className="relative pt-32 pb-20 lg:pt-32 lg:pb-28 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-brand-50">
-        {/* Background decoration */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-100 rounded-full opacity-40 blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-sky-100 rounded-full opacity-30 blur-3xl" />
-        </div>
+      {/* ─── HERO — the ask is a report, not a search ─── */}
+      <section className="pt-28 pb-16 lg:pt-32 lg:pb-20 bg-gradient-to-b from-clay-50 to-paper">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="inline-block text-[11px] font-bold tracking-[0.13em] text-clay-700 bg-clay-100 rounded-full px-4 py-1.5 mb-6">
+            {t('kicker')}
+          </p>
+          <h1 className="font-serif font-semibold text-4xl sm:text-5xl lg:text-6xl text-ink leading-[1.06] tracking-tight mb-5">
+            {t('title')}
+          </h1>
+          <p className="text-lg text-ink-muted leading-relaxed max-w-2xl mx-auto mb-9">{t('lede')}</p>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-7">
+            <Link
+              href={`${base}/payment-safety`}
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-10 py-4 transition-colors shadow-lg shadow-clay-600/25 text-center"
+            >
+              <span className="flex items-center justify-center gap-2 text-lg">
+                {t('cta')} <ArrowRight size={19} />
+              </span>
+              <span className="block text-sm font-medium text-clay-50 mt-0.5">{t('cta_sub')}</span>
+            </Link>
+            <Link
+              href="#check"
+              className="border border-ink/25 text-ink font-semibold rounded-full px-8 py-4 hover:bg-sand transition-colors"
+            >
+              {t('secondary')}
+            </Link>
+          </div>
+
+          <p className="text-[15px] text-ink-faint max-w-2xl mx-auto">
+            {t('note_plain')} <span className="text-ink font-semibold">{t('note_bold')}</span>
+          </p>
+        </div>
+      </section>
+
+      {/* ─── ESCALATION LADDER ─── */}
+      <section className="py-16 lg:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="font-serif font-semibold text-ink text-3xl lg:text-4xl leading-tight mb-3">{t('ladder_title')}</h2>
+          <p className="text-ink-muted max-w-2xl mb-9">{t('ladder_sub')}</p>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {rungs.map((r) => (
+              <div key={r.n} className={`rounded-2xl border p-6 ${r.cls}`}>
+                <span className={`block text-xs font-bold tracking-[0.1em] mb-3 ${r.nCls}`}>{r.n}</span>
+                <h3 className="font-bold text-lg mb-2 leading-snug">{r.h}</h3>
+                <p className={`text-[15px] leading-relaxed ${r.cls.includes('bg-ink') ? 'text-clay-50/70' : 'text-ink-muted'}`}>
+                  {r.p}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── LAW FIRM ESCALATION ─── */}
+      <section className="pb-16 lg:pb-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white border border-clay-200 rounded-3xl p-8 lg:p-12 shadow-sm grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-14 items-start">
             <div>
-              <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-100 text-brand-700 text-xs font-semibold px-4 py-2 rounded-full mb-6">
-                <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
-                {t('hero.badge')}
-              </div>
+              <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-4">{t('legal_title')}</h2>
+              <p className="text-ink-muted leading-relaxed mb-4">{t('legal_p1')}</p>
+              <p className="text-ink-muted leading-relaxed mb-6">
+                <span className="text-ink font-semibold">{t('legal_p2_bold')}</span> {t('legal_p2')}
+              </p>
 
-              <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-slate-900 leading-[1.05] tracking-tight mb-6">
-                {t('hero.title').split('\n').map((line, i) => (
-                  <span key={i}>
-                    {i === 1
-                      ? <span className="text-brand-600">{line}</span>
-                      : line}
-                    {i < 2 && <br />}
-                  </span>
+              <div className="grid sm:grid-cols-2 gap-3 mb-6">
+                {weigh.map((w) => (
+                  <div key={w.t} className="bg-sand rounded-xl px-4 py-3">
+                    <b className="block text-[15px] text-ink">{w.t}</b>
+                    <span className="text-sm text-ink-faint">{w.d}</span>
+                  </div>
                 ))}
-              </h1>
-
-              <p className="text-lg text-slate-600 leading-relaxed mb-8 max-w-lg">
-                {t('hero.subtitle')}
-              </p>
-
-              <div className="flex flex-wrap gap-3 mb-6">
-                <Link href={`${base}/free-evaluation`} className="btn-primary">
-                  {t('hero.cta_primary')}
-                  <ArrowRight size={16} />
-                </Link>
-                <Link href={`#how`} className="btn-secondary">
-                  {t('hero.cta_secondary')}
-                </Link>
               </div>
 
-              <p className="flex items-center gap-2 text-sm text-slate-500">
-                <Lock size={13} className="text-brand-500 flex-shrink-0" />
-                {t('hero.note')}
-              </p>
+              <p className="text-ink-muted leading-relaxed mb-6">{t('legal_p3')}</p>
+
+              <ul className="space-y-3">
+                {rules.map((r) => (
+                  <li key={r.b} className="flex gap-3 text-[15px] leading-relaxed">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-clay-600 shrink-0" />
+                    <span className="text-ink-muted">
+                      <b className="text-ink">{r.b}</b> {r.p}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Right — workflow card */}
-            <div className="relative">
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-xl p-6">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">
-                  {t('hero_workflow.label')}
-                </p>
-                <div className="space-y-0 divide-y divide-slate-50">
-                  {[
-                    { n: '01', title: t('hero_workflow.step1_title'), sub: t('hero_workflow.step1_desc') },
-                    { n: '02', title: t('hero_workflow.step2_title'), sub: t('hero_workflow.step2_desc') },
-                    { n: '03', title: t('hero_workflow.step3_title'), sub: t('hero_workflow.step3_desc') },
-                    { n: '04', title: t('hero_workflow.step4_title'), sub: t('hero_workflow.step4_desc') },
-                  ].map((step) => (
-                    <div key={step.n} className="flex items-start gap-4 py-4">
-                      <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-brand-600 font-display font-bold text-xs">{step.n}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{step.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{step.sub}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-5 bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 size={18} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-800">{t('hero_workflow.result_title')}</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">{t('hero_workflow.result_desc')}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating badges */}
-              <div className="absolute -top-4 -right-4 bg-white border border-slate-100 shadow-lg rounded-xl px-3 py-2 flex items-center gap-2">
-                <Star size={13} className="text-amber-500 fill-amber-500" />
-                <span className="text-xs font-semibold text-slate-700">{t('hero_workflow.badge_certified')}</span>
-              </div>
-              <div className="absolute -bottom-4 -left-4 bg-brand-600 text-white shadow-lg rounded-xl px-3 py-2">
-                <p className="text-xs font-semibold">{t('hero_workflow.badge_speed')}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── TRUST BAR ─── */}
-      <div className="border-y border-slate-100 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-            {[
-              { icon: Shield, label: t('trust.certified') },
-              { icon: FileText, label: t('trust.court') },
-              { icon: Building2, label: t('trust.entity') },
-              { icon: Clock, label: t('trust.speed') },
-              { icon: Phone, label: t('trust.russian') },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2 text-slate-600">
-                <Icon size={14} className="text-brand-500" />
-                <span className="text-sm font-medium">{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── DZHLWK active-investigation banner ─── */}
-      <Link href={`${base}/dzhlwk-victims`} className="block bg-red-600 hover:bg-red-700 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-white text-sm font-semibold">
-          <Shield size={16} className="flex-shrink-0" />
-          <span>{(DZHLWK_BANNER[locale] || DZHLWK_BANNER.en).text}</span>
-          <span className="inline-flex items-center gap-1 underline underline-offset-2">
-            {(DZHLWK_BANNER[locale] || DZHLWK_BANNER.en).cta} <ArrowRight size={14} />
-          </span>
-        </div>
-      </Link>
-
-      {/* ─── STATS ─── */}
-      <section className="py-14 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { num: t('stats.illicit'), label: t('stats.illicit_label') },
-              { num: t('stats.searches'), label: t('stats.searches_label') },
-              { num: t('stats.hours'), label: t('stats.hours_label') },
-              { num: t('stats.chains'), label: t('stats.chains_label') },
-            ].map(({ num, label }) => (
-              <div key={label} className="text-center p-6 rounded-2xl bg-slate-50 border border-slate-100">
-                <div className="font-display font-bold text-3xl lg:text-4xl text-brand-600 mb-2">{num}</div>
-                <div className="text-xs text-slate-500 leading-tight">{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── SERVICES ─── */}
-      <section className="py-20 bg-white" id="services">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="section-tag">{t('services.tag')}</p>
-            <h2 className="section-title text-3xl lg:text-4xl mb-4">
-              {t('services.title').split('\n').map((l, i) => (
-                <span key={i}>{l}{i === 0 && <br />}</span>
-              ))}
-            </h2>
-            <p className="text-slate-600 max-w-2xl mx-auto">{t('services.subtitle')}</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
-            {services.map(({ icon: Icon, key, href }) => (
-              <Link key={key} href={href} className="group card hover:border-brand-200 p-6">
-                <div className="w-11 h-11 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center mb-4 group-hover:bg-brand-100 transition-colors">
-                  <Icon size={20} className="text-brand-600" />
-                </div>
-                <h3 className="font-display font-bold text-slate-900 mb-2">
-                  {t(`services.${key}.title`)}
-                </h3>
-                <p className="text-sm text-slate-500 leading-relaxed mb-4">
-                  {t(`services.${key}.desc`)}
-                </p>
-                <span className="inline-block text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full border border-brand-100">
-                  {t(`services.${key}.tag`)}
+            <div className="bg-sand rounded-2xl p-6 lg:p-7">
+              <div className="flex gap-3 items-start">
+                <span className="mt-0.5 h-6 w-6 rounded-md bg-clay-600 text-white grid place-items-center shrink-0">
+                  <Check size={15} strokeWidth={3} />
                 </span>
-              </Link>
-            ))}
-          </div>
-
-          {/* Russian banner */}
-          <div className="bg-gradient-to-r from-brand-600 to-brand-700 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-            <div className="flex items-start gap-4">
-              <span className="text-4xl">🇷🇺</span>
-              <div>
-                <h3 className="font-display font-bold text-white text-xl mb-1">
-                  {t('russian_banner.title')}
-                </h3>
-                <p className="text-brand-100 text-sm max-w-xl">
-                  {t('russian_banner.desc')}
-                </p>
+                <span className="text-[15px] text-ink leading-relaxed">{t('consent')}</span>
               </div>
-            </div>
-            <Link
-              href={`${base}/free-evaluation`}
-              className="flex-shrink-0 bg-white text-brand-700 font-semibold px-5 py-2.5 rounded-lg hover:bg-brand-50 transition-colors text-sm"
-            >
-              {t('russian_banner.cta')}
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── HOW IT WORKS ─── */}
-      <section className="py-20 bg-slate-50" id="how">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
-            <div>
-              <p className="section-tag">{t('how.tag')}</p>
-              <h2 className="section-title text-3xl lg:text-4xl mb-4">
-                {t('how.title').split('\n').map((l, i) => (
-                  <span key={i}>{l}{i === 0 && <br />}</span>
-                ))}
-              </h2>
-              <p className="text-slate-600 leading-relaxed">{t('how.subtitle')}</p>
-            </div>
-            <div className="space-y-0 divide-y divide-slate-200">
-              {howSteps.map((step, i) => (
-                <div key={step} className="flex gap-5 py-6">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-brand-600 text-white font-display font-bold text-sm flex items-center justify-center mt-0.5">
-                    {String(i + 1).padStart(2, '0')}
-                  </div>
-                  <div>
-                    <h4 className="font-display font-bold text-slate-900 mb-2">
-                      {t(`how.${step}_title`)}
-                    </h4>
-                    <p className="text-sm text-slate-600 leading-relaxed">
-                      {t(`how.${step}_desc`)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              <p className="text-[13.5px] text-ink-faint leading-relaxed mt-5 pt-5 border-t border-clay-200">
+                {t('fine')}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── CASES ─── */}
-      <section className="py-20 bg-white" id="cases">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="section-tag">{t('cases.tag')}</p>
-            <h2 className="section-title text-3xl lg:text-4xl mb-4">
-              {t('cases.title').split('\n').map((l, i) => (
-                <span key={i}>{l}{i === 0 && <br />}</span>
-              ))}
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">{t('cases.subtitle')}</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {cases.map(({ key, colorClass, amountClass }) => (
-              <div key={key} className={`rounded-2xl border p-6 ${colorClass}`}>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
-                  {t(`cases.${key}_type`)}
-                </p>
-                <p className={`font-display font-bold text-3xl mb-3 ${amountClass}`}>
-                  {t(`cases.${key}_amount`)}
-                </p>
-                <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                  {t(`cases.${key}_desc`)}
-                </p>
-                <div className="flex items-start gap-2 text-sm font-semibold text-emerald-700">
-                  <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" />
-                  <span>{t(`cases.${key}_result`)}</span>
-                </div>
-              </div>
-            ))}
+      {/* ─── THE OBJECTION, ANSWERED ─── */}
+      <section className="pb-16 lg:pb-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl border-l-4 border-clay-600 pl-7 py-1">
+            <p className="font-serif font-semibold text-2xl text-ink leading-snug mb-3">{t('objection_q')}</p>
+            <p className="text-ink-muted leading-relaxed">{t('objection_a')}</p>
           </div>
         </div>
       </section>
 
-      {/* ─── PRICING ─── */}
-      <section className="py-20 bg-slate-50" id="pricing">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="section-tag">{t('pricing.tag')}</p>
-            <h2 className="section-title text-3xl lg:text-4xl mb-4">
-              {t('pricing.title').split('\n').map((l, i) => (
-                <span key={i}>{l}{i === 0 && <br />}</span>
-              ))}
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">{t('pricing.subtitle')}</p>
-          </div>
+      {/* ─── SEARCH, DEMOTED BUT PRESENT ─── */}
+      <section id="check" className="py-16 lg:py-20 bg-sand scroll-mt-20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-3">{t('search_title')}</h2>
+          <p className="text-ink-muted mb-8">{t('search_sub')}</p>
 
-          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
-            {/* Basic */}
-            <div className="card">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t('pricing.basic_name')}</p>
-              <div className="mb-1">
-                <span className="font-display font-bold text-3xl text-slate-900">{t('pricing.basic_price')}</span>
-                <span className="text-slate-500 text-sm ml-2">{t('pricing.basic_period')}</span>
-              </div>
-              <p className="text-sm text-slate-500 mb-5">{t('pricing.basic_desc')}</p>
-              <ul className="space-y-2.5 mb-6">
-                {['basic_f1', 'basic_f2', 'basic_f3', 'basic_f4'].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                    <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                    {t(`pricing.${f}`)}
-                  </li>
-                ))}
-              </ul>
-              <Link href={`${base}/free-evaluation`} className="btn-outline">{t('pricing.cta')}</Link>
-            </div>
-
-            {/* Full - Featured */}
-            <div className="relative card border-brand-200 bg-brand-50 shadow-lg">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-xs font-bold px-4 py-1 rounded-full">
-                {t('pricing.full_badge')}
-              </div>
-              <p className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3">{t('pricing.full_name')}</p>
-              <div className="mb-1">
-                <span className="font-display font-bold text-3xl text-slate-900">{t('pricing.full_price')}</span>
-                <span className="text-slate-500 text-sm ml-2">{t('pricing.full_period')}</span>
-              </div>
-              <p className="text-sm text-slate-500 mb-5">{t('pricing.full_desc')}</p>
-              <ul className="space-y-2.5 mb-6">
-                {['full_f1', 'full_f2', 'full_f3', 'full_f4', 'full_f5'].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                    <CheckCircle2 size={15} className="text-brand-600 mt-0.5 flex-shrink-0" />
-                    {t(`pricing.${f}`)}
-                  </li>
-                ))}
-              </ul>
-              <Link href={`${base}/free-evaluation`} className="btn-primary w-full justify-center">
-                {t('pricing.cta')}
-              </Link>
-            </div>
-
-            {/* Expert */}
-            <div className="card">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t('pricing.expert_name')}</p>
-              <div className="mb-1">
-                <span className="font-display font-bold text-3xl text-slate-900">{t('pricing.expert_price')}</span>
-                <span className="text-slate-500 text-sm ml-2">{t('pricing.expert_period')}</span>
-              </div>
-              <p className="text-sm text-slate-500 mb-5">{t('pricing.expert_desc')}</p>
-              <ul className="space-y-2.5 mb-6">
-                {['expert_f1', 'expert_f2', 'expert_f3', 'expert_f4'].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                    <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                    {t(`pricing.${f}`)}
-                  </li>
-                ))}
-              </ul>
-              <Link href={`${base}/contact`} className="btn-outline">{t('pricing.cta_quote')}</Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── WHY US ─── */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="section-tag">{t('why.tag')}</p>
-            <h2 className="section-title text-3xl lg:text-4xl">
-              {t('why.title').split('\n').map((l, i) => (
-                <span key={i}>{l}{i === 0 && <br />}</span>
-              ))}
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {whyItems.map((key, i) => (
-              <div key={key} className="card flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl flex-shrink-0">
-                  {whyIcons[i]}
-                </div>
-                <div>
-                  <h4 className="font-display font-bold text-slate-900 mb-2">{t(`why.${key}_title`)}</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed">{t(`why.${key}_desc`)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── WALLET TRACKER ─── */}
-      <section className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="section-tag">{t('tracker_section.tag')}</p>
-            <h2 className="section-title text-3xl lg:text-4xl mb-4">
-              {t('tracker_section.title')}
-            </h2>
-            <p className="text-slate-600 max-w-2xl mx-auto">{t('tracker_section.subtitle')}</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-5 mb-10 max-w-4xl mx-auto">
-            {[
-              { icon: Search, key: 'feature1' },
-              { icon: BarChart3, key: 'feature2' },
-              { icon: Download, key: 'feature3' },
-            ].map(({ icon: Icon, key }) => (
-              <div key={key} className="card text-center p-6">
-                <div className="w-12 h-12 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center mx-auto mb-4">
-                  <Icon size={22} className="text-brand-600" />
-                </div>
-                <h3 className="font-display font-bold text-slate-900 mb-2">{t(`tracker_section.${key}_title`)}</h3>
-                <p className="text-sm text-slate-500">{t(`tracker_section.${key}_desc`)}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <Link
-              href={`${base}/wallet-tracker`}
-              className="btn-primary text-base px-8 py-3.5"
-            >
-              {t('tracker_section.cta')} <ArrowRight size={16} />
-            </Link>
-            <p className="text-xs text-slate-400 mt-4">{t('tracker_section.note')}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── BLOG ─── */}
-      <section className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <p className="section-tag">{t('blog.tag')}</p>
-              <h2 className="section-title text-3xl">{t('blog.title')}</h2>
-            </div>
-            <Link href={`${base}/blog`} className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700">
-              {t('blog.view_all')} <ChevronRight size={15} />
-            </Link>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {blogPosts.map((post) => (
-              <Link key={post.slug} href={`${base}/blog/${post.slug}`} className="card group hover:border-brand-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-100">
-                    {t(`blog.category_${categoryKey(post.category)}`)}
-                  </span>
-                  <span className="text-xs text-slate-400">{formatBlogDate(post.date, locale)}</span>
-                </div>
-                <h3 className="font-display font-bold text-slate-900 mb-2 group-hover:text-brand-600 transition-colors leading-snug">
-                  {post.title}
-                </h3>
-                <p className="text-sm text-slate-500 leading-relaxed mb-4">{post.excerpt}</p>
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>{t('blog.min_read', { count: post.readMinutes })}</span>
-                  <span className="text-brand-600 font-semibold group-hover:underline">{t('blog.read_more')}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── CTA ─── */}
-      <section className="py-24 bg-gradient-to-br from-brand-600 to-brand-800 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-20 -right-20 w-80 h-80 bg-brand-500 rounded-full opacity-20 blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-brand-700 rounded-full opacity-20 blur-3xl" />
-        </div>
-        <div className="relative max-w-2xl mx-auto px-4 text-center">
-          <p className="text-brand-200 text-xs font-bold tracking-widest uppercase mb-4">{t('cta.tag')}</p>
-          <h2 className="font-display font-bold text-4xl lg:text-5xl text-white leading-tight mb-5">
-            {t('cta.title').split('\n').map((l, i) => (
-              <span key={i}>{l}{i === 0 && <br />}</span>
-            ))}
-          </h2>
-          <p className="text-brand-100 text-lg leading-relaxed mb-8">{t('cta.desc')}</p>
-
-          <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-4">
+          <form action={`${base}/payment-safety`} className="flex flex-col sm:flex-row gap-3">
             <input
-              type="email"
-              placeholder={t('cta.email_placeholder')}
-              className="flex-1 bg-white/10 border border-white/20 text-white placeholder:text-brand-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/40"
+              type="text"
+              name="q"
+              placeholder={t('search_placeholder')}
+              aria-label={t('search_placeholder')}
+              className="input flex-1 bg-white py-4"
             />
-            <Link
-              href={`${base}/free-evaluation`}
-              className="bg-white text-brand-700 font-semibold px-5 py-3 rounded-lg hover:bg-brand-50 transition-colors text-sm whitespace-nowrap"
+            <button
+              type="submit"
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-lg px-8 py-4 transition-colors whitespace-nowrap inline-flex items-center justify-center gap-2"
             >
-              {t('cta.button')}
-            </Link>
+              <Search size={17} /> {t('search_button')}
+            </button>
           </form>
 
-          <p className="flex items-center justify-center gap-2 text-xs text-brand-200 mb-5">
-            <Lock size={12} /> {t('cta.privacy')}
-          </p>
+          <p className="text-sm text-ink-faint mt-5">{RAILS.join(' · ')}</p>
+        </div>
+      </section>
 
-          <div className="flex items-center justify-center gap-4 flex-wrap text-sm">
-            <span className="text-brand-200">{t('cta.phone_label')}</span>
-            <a href="tel:+18335591334" className="text-white font-bold hover:underline">{t('cta.phone')}</a>
-            <span className="text-brand-300 hidden sm:block">·</span>
-            <span className="text-brand-200">{t('cta.russian_label')}</span>
-            <span className="text-white font-bold">{t('cta.russian_value')}</span>
+      {/* ─── PARTNERS: LAWYERS, BANKS, LAW ENFORCEMENT ─── */}
+      <section className="py-16 lg:py-20 bg-espresso text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold tracking-[0.14em] text-clay-300 mb-4">{t('partners_kicker')}</p>
+          <h2 className="font-serif font-semibold text-3xl lg:text-4xl leading-tight max-w-3xl mb-4">
+            {t('partners_title')}
+          </h2>
+          <p className="text-[#BCAA9D] text-lg leading-relaxed max-w-3xl mb-10">{t('partners_lede')}</p>
+
+          <div className="grid md:grid-cols-3 gap-4 mb-11">
+            {who.map(({ icon: Icon, t: title, d }) => (
+              <div key={title} className="border border-white/15 rounded-2xl p-6">
+                <Icon size={20} className="text-clay-300 mb-3" />
+                <h3 className="font-bold text-lg mb-2">{title}</h3>
+                <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{d}</p>
+              </div>
+            ))}
           </div>
+
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 border-t border-white/15 pt-11">
+            <div>
+              <h3 className="font-serif font-semibold text-2xl mb-3">{t('gate_title')}</h3>
+              <p className="text-[#BCAA9D] leading-relaxed mb-6">{t('gate_p')}</p>
+              <div className="flex gap-3 bg-clay-300/15 border border-clay-300/35 rounded-xl p-5">
+                <Info size={18} className="text-clay-300 shrink-0 mt-0.5" />
+                <span className="text-[15px] text-clay-50/90 leading-relaxed">{t('gate_warn')}</span>
+              </div>
+            </div>
+
+            <ol className="space-y-0">
+              {vsteps.map((s, i) => (
+                <li
+                  key={s.b}
+                  className={`flex gap-4 py-4 ${i < vsteps.length - 1 ? 'border-b border-white/10' : ''}`}
+                >
+                  <span className="h-7 w-7 rounded-full bg-clay-600 text-white grid place-items-center text-sm font-bold shrink-0">
+                    {i + 1}
+                  </span>
+                  <span>
+                    <b className="block text-[16.5px]">{s.b}</b>
+                    <span className="text-[15px] text-[#BCAA9D] leading-relaxed">{s.p}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 border-t border-white/15 mt-11 pt-11">
+            <div className="border border-white/15 rounded-2xl p-6">
+              <span className="block text-xs font-bold tracking-[0.11em] text-clay-300 mb-3">{t('tier1_lvl')}</span>
+              <h4 className="font-bold text-lg mb-2">{t('tier1_h')}</h4>
+              <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{t('tier1_p')}</p>
+            </div>
+            <div className="border border-white/15 rounded-2xl p-6">
+              <span className="block text-xs font-bold tracking-[0.11em] text-clay-300 mb-3">{t('tier2_lvl')}</span>
+              <h4 className="font-bold text-lg mb-2">{t('tier2_h')}</h4>
+              <p className="text-[15px] text-[#BCAA9D] leading-relaxed">{t('tier2_p')}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-5 border-t border-white/15 mt-11 pt-9">
+            <Link
+              href={`${base}/contact`}
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2"
+            >
+              {t('partners_cta')} <ArrowRight size={18} />
+            </Link>
+            <span className="text-[15px] text-[#BCAA9D] max-w-lg leading-relaxed">{t('partners_note')}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── CRYPTO FORK ───
+          Colour no longer separates the two products — the site is one palette
+          now — so the fork leans on contrast instead: the only dark band on an
+          otherwise light page. */}
+      <section className="py-16 bg-espresso text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-8 items-center justify-between">
+          <div>
+            <p className="text-xs font-bold tracking-[0.14em] text-clay-300 mb-3">{t('fork_kicker')}</p>
+            <h2 className="font-serif font-semibold text-3xl lg:text-4xl mb-3">{t('fork_title')}</h2>
+            <p className="text-[#BCAA9D] text-lg leading-relaxed max-w-2xl">{t('fork_p')}</p>
+          </div>
+          <Link
+            href={`${base}/crypto`}
+            className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-8 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            {t('fork_button')} <ArrowRight size={18} />
+          </Link>
+        </div>
+      </section>
+
+      {/* ─── FINAL CTA ─── */}
+      <section className="py-16 lg:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-sand border border-clay-200 rounded-3xl p-8 lg:p-12 flex flex-wrap gap-8 items-center justify-between">
+            <div>
+              <h2 className="font-serif font-semibold text-ink text-3xl leading-tight mb-2">{t('final_title')}</h2>
+              <p className="text-ink-muted max-w-xl leading-relaxed">{t('final_p')}</p>
+            </div>
+            <Link
+              href={`${base}/payment-safety`}
+              className="bg-clay-600 hover:bg-clay-700 text-white font-semibold rounded-full px-9 py-4 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+            >
+              {t('cta')} <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          <p className="flex items-center justify-center gap-2 text-sm text-ink-faint mt-8">
+            <Lock size={13} /> <ShieldCheck size={13} /> {t('note_plain')}
+          </p>
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Manrope } from 'next/font/google';
+import { Inter, Manrope, Lora } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
@@ -18,6 +18,15 @@ const manrope = Manrope({
   subsets: ['latin', 'cyrillic'],
   variable: '--font-manrope',
   display: 'swap',
+});
+
+/* Headline serif for the payment product. Lora has Cyrillic, so RU gets
+ * the same editorial voice as EN instead of falling back to a system serif. */
+const lora = Lora({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-lora',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
 });
 
 export function generateStaticParams() {
@@ -78,9 +87,9 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={isRtl ? 'rtl' : 'ltr'}
-      className={`${inter.variable} ${manrope.variable}`}
+      className={`${inter.variable} ${manrope.variable} ${lora.variable}`}
     >
-      <body className="font-sans antialiased bg-white text-slate-900">
+      <body className="font-sans antialiased bg-paper text-ink">
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

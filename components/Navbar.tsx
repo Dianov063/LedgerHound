@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { Menu, X, Globe, ChevronDown } from 'lucide-react';
@@ -38,13 +39,21 @@ export default function Navbar() {
   };
 
   const prefix = locale === 'en' ? '' : `/${locale}`;
+  /* The first two links are the visitor's two states — hasn't paid yet, already
+   * paid. The third is the other product. Everything else is one level down. */
   const navLinks = [
-    { href: `${prefix}/services`, label: t('services') },
-    { href: `${prefix}/cases`, label: t('cases') },
+    { href: `${prefix}/payment-safety`, label: t('report_scam') },
+    { href: `${prefix}/payment-safety#check`, label: t('check_recipient') },
+    { href: `${prefix}/crypto`, label: t('crypto_recovery') },
     { href: `${prefix}/pricing`, label: t('pricing') },
-    { href: `${prefix}/about`, label: t('about') },
     { href: `${prefix}/blog`, label: t('blog') },
   ];
+
+  /* The tools row is crypto-side furniture. Hiding it on the payment pages keeps
+   * the front door to a single row, and showing it everywhere else means no tool
+   * is orphaned — they are still the only navigation those pages have. */
+  const pathNoLocale = pathname.replace(/^\/(ru|es|zh|fr|ar)(?=\/|$)/, '') || '/';
+  const showToolLinks = pathNoLocale !== '/' && !pathNoLocale.startsWith('/payment-');
   const toolLinks = [
     { href: `${prefix}/wallet-tracker`, label: t('tracker'), badge: undefined },
     { href: `${prefix}/graph-tracer`, label: t('graph'), badge: undefined },
@@ -58,19 +67,28 @@ export default function Navbar() {
     { href: `${prefix}/tools/exchange-letter`, label: t('exchange_letter'), badge: 'NEW' },
   ];
 
+  /* One palette site-wide now, so the bar no longer changes skin by route.
+   * `onPaymentSide` only decides which call to action belongs here. */
+  const onPaymentSide = !showToolLinks;
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b shadow-sm bg-paper/95 border-clay-600/15">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top row: logo + pages + CTA */}
-        <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <Link href={locale === 'en' ? '/' : `/${locale}`} className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-display font-bold text-sm">LH</span>
-            </div>
-            <span className="font-display font-bold text-slate-900 text-lg">
-              Ledger<span className="text-brand-600">Hound</span>
-            </span>
+        <div className="flex items-center justify-between h-16">
+          <Link
+            href={locale === 'en' ? '/' : `/${locale}`}
+            aria-label="LedgerHound"
+            className="flex items-center shrink-0"
+          >
+            <Image
+              src="/logo-transparent.png"
+              alt="LedgerHound"
+              width={1497}
+              height={545}
+              priority
+              className="h-12 w-[132px] object-contain sm:h-14 sm:w-[154px]"
+            />
           </Link>
 
           {/* Desktop Nav - pages */}
@@ -79,7 +97,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href || '/'}
-                className="px-3 py-1.5 text-base font-medium text-slate-600 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition-colors"
+                className="px-3 py-1.5 text-base font-medium rounded-lg transition-colors text-ink-muted hover:text-ink hover:bg-clay-50"
               >
                 {link.label}
               </Link>
@@ -132,10 +150,14 @@ export default function Navbar() {
             </div>
 
             <Link
-              href={`/${locale === 'en' ? '' : locale + '/'}free-evaluation`.replace(/\/$/, '') || '/free-evaluation'}
-              className="btn-primary text-sm py-2 px-4"
+              href={
+                onPaymentSide
+                  ? `${prefix}/payment-safety`
+                  : `/${locale === 'en' ? '' : locale + '/'}free-evaluation`.replace(/\/$/, '') || '/free-evaluation'
+              }
+              className="inline-flex items-center gap-2 bg-clay-600 hover:bg-clay-700 text-white font-semibold text-sm py-2.5 px-5 rounded-full transition-colors"
             >
-              {t('cta')}
+              {onPaymentSide ? t('report_scam') : t('cta')}
             </Link>
           </div>
 
@@ -150,8 +172,8 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Bottom row: tools (compact) */}
-        <div className="hidden md:flex items-center justify-center gap-1 border-t border-slate-100 py-1.5">
+        {/* Bottom row: tools (compact) — crypto side only */}
+        <div className={`${showToolLinks ? 'hidden md:flex' : 'hidden'} items-center justify-center gap-1 border-t border-slate-100 py-1.5`}>
           {toolLinks.map((link) => (
             <Link
               key={link.href}
