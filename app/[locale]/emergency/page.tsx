@@ -236,7 +236,7 @@ export default function EmergencyPage() {
       });
       const data = await res.json();
       setRoute(data.route);
-      setAnalysis({ ...data.analysis, caseId: data.caseId });
+      setAnalysis({ ...data.analysis, caseId: data.caseId, caseSecret: data.caseSecret });
     } catch {
       setRoute('URGENT');
       setAnalysis({
@@ -261,7 +261,7 @@ export default function EmergencyPage() {
       const res = await fetch('/api/emergency/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product, caseId: analysis?.caseId, ...form, route }),
+        body: JSON.stringify({ product, caseId: analysis?.caseId, caseSecret: analysis?.caseSecret, ...form, route }),
       });
       const data = await res.json();
       if (data.url) {

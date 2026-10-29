@@ -4,6 +4,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getPlatformIndex, slugify } from '@/lib/scam-db';
 import type { PlatformIndexEntry } from '@/lib/scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { createCaseSecret } from '@/lib/emergency-case-access';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -157,13 +158,16 @@ export async function POST(req: NextRequest) {
           : 'Limited recovery potential';
 
     /* ── Generate case ID and save to S3 ── */
-    // caseId must be UNGUESSABLE: it is the sole access token for /api/emergency/status,
-    // which returns presigned PDF links + the victim's email. A timestamp-only id was
-    // enumerable. The random suffix (64 bits) makes brute-force infeasible.
+    // The random suffix makes ids unguessable, but an id is still not an access
+    // token: rewriting the case needs the owner secret below, and reading its
+    // documents needs the paid Stripe session (see lib/emergency-case-access.ts).
     const caseId = `ER-${Date.now().toString(36).toUpperCase()}-${randomBytes(8).toString('hex')}`;
+    // Owner secret: returned once to this browser; only its hash is stored.
+    const owner = createCaseSecret();
 
     const caseData = {
       caseId,
+      ownerSecretHash: owner.hash,
       route,
       createdAt: new Date().toISOString(),
       country,
@@ -194,6 +198,7 @@ export async function POST(req: NextRequest) {
       },
     };
 
+    let saved = false;
     try {
       await getS3().send(
         new PutObjectCommand({
@@ -202,18 +207,22 @@ export async function POST(req: NextRequest) {
           Body: JSON.stringify(caseData),
           ContentType: 'application/json',
           ServerSideEncryption: 'aws:kms',
+          IfNoneMatch: '*', // never overwrite an existing case
         }),
       );
+      saved = true;
       console.log(`[emergency/analyze] Saved case ${caseId} to S3`);
     } catch (err) {
       console.error(`[emergency/analyze] Failed to save case ${caseId} to S3:`, err);
-      // Non-fatal: still return the analysis even if S3 save fails
+      // Non-fatal: still return the analysis. Without a stored case there is
+      // nothing to check out, so the case id and owner secret are withheld.
     }
 
     /* ── Response ── */
     return NextResponse.json({
       route,
-      caseId,
+      caseId: saved ? caseId : null,
+      caseSecret: saved ? owner.secret : null,
       analysis: {
         recoveryScore,
         recoveryLabel,

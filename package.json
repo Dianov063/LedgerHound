@@ -15,6 +15,7 @@
     "legal:validate-all": "npx tsx scripts/legal-packs/validate-all.ts",
     "legal:refresh": "npx tsx scripts/legal-packs/refresh-pipeline.ts",
     "legal:refresh-all": "npx tsx scripts/legal-packs/refresh-all.ts",
+    "indexnow:submit": "npx tsx scripts/submit-indexnow.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
