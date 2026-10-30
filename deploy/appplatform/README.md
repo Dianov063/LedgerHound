@@ -112,9 +112,38 @@ Certificates for `www.ledgerhound.vip` / `ledgerhound.vip` can only be issued
 after DNS points here, so before cutover test the origin over the private
 network or with an HTTP-only temporary block.
 
+## Public origin
+
+Behind Caddy the standalone server builds `req.url` from its bind address
+(`HOSTNAME=0.0.0.0`), not from the Host header, so a URL taken from the request
+would be `https://0.0.0.0:3000/…`. Every absolute address that leaves the server
+goes through `lib/public-origin.ts`: Stripe success/cancel URLs, the email
+verification redirects and the transaction lookup in `scam-database/report`.
+
+- **Self-host:** `compose.yml` sets `LEDGERHOUND_PUBLIC_ORIGIN=https://www.ledgerhound.vip`.
+  It must be `https://host` with no credentials, path, query or fragment, and a
+  public host. Host and X-Forwarded-Host are never used. Keep `HOSTNAME=0.0.0.0`:
+  it is only what the server binds to.
+- **Vercel and local development:** leave it unset. The request origin is correct
+  there and preview deployments stay on their own URL.
+- **Missing or invalid on self-host:** nothing falls back to the request URL. The
+  startup log says what is wrong, `/api/health` answers 503 `misconfigured` (the
+  container turns unhealthy), both checkouts and the email link answer 500 before
+  touching Stripe, S3 or the token, and a report with a transaction hash fails.
+
+A status code does not show this: check where the redirect goes.
+
+```sh
+curl -si --resolve www.ledgerhound.vip:443:40.160.88.230 \
+  https://www.ledgerhound.vip/api/non-crypto-scam-database/verify-email | grep -i '^location'
+# location: https://www.ledgerhound.vip/payment-safety?emailVerificationError=1
+```
+
 ## Before DNS: shadow checks
 
 - `sudo docker exec appplatform_prod-caddy-1 wget -qO- http://ledgerhound-web:3000/api/health` → `{"status":"ok",…}`
+- The redirect above stays on `https://www.ledgerhound.vip`, and the `success_url`
+  and `cancel_url` of a test-mode Checkout Session of each product do too
 - All locales, `/emergency`, `/payment-scam-report`, `/scam-database`, `/sitemap.xml`
 - `POST /api/emergency/generate-pack` and `POST /api/blog-agent` without key → 401
 - `GET /api/emergency/status?case_id=…` without a paid session → 403

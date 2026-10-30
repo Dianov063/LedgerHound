@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getPublicOrigin, PublicOriginError } from '@/lib/public-origin';
 import Stripe from 'stripe';
 import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest) {
     const networkLabel = NETWORK_LABELS[net] || net.toUpperCase();
     const shortAddr = `${walletAddress.slice(0, 10)}...${walletAddress.slice(-6)}`;
 
+    const origin = getPublicOrigin(req);
+
     const session = await getStripe().checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -95,8 +98,8 @@ export async function POST(req: NextRequest) {
         country: reportCountry,
       },
       customer_email: email,
-      success_url: `${req.nextUrl.origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,
-      cancel_url: `${req.nextUrl.origin}/report`,
+      success_url: `${origin}/report/success?session_id={CHECKOUT_SESSION_ID}&email=${encodeURIComponent(email)}`,
+      cancel_url: `${origin}/report`,
     });
 
     logger.info({ network: net, sessionId: session.id }, '[checkout] Session created');
@@ -104,6 +107,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     logger.error({ err }, '[checkout] Error');
+    if (err instanceof PublicOriginError) {
+      return NextResponse.json({ error: 'Failed to create checkout' }, { status: 500 });
+    }
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to create checkout' }, { status: 500 });
   }
 }

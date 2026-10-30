@@ -4,19 +4,30 @@ import {
   verifyNonCryptoEmailToken,
 } from '@/lib/non-crypto-scam-db';
 import { sendPaymentReportVerification } from '@/lib/payment-safety-emails';
+import { getPublicOrigin } from '@/lib/public-origin';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
+  // Outside the try below, which turns every failure into a redirect, and before
+  // the token is checked: a misconfigured site must not use up the link.
+  let origin: string;
+  try {
+    origin = getPublicOrigin(req);
+  } catch (err) {
+    console.error('[verify-email]', err);
+    return Response.json({ error: 'Email verification is temporarily unavailable.' }, { status: 500 });
+  }
+
   const token = req.nextUrl.searchParams.get('token') || '';
   try {
     const result = await verifyNonCryptoEmailToken(token);
     const localePrefix = result.locale === 'en' ? '' : `/${result.locale}`;
-    return NextResponse.redirect(new URL(`${localePrefix}/payment-safety?emailVerified=1&reportId=${encodeURIComponent(result.reportId)}`, req.url));
+    return NextResponse.redirect(new URL(`${localePrefix}/payment-safety?emailVerified=1&reportId=${encodeURIComponent(result.reportId)}`, origin));
   } catch {
-    return NextResponse.redirect(new URL('/payment-safety?emailVerificationError=1', req.url));
+    return NextResponse.redirect(new URL('/payment-safety?emailVerificationError=1', origin));
   }
 }
 

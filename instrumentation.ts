@@ -17,6 +17,12 @@ export async function register() {
 
   const { beginDrain, drainBackgroundTasks, inFlightCount } = await import('@/lib/background-tasks');
   const { hasUpstash } = await import('@/lib/rate-limit');
+  const { publicOriginProblem } = await import('@/lib/public-origin');
+
+  const originProblem = publicOriginProblem();
+  if (originProblem) {
+    console.error(`[startup] ${originProblem}. Checkouts and email links are refused and /api/health reports misconfigured until it is fixed.`);
+  }
 
   if (!hasUpstash) {
     console.warn('[startup] UPSTASH_REDIS_REST_URL not set: rate limits use this process only (correct for a single container, not for several replicas)');

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { saveReport, isTxidUsed, calcRecoveryScore } from '@/lib/scam-db';
 import type { ScamType } from '@/lib/scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { getPublicOrigin } from '@/lib/public-origin';
 
 const VALID_TYPES: ScamType[] = ['fake_exchange', 'pig_butchering', 'rug_pull', 'phishing', 'ponzi', 'other'];
 
@@ -54,9 +55,11 @@ export async function POST(req: NextRequest) {
     let verifiedTxData: any = null;
 
     if (txHash && txHash.trim()) {
+      // Outside the try below: a misconfigured site must fail the request, not
+      // quietly save a verifiable report as unverified.
+      const baseUrl = getPublicOrigin(req);
       try {
         const txNet = network || 'auto';
-        const baseUrl = req.nextUrl.origin;
         const txRes = await fetch(`${baseUrl}/api/tx`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

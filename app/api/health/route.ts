@@ -1,5 +1,6 @@
 import { inFlightCount, isDraining } from '@/lib/background-tasks';
 import { isEmailDeliveryConfigured } from '@/lib/idempotent-email';
+import { publicOriginProblem } from '@/lib/public-origin';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,6 +36,11 @@ export async function GET() {
   const missing = [...REQUIRED_ENV.filter((name) => !process.env[name]), ...missingEmailConfiguration()];
   if (missing.length > 0) {
     console.error('[health] Missing required env:', missing.join(', '));
+    return Response.json({ status: 'misconfigured' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
+  const originProblem = publicOriginProblem();
+  if (originProblem) {
+    console.error('[health]', originProblem);
     return Response.json({ status: 'misconfigured' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
   return Response.json(

@@ -20,7 +20,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
+      # Bind address only. Public URLs come from LEDGERHOUND_PUBLIC_ORIGIN.
       HOSTNAME: 0.0.0.0
+      LEDGERHOUND_PUBLIC_ORIGIN: https://www.ledgerhound.vip
       # Measured 2026-10-17: idle 60 MiB, page load ~120 MiB, +70 MiB per large
       # report render, 3 concurrent large reports +227 MiB. Heap cap keeps V8
       # collecting well before the container limit.

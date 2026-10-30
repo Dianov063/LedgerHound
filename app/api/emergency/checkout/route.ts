@@ -4,6 +4,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } fr
 import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { CASE_ID_RE, verifyCaseSecret } from '@/lib/emergency-case-access';
+import { getPublicOrigin } from '@/lib/public-origin';
 
 const getS3 = () =>
   new S3Client({
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
         { status: 429 },
       );
     }
+
+    // Checked before the case is touched: a misconfigured site must not start a checkout.
+    const origin = getPublicOrigin(req);
 
     /* ── Parse body ── */
     const body = await req.json();
@@ -247,8 +251,8 @@ export async function POST(req: NextRequest) {
         txid: txid || '',
       },
       customer_email: email,
-      success_url: `${req.nextUrl.origin}/emergency/success?session_id={CHECKOUT_SESSION_ID}&case_id=${encodeURIComponent(caseId)}&product=${encodeURIComponent(product)}`,
-      cancel_url: `${req.nextUrl.origin}/emergency`,
+      success_url: `${origin}/emergency/success?session_id={CHECKOUT_SESSION_ID}&case_id=${encodeURIComponent(caseId)}&product=${encodeURIComponent(product)}`,
+      cancel_url: `${origin}/emergency`,
     });
 
     // Record the session before handing out its URL: the paid check above can
