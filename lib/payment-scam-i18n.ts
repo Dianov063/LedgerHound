@@ -217,6 +217,9 @@ const TELEGRAM_SCAM_COPY: Record<Locale, TelegramScamCopy> = {
   },
 };
 
+/** Scenario pages with translated content. The others render English under every locale. */
+export const TRANSLATED_SCENARIO_SLUGS: readonly string[] = ['telegram-payment-scams'];
+
 export function getTelegramScamCopy(locale: string): TelegramScamCopy {
   return TELEGRAM_SCAM_COPY[locale as Locale] || TELEGRAM_SCAM_COPY.en;
 }

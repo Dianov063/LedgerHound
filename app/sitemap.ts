@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { locales } from '@/i18n';
 import { BLOG_POSTS } from '@/lib/blog/posts';
 import { PAYMENT_SCAM_SCENARIOS } from '@/lib/payment-scam-scenarios';
+import { TRANSLATED_SCENARIO_SLUGS } from '@/lib/payment-scam-i18n';
 
 const baseUrl = 'https://www.ledgerhound.vip';
 
@@ -10,7 +11,11 @@ const baseUrl = 'https://www.ledgerhound.vip';
 // empty fallback into the sitemap until the next build.
 export const dynamic = 'force-dynamic';
 
-const pages = [
+/**
+ * englishOnly: the body renders English under every locale and those locale URLs
+ * canonicalize to the English one, so only the English URL is listed.
+ */
+const pages: { path: string; priority: number; changeFreq: string; englishOnly?: boolean }[] = [
   { path: '', priority: 1.0, changeFreq: 'weekly' },
   /* The crypto landing page. Same content that used to sit at '/', now on its
    * own URL so the payment product can own the front door. */
@@ -37,12 +42,14 @@ const pages = [
   { path: '/whats-included', priority: 0.7, changeFreq: 'monthly' },
   { path: '/dzhlwk-victims', priority: 0.8, changeFreq: 'weekly' },
   { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
-  { path: '/payment-scam-report', priority: 0.9, changeFreq: 'weekly' },
+  { path: '/emergency', priority: 0.9, changeFreq: 'weekly', englishOnly: true },
+  { path: '/payment-scam-report', priority: 0.9, changeFreq: 'weekly', englishOnly: true },
   { path: '/payment-safety', priority: 0.8, changeFreq: 'weekly' },
   ...PAYMENT_SCAM_SCENARIOS.map((scenario) => ({
     path: `/payment-scam/${scenario.slug}`,
     priority: 0.8,
     changeFreq: 'weekly',
+    englishOnly: !TRANSLATED_SCENARIO_SLUGS.includes(scenario.slug),
   })),
   { path: '/tx-lookup', priority: 0.9, changeFreq: 'weekly' },
   { path: '/scam-database', priority: 0.9, changeFreq: 'daily' },
@@ -95,13 +102,23 @@ function buildLanguages(pathname: string): Record<string, string> {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const urls: MetadataRoute.Sitemap = [];
 
+  // lastModified is set only where the data has a real change date: a request
+  // time here would tell crawlers every page changed on every read.
+
   // Static pages
   for (const page of pages) {
+    if (page.englishOnly) {
+      urls.push({
+        url: `${baseUrl}${page.path}`,
+        changeFrequency: page.changeFreq as any,
+        priority: page.priority,
+      });
+      continue;
+    }
     for (const locale of locales) {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
         url: `${baseUrl}${localePath}${page.path}`,
-        lastModified: new Date(),
         changeFrequency: page.changeFreq as any,
         priority: page.priority,
         alternates: { languages: buildLanguages(page.path) },
@@ -115,7 +132,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
         url: `${baseUrl}${localePath}${post}`,
-        lastModified: new Date(),
         changeFrequency: 'monthly',
         priority: 0.8,
         alternates: { languages: buildLanguages(post) },
@@ -133,7 +149,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const localePath = locale === 'en' ? '' : `/${locale}`;
         urls.push({
           url: `${baseUrl}${localePath}${profilePath}`,
-          lastModified: inv.updatedAt ? new Date(inv.updatedAt) : new Date(),
+          ...(inv.updatedAt ? { lastModified: new Date(inv.updatedAt) } : {}),
           changeFrequency: 'weekly',
           priority: 0.6,
           alternates: { languages: buildLanguages(profilePath) },
@@ -152,7 +168,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const localePath = locale === 'en' ? '' : `/${locale}`;
       urls.push({
         url: `${baseUrl}${localePath}${platformPath}`,
-        lastModified: lastReported ? new Date(lastReported) : new Date(),
+        ...(lastReported ? { lastModified: new Date(lastReported) } : {}),
         changeFrequency: 'weekly',
         priority: 0.8,
         alternates: { languages: buildLanguages(platformPath) },

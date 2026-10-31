@@ -38,6 +38,9 @@ interface MakeMetadataParams {
 
   noIndex?: boolean;
   ogImage?: string;
+
+  /** The page body renders English under every locale: canonical is the English URL, no hreflang. */
+  englishOnlyContent?: boolean;
 }
 
 /**
@@ -61,10 +64,10 @@ interface MakeMetadataParams {
  *   });
  */
 export async function makeMetadata(params: MakeMetadataParams): Promise<Metadata> {
-  const { locale, path, metadataKey, title: rawTitle, description: rawDesc, keywords, noIndex, ogImage } = params;
+  const { locale, path, metadataKey, title: rawTitle, description: rawDesc, keywords, noIndex, ogImage, englishOnlyContent } = params;
 
   const cleanPath = !path ? '' : (path.startsWith('/') ? path : `/${path}`);
-  const { canonical, languages } = buildAlternates(locale, cleanPath);
+  const { canonical, languages } = buildAlternates(englishOnlyContent ? 'en' : locale, cleanPath);
 
   let title: string;
   let description: string;
@@ -92,10 +95,7 @@ export async function makeMetadata(params: MakeMetadataParams): Promise<Metadata
     description,
     metadataBase: new URL(SITE_URL),
     ...(keywords ? { keywords } : {}),
-    alternates: {
-      canonical,
-      languages,
-    },
+    alternates: englishOnlyContent ? { canonical } : { canonical, languages },
     openGraph: {
       title,
       description,
