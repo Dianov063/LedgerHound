@@ -6,7 +6,8 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/_next/'],
+        // /_next/ stays open: Google needs its CSS and JS to render the pages.
+        disallow: ['/api/'],
       },
     ],
     sitemap: 'https://www.ledgerhound.vip/sitemap.xml',
