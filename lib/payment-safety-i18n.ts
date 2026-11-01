@@ -1500,3 +1500,18 @@ export function translateApiError(locale: string, error: unknown, fallback: stri
   if (locale === 'en') return error;
   return PAYMENT_SAFETY_TRANSLATIONS[locale as Exclude<Locale, 'en'>]?.[error] || fallback;
 }
+
+/** An error whose message is already safe to show: translated, or the operation's own fallback. */
+export class VisibleError extends Error {}
+
+/**
+ * What a form shows for a caught error. Anything not raised as a VisibleError is
+ * a technical failure (network, unreadable response, a bug), so the visitor gets
+ * the operation's message and only the error type goes to the log: the text can
+ * quote the response body.
+ */
+export function visibleErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof VisibleError) return error.message;
+  console.warn('[payment-safety] request failed:', error instanceof Error ? error.name : typeof error);
+  return fallback;
+}

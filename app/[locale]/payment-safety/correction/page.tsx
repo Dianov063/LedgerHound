@@ -6,7 +6,12 @@ import { useLocale } from 'next-intl';
 import { CheckCircle2, FileText, Loader2, Scale } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { translateApiError, translatePaymentSafety } from '@/lib/payment-safety-i18n';
+import {
+  translateApiError,
+  translatePaymentSafety,
+  visibleErrorMessage,
+  VisibleError,
+} from '@/lib/payment-safety-i18n';
 
 const RAILS = [
   ['zelle', 'Zelle'], ['cashapp', 'Cash App'], ['venmo', 'Venmo'], ['paypal', 'PayPal'],
@@ -26,9 +31,11 @@ export default function PaymentSafetyCorrectionPage() {
 
   async function submitCorrection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // React clears currentTarget once the handler yields, so keep the form for after the requests.
+    const form = event.currentTarget;
     setStatus('loading');
     setError('');
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(form);
     try {
       const evidenceFiles: string[] = [];
       for (const file of files.slice(0, 5)) {
@@ -36,7 +43,7 @@ export default function PaymentSafetyCorrectionPage() {
         upload.append('file', file);
         const uploadRes = await fetch('/api/non-crypto-scam-database/upload', { method: 'POST', body: upload });
         const uploaded = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(translateApiError(locale, uploaded.error, t('Unable to upload {file}').replace('{file}', file.name)));
+        if (!uploadRes.ok) throw new VisibleError(translateApiError(locale, uploaded.error, t('Unable to upload {file}').replace('{file}', file.name)));
         evidenceFiles.push(uploaded.key);
       }
 
@@ -57,13 +64,13 @@ export default function PaymentSafetyCorrectionPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(translateApiError(locale, body.error, t('Unable to submit correction request')));
+      if (!res.ok) throw new VisibleError(translateApiError(locale, body.error, t('Unable to submit correction request')));
       setCorrectionId(body.correctionId);
       setStatus('success');
       setFiles([]);
-      event.currentTarget.reset();
-    } catch (err: any) {
-      setError(err.message || t('Unable to submit correction request'));
+      form.reset();
+    } catch (err) {
+      setError(visibleErrorMessage(err, t('Unable to submit correction request')));
       setStatus('error');
     }
   }

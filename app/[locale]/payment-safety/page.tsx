@@ -11,7 +11,12 @@ import {
   isCommunityLanguage,
   type CommunityLanguage,
 } from '@/lib/community-languages';
-import { translateApiError, translatePaymentSafety } from '@/lib/payment-safety-i18n';
+import {
+  translateApiError,
+  translatePaymentSafety,
+  visibleErrorMessage,
+  VisibleError,
+} from '@/lib/payment-safety-i18n';
 import {
   AlertTriangle,
   ArrowRight,
@@ -646,10 +651,10 @@ export default function PaymentSafetyPage() {
       });
       const res = await fetch(`/api/non-crypto-scam-database/search?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(translateApiError(locale, data.error, t('Search failed')));
+      if (!res.ok) throw new VisibleError(translateApiError(locale, data.error, t('Search failed')));
       setCheckResult({ matched: data.matched, identity: data.identity || null });
-    } catch (err: any) {
-      setCheckError(err.message || t('Search failed'));
+    } catch (err) {
+      setCheckError(visibleErrorMessage(err, t('Search failed')));
     } finally {
       setCheckLoading(false);
     }
@@ -691,7 +696,7 @@ export default function PaymentSafetyPage() {
       });
       const challenge = await challengeRes.json();
       if (!challengeRes.ok || !challenge.submissionToken) {
-        throw new Error(translateApiError(locale, challenge.error, t('Security check expired. Please try again.')));
+        throw new VisibleError(translateApiError(locale, challenge.error, t('Security check expired. Please try again.')));
       }
       const submissionToken = String(challenge.submissionToken);
 
@@ -705,7 +710,7 @@ export default function PaymentSafetyPage() {
           body: uploadData,
         });
         const uploaded = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(translateApiError(locale, uploaded.error, t('Failed to upload {file}').replace('{file}', file.name)));
+        if (!uploadRes.ok) throw new VisibleError(translateApiError(locale, uploaded.error, t('Failed to upload {file}').replace('{file}', file.name)));
         evidenceFiles.push(uploaded.key);
       }
       setUploadStatus(evidenceFiles.length > 0 ? t('Evidence uploaded. Submitting report...') : '');
@@ -755,7 +760,7 @@ export default function PaymentSafetyPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(translateApiError(locale, body.error, t('Report failed')));
+      if (!res.ok) throw new VisibleError(translateApiError(locale, body.error, t('Report failed')));
       setSubmittedRail(reportRail);
       setSubmittedEmail(String(data.get('reporterEmail') || ''));
       setVerificationEmailSent(body.verificationEmailSent === true);
@@ -776,8 +781,8 @@ export default function PaymentSafetyPage() {
       setDraftTouched(false);
       setDraftSavedAt('');
       localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
-    } catch (err: any) {
-      setReportError(err.message || t('Report failed'));
+    } catch (err) {
+      setReportError(visibleErrorMessage(err, t('Report failed')));
       setReportStatus('error');
       setUploadStatus('');
       setTurnstileToken('');
@@ -794,10 +799,10 @@ export default function PaymentSafetyPage() {
         body: JSON.stringify({ reportId, email: submittedEmail, locale }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(translateApiError(locale, body.error, t('Unable to resend verification email')));
+      if (!res.ok) throw new VisibleError(translateApiError(locale, body.error, t('Unable to resend verification email')));
       setVerificationEmailSent(true);
-    } catch (err: any) {
-      setReportError(err.message || t('Unable to resend verification email'));
+    } catch (err) {
+      setReportError(visibleErrorMessage(err, t('Unable to resend verification email')));
     }
   }
 
