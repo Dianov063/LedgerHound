@@ -5,7 +5,6 @@ export async function generateMetadata({ params: { locale } }: { params: { local
     locale,
     path: '/emergency',
     metadataKey: 'emergency',
-    englishOnlyContent: true,
 });
 }
 

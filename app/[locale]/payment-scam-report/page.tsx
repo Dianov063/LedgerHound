@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import {
@@ -15,40 +15,33 @@ import {
 } from 'lucide-react';
 
 const paymentMethods = [
-  'Zelle phone numbers and emails',
-  'Cash App $cashtags',
-  'Venmo usernames',
-  'PayPal emails',
-  'Apple Cash phone numbers and emails',
-  'Chime $ChimeSigns, phones, and emails',
-  'Wise and Revolut recipients',
-  'IBAN and bank accounts',
-  'Phone numbers and email addresses',
-  'Marketplace or social media profiles',
-  'Telegram usernames, groups, and channels',
-  'Local wallets and other payment methods',
+  'zelle',
+  'cashapp',
+  'venmo',
+  'paypal',
+  'apple_cash',
+  'chime',
+  'wise_revolut',
+  'bank',
+  'contact',
+  'profiles',
+  'telegram',
+  'local',
 ];
 
-const scamTypes = [
-  'Goods paid for but never delivered',
-  'Fake services and repair deposits',
-  'Rental deposits and advance fees',
-  'Ticket resale scams',
-  'Marketplace seller scams',
-  'Employment or onboarding fee scams',
-  'Custom orders, cake orders, event deposits, and local service scams',
-];
+const scamTypes = ['goods', 'services', 'rental', 'tickets', 'marketplace', 'employment', 'custom'];
 
 const scenarioPages = [
-  ['telegram-payment-scams', 'Telegram payment scams worldwide'],
-  ['marketplace-payment-scam', 'Marketplace payment scams'],
-  ['ticket-payment-scam', 'Ticket payment scams'],
-  ['goods-not-delivered-payment-scam', 'Goods not delivered'],
-  ['fake-local-service-scam', 'Fake local services and deposits'],
+  ['telegram-payment-scams', 'telegram'],
+  ['marketplace-payment-scam', 'marketplace'],
+  ['ticket-payment-scam', 'tickets'],
+  ['goods-not-delivered-payment-scam', 'goods'],
+  ['fake-local-service-scam', 'local'],
 ];
 
 export default function PaymentScamReportSeoPage() {
   const locale = useLocale();
+  const t = useTranslations('payment_scam_report');
   const base = locale === 'en' ? '' : `/${locale}`;
   const toolHref = `${base}/payment-safety`;
 
@@ -58,26 +51,26 @@ export default function PaymentScamReportSeoPage() {
     mainEntity: [
       {
         '@type': 'Question',
-        name: 'Can I report a payment scam that is not crypto related?',
+        name: t('faq.noncrypto_q'),
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Yes. LedgerHound accepts non-crypto payment scam reports involving Zelle, Cash App, Venmo, PayPal, bank transfer, IBAN, phone, email, marketplace profiles, and other local payment methods.',
+          text: t('faq.noncrypto_a'),
         },
       },
       {
         '@type': 'Question',
-        name: 'Will one report become public?',
+        name: t('faq.public_q'),
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'No. A single report stays private. Public warnings are designed for multiple independent reports about the same payment recipient, and full payment identifiers are masked.',
+          text: t('faq.public_a'),
         },
       },
       {
         '@type': 'Question',
-        name: 'Can I check a payment recipient before sending money?',
+        name: t('faq.check_q'),
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Yes. The payment safety tool lets you check a recipient by country, payment method, and identifier. Private matches are not exposed unless the recipient has enough corroborated reports.',
+          text: t('faq.check_a'),
         },
       },
     ],
@@ -98,21 +91,18 @@ export default function PaymentScamReportSeoPage() {
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 mb-5">
                   <AlertTriangle size={13} />
-                  Non-crypto payment scam reports
+                  {t('eyebrow')}
                 </div>
                 <h1 className="font-display font-bold text-4xl lg:text-5xl text-slate-950 leading-tight mb-5">
-                  Report a payment scam before the same recipient hurts someone else.
+                  {t('title')}
                 </h1>
                 <p className="text-lg text-slate-600 max-w-3xl leading-relaxed mb-7">
-                  LedgerHound is building a payment recipient safety database for everyday scams:
-                  undelivered goods, fake services, marketplace deposits, ticket scams, rental
-                  deposits, and other non-crypto fraud that often repeats through the same payment
-                  account.
+                  {t('intro')}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link href={toolHref} className="btn-primary justify-center px-5 py-3">
                     <FileText size={17} />
-                    Report or check a recipient
+                    {t('cta_report')}
                     <ArrowRight size={17} />
                   </Link>
                   <Link
@@ -120,7 +110,7 @@ export default function PaymentScamReportSeoPage() {
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
                   >
                     <Search size={17} />
-                    Check before paying
+                    {t('cta_check')}
                   </Link>
                 </div>
               </div>
@@ -128,12 +118,12 @@ export default function PaymentScamReportSeoPage() {
               <aside className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
                   <Lock size={18} className="text-emerald-600" />
-                  <h2 className="font-display font-bold text-lg text-slate-950">Privacy-first by design</h2>
+                  <h2 className="font-display font-bold text-lg text-slate-950">{t('privacy_title')}</h2>
                 </div>
                 <div className="space-y-3 text-sm text-slate-600">
-                  <p>One report remains private intake.</p>
-                  <p>Multiple independent reports can create a public warning.</p>
-                  <p>Full emails, phone numbers, bank accounts, and handles are not published.</p>
+                  <p>{t('privacy_one')}</p>
+                  <p>{t('privacy_multiple')}</p>
+                  <p>{t('privacy_masked')}</p>
                 </div>
               </aside>
             </div>
@@ -145,13 +135,13 @@ export default function PaymentScamReportSeoPage() {
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <Banknote size={22} className="text-brand-600" />
-                <h2 className="font-display font-bold text-2xl text-slate-950">Payment methods you can report</h2>
+                <h2 className="font-display font-bold text-2xl text-slate-950">{t('methods_title')}</h2>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 {paymentMethods.map((method) => (
                   <div key={method} className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                     <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 shrink-0" />
-                    <span>{method}</span>
+                    <span>{t(`methods.${method}`)}</span>
                   </div>
                 ))}
               </div>
@@ -160,13 +150,13 @@ export default function PaymentScamReportSeoPage() {
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <Database size={22} className="text-brand-600" />
-                <h2 className="font-display font-bold text-2xl text-slate-950">Scam categories this covers</h2>
+                <h2 className="font-display font-bold text-2xl text-slate-950">{t('types_title')}</h2>
               </div>
               <div className="space-y-3">
                 {scamTypes.map((type) => (
                   <div key={type} className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                     <ShieldCheck size={15} className="text-brand-600 mt-0.5 shrink-0" />
-                    <span>{type}</span>
+                    <span>{t(`types.${type}`)}</span>
                   </div>
                 ))}
               </div>
@@ -178,24 +168,21 @@ export default function PaymentScamReportSeoPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="grid md:grid-cols-3 gap-8">
               <div>
-                <p className="text-sm font-bold text-emerald-400 mb-2">1. Submit the recipient</p>
+                <p className="text-sm font-bold text-emerald-400 mb-2">{t('step1_title')}</p>
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  Add the country, payment method, masked recipient context, amount, date,
-                  evidence type, and a clear description of what happened.
+                  {t('step1_text')}
                 </p>
               </div>
               <div>
-                <p className="text-sm font-bold text-emerald-400 mb-2">2. We match privately</p>
+                <p className="text-sm font-bold text-emerald-400 mb-2">{t('step2_title')}</p>
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  The system normalizes the payment identifier and stores a private hash, so repeated
-                  reports can be matched without exposing the full account publicly.
+                  {t('step2_text')}
                 </p>
               </div>
               <div>
-                <p className="text-sm font-bold text-emerald-400 mb-2">3. Public only after corroboration</p>
+                <p className="text-sm font-bold text-emerald-400 mb-2">{t('step3_title')}</p>
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  Public warnings are reserved for multiple independent reports. The public result
-                  uses masked identifiers and factual report counts.
+                  {t('step3_text')}
                 </p>
               </div>
             </div>
@@ -204,42 +191,36 @@ export default function PaymentScamReportSeoPage() {
 
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h2 className="font-display font-bold text-2xl text-slate-950 mb-4">
-            Why report small payment scams?
+            {t('why_title')}
           </h2>
           <div className="space-y-4 text-slate-600 leading-relaxed">
             <p>
-              Many payment scams are too small for anyone to investigate alone. A fake seller may take
-              a cake deposit, a repair fee, a marketplace payment, or a ticket transfer and disappear.
-              One victim may look like a private dispute. Three, five, or ten independent reports
-              tied to the same payment recipient become a pattern.
+              {t('why_p1')}
             </p>
             <p>
-              The payment safety database is built for that pattern. It does not need to publish a full
-              phone number, email, bank account, or handle to be useful. A masked warning can help the
-              next person pause before sending money, while keeping single unverified reports private.
+              {t('why_p2')}
             </p>
           </div>
 
           <div className="mt-8 rounded-xl border border-brand-200 bg-brand-50 p-6">
             <h3 className="font-display font-bold text-xl text-slate-950 mb-2">
-              Ready to report or check a recipient?
+              {t('ready_title')}
             </h3>
             <p className="text-sm text-slate-600 mb-5">
-              Use the payment safety tool to submit a private report or search for corroborated
-              public warnings before sending funds.
+              {t('ready_text')}
             </p>
             <Link href={toolHref} className="btn-primary inline-flex">
-              Open payment safety tool
+              {t('ready_cta')}
               <ArrowRight size={17} />
             </Link>
           </div>
 
           <div className="mt-10 border-t border-slate-200 pt-8">
-            <h2 className="font-display font-bold text-2xl text-slate-950 mb-4">Report by situation</h2>
+            <h2 className="font-display font-bold text-2xl text-slate-950 mb-4">{t('situations_title')}</h2>
             <div className="grid sm:grid-cols-2 gap-3">
-              {scenarioPages.map(([slug, label]) => (
+              {scenarioPages.map(([slug, key]) => (
                 <Link key={slug} href={`${base}/payment-scam/${slug}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700">
-                  {label}<ArrowRight size={16} />
+                  {t(`situations.${key}`)}<ArrowRight size={16} />
                 </Link>
               ))}
             </div>

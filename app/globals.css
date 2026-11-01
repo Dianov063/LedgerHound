@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Direction arrows point the way the text reads. */
+[dir='rtl'] .lucide-arrow-right,
+[dir='rtl'] .lucide-arrow-left {
+  transform: scaleX(-1);
+}
+
 @layer base {
   /* NOTE: do NOT define --font-inter / --font-manrope here. next/font (see
      app/[locale]/layout.tsx) owns these variables and self-hosts the optimized

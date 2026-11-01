@@ -4,8 +4,7 @@ export async function generateMetadata({ params: { locale } }: { params: { local
   return await makeMetadata({
     locale,
     path: '/emergency/success',
-    title: 'Recovery Pack Ready | LedgerHound',
-    description: 'Your emergency recovery documents are ready for download.',
+    metadataKey: 'emergencySuccess',
   });
 }
 

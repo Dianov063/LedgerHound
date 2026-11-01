@@ -39,7 +39,7 @@ interface MakeMetadataParams {
   noIndex?: boolean;
   ogImage?: string;
 
-  /** The page body renders English under every locale: canonical is the English URL, no hreflang. */
+  /** The page body has no translation yet: canonical is the English URL, no hreflang. */
   englishOnlyContent?: boolean;
 }
 

@@ -42,8 +42,8 @@ const pages: { path: string; priority: number; changeFreq: string; englishOnly?:
   { path: '/whats-included', priority: 0.7, changeFreq: 'monthly' },
   { path: '/dzhlwk-victims', priority: 0.8, changeFreq: 'weekly' },
   { path: '/scam-checker', priority: 0.9, changeFreq: 'weekly' },
-  { path: '/emergency', priority: 0.9, changeFreq: 'weekly', englishOnly: true },
-  { path: '/payment-scam-report', priority: 0.9, changeFreq: 'weekly', englishOnly: true },
+  { path: '/emergency', priority: 0.9, changeFreq: 'weekly' },
+  { path: '/payment-scam-report', priority: 0.9, changeFreq: 'weekly' },
   { path: '/payment-safety', priority: 0.8, changeFreq: 'weekly' },
   ...PAYMENT_SCAM_SCENARIOS.map((scenario) => ({
     path: `/payment-scam/${scenario.slug}`,

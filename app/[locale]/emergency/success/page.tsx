@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import {
@@ -54,6 +54,11 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function useLocalePrefix() {
+  const locale = useLocale();
+  return locale === 'en' ? '' : `/${locale}`;
 }
 
 /* ═══════════════════════════════════════════════ */
@@ -134,6 +139,7 @@ function EmergencySuccessContent() {
    ══════════════════════════════════════════════════════════════ */
 function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId: string }) {
   const t = useTranslations('emergency_success');
+  const base = useLocalePrefix();
   const [pack, setPack] = useState<PackStatus | null>(null);
   const [polling, setPolling] = useState(true);
   const [elapsed, setElapsed] = useState(0);
@@ -204,7 +210,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
       {/* ── Title ── */}
       <h1 className="font-display font-bold text-3xl sm:text-4xl mb-2 text-slate-900">
         {isReady ? t('pack_ready_title') : t('pack_generating_title')}
-        {isReady && <span className="ml-1">&#x26A1;</span>}
+        {isReady && <span className="ms-1">&#x26A1;</span>}
       </h1>
       <p className="text-slate-500 text-lg mb-8">
         {isReady
@@ -222,7 +228,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── Urgency Reminder (shown when ready) ── */}
       {isReady && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-6 py-4 mb-8 flex items-start gap-3 text-left">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-6 py-4 mb-8 flex items-start gap-3 text-start">
           <Clock size={20} className="text-red-500 mt-0.5 shrink-0" />
           <div>
             <p className="text-red-700 font-semibold text-sm">{t('urgency_title')}</p>
@@ -249,15 +255,15 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
           </div>
           <div className="mt-4 flex items-center justify-center gap-6 text-xs text-slate-400">
             <span className={elapsed >= 5 ? 'text-emerald-500' : ''}>
-              {elapsed >= 5 ? <CheckCircle2 size={12} className="inline mr-1" /> : null}
+              {elapsed >= 5 ? <CheckCircle2 size={12} className="inline me-1" /> : null}
               {t('progress_forensic')}
             </span>
             <span className={elapsed >= 30 ? 'text-emerald-500' : ''}>
-              {elapsed >= 30 ? <CheckCircle2 size={12} className="inline mr-1" /> : null}
+              {elapsed >= 30 ? <CheckCircle2 size={12} className="inline me-1" /> : null}
               {t('progress_legal')}
             </span>
             <span className={elapsed >= 60 ? 'text-emerald-500' : ''}>
-              {elapsed >= 60 ? <CheckCircle2 size={12} className="inline mr-1" /> : null}
+              {elapsed >= 60 ? <CheckCircle2 size={12} className="inline me-1" /> : null}
               {t('progress_pdf')}
             </span>
           </div>
@@ -266,7 +272,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── Documents Grid ── */}
       {isReady && docs.length > 0 && (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-6 text-left">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-6 text-start">
           <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 text-slate-900">
             <FileText size={18} className="text-blue-500" />
             {t('your_documents')}
@@ -310,7 +316,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── What's included (shown while generating) ── */}
       {!isReady && (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8 text-left">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8 text-start">
           <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 text-slate-900">
             <FileText size={18} className="text-blue-500" />
             {t('docs_being_prepared')}
@@ -337,7 +343,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── Quick-Start Steps (shown when ready) ── */}
       {isReady && (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-6 text-left">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-6 text-start">
           <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 text-slate-900">
             <AlertTriangle size={18} className="text-amber-500" />
             {t('what_to_do_now')}
@@ -387,7 +393,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── Upsell: Full Investigation ── */}
       {isReady && (
-        <div className="bg-slate-900 rounded-2xl p-6 mb-8 text-left">
+        <div className="bg-slate-900 rounded-2xl p-6 mb-8 text-start">
           <div className="flex items-start gap-3 mb-4">
             <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center shrink-0">
               <Search size={20} className="text-blue-400" />
@@ -433,7 +439,7 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
 
       {/* ── Back link ── */}
       <Link
-        href="/emergency"
+        href={`${base}/emergency`}
         className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
@@ -454,6 +460,7 @@ function SummaryReportSuccess({
   platformSlug: string;
 }) {
   const t = useTranslations('emergency_success');
+  const base = useLocalePrefix();
 
   return (
     <div className="text-center">
@@ -482,7 +489,7 @@ function SummaryReportSuccess({
 
       {platformSlug && (
         <Link
-          href={`/scam-database/platform/${platformSlug}`}
+          href={`${base}/scam-database/platform/${platformSlug}`}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-500 transition-colors text-sm mb-6"
         >
           {t('summary_view_platform')}
@@ -491,7 +498,7 @@ function SummaryReportSuccess({
 
       <div className="block">
         <Link
-          href="/emergency"
+          href={`${base}/emergency`}
           className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm"
         >
           <ArrowLeft size={16} />
@@ -513,6 +520,7 @@ function GroupJoinedSuccess({
   totalLoss: string;
 }) {
   const t = useTranslations('emergency_success');
+  const base = useLocalePrefix();
   const formattedLoss = totalLoss
     ? `$${Number(totalLoss).toLocaleString()}`
     : '';
@@ -554,7 +562,7 @@ function GroupJoinedSuccess({
       )}
 
       <Link
-        href="/emergency"
+        href={`${base}/emergency`}
         className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
@@ -569,6 +577,7 @@ function GroupJoinedSuccess({
    ══════════════════════════════════════════════════════════════ */
 function GenericSuccess({ caseId }: { caseId: string }) {
   const t = useTranslations('emergency_success');
+  const base = useLocalePrefix();
 
   return (
     <div className="text-center">
@@ -592,7 +601,7 @@ function GenericSuccess({ caseId }: { caseId: string }) {
 
       <div className="block">
         <Link
-          href="/emergency"
+          href={`${base}/emergency`}
           className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm"
         >
           <ArrowLeft size={16} />

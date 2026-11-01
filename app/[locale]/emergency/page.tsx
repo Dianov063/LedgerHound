@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import {
@@ -39,21 +39,21 @@ const AGENCIES: Record<string, string> = {
 };
 
 const COUNTRIES = [
-  { code: 'US', name: 'United States', flag: '\u{1F1FA}\u{1F1F8}' },
-  { code: 'UK', name: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}' },
-  { code: 'DE', name: 'Germany', flag: '\u{1F1E9}\u{1F1EA}' },
-  { code: 'FR', name: 'France', flag: '\u{1F1EB}\u{1F1F7}' },
-  { code: 'CA', name: 'Canada', flag: '\u{1F1E8}\u{1F1E6}' },
-  { code: 'AU', name: 'Australia', flag: '\u{1F1E6}\u{1F1FA}' },
-  { code: 'NL', name: 'Netherlands', flag: '\u{1F1F3}\u{1F1F1}' },
-  { code: 'ES', name: 'Spain', flag: '\u{1F1EA}\u{1F1F8}' },
-  { code: 'IT', name: 'Italy', flag: '\u{1F1EE}\u{1F1F9}' },
-  { code: 'CH', name: 'Switzerland', flag: '\u{1F1E8}\u{1F1ED}' },
-  { code: 'RU', name: 'Russia', flag: '\u{1F1F7}\u{1F1FA}' },
-  { code: 'UA', name: 'Ukraine', flag: '\u{1F1FA}\u{1F1E6}' },
-  { code: 'KZ', name: 'Kazakhstan', flag: '\u{1F1F0}\u{1F1FF}' },
-  { code: 'AE', name: 'UAE', flag: '\u{1F1E6}\u{1F1EA}' },
-  { code: 'SG', name: 'Singapore', flag: '\u{1F1F8}\u{1F1EC}' },
+  { code: 'US', flag: '\u{1F1FA}\u{1F1F8}' },
+  { code: 'UK', flag: '\u{1F1EC}\u{1F1E7}' },
+  { code: 'DE', flag: '\u{1F1E9}\u{1F1EA}' },
+  { code: 'FR', flag: '\u{1F1EB}\u{1F1F7}' },
+  { code: 'CA', flag: '\u{1F1E8}\u{1F1E6}' },
+  { code: 'AU', flag: '\u{1F1E6}\u{1F1FA}' },
+  { code: 'NL', flag: '\u{1F1F3}\u{1F1F1}' },
+  { code: 'ES', flag: '\u{1F1EA}\u{1F1F8}' },
+  { code: 'IT', flag: '\u{1F1EE}\u{1F1F9}' },
+  { code: 'CH', flag: '\u{1F1E8}\u{1F1ED}' },
+  { code: 'RU', flag: '\u{1F1F7}\u{1F1FA}' },
+  { code: 'UA', flag: '\u{1F1FA}\u{1F1E6}' },
+  { code: 'KZ', flag: '\u{1F1F0}\u{1F1FF}' },
+  { code: 'AE', flag: '\u{1F1E6}\u{1F1EA}' },
+  { code: 'SG', flag: '\u{1F1F8}\u{1F1EC}' },
 ];
 
 const BRACKETS = [
@@ -64,12 +64,12 @@ const BRACKETS = [
 ];
 
 const SCAM_TYPES = [
-  { id: 'romance', emoji: '\u{1F494}', label: 'Romance / Pig Butchering' },
-  { id: 'fake_platform', emoji: '\u{1F4C8}', label: 'Fake Trading Platform' },
-  { id: 'ponzi', emoji: '\u{1F4B0}', label: 'Investment / Ponzi' },
-  { id: 'phishing', emoji: '\u{1F3A3}', label: 'Phishing / Wallet Drain' },
-  { id: 'rug_pull', emoji: '\u{1F525}', label: 'Rug Pull / Exit Scam' },
-  { id: 'other', emoji: '\u{2753}', label: 'Other' },
+  { id: 'romance', emoji: '\u{1F494}' },
+  { id: 'fake_platform', emoji: '\u{1F4C8}' },
+  { id: 'ponzi', emoji: '\u{1F4B0}' },
+  { id: 'phishing', emoji: '\u{1F3A3}' },
+  { id: 'rug_pull', emoji: '\u{1F525}' },
+  { id: 'other', emoji: '\u{2753}' },
 ];
 
 const CONTACT_METHODS = [
@@ -85,6 +85,14 @@ const CONTACT_METHODS = [
   'LinkedIn',
   'Other',
 ];
+
+/* Values the API stores as-is. Only these need a translated label; the rest are brands. */
+const CONTACT_METHOD_LABEL_KEYS: Record<string, string> = {
+  Email: 'email',
+  'Phone Call': 'phone_call',
+  'Website Ad': 'website_ad',
+  Other: 'other',
+};
 
 const COUNTRY_CURRENCIES: Record<string, string> = {
   US: 'USD', CA: 'USD', SG: 'USD', AE: 'USD',
@@ -110,6 +118,7 @@ function detectNetwork(addr: string): string {
 
 export default function EmergencyPage() {
   const locale = useLocale();
+  const t = useTranslations('emergency_flow');
   const base = locale === 'en' ? '' : `/${locale}`;
 
   /* ── state ── */
@@ -391,7 +400,7 @@ export default function EmergencyPage() {
           {step > 1 && (
             <div className="mb-10">
               <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                <span>Step {Math.min(step, totalSteps)} of {totalSteps}</span>
+                <span>{t('step_progress', { current: Math.min(step, totalSteps), total: totalSteps })}</span>
                 <span>{progress}%</span>
               </div>
               <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -410,13 +419,13 @@ export default function EmergencyPage() {
               <div className="text-center mb-10">
                 <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-1.5 rounded-full text-sm font-medium mb-5">
                   <AlertTriangle size={14} />
-                  Time-sensitive — act now
+                  {t('badge')}
                 </div>
                 <h1 className="font-display font-bold text-3xl sm:text-4xl text-slate-900 mb-3">
-                  Were You Scammed? Act Now.
+                  {t('title')}
                 </h1>
                 <p className="text-slate-500 text-lg max-w-xl mx-auto">
-                  Get your Emergency Recovery Pack — ready in 2 minutes
+                  {t('subtitle')}
                 </p>
               </div>
 
@@ -426,22 +435,22 @@ export default function EmergencyPage() {
                   <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <FileText size={20} className="text-blue-600" />
                   </div>
-                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Police Report</h3>
-                  <p className="text-xs text-slate-500">Ready-to-file complaint for your country</p>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">{t('value_police_title')}</h3>
+                  <p className="text-xs text-slate-500">{t('value_police_text')}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-sm">
                   <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <Shield size={20} className="text-amber-600" />
                   </div>
-                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Freeze Request</h3>
-                  <p className="text-xs text-slate-500">Letter to exchange to freeze funds</p>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">{t('value_freeze_title')}</h3>
+                  <p className="text-xs text-slate-500">{t('value_freeze_text')}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-sm">
                   <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <CheckCircle2 size={20} className="text-emerald-600" />
                   </div>
-                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Action Plan</h3>
-                  <p className="text-xs text-slate-500">Step-by-step recovery instructions</p>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">{t('value_plan_title')}</h3>
+                  <p className="text-xs text-slate-500">{t('value_plan_text')}</p>
                 </div>
               </div>
 
@@ -451,7 +460,7 @@ export default function EmergencyPage() {
                   {/* Country dropdown */}
                   <div className="mb-5">
                     <label htmlFor="country" className="block text-sm font-medium text-slate-700 mb-2">
-                      Where are you located?
+                      {t('country_label')}
                     </label>
                     <select
                       id="country"
@@ -460,10 +469,10 @@ export default function EmergencyPage() {
                       aria-required="true"
                       className={inputCls}
                     >
-                      <option value="">Select country...</option>
+                      <option value="">{t('country_placeholder')}</option>
                       {COUNTRIES.map((c) => (
                         <option key={c.code} value={c.code}>
-                          {c.flag} {c.name}
+                          {c.flag} {t(`countries.${c.code}`)}
                         </option>
                       ))}
                     </select>
@@ -473,14 +482,14 @@ export default function EmergencyPage() {
                   {COUNTRIES_WITH_STATES.includes(form.country) && (
                     <div className="mb-5">
                       <label htmlFor="victimState" className="block text-sm font-medium text-slate-700 mb-2">
-                        State / Region
+                        {t('state_label')}
                       </label>
                       <input
                         id="victimState"
                         type="text"
                         value={form.victimState}
                         onChange={(e) => set({ victimState: e.target.value })}
-                        placeholder={form.country === 'US' ? 'e.g. California' : form.country === 'DE' ? 'e.g. Bayern' : 'e.g. New South Wales'}
+                        placeholder={t(form.country === 'US' ? 'state_placeholder_us' : form.country === 'DE' ? 'state_placeholder_de' : 'state_placeholder_au')}
                         className={inputCls}
                       />
                     </div>
@@ -489,9 +498,9 @@ export default function EmergencyPage() {
                   {/* Amount */}
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      How much did you lose?
+                      {t('loss_label')}
                     </label>
-                    <div className="relative">
+                    <div className="relative" dir="ltr">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
                         {form.lossCurrency === 'USD' ? '$' : form.lossCurrency === 'GBP' ? '\u00A3' : form.lossCurrency === 'EUR' ? '\u20AC' : ''}
                       </span>
@@ -513,20 +522,20 @@ export default function EmergencyPage() {
                     onClick={() => setStep(2)}
                     className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg text-base transition-colors"
                   >
-                    Analyze My Case <ArrowRight size={16} />
+                    {t('analyze_cta')} <ArrowRight size={16} />
                   </button>
                 </div>
 
                 {/* Trust bar */}
                 <div className="flex items-center justify-center gap-6 mt-5 text-xs text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <Shield size={12} /> Encrypted
+                    <Shield size={12} /> {t('trust_encrypted')}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <Zap size={12} /> Instant
+                    <Zap size={12} /> {t('trust_instant')}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <CheckCircle2 size={12} /> 500+ helped
+                    <CheckCircle2 size={12} /> {t('trust_helped')}
                   </span>
                 </div>
               </div>
@@ -534,14 +543,14 @@ export default function EmergencyPage() {
               {/* How It Works */}
               <div className="mt-14 max-w-lg mx-auto">
                 <h3 className="font-display font-semibold text-lg text-slate-900 text-center mb-6">
-                  How It Works
+                  {t('how_title')}
                 </h3>
                 <div className="space-y-4">
                   {[
-                    'Enter transaction details',
-                    'We trace where your funds went',
-                    'Get your recovery probability score',
-                    'Download ready-to-use legal documents',
+                    t('how_1'),
+                    t('how_2'),
+                    t('how_3'),
+                    t('how_4'),
                   ].map((text, i) => (
                     <div key={i} className="flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center flex-shrink-0">
@@ -552,7 +561,7 @@ export default function EmergencyPage() {
                   ))}
                 </div>
                 <p className="text-center text-xs text-slate-400 mt-5">
-                  Takes 2 minutes &middot; Documents ready instantly
+                  {t('how_note')}
                 </p>
               </div>
             </div>
@@ -562,14 +571,14 @@ export default function EmergencyPage() {
           {step === 2 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                Enter transaction details
+                {t('tx_title')}
               </h2>
 
               <div className="space-y-5">
                 {/* TX Hash with auto-lookup */}
                 <div>
                   <label htmlFor="txid" className="block text-sm text-slate-500 mb-2">
-                    Transaction Hash (TXID)
+                    {t('txid_label')}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -577,11 +586,13 @@ export default function EmergencyPage() {
                       type="text"
                       value={form.txid}
                       onChange={(e) => set({ txid: e.target.value.trim() })}
-                      placeholder="Paste transaction hash to auto-fill details"
+                      placeholder={t('txid_placeholder')}
+                      dir="ltr"
                       className={`${inputCls} font-mono text-sm flex-1`}
                     />
                     <button
                       onClick={handleTxLookup}
+                      aria-label={t('tx_lookup')}
                       disabled={txLooking || !form.txid.trim() || form.txid.trim().length < 20}
                       className="px-4 py-3 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors whitespace-nowrap"
                     >
@@ -600,37 +611,37 @@ export default function EmergencyPage() {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={16} className="text-emerald-400" />
                       <span className="text-sm font-semibold text-emerald-300">
-                        Transaction found on {txResult.networkLabel}
+                        {t('tx_found', { network: txResult.networkLabel ?? '' })}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded ${
                         txResult.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                       }`}>
-                        {txResult.status}
+                        {t(txResult.status === 'success' ? 'tx_status_success' : txResult.status === 'pending' ? 'tx_status_pending' : 'tx_status_failed')}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
                       {txResult.value !== undefined && txResult.value > 0 && (
                         <div>
-                          <span className="text-slate-500">Amount:</span>{' '}
-                          <span className="font-mono">{txResult.value.toLocaleString('en-US', { maximumFractionDigits: 4 })} {txResult.token}</span>
+                          <span className="text-slate-500">{t('tx_amount')}</span>{' '}
+                          <span className="font-mono" dir="ltr">{txResult.value.toLocaleString('en-US', { maximumFractionDigits: 4 })} {txResult.token}</span>
                         </div>
                       )}
                       {txResult.timestamp && (
                         <div>
-                          <span className="text-slate-500">Date:</span>{' '}
-                          {new Date(txResult.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          <span className="text-slate-500">{t('tx_date')}</span>{' '}
+                          {new Date(txResult.timestamp).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })}
                         </div>
                       )}
                       {txResult.from && (
                         <div className="sm:col-span-2">
-                          <span className="text-slate-500">From:</span>{' '}
-                          <span className="font-mono">{txResult.from.slice(0, 16)}...{txResult.from.slice(-8)}</span>
+                          <span className="text-slate-500">{t('tx_from')}</span>{' '}
+                          <span className="font-mono" dir="ltr">{txResult.from.slice(0, 16)}...{txResult.from.slice(-8)}</span>
                         </div>
                       )}
                       {txResult.to && (
                         <div className="sm:col-span-2">
-                          <span className="text-slate-500">To:</span>{' '}
-                          <span className="font-mono">{txResult.to.slice(0, 16)}...{txResult.to.slice(-8)}</span>
+                          <span className="text-slate-500">{t('tx_to')}</span>{' '}
+                          <span className="font-mono" dir="ltr">{txResult.to.slice(0, 16)}...{txResult.to.slice(-8)}</span>
                         </div>
                       )}
                     </div>
@@ -641,11 +652,11 @@ export default function EmergencyPage() {
                         rel="noopener noreferrer"
                         className="text-xs text-brand-400 hover:text-brand-300 underline"
                       >
-                        View on explorer
+                        {t('tx_explorer')}
                       </a>
                     )}
                     <p className="text-xs text-emerald-400/70 mt-1">
-                      Fields below have been auto-filled from this transaction.
+                      {t('tx_autofilled')}
                     </p>
                   </div>
                 )}
@@ -656,11 +667,11 @@ export default function EmergencyPage() {
                     <div className="flex items-center gap-2">
                       <AlertTriangle size={16} className="text-amber-400" />
                       <span className="text-sm font-semibold text-amber-300">
-                        Transaction not found
+                        {t('tx_not_found')}
                       </span>
                     </div>
                     <p className="text-xs text-amber-400/70 mt-1">
-                      Please fill in the details manually below.
+                      {t('tx_manual')}
                     </p>
                   </div>
                 )}
@@ -668,10 +679,10 @@ export default function EmergencyPage() {
                 {/* Scam wallet address (recipient) */}
                 <div>
                   <label htmlFor="walletAddress" className="block text-sm text-slate-500 mb-2">
-                    Scam Wallet Address (recipient) <span className="text-red-400">*</span>
+                    {t('wallet_label')} <span className="text-red-400">*</span>
                     {form.detectedNetwork && (
-                      <span className="ml-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
-                        {form.detectedNetwork.toUpperCase()} detected
+                      <span className="ms-2 text-xs text-brand-400 bg-brand-600/10 px-2 py-0.5 rounded">
+                        {t('network_detected', { network: form.detectedNetwork.toUpperCase() })}
                       </span>
                     )}
                   </label>
@@ -680,7 +691,8 @@ export default function EmergencyPage() {
                     type="text"
                     value={form.walletAddress}
                     onChange={(e) => set({ walletAddress: e.target.value })}
-                    placeholder="0x... or bc1... or T..."
+                    placeholder={t('wallet_placeholder')}
+                    dir="ltr"
                     className={`${inputCls} font-mono text-sm`}
                   />
                 </div>
@@ -688,7 +700,7 @@ export default function EmergencyPage() {
                 {/* Date */}
                 <div>
                   <label htmlFor="txDate" className="block text-sm text-slate-500 mb-2">
-                    When did this happen? <span className="text-red-400">*</span>
+                    {t('date_label')} <span className="text-red-400">*</span>
                   </label>
                   <input
                     id="txDate"
@@ -702,36 +714,38 @@ export default function EmergencyPage() {
 
                 {/* Platform Name */}
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">Platform Name</label>
+                  <label className="block text-sm text-slate-500 mb-2">{t('platform_label')}</label>
                   <input
                     type="text"
                     value={form.platformName}
                     onChange={(e) => set({ platformName: e.target.value })}
-                    placeholder="e.g. CryptoTrade Pro"
+                    placeholder={t('platform_placeholder')}
                     className={inputCls}
                   />
                 </div>
 
                 {/* Platform URL */}
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">Platform URL (optional)</label>
+                  <label className="block text-sm text-slate-500 mb-2">{t('platform_url_label')}</label>
                   <input
                     type="text"
                     value={form.platformUrl}
                     onChange={(e) => set({ platformUrl: e.target.value })}
-                    placeholder="e.g. cryptotradepro.com"
+                    placeholder={t('platform_url_placeholder')}
+                    dir="ltr"
                     className={inputCls}
                   />
                 </div>
 
                 {/* Victim wallet */}
                 <div>
-                  <label className="block text-sm text-slate-500 mb-2">Your Wallet Address (sender)</label>
+                  <label className="block text-sm text-slate-500 mb-2">{t('victim_wallet_label')}</label>
                   <input
                     type="text"
                     value={form.victimWallet}
                     onChange={(e) => set({ victimWallet: e.target.value })}
-                    placeholder="The wallet you sent funds FROM"
+                    placeholder={t('victim_wallet_placeholder')}
+                    dir="ltr"
                     className={`${inputCls} font-mono text-sm`}
                   />
                 </div>
@@ -742,14 +756,14 @@ export default function EmergencyPage() {
                   onClick={() => setStep(1)}
                   className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
-                  <ArrowLeft size={16} /> Back
+                  <ArrowLeft size={16} /> {t('back')}
                 </button>
                 <button
                   disabled={!stepValid()}
                   onClick={() => setStep(3)}
                   className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-colors"
                 >
-                  Next <ArrowRight size={16} />
+                  {t('next')} <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -759,25 +773,25 @@ export default function EmergencyPage() {
           {step === 3 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-8 text-center">
-                Tell us what happened
+                {t('story_title')}
               </h2>
 
               {/* Scam type grid */}
               <div className="mb-6">
-                <label className="block text-sm text-slate-500 mb-3">Type of scam</label>
+                <label className="block text-sm text-slate-500 mb-3">{t('scam_type_label')}</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {SCAM_TYPES.map((s) => (
                     <button
                       key={s.id}
                       onClick={() => set({ scamType: s.id })}
-                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-start ${
                         form.scamType === s.id
                           ? 'border-brand-600 bg-brand-600/10'
                           : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
                       <span className="text-xl">{s.emoji}</span>
-                      <span className="text-xs text-slate-600 leading-tight">{s.label}</span>
+                      <span className="text-xs text-slate-600 leading-tight">{t(`scam_types.${s.id}`)}</span>
                     </button>
                   ))}
                 </div>
@@ -785,18 +799,18 @@ export default function EmergencyPage() {
 
               {/* Description */}
               <div className="mb-5">
-                <label htmlFor="description" className="block text-sm text-slate-500 mb-2">Describe what happened</label>
+                <label htmlFor="description" className="block text-sm text-slate-500 mb-2">{t('description_label')}</label>
                 <textarea
                   id="description"
                   rows={4}
                   value={form.description}
                   onChange={(e) => set({ description: e.target.value })}
-                  placeholder="Describe what happened, include any relevant details..."
+                  placeholder={t('description_placeholder')}
                   className={`${inputCls} resize-none`}
                 />
                 <div className="flex justify-end mt-1">
                   <span className={`text-xs ${form.description.length >= 100 ? 'text-emerald-500' : 'text-slate-400'}`}>
-                    {form.description.length} / 100 min
+                    {t('description_counter', { count: form.description.length })}
                   </span>
                 </div>
               </div>
@@ -804,15 +818,15 @@ export default function EmergencyPage() {
               {/* Contact method — US only */}
               {form.country === 'US' && (
                 <div className="mb-5">
-                  <label className="block text-sm text-slate-500 mb-2">How were you contacted?</label>
+                  <label className="block text-sm text-slate-500 mb-2">{t('contact_label')}</label>
                   <select
                     value={form.contactMethod}
                     onChange={(e) => set({ contactMethod: e.target.value })}
                     className={inputCls}
                   >
-                    <option value="">Select...</option>
+                    <option value="">{t('select_placeholder')}</option>
                     {CONTACT_METHODS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>{CONTACT_METHOD_LABEL_KEYS[m] ? t(`contact_methods.${CONTACT_METHOD_LABEL_KEYS[m]}`) : m}</option>
                     ))}
                   </select>
                 </div>
@@ -821,7 +835,7 @@ export default function EmergencyPage() {
               {/* Email */}
               <div className="mb-5">
                 <label htmlFor="email" className="block text-sm text-slate-500 mb-2">
-                  Your email <span className="text-red-400">*</span>
+                  {t('email_label')} <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="email"
@@ -830,19 +844,21 @@ export default function EmergencyPage() {
                   aria-required="true"
                   onChange={(e) => set({ email: e.target.value })}
                   placeholder="you@email.com"
+                  dir="ltr"
                   className={inputCls}
                 />
               </div>
 
               {/* Phone */}
               <div className="mb-6">
-                <label htmlFor="victimPhone" className="block text-sm text-slate-500 mb-2">Phone number (optional)</label>
+                <label htmlFor="victimPhone" className="block text-sm text-slate-500 mb-2">{t('phone_label')}</label>
                 <input
                   id="victimPhone"
                   type="tel"
                   value={form.victimPhone}
                   onChange={(e) => set({ victimPhone: e.target.value })}
                   placeholder="+1 (555) 123-4567"
+                  dir="ltr"
                   className={inputCls}
                 />
               </div>
@@ -852,7 +868,7 @@ export default function EmergencyPage() {
                   onClick={() => setStep(2)}
                   className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
                 >
-                  <ArrowLeft size={16} /> Back
+                  <ArrowLeft size={16} /> {t('back')}
                 </button>
                 <button
                   disabled={!stepValid() || analyzing}
@@ -861,11 +877,11 @@ export default function EmergencyPage() {
                 >
                   {analyzing ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" /> Analyzing...
+                      <Loader2 size={16} className="animate-spin" /> {t('analyzing')}
                     </>
                   ) : (
                     <>
-                      <Search size={16} /> Analyze My Case
+                      <Search size={16} /> {t('analyze_cta')}
                     </>
                   )}
                 </button>
@@ -877,16 +893,16 @@ export default function EmergencyPage() {
           {step === 4 && (
             <div>
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-10 text-center">
-                Analyzing your case...
+                {t('analysis_title')}
               </h2>
 
               <div className="max-w-md mx-auto space-y-4">
                 {[
-                  'Checking OFAC sanctions database...',
-                  'Tracing fund movements...',
-                  'Identifying destination exchange...',
-                  'Checking scam database for matches...',
-                  'Calculating recovery probability...',
+                  t('analysis_1'),
+                  t('analysis_2'),
+                  t('analysis_3'),
+                  t('analysis_4'),
+                  t('analysis_5'),
                 ].map((text, i) => (
                   <div
                     key={i}
@@ -913,9 +929,9 @@ export default function EmergencyPage() {
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8 text-center">
                 <Zap size={28} className="mx-auto text-emerald-400 mb-3" />
                 <h2 className="font-display font-bold text-2xl sm:text-3xl text-emerald-700 mb-2">
-                  URGENT: Funds can still be frozen!
+                  {t('result_emergency_title')}
                 </h2>
-                <p className="text-slate-500 text-sm">Act immediately to maximize recovery chances</p>
+                <p className="text-slate-500 text-sm">{t('result_emergency_text')}</p>
               </div>
 
               {/* score + details */}
@@ -923,7 +939,7 @@ export default function EmergencyPage() {
                 {/* recovery score */}
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center">
                   <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    Recovery Score
+                    {t('recovery_score')}
                   </span>
                   <div className="relative w-24 h-24 flex items-center justify-center">
                     <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
@@ -957,21 +973,21 @@ export default function EmergencyPage() {
                 {/* destination */}
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
                   <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    Destination
+                    {t('destination')}
                   </span>
                   <span className="text-lg font-semibold text-slate-900">
-                    {analysis?.exchange || 'Exchange detected'}
+                    {analysis?.exchange || t('exchange_detected')}
                   </span>
                 </div>
 
                 {/* time remaining */}
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
                   <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    Time Remaining
+                    {t('time_remaining')}
                   </span>
                   <Clock size={20} className="text-amber-400 mb-1" />
                   <span className="text-lg font-semibold text-amber-400">
-                    ~{Math.max(0, 72 - (analysis?.daysSince ?? 0) * 24)} hours
+                    {t('hours_remaining', { hours: Math.max(0, 72 - (analysis?.daysSince ?? 0) * 24) })}
                   </span>
                 </div>
               </div>
@@ -981,18 +997,18 @@ export default function EmergencyPage() {
                 <div className="flex items-center gap-3 mb-5">
                   <Shield size={24} className="text-emerald-400" />
                   <h3 className="font-display font-bold text-xl text-slate-900">
-                    Emergency Preservation Pack
+                    {t('pack_title')}
                   </h3>
                 </div>
 
                 <ul className="space-y-3 mb-6">
                   {[
-                    `Police Report (${AGENCIES[form.country] || 'Local Authority'})`,
-                    `Preservation Letter for ${analysis?.exchange || 'Exchange'}`,
-                    'Chain of Custody Evidence',
-                    'Step-by-step instructions',
-                    'Affidavit of Ownership template',
-                    'Executive summary for attorney',
+                    t('pack_police', { agency: AGENCIES[form.country] || t('pack_local_authority') }),
+                    t('pack_letter', { exchange: analysis?.exchange || t('pack_exchange_fallback') }),
+                    t('pack_custody'),
+                    t('pack_steps'),
+                    t('pack_affidavit'),
+                    t('pack_summary'),
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <CheckCircle2
@@ -1013,7 +1029,7 @@ export default function EmergencyPage() {
                     <Loader2 size={20} className="animate-spin" />
                   ) : (
                     <>
-                      $79 &mdash; Get Documents Now <ArrowRight size={18} />
+                      $79 &mdash; {t('get_documents')} <ArrowRight size={18} />
                     </>
                   )}
                 </button>
@@ -1027,10 +1043,12 @@ export default function EmergencyPage() {
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
                 <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
                 <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
-                  Direct freeze unlikely ({analysis?.daysSince ?? '?'} days ago)
+                  {typeof analysis?.daysSince === 'number'
+                    ? t('aggregator_title', { days: analysis.daysSince })
+                    : t('aggregator_title_unknown')}
                 </h2>
                 <p className="text-lg font-semibold text-slate-900 mt-3">
-                  BUT: You&apos;re not alone!
+                  {t('aggregator_not_alone')}
                 </p>
               </div>
 
@@ -1038,17 +1056,17 @@ export default function EmergencyPage() {
               <div className="grid sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
                   <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    Platform
+                    {t('platform')}
                   </span>
                   <span className="text-slate-900 font-semibold">
-                    {analysis?.scamDbMatch?.name || form.platformName || 'Unknown'}
+                    {analysis?.scamDbMatch?.name || form.platformName || t('unknown')}
                   </span>
                 </div>
 
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
                   <Users size={18} className="mx-auto text-brand-400 mb-1" />
                   <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    Victims in Group
+                    {t('victims_in_group')}
                   </span>
                   <span className="text-slate-900 font-semibold text-lg">
                     {analysis?.victimCount ?? 0}
@@ -1057,7 +1075,7 @@ export default function EmergencyPage() {
 
                 <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
                   <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    Total Losses
+                    {t('total_losses')}
                   </span>
                   <span className="text-slate-900 font-semibold text-lg">
                     ${(analysis?.totalLoss ?? 0).toLocaleString()}
@@ -1068,7 +1086,7 @@ export default function EmergencyPage() {
               {/* threshold progress */}
               <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 mb-8">
                 <div className="flex items-center justify-between text-sm mb-3">
-                  <span className="text-slate-400">Threshold for legal action</span>
+                  <span className="text-slate-400">{t('threshold')}</span>
                   <span className="text-slate-900 font-semibold">
                     ${(analysis?.threshold ?? 500000).toLocaleString()}
                   </span>
@@ -1084,15 +1102,16 @@ export default function EmergencyPage() {
                     }}
                   />
                 </div>
-                <div className="text-right mt-1">
+                <div className="text-end mt-1">
                   <span className="text-xs text-slate-400">
-                    {Math.min(
-                      100,
-                      Math.round(
-                        ((analysis?.totalLoss ?? 0) / (analysis?.threshold ?? 500000)) * 100,
+                    {t('threshold_reached', {
+                      percent: Math.min(
+                        100,
+                        Math.round(
+                          ((analysis?.totalLoss ?? 0) / (analysis?.threshold ?? 500000)) * 100,
+                        ),
                       ),
-                    )}
-                    % reached
+                    })}
                   </span>
                 </div>
               </div>
@@ -1108,7 +1127,7 @@ export default function EmergencyPage() {
                     <Loader2 size={20} className="animate-spin" />
                   ) : (
                     <>
-                      <Users size={18} /> Join Recovery Group &mdash; FREE
+                      <Users size={18} /> {t('join_group')}
                     </>
                   )}
                 </button>
@@ -1122,7 +1141,7 @@ export default function EmergencyPage() {
                     <Loader2 size={20} className="animate-spin" />
                   ) : (
                     <>
-                      <FileText size={16} /> Get Summary Report for $19
+                      <FileText size={16} /> {t('summary_report', { price: '$19' })}
                     </>
                   )}
                 </button>
@@ -1136,7 +1155,7 @@ export default function EmergencyPage() {
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
                 <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
                 <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
-                  Chances reduced but not zero. Act within 24 hours.
+                  {t('urgent_title')}
                 </h2>
               </div>
 
@@ -1145,18 +1164,18 @@ export default function EmergencyPage() {
                 <div className="flex items-center gap-3 mb-5">
                   <Shield size={24} className="text-amber-400" />
                   <h3 className="font-display font-bold text-xl text-slate-900">
-                    Emergency Preservation Pack
+                    {t('pack_title')}
                   </h3>
                 </div>
 
                 <ul className="space-y-3 mb-6">
                   {[
-                    `Police Report (${AGENCIES[form.country] || 'Local Authority'})`,
-                    `Preservation Letter for ${analysis?.exchange || 'Exchange'}`,
-                    'Chain of Custody Evidence',
-                    'Step-by-step instructions',
-                    'Affidavit of Ownership template',
-                    'Executive summary for attorney',
+                    t('pack_police', { agency: AGENCIES[form.country] || t('pack_local_authority') }),
+                    t('pack_letter', { exchange: analysis?.exchange || t('pack_exchange_fallback') }),
+                    t('pack_custody'),
+                    t('pack_steps'),
+                    t('pack_affidavit'),
+                    t('pack_summary'),
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <CheckCircle2
@@ -1177,7 +1196,7 @@ export default function EmergencyPage() {
                     <Loader2 size={20} className="animate-spin" />
                   ) : (
                     <>
-                      $79 &mdash; Get Documents Now <ArrowRight size={18} />
+                      $79 &mdash; {t('get_documents')} <ArrowRight size={18} />
                     </>
                   )}
                 </button>
@@ -1189,7 +1208,7 @@ export default function EmergencyPage() {
                   onClick={() => setRoute('AGGREGATOR')}
                   className="text-brand-400 hover:text-brand-300 underline underline-offset-4 transition-colors"
                 >
-                  Or join the Victim Recovery Group
+                  {t('join_group_link')}
                 </button>
               </div>
             </div>

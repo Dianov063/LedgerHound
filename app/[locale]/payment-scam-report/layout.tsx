@@ -1,13 +1,12 @@
-import type { Metadata } from 'next';
+import { makeMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Report a Payment Scam | Zelle, Cash App, Telegram, Apple Cash',
-  description:
-    'Report a non-crypto payment scam involving Zelle, Cash App, Venmo, Apple Cash, Chime, Telegram sellers, bank transfers, or marketplace profiles.',
-  alternates: {
-    canonical: '/payment-scam-report',
-  },
-};
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  return makeMetadata({
+    locale,
+    path: '/payment-scam-report',
+    metadataKey: 'paymentScamReport',
+  });
+}
 
 export default function PaymentScamReportLayout({
   children,
