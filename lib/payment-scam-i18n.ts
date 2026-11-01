@@ -217,9 +217,231 @@ const TELEGRAM_SCAM_COPY: Record<Locale, TelegramScamCopy> = {
   },
 };
 
-/** Scenario pages with translated content. The others render English under every locale. */
-export const TRANSLATED_SCENARIO_SLUGS: readonly string[] = ['telegram-payment-scams'];
+/** Text of a non-Telegram scenario. Everything else on the page is shared with the Telegram copy. */
+type ScenarioText = Pick<TelegramScamCopy, 'title' | 'description' | 'metadataTitle' | 'examples' | 'collect'>;
+
+const SHARED_SCENARIO_COPY: Record<Locale, Pick<TelegramScamCopy, 'eyebrow' | 'actionsText'>> = {
+  en: {
+    eyebrow: 'Payment scam reporting',
+    actionsText: 'Contact the payment provider and funding bank first. Report the seller\'s account and messages to the platform where you met them, then contact the cybercrime or consumer protection authority in your country. US victims can also file with the FTC and IC3.',
+  },
+  ru: {
+    eyebrow: 'Жалобы на платёжное мошенничество',
+    actionsText: 'Сначала свяжитесь с платёжным сервисом и банком, с которого был списан платёж. Сообщите о счёте продавца и переписке с ним на платформу, где вы познакомились, затем обратитесь в орган по киберпреступлениям или защите прав потребителей в вашей стране. Пострадавшие из США также могут подать жалобу в FTC и IC3.',
+  },
+  es: {
+    eyebrow: 'Denuncias de estafas de pago',
+    actionsText: 'Primero comunícate con el proveedor de pagos y con el banco vinculado a tu método de pago. Reporta la cuenta del vendedor y sus mensajes a la plataforma donde lo conociste, y luego contacta a la autoridad de ciberdelincuencia o de protección al consumidor de tu país. Las víctimas en EE. UU. también pueden presentar una denuncia ante la FTC y la IC3.',
+  },
+  zh: {
+    eyebrow: '支付诈骗举报',
+    actionsText: '请先联系支付服务商和资金来源银行。将卖家的账户及消息举报至您与其相识的平台，然后联系您所在国家的网络犯罪或消费者保护机构。美国受害者还可以向 FTC 和 IC3 提交举报。',
+  },
+  fr: {
+    eyebrow: 'Signalement d’arnaques de paiement',
+    actionsText: 'Contactez d’abord le prestataire de paiement et la banque qui a financé le paiement. Signalez le compte du vendeur et ses messages à la plateforme où vous l’avez rencontré, puis contactez l’autorité de lutte contre la cybercriminalité ou de protection des consommateurs de votre pays. Les victimes américaines peuvent aussi effectuer un signalement auprès de la FTC et de l’IC3.',
+  },
+  ar: {
+    eyebrow: 'الإبلاغ عن احتيال المدفوعات',
+    actionsText: 'تواصل أولاً مع مزوّد الدفع والبنك المرتبط بحسابك. أبلغ عن حساب البائع ورسائله للمنصة التي تعرّفت عليه من خلالها، ثم تواصل مع جهة مكافحة الجرائم الإلكترونية أو جهة حماية المستهلك في بلدك. ويمكن لضحايا الولايات المتحدة أيضاً تقديم بلاغ إلى FTC وIC3.',
+  },
+};
+
+const SCENARIO_COPY: Record<string, Record<Locale, ScenarioText>> = {
+  'marketplace-payment-scam': {
+    en: {
+      title: 'Report a Marketplace Payment Scam',
+      description: 'Report a seller who moved a marketplace purchase to a payment app and did not deliver the promised item.',
+      metadataTitle: 'Report a Marketplace Payment Scam | LedgerHound',
+      examples: ['Facebook Marketplace deposits', 'OfferUp or Craigslist payments', 'social media sellers who disappear after payment'],
+      collect: ['seller profile', 'listing URL', 'chat screenshots', 'payment receipt', 'promised delivery date'],
+    },
+    ru: {
+      title: 'Подать жалобу на мошенничество с оплатой на маркетплейсе',
+      description: 'Подайте жалобу на продавца, который перевёл покупку с маркетплейса в платёжное приложение и не передал обещанный товар.',
+      metadataTitle: 'Подать жалобу на мошенничество с оплатой на маркетплейсе | LedgerHound',
+      examples: ['задатки на Facebook Marketplace', 'платежи через OfferUp или Craigslist', 'продавцы в соцсетях, которые пропадают после оплаты'],
+      collect: ['профиль продавца', 'ссылка на объявление', 'скриншоты переписки', 'квитанция об оплате', 'обещанная дата доставки'],
+    },
+    es: {
+      title: 'Denuncia una estafa de pago en un marketplace',
+      description: 'Denuncia a un vendedor que trasladó una compra en un marketplace a una app de pagos y no entregó el artículo prometido.',
+      metadataTitle: 'Denuncia una estafa de pago en un marketplace | LedgerHound',
+      examples: ['Depósitos en Facebook Marketplace', 'Pagos por OfferUp o Craigslist', 'vendedores en redes sociales que desaparecen después del pago'],
+      collect: ['perfil del vendedor', 'URL del anuncio', 'capturas de pantalla del chat', 'comprobante de pago', 'fecha de entrega prometida'],
+    },
+    zh: {
+      title: '举报市场支付诈骗',
+      description: '举报卖家在市场交易中将购买款转至支付应用后，未交付承诺商品的情况。',
+      metadataTitle: '举报市场支付诈骗 | LedgerHound',
+      examples: ['Facebook Marketplace 定金', 'OfferUp 或 Craigslist 付款', '付款后消失的社交媒体卖家'],
+      collect: ['卖家资料', '商品链接', '聊天截图', '付款凭证', '承诺的交付日期'],
+    },
+    fr: {
+      title: 'Signaler une arnaque de paiement sur une place de marché',
+      description: 'Signalez un vendeur qui a transféré un achat sur une place de marché vers une application de paiement et n’a pas livré l’article promis.',
+      metadataTitle: 'Signaler une arnaque de paiement sur une place de marché | LedgerHound',
+      examples: ['acomptes sur Facebook Marketplace', 'paiements OfferUp ou Craigslist', 'vendeurs sur les réseaux sociaux qui disparaissent après le paiement'],
+      collect: ['profil du vendeur', 'URL de l’annonce', 'captures d’écran des discussions', 'reçu de paiement', 'date de livraison promise'],
+    },
+    ar: {
+      title: 'الإبلاغ عن احتيال دفع في سوق إلكتروني',
+      description: 'أبلغ عن بائع نقل عملية شراء من سوق إلكتروني إلى تطبيق دفع ولم يسلّم السلعة الموعودة.',
+      metadataTitle: 'الإبلاغ عن احتيال دفع في سوق إلكتروني | LedgerHound',
+      examples: ['عرابين Facebook Marketplace', 'مدفوعات OfferUp أو Craigslist', 'بائعون على وسائل التواصل يختفون بعد الدفع'],
+      collect: ['ملف تعريف البائع', 'رابط الإعلان', 'لقطات شاشة للمحادثات', 'إيصال الدفع', 'تاريخ التسليم الموعود'],
+    },
+  },
+  'ticket-payment-scam': {
+    en: {
+      title: 'Report a Ticket Payment Scam',
+      description: 'Report fake, reused, invalid, or undelivered event tickets paid through a peer-to-peer payment app.',
+      metadataTitle: 'Report a Ticket Payment Scam | LedgerHound',
+      examples: ['concert tickets', 'sports tickets', 'festival passes', 'tickets never transferred after payment'],
+      collect: ['event and ticket details', 'seller handle', 'chat screenshots', 'payment receipt', 'transfer promise'],
+    },
+    ru: {
+      title: 'Подать жалобу на мошенничество с оплатой билетов',
+      description: 'Подайте жалобу на поддельные, повторно использованные, недействительные или не переданные билеты на мероприятия, оплаченные через приложение для переводов между людьми.',
+      metadataTitle: 'Подать жалобу на мошенничество с оплатой билетов | LedgerHound',
+      examples: ['билеты на концерты', 'билеты на спортивные события', 'пропуска на фестивали', 'билеты, которые так и не передали после оплаты'],
+      collect: ['данные о мероприятии и билете', 'никнейм продавца', 'скриншоты переписки', 'квитанция об оплате', 'обещание передачи билета'],
+    },
+    es: {
+      title: 'Denuncia una estafa de pago de boletos',
+      description: 'Denuncia boletos de eventos falsos, reutilizados, inválidos o no entregados que se pagaron mediante una app de pagos entre personas.',
+      metadataTitle: 'Denuncia una estafa de pago de boletos | LedgerHound',
+      examples: ['boletos de conciertos', 'boletos deportivos', 'pases de festival', 'boletos que nunca se transfirieron después del pago'],
+      collect: ['datos del evento y del boleto', 'usuario del vendedor', 'capturas de pantalla del chat', 'comprobante de pago', 'promesa de transferencia'],
+    },
+    zh: {
+      title: '举报票务支付诈骗',
+      description: '举报通过点对点支付应用付款购买的虚假、重复使用、无效或未交付的活动票务。',
+      metadataTitle: '举报票务支付诈骗 | LedgerHound',
+      examples: ['演唱会门票', '体育赛事门票', '音乐节通行证', '付款后票务从未转让'],
+      collect: ['活动和票务详情', '卖家账号名', '聊天截图', '付款凭证', '转让承诺'],
+    },
+    fr: {
+      title: 'Signaler une arnaque de paiement de billets',
+      description: 'Signalez des billets d’événement faux, réutilisés, invalides ou non livrés, payés via une application de paiement entre particuliers.',
+      metadataTitle: 'Signaler une arnaque de paiement de billets | LedgerHound',
+      examples: ['billets de concert', 'billets de sport', 'pass de festival', 'billets jamais transférés après le paiement'],
+      collect: ['détails de l’événement et du billet', 'identifiant du vendeur', 'captures d’écran des discussions', 'reçu de paiement', 'promesse de transfert'],
+    },
+    ar: {
+      title: 'الإبلاغ عن احتيال دفع ثمن التذاكر',
+      description: 'أبلغ عن تذاكر فعاليات مزيفة أو مُعاد استخدامها أو غير صالحة أو لم تُسلَّم، دُفع ثمنها عبر تطبيق دفع من فرد لفرد.',
+      metadataTitle: 'الإبلاغ عن احتيال دفع ثمن التذاكر | LedgerHound',
+      examples: ['تذاكر حفلات', 'تذاكر رياضية', 'تصاريح مهرجانات', 'تذاكر لم تُنقل أبداً بعد الدفع'],
+      collect: ['تفاصيل الفعالية والتذكرة', 'معرّف البائع', 'لقطات شاشة للمحادثات', 'إيصال الدفع', 'وعد النقل'],
+    },
+  },
+  'goods-not-delivered-payment-scam': {
+    en: {
+      title: 'Report Goods Paid For but Not Delivered',
+      description: 'Report a small purchase paid by Zelle, Cash App, Venmo, Apple Cash, Chime, or another payment method when the goods never arrived.',
+      metadataTitle: 'Report Goods Paid For but Not Delivered | LedgerHound',
+      examples: ['custom orders', 'electronics', 'clothing', 'food or cake orders', 'local pickup deposits'],
+      collect: ['item description', 'seller profile', 'payment receipt', 'delivery promise', 'last seller response'],
+    },
+    ru: {
+      title: 'Подать жалобу на товар, оплаченный, но не доставленный',
+      description: 'Подайте жалобу на небольшую покупку, оплаченную через Zelle, Cash App, Venmo, Apple Cash, Chime или другой способ оплаты, если товар так и не пришёл.',
+      metadataTitle: 'Подать жалобу на товар, оплаченный, но не доставленный | LedgerHound',
+      examples: ['индивидуальные заказы', 'электроника', 'одежда', 'заказы еды или тортов', 'задатки за самовывоз'],
+      collect: ['описание товара', 'профиль продавца', 'квитанция об оплате', 'обещание доставки', 'последний ответ продавца'],
+    },
+    es: {
+      title: 'Denuncia productos pagados que no fueron entregados',
+      description: 'Denuncia una compra pequeña pagada con Zelle, Cash App, Venmo, Apple Cash, Chime u otro método de pago cuando el producto nunca llegó.',
+      metadataTitle: 'Denuncia productos pagados que no fueron entregados | LedgerHound',
+      examples: ['pedidos personalizados', 'electrónicos', 'ropa', 'pedidos de comida o de pasteles', 'depósitos por recogida en persona'],
+      collect: ['descripción del artículo', 'perfil del vendedor', 'comprobante de pago', 'promesa de entrega', 'última respuesta del vendedor'],
+    },
+    zh: {
+      title: '举报已付款但未送达的商品',
+      description: '举报通过 Zelle、Cash App、Venmo、Apple Cash、Chime 或其他支付方式支付的小额购买，商品从未送达的情况。',
+      metadataTitle: '举报已付款但未送达的商品 | LedgerHound',
+      examples: ['定制订单', '电子产品', '服装', '食品或蛋糕订单', '本地自提定金'],
+      collect: ['商品描述', '卖家资料', '付款凭证', '交付承诺', '卖家最后一次回复'],
+    },
+    fr: {
+      title: 'Signaler des marchandises payées mais non livrées',
+      description: 'Signalez un petit achat payé par Zelle, Cash App, Venmo, Apple Cash, Chime ou un autre moyen de paiement lorsque la marchandise n’est jamais arrivée.',
+      metadataTitle: 'Signaler des marchandises payées mais non livrées | LedgerHound',
+      examples: ['commandes personnalisées', 'électronique', 'vêtements', 'commandes de nourriture ou de gâteaux', 'acomptes pour retrait sur place'],
+      collect: ['description de l’article', 'profil du vendeur', 'reçu de paiement', 'promesse de livraison', 'dernière réponse du vendeur'],
+    },
+    ar: {
+      title: 'الإبلاغ عن سلع دُفع ثمنها ولم تُسلَّم',
+      description: 'أبلغ عن عملية شراء بمبلغ صغير دُفعت عبر Zelle أو Cash App أو Venmo أو Apple Cash أو Chime أو وسيلة دفع أخرى، ولم تصل السلعة أبداً.',
+      metadataTitle: 'الإبلاغ عن سلع دُفع ثمنها ولم تُسلَّم | LedgerHound',
+      examples: ['طلبات مخصصة', 'أجهزة إلكترونية', 'ملابس', 'طلبات طعام أو كعك', 'عرابين استلام شخصي'],
+      collect: ['وصف السلعة', 'ملف تعريف البائع', 'إيصال الدفع', 'وعد التسليم', 'آخر رد من البائع'],
+    },
+  },
+  'fake-local-service-scam': {
+    en: {
+      title: 'Report a Fake Local Service or Deposit Scam',
+      description: 'Report a small service deposit or advance fee when the provider never performs the promised work.',
+      metadataTitle: 'Report a Fake Local Service or Deposit Scam | LedgerHound',
+      examples: ['repairs', 'moving help', 'cleaning', 'design work', 'beauty appointments', 'document assistance'],
+      collect: ['service description', 'provider profile', 'invoice or promise', 'payment receipt', 'refund messages'],
+    },
+    ru: {
+      title: 'Подать жалобу на поддельную местную услугу или задаток',
+      description: 'Подайте жалобу на небольшой задаток за услугу или авансовый платёж, если исполнитель так и не выполнил обещанную работу.',
+      metadataTitle: 'Подать жалобу на поддельную услугу или задаток | LedgerHound',
+      examples: ['ремонт', 'помощь с переездом', 'уборка', 'дизайнерские работы', 'записи в салон красоты', 'помощь с документами'],
+      collect: ['описание услуги', 'профиль исполнителя', 'счёт или обещание', 'квитанция об оплате', 'сообщения о возврате средств'],
+    },
+    es: {
+      title: 'Denuncia un servicio local falso o una estafa de depósito',
+      description: 'Denuncia un depósito por un servicio pequeño o un pago anticipado de tarifas cuando el proveedor nunca realiza el trabajo prometido.',
+      metadataTitle: 'Denuncia un servicio local falso o una estafa de depósito | LedgerHound',
+      examples: ['reparaciones', 'ayuda con mudanzas', 'limpieza', 'trabajos de diseño', 'citas de belleza', 'asistencia con documentos'],
+      collect: ['descripción del servicio', 'perfil del proveedor', 'factura o promesa', 'comprobante de pago', 'mensajes de reembolso'],
+    },
+    zh: {
+      title: '举报虚假本地服务或定金诈骗',
+      description: '举报小额服务定金或预付费用后，服务提供者从未履行承诺工作的情况。',
+      metadataTitle: '举报虚假本地服务或定金诈骗 | LedgerHound',
+      examples: ['维修', '搬家帮忙', '清洁', '设计工作', '美容预约', '文件协助'],
+      collect: ['服务描述', '服务提供者资料', '发票或承诺', '付款凭证', '退款相关消息'],
+    },
+    fr: {
+      title: 'Signaler un faux service local ou une arnaque à l’acompte',
+      description: 'Signalez un acompte pour un service ou des frais d’avance lorsque le prestataire n’effectue jamais le travail promis.',
+      metadataTitle: 'Signaler un faux service local ou une arnaque à l’acompte | LedgerHound',
+      examples: ['réparations', 'aide au déménagement', 'nettoyage', 'travaux de design', 'rendez-vous beauté', 'aide aux démarches administratives'],
+      collect: ['description du service', 'profil du prestataire', 'facture ou promesse', 'reçu de paiement', 'messages de remboursement'],
+    },
+    ar: {
+      title: 'الإبلاغ عن خدمة محلية وهمية أو احتيال عربون',
+      description: 'أبلغ عن عربون خدمة صغير أو رسوم مقدّمة عندما لا يقوم مزوّد الخدمة بالعمل الموعود أبداً.',
+      metadataTitle: 'الإبلاغ عن خدمة محلية وهمية أو احتيال عربون | LedgerHound',
+      examples: ['إصلاحات', 'مساعدة في النقل', 'تنظيف', 'أعمال تصميم', 'مواعيد تجميل', 'مساعدة في المستندات'],
+      collect: ['وصف الخدمة', 'ملف تعريف مزوّد الخدمة', 'الفاتورة أو الوعد', 'إيصال الدفع', 'رسائل استرداد المبلغ'],
+    },
+  },
+};
+
+/** The single record of which scenarios are translated: the page, its metadata and the sitemap all read it. */
+export const TRANSLATED_SCENARIO_SLUGS: readonly string[] = ['telegram-payment-scams', ...Object.keys(SCENARIO_COPY)];
 
 export function getTelegramScamCopy(locale: string): TelegramScamCopy {
   return TELEGRAM_SCAM_COPY[locale as Locale] || TELEGRAM_SCAM_COPY.en;
+}
+
+export function getScenarioCopy(slug: string, locale: string): TelegramScamCopy {
+  const base = getTelegramScamCopy(locale);
+  const text = SCENARIO_COPY[slug];
+  if (!text) return base;
+  const key = (locale in text ? locale : 'en') as Locale;
+  return {
+    ...base,
+    ...SHARED_SCENARIO_COPY[key],
+    ...text[key],
+    metadataDescription: text[key].description,
+  };
 }
