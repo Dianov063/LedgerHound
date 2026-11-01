@@ -11,7 +11,7 @@ import {
   isCommunityLanguage,
   type CommunityLanguage,
 } from '@/lib/community-languages';
-import { translatePaymentSafety } from '@/lib/payment-safety-i18n';
+import { translateApiError, translatePaymentSafety } from '@/lib/payment-safety-i18n';
 import {
   AlertTriangle,
   ArrowRight,
@@ -646,10 +646,10 @@ export default function PaymentSafetyPage() {
       });
       const res = await fetch(`/api/non-crypto-scam-database/search?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Search failed');
+      if (!res.ok) throw new Error(translateApiError(locale, data.error, t('Search failed')));
       setCheckResult({ matched: data.matched, identity: data.identity || null });
     } catch (err: any) {
-      setCheckError(err.message || 'Search failed');
+      setCheckError(err.message || t('Search failed'));
     } finally {
       setCheckLoading(false);
     }
@@ -672,7 +672,7 @@ export default function PaymentSafetyPage() {
     setReportStatus('loading');
     setReportError('');
     setReportId('');
-    setUploadStatus(reportFiles.length > 0 ? `Uploading ${reportFiles.length} evidence file(s)...` : '');
+    setUploadStatus(reportFiles.length > 0 ? t('Uploading {count} evidence file(s)...').replace('{count}', String(reportFiles.length)) : '');
 
     const evidenceTypes = [
       data.get('payment_receipt') ? 'payment_receipt' : '',
@@ -691,7 +691,7 @@ export default function PaymentSafetyPage() {
       });
       const challenge = await challengeRes.json();
       if (!challengeRes.ok || !challenge.submissionToken) {
-        throw new Error(challenge.error || t('Security check expired. Please try again.'));
+        throw new Error(translateApiError(locale, challenge.error, t('Security check expired. Please try again.')));
       }
       const submissionToken = String(challenge.submissionToken);
 
@@ -705,10 +705,10 @@ export default function PaymentSafetyPage() {
           body: uploadData,
         });
         const uploaded = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(uploaded.error || `Failed to upload ${file.name}`);
+        if (!uploadRes.ok) throw new Error(translateApiError(locale, uploaded.error, t('Failed to upload {file}').replace('{file}', file.name)));
         evidenceFiles.push(uploaded.key);
       }
-      setUploadStatus(evidenceFiles.length > 0 ? 'Evidence uploaded. Submitting report...' : '');
+      setUploadStatus(evidenceFiles.length > 0 ? t('Evidence uploaded. Submitting report...') : '');
 
       const res = await fetch('/api/non-crypto-scam-database/report', {
         method: 'POST',
@@ -755,7 +755,7 @@ export default function PaymentSafetyPage() {
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Report failed');
+      if (!res.ok) throw new Error(translateApiError(locale, body.error, t('Report failed')));
       setSubmittedRail(reportRail);
       setSubmittedEmail(String(data.get('reporterEmail') || ''));
       setVerificationEmailSent(body.verificationEmailSent === true);
@@ -777,7 +777,7 @@ export default function PaymentSafetyPage() {
       setDraftSavedAt('');
       localStorage.removeItem(REPORT_DRAFT_STORAGE_KEY);
     } catch (err: any) {
-      setReportError(err.message || 'Report failed');
+      setReportError(err.message || t('Report failed'));
       setReportStatus('error');
       setUploadStatus('');
       setTurnstileToken('');
@@ -794,10 +794,10 @@ export default function PaymentSafetyPage() {
         body: JSON.stringify({ reportId, email: submittedEmail, locale }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Unable to resend verification email');
+      if (!res.ok) throw new Error(translateApiError(locale, body.error, t('Unable to resend verification email')));
       setVerificationEmailSent(true);
     } catch (err: any) {
-      setReportError(err.message || 'Unable to resend verification email');
+      setReportError(err.message || t('Unable to resend verification email'));
     }
   }
 
@@ -896,6 +896,7 @@ export default function PaymentSafetyPage() {
                     value={checkIdentifier}
                     onChange={(e) => setCheckIdentifier(e.target.value)}
                     required
+                    dir="auto"
                     className="input"
                     placeholder={t('Phone, email, $cashtag, @handle, IBAN, account')}
                   />
@@ -1025,7 +1026,7 @@ export default function PaymentSafetyPage() {
                             setReportCategory(category.value);
                             setDraftTouched(true);
                           }}
-                          className={`flex min-h-[52px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                          className={`flex min-h-[52px] items-center gap-2 rounded-lg border px-3 py-2 text-start text-sm font-semibold transition-colors ${
                             selected
                               ? 'border-brand-500 bg-brand-50 text-brand-800'
                               : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300'
@@ -1078,13 +1079,14 @@ export default function PaymentSafetyPage() {
                     name="paymentIdentifier"
                     minLength={3}
                     defaultValue={draftValue('paymentIdentifier')}
+                    dir="auto"
                     className="input"
                     placeholder={t(paymentRecipientHint[reportRail] || 'Phone, email, $cashtag, account')}
                   />
                 </div>
                 <div className={reportStep === 4 ? '' : 'hidden'}>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Your email')}</label>
-                  <input name="reporterEmail" type="email" defaultValue={draftValue('reporterEmail')} className="input" placeholder="you@example.com" />
+                  <input name="reporterEmail" type="email" dir="ltr" defaultValue={draftValue('reporterEmail')} className="input" placeholder="you@example.com" />
                 </div>
               </div>
 
@@ -1181,7 +1183,7 @@ export default function PaymentSafetyPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Listing URL')}</label>
-                    <input name="listingUrl" type="url" maxLength={500} defaultValue={draftValue('listingUrl')} className="input" placeholder="https://..." />
+                    <input name="listingUrl" type="url" dir="ltr" maxLength={500} defaultValue={draftValue('listingUrl')} className="input" placeholder="https://..." />
                   </div>
                 </div>
               </div>
@@ -1201,7 +1203,7 @@ export default function PaymentSafetyPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Transaction reference')}</label>
-                  <input name="transactionReference" maxLength={160} defaultValue={draftValue('transactionReference')} className="input" placeholder={t('From payment receipt')} />
+                  <input name="transactionReference" dir="auto" maxLength={160} defaultValue={draftValue('transactionReference')} className="input" placeholder={t('From payment receipt')} />
                 </div>
               </div>
 
@@ -1258,7 +1260,7 @@ export default function PaymentSafetyPage() {
                   multiple
                   accept="image/png,image/jpeg,image/webp,application/pdf"
                   onChange={(e) => setReportFiles(Array.from(e.target.files || []).slice(0, 5))}
-                  className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+                  className="block w-full text-sm text-slate-600 file:me-4 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
                 />
                 <p className="mt-1 text-xs text-slate-500">{t('Optional. Up to 5 files, 10MB each. PDF, PNG, JPG, or WebP.')}</p>
                 {reportFiles.length > 0 && (
@@ -1324,7 +1326,7 @@ export default function PaymentSafetyPage() {
                           key={item.label}
                           type="button"
                           onClick={() => moveToReportStep(item.step)}
-                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left text-sm ${
+                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-start text-sm ${
                             item.done
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                               : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -1349,7 +1351,7 @@ export default function PaymentSafetyPage() {
                           key={item.label}
                           type="button"
                           onClick={() => moveToReportStep(item.step)}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm text-slate-700"
+                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-start text-sm text-slate-700"
                         >
                           <span className="flex items-center gap-2">
                             {item.done ? <CheckCircle2 size={16} className="text-emerald-600" /> : <span className="h-4 w-4 rounded-full border border-slate-300" />}
@@ -1368,10 +1370,10 @@ export default function PaymentSafetyPage() {
 
               {reportStatus === 'success' && (
                 <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
-                  <p className="font-semibold">{t('Report received. ID:')} <span className="font-mono">{reportId}</span></p>
+                  <p className="font-semibold">{t('Report received. ID:')} <bdi dir="ltr" className="font-mono">{reportId}</bdi></p>
                   <p className="mt-1">
                     {verificationEmailSent
-                      ? `${t('Verification email sent to')} ${submittedEmail}.`
+                      ? <>{t('Verification email sent to')} <bdi dir="ltr">{submittedEmail}</bdi>.</>
                       : t('The verification email could not be sent.')}
                   </p>
                   <button type="button" onClick={resendVerification} className="mt-2 font-semibold underline underline-offset-2">
@@ -1484,8 +1486,8 @@ function RecoveryActions({ rail }: { rail: PaymentRail }) {
   return (
     <div className="border-t border-emerald-200 mt-3 pt-3">
       <p className="font-semibold mb-2">{t('Act now')}</p>
-      <ol className="list-decimal pl-5 space-y-1.5 text-emerald-900">
-        {provider && <li>{provider.instruction}</li>}
+      <ol className="list-decimal ps-5 space-y-1.5 text-emerald-900">
+        {provider && <li>{t(provider.instruction)}</li>}
         <li>{t('Contact the bank or card issuer that funded the payment and ask what dispute options apply.')}</li>
         <li>{t('Report the seller profile to the marketplace or social platform.')}</li>
         <li>{t('Report the incident to the cybercrime or consumer protection authority in your country.')}</li>
@@ -1493,7 +1495,7 @@ function RecoveryActions({ rail }: { rail: PaymentRail }) {
       <div className="flex flex-wrap gap-3 mt-3">
         {provider && (
           <a href={provider.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2">
-            {provider.linkLabel} <ExternalLink size={13} />
+            {t(provider.linkLabel)} <ExternalLink size={13} />
           </a>
         )}
         <a href="https://reportfraud.ftc.gov/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2">
@@ -1571,10 +1573,10 @@ function PublicWarningsSection({ warnings, loading, base }: { warnings: Identity
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                      {identity.country}{identity.states?.length ? ` (${identity.states.join(', ')})` : ''} / {RAILS.find((r) => r.value === identity.rail)?.label || identity.rail}
+                      {identity.country}{identity.states?.length ? ` (${identity.states.join(', ')})` : ''} / {t(RAILS.find((r) => r.value === identity.rail)?.label || identity.rail)}
                     </p>
                     <h3 className="font-display font-bold text-base text-slate-950 mt-1">
-                      {identity.identityMask}
+                      <bdi dir="ltr">{identity.identityMask}</bdi>
                     </h3>
                   </div>
                   <AlertTriangle size={18} className="text-amber-600 shrink-0" />
@@ -1650,7 +1652,7 @@ function ResultPanel({ result }: { result: { matched: boolean; identity: Identit
         <AlertTriangle size={21} className="text-amber-600" />
       </div>
       <h3 className="font-display font-bold text-lg text-slate-950 mb-2">{t('Matching reports found')}</h3>
-      <p className="text-sm text-slate-500 mb-5">{identity.identityMask}</p>
+      <p className="text-sm text-slate-500 mb-5"><bdi dir="ltr">{identity.identityMask}</bdi></p>
 
       <div className="space-y-3 text-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -1667,7 +1669,7 @@ function ResultPanel({ result }: { result: { matched: boolean; identity: Identit
         </div>
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <span className="text-slate-500">{t('Reported amount')}</span>
-          <span className="font-bold text-slate-900">{formatAmount(identity.totalReportedAmount, identity.currency)}</span>
+          <bdi dir="ltr" className="font-bold text-slate-900">{formatAmount(identity.totalReportedAmount, identity.currency)}</bdi>
         </div>
       </div>
 
