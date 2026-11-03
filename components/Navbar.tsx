@@ -35,7 +35,10 @@ export default function Navbar() {
   const [langOpen, setLangOpen] = useState(false);
 
   const switchLocale = (newLocale: string) => {
-    router.replace(pathname, { locale: newLocale });
+    // usePathname has no query or fragment. Take them verbatim from the address bar,
+    // so repeated keys and encoded values survive the switch unchanged.
+    const { search, hash } = window.location;
+    router.replace(`${pathname}${search}${hash}`, { locale: newLocale });
   };
 
   const prefix = locale === 'en' ? '' : `/${locale}`;
