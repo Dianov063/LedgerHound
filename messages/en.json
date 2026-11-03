@@ -1528,6 +1528,12 @@
     "join_group": "Join Recovery Group — FREE",
     "summary_report": "Get Summary Report for {price}",
     "urgent_title": "Chances reduced but not zero. Act within 24 hours.",
-    "join_group_link": "Or join the Victim Recovery Group"
+    "join_group_link": "Or join the Victim Recovery Group",
+    "error_analyze": "We could not analyze your case right now. Your answers are still here; please try again in a minute.",
+    "error_rate_limited": "Too many attempts from this connection. Please wait a few minutes and try again.",
+    "error_checkout": "We could not open the payment page. You have not been charged. Please try again.",
+    "error_already_paid": "This case has already been paid. To buy documents for another case, start a new case.",
+    "error_join": "We could not add you to the Recovery Group right now. Please try again.",
+    "error_join_platform": "To join the Recovery Group, go back to step 2 and enter the platform name."
   }
 }

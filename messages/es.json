@@ -1528,6 +1528,12 @@
     "join_group": "Únete al grupo de recuperación — GRATIS",
     "summary_report": "Obtén el informe resumen por {price}",
     "urgent_title": "Las probabilidades se redujeron, pero no son cero. Actúa dentro de 24 horas.",
-    "join_group_link": "O únete al grupo de recuperación de víctimas"
+    "join_group_link": "O únete al grupo de recuperación de víctimas",
+    "error_analyze": "No pudimos analizar tu caso en este momento. Tus respuestas siguen aquí; vuelve a intentarlo en un minuto.",
+    "error_rate_limited": "Demasiados intentos desde esta conexión. Espera unos minutos y vuelve a intentarlo.",
+    "error_checkout": "No pudimos abrir la página de pago. No se te ha cobrado nada. Vuelve a intentarlo.",
+    "error_already_paid": "Este caso ya fue pagado. Para comprar documentos de otro caso, inicia un caso nuevo.",
+    "error_join": "No pudimos agregarte al grupo de recuperación en este momento. Vuelve a intentarlo.",
+    "error_join_platform": "Para unirte al grupo de recuperación, vuelve al paso 2 e ingresa el nombre de la plataforma."
   }
 }

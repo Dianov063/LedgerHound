@@ -1528,6 +1528,12 @@
     "join_group": "加入追回小组 — 免费",
     "summary_report": "获取摘要报告，{price}",
     "urgent_title": "成功机会已降低，但并非为零。请在 24 小时内行动。",
-    "join_group_link": "或加入受害者追回小组"
+    "join_group_link": "或加入受害者追回小组",
+    "error_analyze": "暂时无法分析您的案例。您填写的内容仍保留在页面上，请一分钟后再试。",
+    "error_rate_limited": "此网络连接的尝试次数过多。请等待几分钟后再试。",
+    "error_checkout": "无法打开付款页面。您未被扣款。请重试。",
+    "error_already_paid": "此案例已付款。如需为其他案例购买文件，请新建案例。",
+    "error_join": "暂时无法将您加入追回小组。请重试。",
+    "error_join_platform": "如需加入追回小组，请返回第 2 步并填写平台名称。"
   }
 }

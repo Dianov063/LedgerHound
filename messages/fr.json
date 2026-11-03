@@ -1528,6 +1528,12 @@
     "join_group": "Rejoindre le groupe de récupération — GRATUIT",
     "summary_report": "Obtenir le rapport de synthèse pour {price}",
     "urgent_title": "Les chances sont réduites mais non nulles. Agissez dans les 24 heures.",
-    "join_group_link": "Ou rejoignez le groupe de récupération des victimes"
+    "join_group_link": "Ou rejoignez le groupe de récupération des victimes",
+    "error_analyze": "Nous n’avons pas pu analyser votre dossier pour le moment. Vos réponses sont conservées ; réessayez dans une minute.",
+    "error_rate_limited": "Trop de tentatives depuis cette connexion. Patientez quelques minutes, puis réessayez.",
+    "error_checkout": "Nous n’avons pas pu ouvrir la page de paiement. Aucun montant ne vous a été débité. Veuillez réessayer.",
+    "error_already_paid": "Ce dossier a déjà été payé. Pour acheter des documents pour un autre dossier, créez un nouveau dossier.",
+    "error_join": "Nous n’avons pas pu vous ajouter au groupe de récupération pour le moment. Veuillez réessayer.",
+    "error_join_platform": "Pour rejoindre le groupe de récupération, revenez à l’étape 2 et indiquez le nom de la plateforme."
   }
 }

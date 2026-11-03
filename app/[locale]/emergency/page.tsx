@@ -63,6 +63,8 @@ const BRACKETS = [
   { label: '>$100K', min: 100000, max: Infinity, mid: 150000 },
 ];
 
+const ROUTES = ['EMERGENCY', 'URGENT', 'AGGREGATOR'];
+
 const SCAM_TYPES = [
   { id: 'romance', emoji: '\u{1F494}' },
   { id: 'fake_platform', emoji: '\u{1F4C8}' },
@@ -146,6 +148,7 @@ export default function EmergencyPage() {
   const [analysis, setAnalysis] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [flowError, setFlowError] = useState('');
   const [txLooking, setTxLooking] = useState(false);
   const [txResult, setTxResult] = useState<{
     found: boolean;
@@ -234,51 +237,56 @@ export default function EmergencyPage() {
     return () => clearInterval(interval);
   }, [step]);
 
+  /* An error belongs to the screen it was raised on. */
+  useEffect(() => {
+    setFlowError('');
+  }, [step, route]);
+
   /* ── analyze handler ── */
   const handleAnalyze = async () => {
     setAnalyzing(true);
+    setFlowError('');
     try {
       const res = await fetch('/api/emergency/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      // Without a real analysis there is nothing honest to show: stay on the
+      // answers so the visitor can retry, rather than invent a score or route.
+      if (!res.ok || !ROUTES.includes(data?.route)) {
+        setFlowError(t(res.status === 429 ? 'error_rate_limited' : 'error_analyze'));
+        return;
+      }
       setRoute(data.route);
       setAnalysis({ ...data.analysis, caseId: data.caseId, caseSecret: data.caseSecret });
+      setStep(4);
     } catch {
-      setRoute('URGENT');
-      setAnalysis({
-        recoveryScore: 35,
-        destination: null,
-        exchange: null,
-        daysSince: 14,
-        scamDbMatch: null,
-        victimCount: 0,
-        totalLoss: 0,
-        threshold: 500000,
-      });
+      setFlowError(t('error_analyze'));
+    } finally {
+      setAnalyzing(false);
     }
-    setAnalyzing(false);
-    setStep(4);
   };
 
   /* ── checkout handler ── */
   const handleCheckout = async (product: 'emergency_pack' | 'summary_report') => {
     setCheckoutLoading(true);
+    setFlowError('');
     try {
       const res = await fetch('/api/emergency/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ product, caseId: analysis?.caseId, caseSecret: analysis?.caseSecret, ...form, route }),
       });
-      const data = await res.json();
-      if (data.url) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.url) {
         window.location.href = data.url;
         return;
       }
+      setFlowError(t(res.status === 409 ? 'error_already_paid' : res.status === 429 ? 'error_rate_limited' : 'error_checkout'));
     } catch {
-      /* fall through */
+      setFlowError(t('error_checkout'));
     }
     setCheckoutLoading(false);
   };
@@ -352,6 +360,12 @@ export default function EmergencyPage() {
 
   /* ── join aggregator ── */
   const handleJoinGroup = async () => {
+    setFlowError('');
+    // The group is keyed by platform, and the platform name is optional on step 2.
+    if (!form.platformName.trim()) {
+      setFlowError(t('error_join_platform'));
+      return;
+    }
     setCheckoutLoading(true);
     try {
       const res = await fetch('/api/emergency/join-group', {
@@ -367,8 +381,8 @@ export default function EmergencyPage() {
           scamType: form.scamType,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
         const params = new URLSearchParams({
           product: 'group_joined',
           victims: String(data.victims || 0),
@@ -377,8 +391,9 @@ export default function EmergencyPage() {
         window.location.href = `${base}/emergency/success?${params.toString()}`;
         return;
       }
+      setFlowError(t(res.status === 429 ? 'error_rate_limited' : 'error_join'));
     } catch {
-      /* ignore */
+      setFlowError(t('error_join'));
     }
     setCheckoutLoading(false);
   };
@@ -1211,6 +1226,12 @@ export default function EmergencyPage() {
                   {t('join_group_link')}
                 </button>
               </div>
+            </div>
+          )}
+
+          {flowError && (step === 3 || step === 5) && (
+            <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {flowError}
             </div>
           )}
         </div>
