@@ -22,17 +22,20 @@ import {
 interface ScamResult {
   address: string;
   isFlagged: boolean;
-  riskLevel: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  riskLevel: 'CLEAN' | 'INCOMPLETE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   riskScore: number;
   sources: { source: string; label: string; type: string; category: string }[];
   categories: string[];
   entityInfo: { label: string; type: string } | null;
   ofacWarning: string;
   scamDbPlatforms: string[];
+  incomplete?: boolean;
+  unavailableSources?: string[];
 }
 
 const RISK_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
   CLEAN: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-800' },
+  INCOMPLETE: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300', badge: 'bg-slate-200 text-slate-800' },
   LOW: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', badge: 'bg-yellow-100 text-yellow-800' },
   MEDIUM: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800' },
   HIGH: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', badge: 'bg-red-100 text-red-800' },
@@ -227,6 +230,8 @@ function ScamCheckerInner() {
               <div className="flex-shrink-0 mt-1">
                 {result.isFlagged ? (
                   <ShieldAlert size={40} className={risk.text} />
+                ) : result.incomplete ? (
+                  <AlertTriangle size={40} className={risk.text} />
                 ) : (
                   <ShieldCheck size={40} className={risk.text} />
                 )}
@@ -243,11 +248,14 @@ function ScamCheckerInner() {
                   )}
                 </div>
                 <p className={`text-lg font-semibold ${risk.text} mb-1`}>
-                  {result.isFlagged ? t('flagged_title') : t('clean_title')}
+                  {result.isFlagged ? t('flagged_title') : result.incomplete ? t('incomplete_title') : t('clean_title')}
                 </p>
                 <p className="text-sm text-slate-600">
-                  {result.isFlagged ? t('flagged_desc') : t('clean_desc')}
+                  {result.isFlagged ? t('flagged_desc') : result.incomplete ? t('incomplete_desc') : t('clean_desc')}
                 </p>
+                {result.isFlagged && result.incomplete && (
+                  <p className="text-sm text-slate-600 mt-2">{t('incomplete_note')}</p>
+                )}
                 <p className="text-xs font-mono text-slate-400 mt-3 break-all">{result.address}</p>
               </div>
             </div>

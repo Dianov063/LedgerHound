@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
     // BTC and SOL addresses are case-sensitive; TRON is case-sensitive; ETH is lowercased
     const addr = isEth ? address.toLowerCase() : address;
     const sources: { source: string; label: string; type: string; category: string }[] = [];
+    // A source that could not be read must not count as "no match".
+    const unavailableSources: string[] = [];
 
     /* 1. Check internal DB */
     const entity = getScamCheckView(addr);
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
         });
       }
     } catch {
-      // Scam database check failed — continue without it
+      unavailableSources.push('LedgerHound Scam Database');
     }
 
     /* 3. Check the OFAC SDN list (refreshed weekly by the refresh-ofac cron).
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
         sources.push({ source: 'OFAC SDN list', label: ofac.tag, type: 'sanctioned', category: 'Sanctions' });
       }
     } catch {
-      // OFAC list unavailable — continue without it
+      unavailableSources.push('OFAC SDN list');
     }
 
     /* 4. Determine entity info for clean addresses */
@@ -78,7 +80,9 @@ export async function POST(req: NextRequest) {
 
     /* 5. Calculate risk */
     const isFlagged = sources.length > 0;
-    let riskLevel: 'CLEAN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'CLEAN';
+    const incomplete = unavailableSources.length > 0;
+    // Nothing found while a source was unreadable is not a clean result.
+    let riskLevel: 'CLEAN' | 'INCOMPLETE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = incomplete ? 'INCOMPLETE' : 'CLEAN';
     let riskScore = 0;
     let ofacWarning = '';
 
@@ -139,6 +143,8 @@ export async function POST(req: NextRequest) {
       entityInfo,
       ofacWarning,
       scamDbPlatforms,
+      incomplete,
+      unavailableSources,
     });
   } catch (err: any) {
     console.error('[scam-check]', err);

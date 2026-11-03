@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
     try {
       session = await getStripe().checkout.sessions.retrieve(sessionId);
     } catch (err: any) {
-      // Stripe answers an unknown id with an invalid-request error: that is a 404, not our failure.
-      if (err?.type === 'StripeInvalidRequestError') {
+      // Only a confirmed missing session is a 404; any other Stripe error stays a failure.
+      if (err?.type === 'StripeInvalidRequestError' && err?.code === 'resource_missing') {
         return NextResponse.json({ error: 'Session not found' }, { status: 404 });
       }
       throw err;

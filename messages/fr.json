@@ -570,7 +570,11 @@
     "cta_report_btn": "Obtenir un Rapport Forensique — 49$",
     "cta_eval_btn": "Evaluation Gratuite",
     "seo_title": "Verificateur Gratuit d'Arnaques Crypto | LedgerHound",
-    "seo_desc": "Verifiez si une adresse de portefeuille crypto a ete signalee pour arnaque, fraude ou sanctions. Outil gratuit de securite blockchain."
+    "seo_desc": "Verifiez si une adresse de portefeuille crypto a ete signalee pour arnaque, fraude ou sanctions. Outil gratuit de securite blockchain.",
+    "risk_incomplete": "VÉRIFICATION INCOMPLÈTE",
+    "incomplete_title": "Nous n’avons pas pu terminer la vérification",
+    "incomplete_desc": "L’une de nos sources est indisponible pour le moment : nous ne pouvons donc pas affirmer que cette adresse est saine. Réessayez dans quelques minutes.",
+    "incomplete_note": "L’une de nos sources est indisponible pour le moment : ce résultat peut donc être incomplet."
   },
   "networks": {
     "eth": "Ethereum",

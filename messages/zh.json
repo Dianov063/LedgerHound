@@ -570,7 +570,11 @@
     "cta_report_btn": "获取法证报告 — $49",
     "cta_eval_btn": "免费案件评估",
     "seo_title": "免费加密货币诈骗地址检查器 | LedgerHound",
-    "seo_desc": "检查加密货币钱包地址是否被举报为诈骗、欺诈或制裁。免费区块链安全工具。"
+    "seo_desc": "检查加密货币钱包地址是否被举报为诈骗、欺诈或制裁。免费区块链安全工具。",
+    "risk_incomplete": "核查未完成",
+    "incomplete_title": "无法完成核查",
+    "incomplete_desc": "我们的一个数据来源暂时无法读取，因此无法确认该地址安全。请几分钟后重试。",
+    "incomplete_note": "我们的一个数据来源暂时无法读取，因此此结果可能不完整。"
   },
   "networks": {
     "eth": "Ethereum",

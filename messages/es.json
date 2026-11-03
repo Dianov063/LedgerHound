@@ -570,7 +570,11 @@
     "cta_report_btn": "Obtener Informe Forense — $49",
     "cta_eval_btn": "Evaluacion Gratuita",
     "seo_title": "Verificador Gratuito de Estafas Cripto | LedgerHound",
-    "seo_desc": "Verifique si una direccion de billetera criptomoneda ha sido reportada por estafas, fraude o sanciones. Herramienta gratuita de seguridad blockchain."
+    "seo_desc": "Verifique si una direccion de billetera criptomoneda ha sido reportada por estafas, fraude o sanciones. Herramienta gratuita de seguridad blockchain.",
+    "risk_incomplete": "VERIFICACIÓN INCOMPLETA",
+    "incomplete_title": "No pudimos completar la verificación",
+    "incomplete_desc": "Una de nuestras fuentes no está disponible en este momento, por lo que no podemos afirmar que esta dirección esté limpia. Vuelva a intentarlo en unos minutos.",
+    "incomplete_note": "Una de nuestras fuentes no está disponible en este momento, por lo que este resultado puede estar incompleto."
   },
   "networks": {
     "eth": "Ethereum",

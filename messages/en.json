@@ -570,7 +570,11 @@
     "cta_report_btn": "Get Forensic Report — $49",
     "cta_eval_btn": "Free Case Evaluation",
     "seo_title": "Free Crypto Scam Address Checker | LedgerHound",
-    "seo_desc": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Free blockchain security tool powered by multiple databases."
+    "seo_desc": "Check if a cryptocurrency wallet address has been reported for scams, fraud, or sanctions. Free blockchain security tool powered by multiple databases.",
+    "risk_incomplete": "CHECK INCOMPLETE",
+    "incomplete_title": "We could not complete the check",
+    "incomplete_desc": "One of our sources could not be read right now, so we cannot say this address is clear. Please try again in a few minutes.",
+    "incomplete_note": "One of our sources could not be read right now, so this result may be incomplete."
   },
   "networks": {
     "eth": "Ethereum",
