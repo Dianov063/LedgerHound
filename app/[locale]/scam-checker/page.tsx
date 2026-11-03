@@ -26,7 +26,6 @@ interface ScamResult {
   riskScore: number;
   sources: { source: string; label: string; type: string; category: string }[];
   categories: string[];
-  chainabuseReports: number;
   entityInfo: { label: string; type: string } | null;
   ofacWarning: string;
   scamDbPlatforms: string[];

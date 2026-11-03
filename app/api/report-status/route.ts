@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getReports } from '@/lib/reports-log';
 import { getReportDownloadUrl } from '@/lib/s3-storage';
+import { isStripeSessionId } from '@/lib/emergency-case-access';
 import logger from '@/lib/logger';
 
 const getStripe = (): any => {
@@ -23,9 +24,21 @@ export async function GET(req: NextRequest) {
   if (!sessionId) {
     return NextResponse.json({ error: 'Missing session_id' }, { status: 400 });
   }
+  if (!isStripeSessionId(sessionId)) {
+    return NextResponse.json({ error: 'Invalid session_id' }, { status: 400 });
+  }
 
   try {
-    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    let session;
+    try {
+      session = await getStripe().checkout.sessions.retrieve(sessionId);
+    } catch (err: any) {
+      // Stripe answers an unknown id with an invalid-request error: that is a 404, not our failure.
+      if (err?.type === 'StripeInvalidRequestError') {
+        return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      }
+      throw err;
+    }
 
     if (session.payment_status !== 'paid') {
       return NextResponse.json({ status: 'pending', message: 'Payment not yet confirmed' });

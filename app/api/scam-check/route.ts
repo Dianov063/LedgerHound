@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getAddressIndex } from '@/lib/scam-db';
 import { getScamCheckView } from '@/lib/known-entities';
+import { checkOfac } from '@/lib/labels/ofac';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 // 2026-05-20: Local KNOWN_ENTITIES removed. Source of truth is now
@@ -28,8 +29,6 @@ export async function POST(req: NextRequest) {
     // BTC and SOL addresses are case-sensitive; TRON is case-sensitive; ETH is lowercased
     const addr = isEth ? address.toLowerCase() : address;
     const sources: { source: string; label: string; type: string; category: string }[] = [];
-    let chainabuseReports = 0;
-    let chainabuseCategories: string[] = [];
 
     /* 1. Check internal DB */
     const entity = getScamCheckView(addr);
@@ -59,33 +58,16 @@ export async function POST(req: NextRequest) {
       // Scam database check failed — continue without it
     }
 
-    /* 3. Check Chainabuse (public API, no key needed) */
+    /* 3. Check the OFAC SDN list (refreshed weekly by the refresh-ofac cron).
+       Chainabuse is not queried here: its API needs a key with a quota of a few
+       calls a month, which the paid report uses; a keyless call is always refused. */
     try {
-      const caRes = await fetch(
-        `https://api.chainabuse.com/v0/reports?address=${addr}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      if (caRes.ok) {
-        const caData = await caRes.json();
-        const reports = caData.reports || caData.items || [];
-        if (Array.isArray(reports) && reports.length > 0) {
-          chainabuseReports = reports.length;
-          const cats = new Set<string>();
-          for (const r of reports) {
-            if (r.category) cats.add(r.category);
-            if (r.scamType) cats.add(r.scamType);
-          }
-          chainabuseCategories = Array.from(cats);
-          sources.push({
-            source: 'Chainabuse',
-            label: `${chainabuseReports} community report${chainabuseReports > 1 ? 's' : ''}`,
-            type: 'community_report',
-            category: chainabuseCategories[0] || 'Reported',
-          });
-        }
+      const ofac = await checkOfac(addr);
+      if (ofac && !sources.some((s) => s.type === 'sanctioned')) {
+        sources.push({ source: 'OFAC SDN list', label: ofac.tag, type: 'sanctioned', category: 'Sanctions' });
       }
     } catch {
-      // Chainabuse timeout/error — continue without it
+      // OFAC list unavailable — continue without it
     }
 
     /* 4. Determine entity info for clean addresses */
@@ -130,8 +112,6 @@ export async function POST(req: NextRequest) {
 
       // Bump score for multiple signals
       if (hasSanctions && hasScam) riskScore = 100;
-      if (chainabuseReports > 0 && !hasCommunityOnly) riskScore = Math.min(100, riskScore + 5);
-      if (chainabuseReports > 5) riskScore = Math.min(100, riskScore + 10);
 
       riskScore = Math.min(100, riskScore);
 
@@ -142,10 +122,7 @@ export async function POST(req: NextRequest) {
     }
 
     /* 6. Collect all categories + OFAC badge */
-    const categories = Array.from(new Set([
-      ...sources.map(s => s.category),
-      ...chainabuseCategories,
-    ]));
+    const categories = Array.from(new Set(sources.map(s => s.category)));
     // Ensure "OFAC Sanctioned" appears as a distinct category
     const OFAC_LABEL_RE_CAT = /OFAC|Lazarus|Blender\.io|Sinbad\.io|Tornado Cash/i;
     if (sources.some(s => s.type === 'sanctioned' || OFAC_LABEL_RE_CAT.test(s.label)) && !categories.includes('OFAC Sanctioned')) {
@@ -159,7 +136,6 @@ export async function POST(req: NextRequest) {
       riskScore,
       sources,
       categories,
-      chainabuseReports,
       entityInfo,
       ofacWarning,
       scamDbPlatforms,
