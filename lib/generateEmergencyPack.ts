@@ -386,7 +386,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
           <p style="color: #64748b; font-size: 13px;">These links expire in 24 hours. If you need new links, contact our support team.</p>
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
           <p style="color: #64748b; font-size: 12px;">
-            LedgerHound by USPROJECT LLC &mdash; Crypto Fraud Recovery<br />
+            LedgerHound by USPROJECT LLC &mdash; Blockchain forensics<br />
             contact@ledgerhound.vip &middot; +1 (833) 559-1334
           </p>
         </div>

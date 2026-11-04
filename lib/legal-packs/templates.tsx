@@ -93,7 +93,10 @@ const Field = ({ label, value, mono }: { label: string; value?: string; mono?: b
 
 const Checkbox = ({ label, checked }: { label: string; checked?: boolean }) => (
   <View style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 8 }}>
-    <Text style={{ fontSize: 9, color: slate900, width: 16, flexShrink: 0 }}>{checked ? '\u2611' : '\u2610'}</Text>
+    {/* Drawn, not a glyph: the embedded fonts have no ballot-box characters. */}
+    <View style={{ width: 8, height: 8, marginTop: 2, marginRight: 8, flexShrink: 0, borderWidth: 0.8, borderColor: slate900, alignItems: 'center', justifyContent: 'center' }}>
+      {checked ? <View style={{ width: 4, height: 4, backgroundColor: slate900 }} /> : null}
+    </View>
     <Text style={{ fontSize: 9, color: slate900, flex: 1 }}>{label}</Text>
   </View>
 );
@@ -141,9 +144,7 @@ const interp = (str: string, vars: Record<string, string>) =>
    ═══════════════════════════════════════════════════════════════ */
 export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryResearch; caseData: CaseData }) => {
   const t = getPdfTranslations(caseData.country);
-  const score = caseData.recoveryScore ?? 0;
   const exchanges = caseData.detectedExchange || t.common.none;
-  const riskScore = caseData.recoveryScore ?? 0;
   const scamTypes = getLocalizedScamTypes(t);
 
   return (
@@ -187,10 +188,8 @@ export const PoliceComplaintDoc = ({ research, caseData }: { research: CountryRe
         {/* BLOCKCHAIN VERIFICATION */}
         <SectionTitle>{t.police.blockchain_verification}</SectionTitle>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Field label={t.police.risk_score} value={`${riskScore}/100`} />
-          <Field label={t.police.recovery_probability} value={`${score}%`} />
           <Field label={t.police.exchanges_identified} value={exchanges} />
-          <Field label={t.police.full_report} value={`ledgerhound.vip/case/${caseData.caseId}`} />
+          <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, marginTop: 2 }}>{t.police.exchanges_note}</Text>
         </View>
 
         <DocFooter caseData={caseData} docTitle={t.police.title} t={t} />
@@ -322,7 +321,7 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <PlField label="Date/Time" value={caseData.txDateTime || caseData.incidentDate} />
         {exchangeAddr ? (
           <View style={{ marginTop: 6 }}>
-            <Text style={{ fontSize: 8, color: slate400, marginBottom: 2 }}>Receiving Address on Your Platform:</Text>
+            <Text style={{ fontSize: 8, color: slate400, marginBottom: 2 }}>Receiving address (matches {exchangeName} in LedgerHound's reference list of exchange addresses):</Text>
             <Text style={{ fontSize: 8, fontFamily: 'Courier', color: slate900 }}>{exchangeAddr}</Text>
           </View>
         ) : null}
@@ -334,13 +333,16 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <PlField label="Police Report" value={`Filed with ${research.policeAgency.name}`} />
         <PlField label="Reference" value={caseData.policeReportNumber || '[Pending]'} />
 
-        {/* BLOCKCHAIN VERIFICATION */}
-        <PlSection>BLOCKCHAIN VERIFICATION</PlSection>
+        {/* SOURCES: what the victim reported vs what LedgerHound looked up */}
+        <PlSection>SOURCES OF THIS INFORMATION</PlSection>
         <View style={{ backgroundColor: '#eff6ff', borderRadius: 4, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
-          <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 4 }}>This transaction has been verified by LedgerHound blockchain forensics:</Text>
-          <PlBullet>Funds traced from victim wallet to your platform</PlBullet>
-          <PlBullet>Risk Score: {caseData.recoveryScore ?? 0}/100</PlBullet>
-          <PlBullet>Full forensic report: ledgerhound.vip/case/{caseData.caseId}</PlBullet>
+          <PlBullet>The amount, transaction hash, date and fraud details above were provided by the victim.</PlBullet>
+          {exchangeAddr ? (
+            <PlBullet>The receiving address matches {exchangeName} in LedgerHound's reference list of exchange addresses. This identifies the address owner according to that list; it does not show where the funds are now.</PlBullet>
+          ) : (
+            <PlBullet>No receiving address on your platform has been identified. Please check the transaction above against your records.</PlBullet>
+          )}
+          <PlBullet>LedgerHound case number: {caseData.caseId}</PlBullet>
         </View>
 
         {/* REQUESTED ACTIONS */}
@@ -541,8 +543,6 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
   const t = getPdfTranslations(caseData.country);
   const ag = t.action_guide;
 
-  const score = caseData.recoveryScore ?? 45;
-  const riskLevel = caseData.riskLevel ?? 'medium';
   const daysOld = caseData.daysOld ?? 0;
   const hops = caseData.hops ?? 0;
   const exchangeSupportsLE = caseData.exchangeSupportsLE ?? false;
@@ -552,15 +552,6 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
   const identifiedExchanges = caseData.detectedExchange || '';
   const hasExchanges = !!identifiedExchanges;
   const lossUSD = caseData.lossAmount || 0;
-
-  const getRiskColor = (level: string) => {
-    switch (level) {
-      case 'critical': return red;
-      case 'high': return amber;
-      case 'medium': return '#2563eb';
-      default: return green;
-    }
-  };
 
   /* Step box component — uses localized prefix */
   const StepBox = ({ num, title, timing, why, children }: { num: number; title: string; timing: string; why: string; children: React.ReactNode }) => (
@@ -606,19 +597,9 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
 
         {/* RECOVERY ANALYSIS */}
         <SectionTitle>{ag.recovery_analysis}</SectionTitle>
-        <View style={{ flexDirection: 'row', marginBottom: 10, gap: 12 }}>
-          {/* Score circle */}
-          <View style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: getRiskColor(riskLevel), alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 20, fontFamily: 'NotoSans', fontWeight: 700, color: getRiskColor(riskLevel) }}>{score}%</Text>
-            <Text style={{ fontSize: 6, color: slate400 }}>{ag.recovery}</Text>
-          </View>
-          {/* Stats */}
-          <View style={{ flex: 1 }}>
-            <Field label={ag.risk_score} value={`${score}/100 (${riskLevel.toUpperCase()})`} />
-            <Field label={ag.fund_status} value={hasExchanges ? `${ag.exchange_detected}: ${identifiedExchanges}` : mixerDetected ? ag.mixer_warning : ag.no_exchange} />
-            <Field label={ag.exchanges_found} value={hasExchanges ? t.common.yes : t.common.no} />
-          </View>
-        </View>
+        {mixerDetected ? (
+          <Text style={{ fontSize: 9, color: slate600, marginBottom: 6 }}>{ag.mixer_warning}</Text>
+        ) : null}
 
         {/* Exchange status box */}
         {hasExchanges ? (
@@ -632,7 +613,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         ) : (
           <View style={{ backgroundColor: '#fffbeb', borderRadius: 4, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
             <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, width: 18, flexShrink: 0 }}>{'\u26A0'}</Text>
+              <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, width: 18, flexShrink: 0 }}>{'!'}</Text>
               <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: amber, flex: 1 }}>{ag.no_exchange_caution}</Text>
             </View>
             <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 18 }}>{ag.no_exchange_caution_text}</Text>
@@ -642,7 +623,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
         {/* CRITICAL WINDOW */}
         <View style={{ backgroundColor: '#fef2f2', borderRadius: 4, padding: 8, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
           <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, width: 18, flexShrink: 0 }}>{'\u23F0'}</Text>
+            <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, width: 18, flexShrink: 0 }}>{'!'}</Text>
             <Text style={{ fontSize: 9, fontFamily: 'NotoSans', fontWeight: 700, color: red, flex: 1 }}>{ag.critical_window}</Text>
           </View>
           <Text style={{ fontSize: 8, color: slate600, lineHeight: 1.4, paddingLeft: 18 }}>{ag.critical_window_text}</Text>
@@ -776,7 +757,7 @@ export const ActionGuideDoc = ({ research, caseData }: { research: CountryResear
           </Text>
           <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Email: contact@ledgerhound.vip</Text>
           <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Phone: +1 (833) 559-1334</Text>
-          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Web: ledgerhound.vip/full-investigation</Text>
+          <Text style={{ fontSize: 10, fontFamily: 'NotoSans', fontWeight: 700, color: '#60a5fa' }}>Web: ledgerhound.vip/contact</Text>
         </View>
 
         {/* DISCLAIMER */}

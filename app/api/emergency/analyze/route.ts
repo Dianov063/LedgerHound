@@ -5,6 +5,7 @@ import { getPlatformIndex, slugify } from '@/lib/scam-db';
 import type { PlatformIndexEntry } from '@/lib/scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { createCaseSecret } from '@/lib/emergency-case-access';
+import { checkOfac } from '@/lib/labels/ofac';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -103,7 +104,19 @@ export async function POST(req: NextRequest) {
     let totalLoss = lossAmount || 0;
     let threshold = 500000;
     let hasOfac = false;
+    // 'unavailable' when the OFAC list could not be read: never reported as not listed.
+    let ofacStatus: 'listed' | 'clear' | 'unavailable' | 'not_checked' = 'not_checked';
+    if (walletAddress) {
+      try {
+        hasOfac = !!(await checkOfac(walletAddress));
+        ofacStatus = hasOfac ? 'listed' : 'clear';
+      } catch {
+        ofacStatus = 'unavailable';
+      }
+    }
 
+    // 'unavailable' when the database could not be read: never reported as "not in the database".
+    let scamDbStatus: 'match' | 'no_match' | 'unavailable' | 'not_checked' = 'not_checked';
     if (platformName) {
       try {
         const platforms = await getPlatformIndex();
@@ -120,6 +133,7 @@ export async function POST(req: NextRequest) {
           ) ||
           null;
 
+        scamDbStatus = scamDbMatch ? 'match' : 'no_match';
         if (scamDbMatch) {
           victimCount = scamDbMatch.victims;
           totalLoss = scamDbMatch.totalLoss;
@@ -127,6 +141,7 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('[emergency/analyze] scam-db lookup failed:', err);
+        scamDbStatus = 'unavailable';
       }
     }
 
@@ -137,25 +152,8 @@ export async function POST(req: NextRequest) {
       threshold = 500000;
     }
 
-    /* ── Calculate recovery score ── */
-    let recoveryScore = 50; // base
-
-    if (daysSince <= 3) recoveryScore += 30;
-    else if (daysSince <= 7) recoveryScore += 15;
-
-    if (exchange) recoveryScore += 20;
-    if (hasMixer) recoveryScore -= 25;
-    if ((lossAmount || 0) > 50000) recoveryScore += 5;
-
-    // Clamp 5-95
-    recoveryScore = Math.max(5, Math.min(95, recoveryScore));
-
-    const recoveryLabel =
-      recoveryScore >= 70
-        ? 'High recovery potential'
-        : recoveryScore >= 45
-          ? 'Moderate recovery potential'
-          : 'Limited recovery potential';
+    // No recovery score: the page and the documents show what was checked, not an
+    // estimate of the outcome (review/44).
 
     /* ── Generate case ID and save to S3 ── */
     // The random suffix makes ids unguessable, but an id is still not an access
@@ -183,8 +181,6 @@ export async function POST(req: NextRequest) {
       contactMethod,
       email,
       analysis: {
-        recoveryScore,
-        recoveryLabel,
         destination,
         exchange,
         hasMixer,
@@ -195,6 +191,8 @@ export async function POST(req: NextRequest) {
         totalLoss,
         threshold,
         hasOfac,
+        ofacStatus,
+        scamDbStatus,
       },
     };
 
@@ -224,8 +222,6 @@ export async function POST(req: NextRequest) {
       caseId: saved ? caseId : null,
       caseSecret: saved ? owner.secret : null,
       analysis: {
-        recoveryScore,
-        recoveryLabel,
         destination,
         exchange,
         daysSince,
@@ -236,6 +232,8 @@ export async function POST(req: NextRequest) {
         totalLoss,
         threshold,
         hasOfac,
+        ofacStatus,
+        scamDbStatus,
       },
     });
   } catch (err: any) {

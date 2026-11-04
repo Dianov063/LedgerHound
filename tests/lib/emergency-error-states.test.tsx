@@ -21,7 +21,7 @@ const ANALYSIS = {
   route: 'URGENT',
   caseId: 'EMG-TEST',
   caseSecret: 'secret',
-  analysis: { recoveryScore: 62, exchange: null, daysSince: 1, scamDbMatch: null, victimCount: 3, totalLoss: 42000, threshold: 500000 },
+  analysis: { exchange: null, daysSince: 1, scamDbMatch: null, ofacStatus: 'clear', scamDbStatus: 'no_match' },
 };
 
 type Routes = Partial<Record<'analyze' | 'checkout' | 'join', () => Promise<Response>>>;
@@ -65,7 +65,7 @@ async function reachResults(locale: Locale) {
   fireEvent.click(analyzeButton(locale));
   await screen.findByText(flow(locale).analysis_title);
   await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
-  await screen.findByText(flow(locale).urgent_title);
+  await screen.findByText(flow(locale).result_no_exchange_title);
 }
 
 beforeEach(() => {

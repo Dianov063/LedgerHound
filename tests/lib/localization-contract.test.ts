@@ -47,7 +47,6 @@ const strings = (dictionary: unknown): Record<string, string> => {
 /* Spelled the same in a target language, or a label that is the same word there. */
 const SAME_AS_ENGLISH = new Set([
   'emergency_flow.description_counter',
-  'emergency_flow.destination',
   'emergency_flow.countries.AU',
   'emergency_flow.countries.CA',
   'emergency_flow.countries.FR',
@@ -83,7 +82,7 @@ describe('page dictionaries', () => {
     }
     const page = readFileSync('app/[locale]/emergency/page.tsx', 'utf8');
     expect(page).toContain("price: '$19'");
-    expect(page.split("$79 &mdash; {t('get_documents')}").length - 1).toBe(2);
+    expect(page.split("$79 &mdash; {t('get_documents')}").length - 1).toBe(1);
   });
 });
 

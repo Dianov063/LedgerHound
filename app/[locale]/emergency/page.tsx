@@ -8,7 +8,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Shield,
-  Zap,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -115,6 +114,24 @@ function detectNetwork(addr: string): string {
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr) && !addr.startsWith('0x')) return 'sol';
   return '';
 }
+
+/** One line of the results: a label and what we know for it. */
+function FactRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:gap-4">
+      <dt className="text-slate-400 sm:w-48 flex-shrink-0">{label}</dt>
+      <dd
+        className={`text-slate-900 font-medium ${mono ? 'font-mono text-xs break-all' : ''}`}
+        dir={mono ? 'ltr' : undefined}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+const OFAC_STATUSES = ['listed', 'clear', 'unavailable', 'not_checked'];
+const SCAM_DB_STATUSES = ['match', 'no_match', 'unavailable', 'not_checked'];
 
 /* ───────── component ───────── */
 
@@ -224,7 +241,7 @@ export default function EmergencyPage() {
   useEffect(() => {
     if (step !== 4) return;
     setVisibleChecks(0);
-    const items = 5;
+    const items = 4;
     let count = 0;
     const interval = setInterval(() => {
       count++;
@@ -398,6 +415,10 @@ export default function EmergencyPage() {
     setCheckoutLoading(false);
   };
 
+  /* A status the page does not know is shown as "not checked", never as clear. */
+  const ofacStatus = OFAC_STATUSES.includes(analysis?.ofacStatus) ? analysis.ofacStatus : 'not_checked';
+  const scamDbStatus = SCAM_DB_STATUSES.includes(analysis?.scamDbStatus) ? analysis.scamDbStatus : 'not_checked';
+
   /* ── progress bar ── */
   const totalSteps = 5;
   const progress = Math.round((Math.min(step, totalSteps) / totalSteps) * 100);
@@ -544,13 +565,10 @@ export default function EmergencyPage() {
                 {/* Trust bar */}
                 <div className="flex items-center justify-center gap-6 mt-5 text-xs text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <Shield size={12} /> {t('trust_encrypted')}
+                    <Shield size={12} /> {t('trust_stored')}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <Zap size={12} /> {t('trust_instant')}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 size={12} /> {t('trust_helped')}
+                    <CheckCircle2 size={12} /> {t('trust_https')}
                   </span>
                 </div>
               </div>
@@ -917,7 +935,6 @@ export default function EmergencyPage() {
                   t('analysis_2'),
                   t('analysis_3'),
                   t('analysis_4'),
-                  t('analysis_5'),
                 ].map((text, i) => (
                   <div
                     key={i}
@@ -937,295 +954,176 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {/* ═══════ STEP 5: Results ═══════ */}
-          {step === 5 && route === 'EMERGENCY' && (
+          {/* ═══════ STEP 5: Results ═══════
+              Facts only: what the visitor told us and what our checks found.
+              No score and no countdown (review/44). The route only decides what is offered. */}
+          {step === 5 && route && (
             <div>
-              {/* urgent banner */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-8 text-center">
-                <Zap size={28} className="mx-auto text-emerald-400 mb-3" />
-                <h2 className="font-display font-bold text-2xl sm:text-3xl text-emerald-700 mb-2">
-                  {t('result_emergency_title')}
+              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 mb-6 text-center">
+                <Search
+                  size={28}
+                  className={`mx-auto mb-3 ${analysis?.exchange ? 'text-brand-500' : 'text-slate-400'}`}
+                />
+                <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900">
+                  {analysis?.exchange
+                    ? t('result_exchange_title', { exchange: analysis.exchange })
+                    : t('result_no_exchange_title')}
                 </h2>
-                <p className="text-slate-500 text-sm">{t('result_emergency_text')}</p>
               </div>
 
-              {/* score + details */}
-              <div className="grid sm:grid-cols-3 gap-4 mb-8">
-                {/* recovery score */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center">
-                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    {t('recovery_score')}
-                  </span>
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="42"
-                        stroke="currentColor"
-                        className="text-slate-200"
-                        strokeWidth="8"
-                        fill="none"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="42"
-                        stroke="currentColor"
-                        className="text-emerald-400"
-                        strokeWidth="8"
-                        fill="none"
-                        strokeDasharray={`${(analysis?.recoveryScore ?? 0) * 2.64} 264`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <span className="absolute text-2xl font-bold text-emerald-400">
-                      {analysis?.recoveryScore ?? 0}%
-                    </span>
+              {/* findings: the visitor's answers kept apart from our checks */}
+              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 mb-6">
+                <h3 className="text-xs text-slate-400 uppercase tracking-wider mb-3">
+                  {t('facts_answers')}
+                </h3>
+                <dl className="space-y-2 mb-6 text-sm">
+                  <FactRow
+                    label={t('fact_sent')}
+                    value={
+                      (analysis?.daysSince ?? 0) === 0
+                        ? t('fact_sent_today')
+                        : t('fact_sent_value', { days: analysis.daysSince })
+                    }
+                  />
+                  <FactRow label={t('fact_address')} value={form.walletAddress} mono />
+                  <FactRow label={t('platform')} value={form.platformName.trim() || t('fact_not_given')} />
+                </dl>
+
+                <h3 className="text-xs text-slate-400 uppercase tracking-wider mb-3">
+                  {t('facts_checks')}
+                </h3>
+                <dl className="space-y-2 text-sm">
+                  <FactRow
+                    label={t('fact_exchange')}
+                    value={
+                      analysis?.exchange
+                        ? t('fact_exchange_match', { exchange: analysis.exchange })
+                        : t('fact_exchange_none')
+                    }
+                  />
+                  <FactRow label={t('fact_ofac')} value={t(`fact_ofac_${ofacStatus}`)} />
+                  <FactRow
+                    label={t('fact_scam_db')}
+                    value={
+                      scamDbStatus === 'match'
+                        ? t('fact_scam_db_match', {
+                            name: analysis?.scamDbMatch?.name || form.platformName,
+                            count: analysis?.scamDbMatch?.victims ?? 0,
+                          })
+                        : t(`fact_scam_db_${scamDbStatus}`)
+                    }
+                  />
+                </dl>
+                <p className="text-xs text-slate-400 mt-4">{t('fact_exchange_note')}</p>
+              </div>
+
+              {(route === 'EMERGENCY' || route === 'URGENT') && (
+                <>
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+                    <p className="font-semibold text-amber-800 mb-1 flex items-center gap-2">
+                      <Clock size={16} /> {t('act_title')}
+                    </p>
+                    <p className="text-sm text-slate-600">{t('act_text')}</p>
+                  </div>
+
+                  {/* emergency pack card */}
+                  <div className="bg-white border border-brand-200 shadow-sm rounded-xl p-6 sm:p-8 mb-8">
+                    <div className="flex items-center gap-3 mb-5">
+                      <Shield size={24} className="text-brand-500" />
+                      <h3 className="font-display font-bold text-xl text-slate-900">
+                        {t('pack_title')}
+                      </h3>
+                    </div>
+
+                    {/* the documents the pack really contains (lib/checkout-processor.ts) */}
+                    <ul className="space-y-3 mb-6">
+                      {[
+                        t('pack_forensic'),
+                        t('pack_police', { agency: AGENCIES[form.country] || t('pack_local_authority') }),
+                        t('pack_letter', { exchange: analysis?.exchange || t('pack_exchange_fallback') }),
+                        t('pack_regulator'),
+                        t('pack_steps'),
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <CheckCircle2
+                            size={18}
+                            className="text-brand-500 flex-shrink-0 mt-0.5"
+                          />
+                          <span className="text-slate-600 text-sm">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      disabled={checkoutLoading}
+                      onClick={() => handleCheckout('emergency_pack')}
+                      className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold py-4 rounded-lg text-lg transition-colors"
+                    >
+                      {checkoutLoading ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <>
+                          $79 &mdash; {t('get_documents')} <ArrowRight size={18} />
+                        </>
+                      )}
+                    </button>
+                    <p className="text-center text-xs text-slate-400 mt-3">{t('how_note')}</p>
+                  </div>
+
+                  {route === 'URGENT' && (
+                    <div className="text-center">
+                      <button
+                        onClick={() => setRoute('AGGREGATOR')}
+                        className="text-brand-600 hover:text-brand-700 underline underline-offset-4 transition-colors"
+                      >
+                        {t('join_group_link')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {route === 'AGGREGATOR' && (
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Users size={22} className="text-brand-500" />
+                    <h3 className="font-display font-bold text-lg text-slate-900">
+                      {t('group_title')}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-6">{t('group_text')}</p>
+
+                  <div className="space-y-3">
+                    <button
+                      disabled={checkoutLoading}
+                      onClick={handleJoinGroup}
+                      className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold py-4 rounded-lg text-lg transition-colors"
+                    >
+                      {checkoutLoading ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Users size={18} /> {t('join_group')}
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      disabled={checkoutLoading}
+                      onClick={() => handleCheckout('summary_report')}
+                      className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 disabled:opacity-50 text-slate-900 font-semibold py-3 rounded-lg transition-colors"
+                    >
+                      {checkoutLoading ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <>
+                          <FileText size={16} /> {t('summary_report', { price: '$19' })}
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
-
-                {/* destination */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    {t('destination')}
-                  </span>
-                  <span className="text-lg font-semibold text-slate-900">
-                    {analysis?.exchange || t('exchange_detected')}
-                  </span>
-                </div>
-
-                {/* time remaining */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                    {t('time_remaining')}
-                  </span>
-                  <Clock size={20} className="text-amber-400 mb-1" />
-                  <span className="text-lg font-semibold text-amber-400">
-                    {t('hours_remaining', { hours: Math.max(0, 72 - (analysis?.daysSince ?? 0) * 24) })}
-                  </span>
-                </div>
-              </div>
-
-              {/* emergency pack card */}
-              <div className="bg-white border border-emerald-200 shadow-sm rounded-xl p-6 sm:p-8 mb-8">
-                <div className="flex items-center gap-3 mb-5">
-                  <Shield size={24} className="text-emerald-400" />
-                  <h3 className="font-display font-bold text-xl text-slate-900">
-                    {t('pack_title')}
-                  </h3>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {[
-                    t('pack_police', { agency: AGENCIES[form.country] || t('pack_local_authority') }),
-                    t('pack_letter', { exchange: analysis?.exchange || t('pack_exchange_fallback') }),
-                    t('pack_custody'),
-                    t('pack_steps'),
-                    t('pack_affidavit'),
-                    t('pack_summary'),
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2
-                        size={18}
-                        className="text-emerald-400 flex-shrink-0 mt-0.5"
-                      />
-                      <span className="text-slate-600 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  disabled={checkoutLoading}
-                  onClick={() => handleCheckout('emergency_pack')}
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-4 rounded-lg text-lg transition-colors"
-                >
-                  {checkoutLoading ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <>
-                      $79 &mdash; {t('get_documents')} <ArrowRight size={18} />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 5 && route === 'AGGREGATOR' && (
-            <div>
-              {/* header */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
-                <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
-                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
-                  {typeof analysis?.daysSince === 'number'
-                    ? t('aggregator_title', { days: analysis.daysSince })
-                    : t('aggregator_title_unknown')}
-                </h2>
-                <p className="text-lg font-semibold text-slate-900 mt-3">
-                  {t('aggregator_not_alone')}
-                </p>
-              </div>
-
-              {/* stats */}
-              <div className="grid sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
-                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    {t('platform')}
-                  </span>
-                  <span className="text-slate-900 font-semibold">
-                    {analysis?.scamDbMatch?.name || form.platformName || t('unknown')}
-                  </span>
-                </div>
-
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
-                  <Users size={18} className="mx-auto text-brand-400 mb-1" />
-                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    {t('victims_in_group')}
-                  </span>
-                  <span className="text-slate-900 font-semibold text-lg">
-                    {analysis?.victimCount ?? 0}
-                  </span>
-                </div>
-
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 text-center">
-                  <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">
-                    {t('total_losses')}
-                  </span>
-                  <span className="text-slate-900 font-semibold text-lg">
-                    ${(analysis?.totalLoss ?? 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* threshold progress */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 mb-8">
-                <div className="flex items-center justify-between text-sm mb-3">
-                  <span className="text-slate-400">{t('threshold')}</span>
-                  <span className="text-slate-900 font-semibold">
-                    ${(analysis?.threshold ?? 500000).toLocaleString()}
-                  </span>
-                </div>
-                <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-500 rounded-full transition-all duration-700"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((analysis?.totalLoss ?? 0) / (analysis?.threshold ?? 500000)) * 100,
-                      )}%`,
-                    }}
-                  />
-                </div>
-                <div className="text-end mt-1">
-                  <span className="text-xs text-slate-400">
-                    {t('threshold_reached', {
-                      percent: Math.min(
-                        100,
-                        Math.round(
-                          ((analysis?.totalLoss ?? 0) / (analysis?.threshold ?? 500000)) * 100,
-                        ),
-                      ),
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              {/* actions */}
-              <div className="space-y-3">
-                <button
-                  disabled={checkoutLoading}
-                  onClick={handleJoinGroup}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold py-4 rounded-lg text-lg transition-colors"
-                >
-                  {checkoutLoading ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <>
-                      <Users size={18} /> {t('join_group')}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  disabled={checkoutLoading}
-                  onClick={() => handleCheckout('summary_report')}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 disabled:opacity-50 text-slate-900 font-semibold py-3 rounded-lg transition-colors"
-                >
-                  {checkoutLoading ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <>
-                      <FileText size={16} /> {t('summary_report', { price: '$19' })}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 5 && route === 'URGENT' && (
-            <div>
-              {/* warning banner */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-center">
-                <AlertTriangle size={28} className="mx-auto text-amber-400 mb-3" />
-                <h2 className="font-display font-bold text-xl sm:text-2xl text-amber-700 mb-2">
-                  {t('urgent_title')}
-                </h2>
-              </div>
-
-              {/* emergency pack card */}
-              <div className="bg-white border border-amber-200 shadow-sm rounded-xl p-6 sm:p-8 mb-8">
-                <div className="flex items-center gap-3 mb-5">
-                  <Shield size={24} className="text-amber-400" />
-                  <h3 className="font-display font-bold text-xl text-slate-900">
-                    {t('pack_title')}
-                  </h3>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {[
-                    t('pack_police', { agency: AGENCIES[form.country] || t('pack_local_authority') }),
-                    t('pack_letter', { exchange: analysis?.exchange || t('pack_exchange_fallback') }),
-                    t('pack_custody'),
-                    t('pack_steps'),
-                    t('pack_affidavit'),
-                    t('pack_summary'),
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2
-                        size={18}
-                        className="text-amber-400 flex-shrink-0 mt-0.5"
-                      />
-                      <span className="text-slate-600 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  disabled={checkoutLoading}
-                  onClick={() => handleCheckout('emergency_pack')}
-                  className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-4 rounded-lg text-lg transition-colors"
-                >
-                  {checkoutLoading ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <>
-                      $79 &mdash; {t('get_documents')} <ArrowRight size={18} />
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* aggregator link */}
-              <div className="text-center">
-                <button
-                  onClick={() => setRoute('AGGREGATOR')}
-                  className="text-brand-400 hover:text-brand-300 underline underline-offset-4 transition-colors"
-                >
-                  {t('join_group_link')}
-                </button>
-              </div>
+              )}
             </div>
           )}
 

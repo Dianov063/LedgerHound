@@ -413,8 +413,6 @@ function EmergencyPackSuccess({ caseId, sessionId }: { caseId: string; sessionId
               t('upsell_f1'),
               t('upsell_f2'),
               t('upsell_f3'),
-              t('upsell_f4'),
-              t('upsell_f5'),
             ].map((item) => (
               <li key={item} className="flex items-start gap-2">
                 <Shield size={14} className="text-blue-400 mt-0.5 shrink-0" />
