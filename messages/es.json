@@ -881,9 +881,6 @@
     "summary_view_platform": "Ver perfil de plataforma en Base de Estafas",
     "group_joined_title": "Está en la lista",
     "group_joined_desc": "Guardamos su email en nuestra lista de esta plataforma y podemos contactarle si surge una acción colectiva o información nueva. Esto no inicia ninguna acción legal.",
-    "group_progress": "En la lista hasta ahora",
-    "group_victims": "personas añadidas",
-    "group_total_losses": "pérdidas declaradas",
     "generic_title": "Éxito",
     "generic_desc": "Su solicitud ha sido procesada exitosamente."
   },

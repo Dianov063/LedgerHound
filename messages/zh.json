@@ -881,9 +881,6 @@
     "summary_view_platform": "在诈骗数据库中查看平台资料",
     "group_joined_title": "您已在名单上",
     "group_joined_desc": "我们会将您的电子邮箱保存在该平台的名单中，如有集体行动或新信息，可能会联系您。这不会启动任何法律行动。",
-    "group_progress": "目前名单情况",
-    "group_victims": "已加入人数",
-    "group_total_losses": "已申报损失",
     "generic_title": "成功",
     "generic_desc": "您的请求已成功处理。"
   },

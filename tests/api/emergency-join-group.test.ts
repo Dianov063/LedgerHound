@@ -22,37 +22,47 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+const record = () => { const m = members(); expect(m).toHaveLength(1); return m[0]; };
+
 describe('list of people affected by a platform', () => {
   it('keeps both of two parallel joins', async () => {
     const [a, b] = await Promise.all([send({ email: 'a@example.invalid' }), send({ email: 'b@example.invalid', lossAmount: 40, country: 'DE' })]);
     expect([a.status, b.status]).toEqual([200, 200]);
     expect(members().map((m) => m.email).sort()).toEqual(['a@example.invalid', 'b@example.invalid']);
-    expect(await (await send({ email: 'c@example.invalid', lossAmount: 1 })).json()).toMatchObject({ victims: 3, totalLoss: 141 });
   });
 
   it('links each email to its own country, loss and case', async () => {
     await send({ email: 'b@example.invalid', lossAmount: 40, country: 'DE', caseId: 'ER-TEST-2' });
-    expect(members()[0]).toMatchObject({ email: 'b@example.invalid', lossAmount: 40, country: 'DE', caseId: 'ER-TEST-2', platformName: 'Fictional Exchange' });
+    expect(record()).toMatchObject({ email: 'b@example.invalid', lossAmount: 40, country: 'DE', caseId: 'ER-TEST-2', platformName: 'Fictional Exchange' });
   });
 
-  it('counts a repeated join once', async () => {
+  it('counts a repeated join once, case and spaces in the email included', async () => {
     await send({});
-    const again = await (await send({ email: '  A@Example.invalid ' })).json();
-    expect(again).toMatchObject({ success: true, alreadyOnList: true, victims: 1, totalLoss: 100 });
-    expect(members()).toHaveLength(1);
+    expect((await send({ email: '  A@Example.invalid ' })).status).toBe(200);
+    expect(record()).toMatchObject({ email: 'a@example.invalid', lossAmount: 100 });
   });
 
-  it('updates the record when the person sends new answers, still counting once', async () => {
-    await send({});
-    const res = await (await send({ lossAmount: 250, country: 'FR' })).json();
-    expect(res).toMatchObject({ victims: 1, totalLoss: 250 });
-    expect(members()[0]).toMatchObject({ lossAmount: 250, country: 'FR' });
+  it('a request by someone who only knows the email changes nothing (review 47, R1)', async () => {
+    await send({ caseId: 'ORIGINAL-CASE', lossAmount: 100, country: 'US', walletAddress: '0xaaa', scamType: 'romance' });
+    const before = record();
+    const res = await send({ caseId: 'UNRELATED-CASE', lossAmount: 999999, country: 'FR', walletAddress: '0xbbb', scamType: 'phishing' });
+    expect(res.status).toBe(200);
+    expect(record()).toEqual(before);
   });
 
-  it('two parallel joins by the same person leave one record', async () => {
+  it('answers the same whether or not the email was already on the list', async () => {
+    const first = await (await send({})).json();
+    const repeat = await (await send({ lossAmount: 5 })).json();
+    const other = await (await send({ email: 'new@example.invalid' })).json();
+    expect(repeat).toEqual(first);
+    expect(other).toEqual(first);
+    expect(first).toEqual({ success: true, groupSlug: 'fictional-exchange' });
+  });
+
+  it('parallel joins by the same person leave one record, written by the first', async () => {
     const results = await Promise.all([send({}), send({}), send({ lossAmount: 300 })]);
     expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
-    expect(members()).toHaveLength(1);
+    expect(record().lossAmount).toBe(100);
   });
 
   it('leaves an older group file as it was', async () => {

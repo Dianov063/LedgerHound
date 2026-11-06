@@ -75,8 +75,6 @@ function EmergencySuccessContent() {
   const t = useTranslations('emergency_success');
   const searchParams = useSearchParams();
   const product = searchParams.get('product') || '';
-  const victims = searchParams.get('victims') || '';
-  const totalLoss = searchParams.get('total_loss') || '';
   const platformSlug = searchParams.get('platform_slug') || '';
   const [access, setAccess] = useState({
     sessionId: searchParams.get('session_id') || '',
@@ -123,7 +121,7 @@ function EmergencySuccessContent() {
             <SummaryReportSuccess caseId={caseId} platformSlug={platformSlug} />
           )}
           {product === 'group_joined' && (
-            <GroupJoinedSuccess victims={victims} totalLoss={totalLoss} />
+            <GroupJoinedSuccess />
           )}
           {!product && <GenericSuccess caseId={caseId} />}
         </div>
@@ -510,18 +508,9 @@ function SummaryReportSuccess({
 /* ══════════════════════════════════════════════════════════════
    GROUP JOINED SUCCESS
    ══════════════════════════════════════════════════════════════ */
-function GroupJoinedSuccess({
-  victims,
-  totalLoss,
-}: {
-  victims: string;
-  totalLoss: string;
-}) {
+function GroupJoinedSuccess() {
   const t = useTranslations('emergency_success');
   const base = useLocalePrefix();
-  const formattedLoss = totalLoss
-    ? `$${Number(totalLoss).toLocaleString()}`
-    : '';
 
   return (
     <div className="text-center">
@@ -535,29 +524,6 @@ function GroupJoinedSuccess({
       <p className="text-slate-500 text-lg mb-8">
         {t('group_joined_desc')}
       </p>
-
-      {(victims || totalLoss) && (
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8">
-          <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 justify-center text-slate-900">
-            <Users size={18} className="text-purple-500" />
-            {t('group_progress')}
-          </h2>
-          <div className="flex items-center justify-center gap-8">
-            {victims && (
-              <div>
-                <p className="text-3xl font-bold text-slate-900">{victims}</p>
-                <p className="text-slate-500 text-sm">{t('group_victims')}</p>
-              </div>
-            )}
-            {formattedLoss && (
-              <div>
-                <p className="text-3xl font-bold text-emerald-500">{formattedLoss}</p>
-                <p className="text-slate-500 text-sm">{t('group_total_losses')}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <Link
         href={`${base}/emergency`}

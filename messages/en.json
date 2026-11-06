@@ -881,9 +881,6 @@
     "summary_view_platform": "View platform profile in Scam Database",
     "group_joined_title": "You're on the list",
     "group_joined_desc": "We keep your email on our list for this platform and may contact you if a group action or new information appears. This does not start any legal action.",
-    "group_progress": "On this list so far",
-    "group_victims": "people added",
-    "group_total_losses": "losses reported",
     "generic_title": "Success",
     "generic_desc": "Your request has been processed successfully."
   },

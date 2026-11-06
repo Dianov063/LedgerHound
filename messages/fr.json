@@ -881,9 +881,6 @@
     "summary_view_platform": "Voir le profil de la plateforme dans la base de données des arnaques",
     "group_joined_title": "Vous êtes sur la liste",
     "group_joined_desc": "Nous gardons votre email dans notre liste pour cette plateforme et pouvons vous contacter si une action collective ou une information nouvelle apparaît. Cela ne lance aucune action en justice.",
-    "group_progress": "Sur la liste à ce jour",
-    "group_victims": "personnes inscrites",
-    "group_total_losses": "pertes déclarées",
     "generic_title": "Succès",
     "generic_desc": "Votre demande a été traitée avec succès."
   },

@@ -400,11 +400,7 @@ export default function EmergencyPage() {
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
-        const params = new URLSearchParams({
-          product: 'group_joined',
-          victims: String(data.victims || 0),
-          total_loss: String(data.totalLoss || 0),
-        });
+        const params = new URLSearchParams({ product: 'group_joined' });
         window.location.href = `${base}/emergency/success?${params.toString()}`;
         return;
       }
