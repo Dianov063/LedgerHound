@@ -1,3 +1,4 @@
+import { VERIFIED_SEED_PLATFORMS } from './scam-db-verified-seed';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
 
 /* ── S3 client ── */
@@ -88,13 +89,46 @@ export interface ScamPlatform {
   /** External corroborating sources (regulator warnings, OFAC, Etherscan, etc.).
    *  Optional for legacy/community entries; REQUIRED for seeded platforms. */
   sources?: PlatformSource[];
+  /** Seed values recorded before the first report was added (see toPublicPlatform). */
+  seedBaseline?: SeedBaseline;
 }
+
+/** The part of a seeded platform that came from the verified seed, not from reports. */
+export interface SeedBaseline {
+  victims: number;
+  totalLoss: number;
+  blockchainVerifiedCount: number;
+  addresses: string[];
+  urls: string[];
+  types: ScamType[];
+  staffVerified: boolean;
+  verified: boolean;
+  trustScore: number;
+  firstReported: string;
+  lastReported: string;
+}
+
+export const seedBaselineFrom = (p: ScamPlatform): SeedBaseline => ({
+  victims: p.victims,
+  totalLoss: p.totalLoss,
+  blockchainVerifiedCount: p.blockchainVerifiedCount,
+  addresses: [...p.addresses],
+  urls: [...p.urls],
+  types: [...p.types],
+  staffVerified: p.staffVerified,
+  verified: p.verified,
+  trustScore: p.trustScore,
+  firstReported: p.firstReported,
+  lastReported: p.lastReported,
+});
 
 export interface PlatformIndexEntry {
   slug: string;
   name: string;
   victims: number;
   totalLoss: number;
+  /** Public count of blockchain-confirmed reports (absent on entries written before). */
+  blockchainVerifiedCount?: number;
   verified: boolean;
   trustScore: number;
   types: ScamType[];
@@ -247,55 +281,84 @@ async function loadReports(ids: string[]): Promise<ScamReport[]> {
     .filter((r): r is ScamReport => !!r && unique.includes(r.id));
 }
 
+/** Which values of a platform came from the verified seed, before any report. */
+function baselineOf(platform: ScamPlatform): SeedBaseline | null {
+  if (platform.seedBaseline) return platform.seedBaseline;
+  // Platforms seeded before baselines were recorded: the seed in code is the record.
+  const seed = VERIFIED_SEED_PLATFORMS.find(p => p.slug === platform.slug);
+  return seed ? seedBaselineFrom(seed) : null;
+}
+
+/**
+ * For a sourced platform with no record of its seed: counts are additive (each report
+ * added exactly one victim, its loss and its chain confirmation), so the seed's counts
+ * are the stored totals minus the reports' — when every report could be read. Sets
+ * (addresses, URLs, types) cannot be separated this way and are left empty.
+ */
+function countsOnlyBaseline(platform: ScamPlatform, reports: ScamReport[]): SeedBaseline {
+  const ids = new Set(platform.reportIds);
+  const own = reports.filter(r => ids.has(r.id));
+  const complete = own.length === ids.size;
+  return {
+    victims: Math.max(0, platform.victims - platform.reportIds.length),
+    totalLoss: complete ? Math.max(0, platform.totalLoss - own.reduce((s, r) => s + (r.lossAmount || 0), 0)) : 0,
+    blockchainVerifiedCount: complete ? Math.max(0, platform.blockchainVerifiedCount - own.filter(r => r.blockchainConfirmed).length) : 0,
+    addresses: [],
+    urls: [],
+    types: [],
+    staffVerified: false,
+    verified: false,
+    trustScore: 0,
+    firstReported: platform.firstReported,
+    lastReported: '',
+  };
+}
+
 /**
  * The platform as the public may see it, or null when nothing about it may be shown.
  * `reports` are the platform's loaded report files (any status).
+ *
+ * Shown values are the seed baseline plus what published reports carry. Nothing is
+ * inferred from the stored aggregates, which mix both and cannot tell them apart:
+ * a rejected report that repeats a seeded address leaves the seeded address shown,
+ * and an item no published report or baseline carries is not shown.
  */
 export function toPublicPlatform(platform: ScamPlatform, reports: ScamReport[]): ScamPlatform | null {
   const sourced = hasSources(platform);
   if (platform.reportIds.length === 0) return sourced || platform.victims > 0 ? platform : null;
 
-  const published = reports.filter(isPublished);
+  const published = reports.filter(r => isPublished(r) && platform.reportIds.includes(r.id));
   if (!sourced && published.length === 0) return null;
-  // With a report unread, an item it carried would look seeded: show no seeded items then.
-  const complete = new Set(platform.reportIds).size === reports.length;
-  const seeded = sourced && complete;
+  const base = baselineOf(platform) ?? (sourced ? countsOnlyBaseline(platform, reports) : null);
 
-  // An item (address, URL, type) is shown when a published report carries it, or —
-  // on a seeded platform — when no report carries it at all (it came from the seed).
-  const keep = <T>(stored: T[], of: (r: ScamReport) => (T | undefined)[]): T[] => {
-    const fromPublished = new Set(published.flatMap(of));
-    const fromAny = new Set(reports.flatMap(of));
-    const fromSeed = seeded ? stored.filter(x => !fromAny.has(x)) : [];
-    return Array.from(new Set([...fromSeed, ...stored.filter(x => fromPublished.has(x)), ...Array.from(fromPublished)]))
+  const union = <T>(fromBase: T[] | undefined, of: (r: ScamReport) => (T | undefined)[]): T[] =>
+    Array.from(new Set([...(fromBase ?? []), ...published.flatMap(of)]))
       .filter((x): x is T => x !== undefined && x !== '');
-  };
 
-  const seedVictims = sourced ? Math.max(0, platform.victims - platform.reportIds.length) : 0;
-  const seedLoss = seeded ? Math.max(0, platform.totalLoss - reports.reduce((s, r) => s + (r.lossAmount || 0), 0)) : 0;
-  const seedChain = seeded ? Math.max(0, platform.blockchainVerifiedCount - reports.filter(r => r.blockchainConfirmed).length) : 0;
   const staffVerifiedReport = published.some(r => r.status === 'verified' && r.trustTier === 3);
   const moderated = published.some(r => r.status === 'verified');
-  const dates = published.map(r => r.createdAt).sort();
+  const dates = [...(base ? [base.firstReported, base.lastReported] : []), ...published.map(r => r.createdAt)]
+    .filter(Boolean).sort();
 
   const view: ScamPlatform = {
     ...platform,
     reportIds: published.map(r => r.id),
-    victims: seedVictims + published.length,
-    totalLoss: seedLoss + published.reduce((s, r) => s + (r.lossAmount || 0), 0),
-    blockchainVerifiedCount: seedChain + published.filter(r => r.blockchainConfirmed).length,
-    staffVerified: (sourced && platform.staffVerified) || staffVerifiedReport,
-    addresses: keep(platform.addresses, r => [r.scamAddress]),
-    urls: keep(platform.urls, r => [r.platformUrl, ...(r.platformUrls || [])]),
-    types: keep(platform.types, r => [r.platformType]),
-    firstReported: sourced ? platform.firstReported : dates[0],
-    lastReported: sourced && !dates.length ? platform.lastReported : dates[dates.length - 1],
+    victims: (base?.victims ?? 0) + published.length,
+    totalLoss: (base?.totalLoss ?? 0) + published.reduce((sum, r) => sum + (r.lossAmount || 0), 0),
+    blockchainVerifiedCount: (base?.blockchainVerifiedCount ?? 0) + published.filter(r => r.blockchainConfirmed).length,
+    staffVerified: !!base?.staffVerified || staffVerifiedReport,
+    addresses: union(base?.addresses, r => [r.scamAddress]),
+    urls: union(base?.urls, r => [r.platformUrl, ...(r.platformUrls || [])]),
+    types: union(base?.types, r => [r.platformType]),
+    firstReported: dates[0] ?? platform.firstReported,
+    lastReported: dates[dates.length - 1] ?? platform.lastReported,
   };
   let score = calcTrustScore(view);
-  if (sourced) score = Math.max(score, platform.trustScore);
+  if (sourced) score = Math.max(score, base?.trustScore ?? 0);
   else if (!moderated) score = Math.min(score, UNMODERATED_SCORE_CAP);
   view.trustScore = score;
-  view.verified = (sourced && platform.verified) || score >= 10;
+  view.verified = !!base?.verified || score >= 10;
+  delete view.seedBaseline;
   return view;
 }
 
@@ -304,6 +367,7 @@ const toIndexEntry = (p: ScamPlatform): PlatformIndexEntry => ({
   name: p.name,
   victims: p.victims,
   totalLoss: p.totalLoss,
+  blockchainVerifiedCount: p.blockchainVerifiedCount,
   verified: p.verified,
   trustScore: p.trustScore,
   types: p.types,
@@ -420,6 +484,9 @@ export async function saveReport(report: Omit<ScamReport, 'id' | 'createdAt'>): 
   // 3. Update ONLY this platform file (not all platforms)
   const slug = slugify(full.platformName);
   const platform: ScamPlatform = (await s3Get(`platforms/${slug}.json`)) || defaultPlatform(report, slug);
+  if (hasSources(platform) && !platform.seedBaseline && platform.reportIds.length === 0) {
+    platform.seedBaseline = seedBaselineFrom(platform);
+  }
   platform.victims++;
   platform.totalLoss += full.lossAmount || 0;
   if (full.lossCurrency) platform.lossCurrency = full.lossCurrency;
@@ -497,6 +564,12 @@ export async function getPlatformIndex(): Promise<PlatformIndexEntry[]> {
   return value;
 }
 
+/** Blockchain-confirmed count of a public entry; old seed entries carry it in the seed. */
+function publicChainCount(entry: PlatformIndexEntry): number {
+  if (typeof entry.blockchainVerifiedCount === 'number') return entry.blockchainVerifiedCount;
+  return VERIFIED_SEED_PLATFORMS.find(p => p.slug === entry.slug)?.blockchainVerifiedCount ?? 0;
+}
+
 /** Public totals, derived from the public index rather than the stored counters. */
 export async function getPublicStats(): Promise<ScamStats> {
   const [stored, index] = await Promise.all([getStats(), getPlatformIndex()]);
@@ -505,7 +578,8 @@ export async function getPublicStats(): Promise<ScamStats> {
     totalReports,
     totalPlatforms: index.length,
     totalLoss: index.reduce((sum, p) => sum + p.totalLoss, 0),
-    blockchainVerified: Math.min(Math.max(0, stored.blockchainVerified), totalReports),
+    // From the public entries, never from the stored counter (which counted rejected reports).
+    blockchainVerified: index.reduce((sum, p) => sum + publicChainCount(p), 0),
     updatedAt: stored.updatedAt,
   };
 }
@@ -538,28 +612,30 @@ export async function getAddressIndex(address: string): Promise<AddressIndex | n
   const ids = stored.reports || [];
   if (ids.length === 0) return stored.platforms?.length ? stored : null; // seeded entry
 
+  const key = address.toLowerCase();
   const reports = await loadReports(ids);
-  const published = reports.filter(isPublished);
-  const fromAny = new Set(reports.map(r => slugify(r.platformName)));
+  const published = reports.filter(r => isPublished(r) && r.scamAddress?.toLowerCase() === key);
   const fromPublished = new Set(published.map(r => slugify(r.platformName)));
-  // A platform stays when a published report names it, or no report names it (seeded).
-  // With a report unread, any platform could be its: then only published ones stay.
-  const complete = new Set(ids).size === reports.length;
-  const platforms = stored.platforms.filter(slug => fromPublished.has(slug) || (complete && !fromAny.has(slug)));
+
+  // A platform stays when a published report names it, or when its seed baseline lists
+  // this address. Nothing is inferred from the stored totals, which mix both.
+  const seeded: { slug: string; name: string; base: SeedBaseline }[] = [];
+  for (const slug of stored.platforms) {
+    if (fromPublished.has(slug)) continue;
+    const platform: ScamPlatform | null = await s3Get(`platforms/${slug}.json`);
+    const base = platform ? baselineOf(platform) : null;
+    if (platform && base?.addresses.some(a => a.toLowerCase() === key)) seeded.push({ slug, name: platform.name, base });
+  }
+  const platforms = Array.from(new Set([...Array.from(fromPublished), ...seeded.map(x => x.slug)]));
   if (platforms.length === 0) return null;
-  const seeded = platforms.filter(slug => !fromAny.has(slug));
-  const names = Array.from(new Set([
-    ...published.map(r => r.platformName),
-    ...stored.platformNames.filter(name => seeded.includes(slugify(name))),
-  ]));
-  const seedLoss = seeded.length ? Math.max(0, stored.totalLoss - reports.reduce((s, r) => s + (r.lossAmount || 0), 0)) : 0;
+  const names = Array.from(new Set([...published.map(r => r.platformName), ...seeded.map(x => x.name)]));
   const dates = published.map(r => r.createdAt).sort();
   return {
     address: stored.address,
     platforms,
     platformNames: names,
     reports: published.map(r => r.id),
-    totalLoss: seedLoss + published.reduce((s, r) => s + (r.lossAmount || 0), 0),
+    totalLoss: seeded.reduce((s, x) => s + x.base.totalLoss, 0) + published.reduce((s, r) => s + (r.lossAmount || 0), 0),
     networks: Array.from(new Set(published.map(r => r.network).filter((n): n is string => !!n))),
     firstSeen: dates[0] ?? stored.firstSeen,
     lastSeen: dates[dates.length - 1] ?? stored.lastSeen,
@@ -765,9 +841,6 @@ export async function seedDatabase(force = false): Promise<{ seeded: number; ski
     return { seeded: 0, skipped: true };
   }
 
-  // Dynamic import to avoid circular dep at module load
-  const { VERIFIED_SEED_PLATFORMS } = await import('./scam-db-verified-seed');
-
   const now = new Date().toISOString();
 
   if (VERIFIED_SEED_PLATFORMS.length === 0) {
@@ -791,7 +864,8 @@ export async function seedDatabase(force = false): Promise<{ seeded: number; ski
   let totalLoss = 0;
   let totalVerified = 0;
 
-  for (const platform of VERIFIED_SEED_PLATFORMS) {
+  for (const seed of VERIFIED_SEED_PLATFORMS) {
+    const platform: ScamPlatform = { ...seed, seedBaseline: seedBaselineFrom(seed) };
     allPlatforms.push(platform);
     platformIndex.push({
       slug: platform.slug,
