@@ -101,8 +101,11 @@ const Checkbox = ({ label, checked }: { label: string; checked?: boolean }) => (
   </View>
 );
 
-const fmtMoney = (amount: number, currency: string = 'USD') =>
-  `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** An unknown amount is a blank to fill in, never a guessed or substituted figure. */
+export const fmtMoney = (amount: number | null | undefined, currency: string = 'USD') =>
+  typeof amount === 'number' && Number.isFinite(amount) && amount > 0
+    ? `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : `${currency} ____________`;
 
 const shortAddr = (addr: string) =>
   addr && addr.length > 20 ? `${addr.slice(0, 10)}...${addr.slice(-8)}` : addr || '';

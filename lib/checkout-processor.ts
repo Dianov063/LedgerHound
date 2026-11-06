@@ -1,8 +1,21 @@
-import { S3Client, GetObjectCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
 import { deliverFrozenReport, getFrozenReport, summarizeReport, type ReportSummary } from '@/lib/report-delivery';
-import { paymentIdOf, type WebhookJob } from '@/lib/webhook-jobs';
+import { getDelivered, markDelivered, paymentIdOf, type WebhookJob } from '@/lib/webhook-jobs';
+import { readPackManifest } from '@/lib/legal-packs/manifest';
+import {
+  ManualReviewError,
+  RetryableReadError,
+  freezeLegacySnapshot,
+  isNotFound,
+  lossAmountOf,
+  purchaseRefFrom,
+  readLegacySnapshot,
+  readSnapshot,
+  readText,
+  type PurchaseSnapshot,
+} from '@/lib/purchase-snapshot';
 import logger from '@/lib/logger';
 
 /**
@@ -20,6 +33,18 @@ import logger from '@/lib/logger';
  * way (lib/generateEmergencyPack.ts). Both emails carry a per-payment
  * idempotency key over an identical body, so the selected transport never
  * sends twice.
+ *
+ * Emergency purchases are built ONLY from their immutable purchase snapshot
+ * (lib/purchase-snapshot.ts). A read that fails for a temporary reason throws
+ * RetryableReadError before anything is generated, emailed or marked; a
+ * confirmed missing or inconsistent snapshot throws ManualReviewError, which
+ * the runner parks in webhook-jobs/manual-review/. Sessions created before
+ * snapshots existed are verified against their recorded checkout (see
+ * legacyPackSnapshot) or sent to manual review.
+ *
+ * A delivered purchase is recorded per payment (webhook-deliveries/); any
+ * later run for that payment (webhook replay, sweep, manual re-run) stops
+ * there, so one payment gets one delivery and one email.
  */
 export type CheckoutOutcome = 'done' | 'already-done' | 'invalid';
 
@@ -34,22 +59,83 @@ const getS3 = () =>
 
 const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadCaseData(caseId: string): Promise<Record<string, any> | null> {
-  if (!caseId) return null;
+/** Fields the old checkout copied into the session metadata; all must still match the case file. */
+const LEGACY_MIRRORED = ['product', 'email', 'country', 'walletAddress', 'network', 'platformName', 'scamType', 'route', 'txid'] as const;
+
+function parseJson(text: string, code: string, what: string): Record<string, unknown> {
   try {
-    const resp = await getS3().send(
-      new GetObjectCommand({
-        Bucket: s3Bucket(),
-        Key: `emergency-cases/${caseId}.json`,
-      }),
-    );
-    const body = await resp.Body?.transformToString();
-    return body ? JSON.parse(body) : null;
-  } catch (err: unknown) {
-    logger.error({ err }, '[webhook] Failed to load case data from S3');
-    return null;
+    const value = JSON.parse(text);
+    if (value && typeof value === 'object') return value as Record<string, unknown>;
+  } catch { /* below */ }
+  throw new ManualReviewError(code, `${what} is not valid JSON`);
+}
+
+/**
+ * Pack sessions created before purchase snapshots existed. The old checkout
+ * rewrote emergency-cases/<caseId>.json on every new link, so the case file
+ * matches THIS session only if it was saved before this session was recorded
+ * (no later checkout rewrote it) and every field the session itself carries
+ * still matches. Then it is frozen as this purchase's snapshot; otherwise the
+ * original data cannot be proven and the order goes to manual review.
+ */
+async function legacyPackSnapshot(job: WebhookJob): Promise<PurchaseSnapshot> {
+  const meta = job.session.metadata;
+  const caseId = meta.caseId || '';
+  const sessionId = job.session.id;
+  if (!caseId || !sessionId) throw new ManualReviewError('legacy_no_case', 'the session names no case');
+
+  const frozen = await readLegacySnapshot(caseId, sessionId);
+  if (frozen) return frozen;
+
+  const caseText = await readText(`emergency-cases/${caseId}.json`, 'case');
+  if (caseText === null) throw new ManualReviewError('legacy_case_missing', 'the case of this older session no longer exists');
+  const recordText = await readText(`emergency-case-sessions/${caseId}/${sessionId}.json`, 'session record');
+  if (recordText === null) throw new ManualReviewError('legacy_session_unrecorded', 'the checkout of this older session was not recorded');
+  const saved = parseJson(caseText, 'legacy_case_unreadable', 'the case');
+  const record = parseJson(recordText, 'legacy_session_unrecorded', 'the session record');
+
+  const savedAt = Date.parse(String(saved.savedAt ?? ''));
+  const recordedAt = Date.parse(String(record.createdAt ?? ''));
+  if (!(savedAt <= recordedAt)) {
+    throw new ManualReviewError('legacy_case_changed', 'the case was saved again after this payment link was created');
   }
+  const mismatch = LEGACY_MIRRORED.filter((f) => String(saved[f] ?? '') !== String(meta[f] ?? ''));
+  if (String(saved.lossAmount ?? '') !== String(meta.lossAmount ?? '')) mismatch.push('lossAmount' as never);
+  if (mismatch.length) {
+    throw new ManualReviewError('legacy_case_changed', `the case differs from this payment link (${mismatch.join(', ')})`);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { ownerSecretHash: _hash, ...caseData } = saved;
+  return freezeLegacySnapshot({
+    version: 1,
+    purchaseId: `legacy-${sessionId}`,
+    caseId,
+    product: 'emergency_pack',
+    createdAt: new Date().toISOString(),
+    amountCents: job.session.amount_total ?? 0,
+    currency: 'usd',
+    source: 'legacy-verified',
+    sessionId,
+    case: caseData,
+  });
+}
+
+/** The snapshot this Emergency purchase bought, or null for products that never had one. */
+async function purchaseSnapshotOf(job: WebhookJob, product: string): Promise<PurchaseSnapshot | null> {
+  const ref = job.purchase ?? purchaseRefFrom(job.session.metadata);
+  if (ref) {
+    const meta = job.session.metadata;
+    // The job copy must agree with the signed session it came from.
+    if (ref.purchaseId !== (meta.purchaseId || '') || ref.snapshotSha256 !== (meta.snapshotSha256 || '')
+      || ref.caseId !== (meta.caseId || '') || ref.product !== product) {
+      throw new ManualReviewError('snapshot_reference_invalid', 'the job and its session disagree about the purchase');
+    }
+    return readSnapshot(ref);
+  }
+  if (product === 'emergency_pack') return legacyPackSnapshot(job);
+  // Summary report before snapshots: it was always built from its own session
+  // metadata alone (never from the shared case), which Stripe keeps unchanged.
+  return null;
 }
 
 /**
@@ -59,15 +145,16 @@ async function loadCaseData(caseId: string): Promise<Record<string, any> | null>
  */
 const packCompleteKey = (caseId: string) => `legal-packs/cases/${caseId}/complete.json`;
 
-async function isPackComplete(caseId: string): Promise<boolean> {
-  if (!caseId) return false;
+/** The completion record of a case's pack, or null. Only a confirmed 404 is "none". */
+async function packCompletion(caseId: string): Promise<{ paymentId?: string } | null> {
+  if (!caseId) return null;
   try {
-    await getS3().send(new HeadObjectCommand({ Bucket: s3Bucket(), Key: packCompleteKey(caseId) }));
-    return true;
+    const r = await getS3().send(new GetObjectCommand({ Bucket: s3Bucket(), Key: packCompleteKey(caseId) }));
+    const text = (await r.Body?.transformToString()) || '{}';
+    try { return JSON.parse(text) as { paymentId?: string }; } catch { return {}; }
   } catch (err: unknown) {
-    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
-    if (e.$metadata?.httpStatusCode === 404 || e.name === 'NotFound' || e.name === 'NoSuchKey') return false;
-    throw err;
+    if (isNotFound(err)) return null;
+    throw new RetryableReadError('pack completion marker', err);
   }
 }
 
@@ -112,56 +199,88 @@ async function deliverForensicReport(
   return { summary: summarizeReport(result), reused: false };
 }
 
+const str = (v: unknown) => (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v));
+
 export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boolean }): Promise<CheckoutOutcome> {
   const { session, eventId } = job;
   const product = session.metadata?.product || 'forensic_report';
-  const walletAddress = session.metadata?.walletAddress;
-  const email = session.metadata?.email;
-  const network = session.metadata?.network || 'eth';
-  const caseId = session.metadata?.caseId || '';
-  // Phase 3: report language (en|es). Falls back to en if absent/unsupported.
-  const reportLocale = session.metadata?.locale || 'en';
-  // Phase 3: victim's country (ISO-ish code, e.g. PE). Unlocks country-specific
-  // recovery guidance. Empty string → generic guidance.
-  const reportCountry = session.metadata?.country || '';
   const paymentId = paymentIdOf(session);
 
   logger.info({ product, eventId, resumed: opts.resumed }, '[webhook] Processing checkout');
 
+  // One payment, one delivery: a run after the recorded delivery does nothing.
+  let delivered;
+  try {
+    delivered = await getDelivered(paymentId);
+  } catch (err) {
+    throw new RetryableReadError('delivery record', err);
+  }
+  if (delivered) {
+    logger.info({ eventId, product }, '[webhook] Purchase already delivered for this payment, skipping');
+    return 'already-done';
+  }
+
+  // Emergency purchases: the snapshot is the only source of the purchase data.
+  const snapshot = await purchaseSnapshotOf(job, product);
+  const data: Record<string, unknown> = snapshot ? snapshot.case : session.metadata ?? {};
+  const walletAddress = str(data.walletAddress);
+  const email = str(data.email);
+  const network = str(data.network) || 'eth';
+  const caseId = snapshot ? snapshot.caseId : str(session.metadata?.caseId);
+  // Phase 3: report language (en|es). Falls back to en if absent/unsupported.
+  const reportLocale = session.metadata?.locale || 'en';
+  // Phase 3: victim's country (ISO-ish code, e.g. PE). Unlocks country-specific
+  // recovery guidance. Empty string → generic guidance.
+  const reportCountry = str(data.country);
+  const finish = async (outcome: CheckoutOutcome): Promise<CheckoutOutcome> => {
+    await markDelivered({ paymentId, eventId, product, purchaseId: snapshot?.purchaseId, deliveredAt: new Date().toISOString() });
+    return outcome;
+  };
+
   if (!email) {
-    logger.error({ eventId }, '[webhook] Missing email in metadata');
+    logger.error({ eventId }, '[webhook] Missing email in purchase data');
     return 'invalid';
   }
 
   if (product === 'emergency_pack') {
     /* ── Emergency Pack: 4 legal PDFs + Forensic Report ── */
-    if (await isPackComplete(caseId)) {
+    // The pack is stored per case. A second payment for the same case (two
+    // open links both paid) must not receive or overwrite the first one.
+    const completion = await packCompletion(caseId);
+    if (completion) {
+      if (completion.paymentId && completion.paymentId !== paymentId) {
+        throw new ManualReviewError('case_paid_twice', 'the pack of this case was already delivered for another payment');
+      }
       logger.info({ eventId, caseId }, '[webhook] Pack already delivered, skipping');
-      return 'already-done';
+      return finish('already-done');
     }
-    const saved = await loadCaseData(caseId);
+    let manifest;
+    try {
+      manifest = await readPackManifest(caseId);
+    } catch (err) {
+      throw new RetryableReadError('pack manifest', err);
+    }
+    if (manifest?.paymentId && manifest.paymentId !== paymentId) {
+      throw new ManualReviewError('case_paid_twice', 'the pack of this case is being delivered for another payment');
+    }
 
-    const country = saved?.country || session.metadata?.country || 'US';
-    const scamType = saved?.scamType || session.metadata?.scamType || '';
-    const platformName = saved?.platformName || session.metadata?.platformName || '';
-    const description = saved?.description || '';
-    const txid = saved?.txid || session.metadata?.txid || '';
-    const txDate = saved?.txDate || '';
-    const detectedNetwork = saved?.detectedNetwork || session.metadata?.network || 'eth';
-    const contactMethod = saved?.contactMethod || '';
-    const victimPhone = saved?.victimPhone || '';
-    const victimState = saved?.victimState || '';
-    const platformUrl = saved?.platformUrl || '';
-    const victimWallet = saved?.victimWallet || '';
-    const lossCurrency = saved?.lossCurrency || 'USD';
-    const userLossAmount = saved?.lossAmount
-      ? parseFloat(String(saved.lossAmount))
-      : session.metadata?.lossAmount
-        ? parseFloat(session.metadata.lossAmount)
-        : NaN;
-    const lossAmount = !isNaN(userLossAmount) ? userLossAmount : (session.amount_total || 7900) / 100;
+    const country = str(data.country) || 'US';
+    const scamType = str(data.scamType);
+    const platformName = str(data.platformName);
+    const description = str(data.description);
+    const txid = str(data.txid);
+    const txDate = str(data.txDate);
+    const detectedNetwork = str(data.detectedNetwork) || network;
+    const contactMethod = str(data.contactMethod);
+    const victimPhone = str(data.victimPhone);
+    const victimState = str(data.victimState);
+    const platformUrl = str(data.platformUrl);
+    const victimWallet = str(data.victimWallet);
+    const lossCurrency = str(data.lossCurrency) || 'USD';
+    // Never the price of the pack: an unknown loss is printed as a blank to fill in.
+    const lossAmount = lossAmountOf(data.lossAmount);
 
-    logger.info({ caseId, country, lossAmount, eventId }, '[webhook] Generating Emergency Pack');
+    logger.info({ caseId, country, purchase: snapshot?.purchaseId, eventId }, '[webhook] Generating Emergency Pack');
 
     // 1. The forensic report is part of the pack: it must be delivered before
     //    the legal documents, and a failure fails the attempt (the job is
@@ -209,11 +328,12 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
       victimState,
       enrichment,
       idempotencyKey: `ledgerhound:pack:${paymentId}`,
+      paymentId,
     });
     // Reached only when every document was saved and the email went out.
     await markPackComplete(caseId, job, packResult.templates.map((t) => t.type));
     logger.info({ templateCount: packResult.templates?.length, eventId }, '[webhook] Emergency Pack generated');
-    return 'done';
+    return finish('done');
   }
 
   /* ── Summary Report ($19) or default Forensic Report ($49) ── */
@@ -226,6 +346,5 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
     walletAddress, email, amount: session.amount_total || (product === 'summary_report' ? 1900 : 4900), network, locale: reportLocale, country: reportCountry,
   });
   logger.info({ caseId: job.reportCaseId, eventId, product, reused }, '[webhook] Report delivered');
-  if (reused) return 'already-done';
-  return 'done';
+  return finish(reused ? 'already-done' : 'done');
 }

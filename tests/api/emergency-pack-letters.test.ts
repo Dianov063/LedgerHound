@@ -28,9 +28,12 @@ vi.mock('@/lib/legal-packs/templates', () => ({
   ActionGuideDoc: () => null,
 }));
 // Each "PDF" records which exchange address it was rendered for.
+const rendered = vi.hoisted(() => [] as { lossAmount?: unknown }[]);
 vi.mock('@react-pdf/renderer', () => ({
-  renderToBuffer: async (el: { props: { caseData: { exchangeAddress?: string } } }) =>
-    Buffer.from(`%PDF ${el.props.caseData.exchangeAddress ?? 'none'}`),
+  renderToBuffer: async (el: { props: { caseData: { exchangeAddress?: string; lossAmount?: unknown } } }) => {
+    rendered.push(el.props.caseData);
+    return Buffer.from(`%PDF ${el.props.caseData.exchangeAddress ?? 'none'}`);
+  },
 }));
 
 const CASE = 'ER-MVTUQ1X5-69d6a410ad98d176';
@@ -63,12 +66,33 @@ const input = () => ({
 });
 
 beforeEach(() => {
+  rendered.length = 0;
   resetS3();
   resetResend();
   resetStripe();
   __resetCaseAccessCacheForTests();
   process.env.EMAIL_TRANSPORT = 'resend';
   process.env.RESEND_API_KEY = 're_test';
+});
+
+describe('Emergency Pack belongs to one payment', () => {
+  it('records the payment in the manifest', async () => {
+    await generateEmergencyPack({ ...input(), paymentId: 'pi_first' });
+    expect(getJson<PackManifest>(packManifestKey(CASE))!.paymentId).toBe('pi_first');
+  });
+
+  it('never sends or reuses the pack of another payment of the same case', async () => {
+    await generateEmergencyPack({ ...input(), paymentId: 'pi_first' });
+    await expect(generateEmergencyPack({ ...input(), paymentId: 'pi_second', idempotencyKey: 'ledgerhound:pack:pi_second' }))
+      .rejects.toMatchObject({ name: 'ManualReviewError', code: 'case_paid_twice' });
+    expect(sentEmails).toHaveLength(1);
+  });
+
+  it('an unknown loss reaches the documents as unknown, not as zero or the price', async () => {
+    await generateEmergencyPack({ ...input(), lossAmount: null, paymentId: 'pi_first' });
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.every((c) => c.lossAmount === null)).toBe(true);
+  });
 });
 
 describe('Emergency Pack preservation letters', () => {

@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { CASE_ID_RE, verifyCaseSecret } from '@/lib/emergency-case-access';
 import { getPublicOrigin } from '@/lib/public-origin';
+import { newPurchaseId, writeSnapshot } from '@/lib/purchase-snapshot';
 
 const getS3 = () =>
   new S3Client({
@@ -68,12 +69,12 @@ async function listCaseSessionIds(caseId: string): Promise<string[]> {
     .filter(Boolean);
 }
 
-async function recordCaseSession(caseId: string, sessionId: string, product: string): Promise<void> {
+async function recordCaseSession(caseId: string, sessionId: string, product: string, purchase: { purchaseId: string; snapshotSha256: string }): Promise<void> {
   await getS3().send(
     new PutObjectCommand({
       Bucket: s3Bucket(),
       Key: `${SESSIONS_PREFIX}${caseId}/${sessionId}.json`,
-      Body: JSON.stringify({ sessionId, product, createdAt: new Date().toISOString() }),
+      Body: JSON.stringify({ sessionId, product, ...purchase, createdAt: new Date().toISOString() }),
       ContentType: 'application/json',
       ServerSideEncryption: 'aws:kms',
     }),
@@ -95,6 +96,23 @@ async function caseIsPaid(caseId: string): Promise<boolean> {
     new ListObjectsV2Command({ Bucket: s3Bucket(), Prefix: `legal-packs/cases/${caseId}/`, MaxKeys: 1 }),
   );
   return (docs.KeyCount ?? docs.Contents?.length ?? 0) > 0;
+}
+
+async function expireOtherSessions(caseId: string, keep: string): Promise<void> {
+  let ids: string[];
+  try {
+    ids = (await listCaseSessionIds(caseId)).filter((id) => id !== keep);
+  } catch (err: unknown) {
+    logger.warn({ err, caseId }, '[emergency/checkout] Could not list earlier sessions to expire');
+    return;
+  }
+  for (const id of ids) {
+    try {
+      await getStripe().checkout.sessions.expire(id);
+    } catch {
+      // Already expired, completed or unknown to Stripe: nothing to do.
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -174,8 +192,10 @@ export async function POST(req: NextRequest) {
     }
 
     const productDef = PRODUCTS[product as ProductKey];
+    const purchaseId = newPurchaseId();
+    let snapshotSha256: string;
 
-    /* ── Save full case data to S3 for webhook retrieval ── */
+    /* ── Immutable purchase snapshot, then the case for the status page ── */
     try {
       const casePayload = {
         // Keep analyze's fields (analysis, createdAt, ...) and its owner hash.
@@ -205,6 +225,22 @@ export async function POST(req: NextRequest) {
         savedAt: new Date().toISOString(),
       };
 
+      // Written once, before the payment link exists: the webhook builds this
+      // purchase only from it, whatever happens to the case afterwards.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { ownerSecretHash: _hash, ...snapshotCase } = casePayload;
+      ({ snapshotSha256 } = await writeSnapshot({
+        version: 1,
+        purchaseId,
+        caseId,
+        product,
+        createdAt: casePayload.savedAt,
+        amountCents: productDef.unit_amount,
+        currency: 'usd',
+        source: 'checkout',
+        case: snapshotCase,
+      }));
+
       await getS3().send(
         new PutObjectCommand({
           Bucket: s3Bucket(),
@@ -214,7 +250,7 @@ export async function POST(req: NextRequest) {
           ServerSideEncryption: 'aws:kms',
         }),
       );
-      logger.info({ caseId }, '[emergency/checkout] Case data saved to S3');
+      logger.info({ caseId, purchaseId }, '[emergency/checkout] Purchase snapshot and case saved to S3');
     } catch (s3Err: unknown) {
       logger.error({ err: s3Err }, '[emergency/checkout] Failed to save case data to S3');
       return NextResponse.json({ error: 'Unable to save case data. Please try again.' }, { status: 500 });
@@ -249,6 +285,9 @@ export async function POST(req: NextRequest) {
         route: route || '',
         lossAmount: String(lossAmount || ''),
         txid: txid || '',
+        // The immutable purchase data and its hash (lib/purchase-snapshot.ts).
+        purchaseId,
+        snapshotSha256,
       },
       customer_email: email,
       success_url: `${origin}/emergency/success?session_id={CHECKOUT_SESSION_ID}&case_id=${encodeURIComponent(caseId)}&product=${encodeURIComponent(product)}`,
@@ -259,7 +298,7 @@ export async function POST(req: NextRequest) {
     // only see sessions it knows about. If recording fails, the session is
     // expired so it can never be paid unrecorded.
     try {
-      await recordCaseSession(caseId, session.id, product);
+      await recordCaseSession(caseId, session.id, product, { purchaseId, snapshotSha256 });
     } catch (recordErr: unknown) {
       logger.error({ err: recordErr, caseId }, '[emergency/checkout] Could not record session; expiring it');
       try {
@@ -270,7 +309,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unable to start checkout. Please try again.' }, { status: 500 });
     }
 
-    logger.info({ sessionId: session.id, caseId, product }, '[emergency/checkout] Session created');
+    // Older open links of this case stop working: only the newest one can be
+    // paid. Best effort; each link keeps its own snapshot even if one survives.
+    await expireOtherSessions(caseId, session.id);
+
+    logger.info({ sessionId: session.id, caseId, product, purchaseId }, '[emergency/checkout] Session created');
 
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {

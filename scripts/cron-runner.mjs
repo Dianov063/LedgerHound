@@ -19,7 +19,7 @@ export const JOBS = [
   { name: 'refresh-ofac', path: '/api/admin/refresh-ofac', cron: '0 6 * * 1', timeoutMs: 5 * 60_000 },
   { name: 'cleanup-payment-safety', path: '/api/admin/cleanup-payment-safety', cron: '20 4 * * *', timeoutMs: 5 * 60_000 },
   // Self-host only: resumes paid checkouts whose generation was interrupted.
-  { name: 'resume-webhook-jobs', path: '/api/admin/resume-webhook-jobs', cron: '*/5 * * * *', timeoutMs: 10 * 60_000 },
+  { name: 'resume-webhook-jobs', path: '/api/admin/resume-webhook-jobs', cron: '*/5 * * * *', timeoutMs: 10 * 60_000, reportsOrders: true },
 ];
 
 const RANGES = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 6]];
@@ -64,6 +64,21 @@ function log(fields) {
   console.log(JSON.stringify({ time: new Date().toISOString(), service: 'ledgerhound-cron', ...fields }));
 }
 
+/**
+ * Paid-order watch until external alerts exist: every sweep returns the queue
+ * counts; anything but status 'ok' is logged as "attention" (counts only), so
+ * `docker logs ledgerhound-cron | grep attention` shows parked, late or
+ * unreadable queues. A missing summary is itself "unknown", never "ok".
+ */
+export function logOrders(job, body) {
+  const orders = body?.orders;
+  if (orders?.status === 'ok') return;
+  const fields = orders
+    ? { status: orders.status, pending: orders.pending, oldestPendingAgeSeconds: orders.oldestPendingAgeSeconds, failed: orders.failed, manualReview: orders.manualReview }
+    : { status: 'unknown' };
+  log({ job: job.name, result: 'attention', orders: fields });
+}
+
 async function runJob(job, baseUrl, secret) {
   const started = Date.now();
   try {
@@ -72,6 +87,7 @@ async function runJob(job, baseUrl, secret) {
       signal: AbortSignal.timeout(job.timeoutMs),
     });
     log({ job: job.name, status: res.status, ms: Date.now() - started, result: res.status === 409 ? 'skipped-already-running' : res.ok ? 'ok' : 'error' });
+    if (job.reportsOrders && res.ok) logOrders(job, await res.json().catch(() => null));
   } catch (err) {
     log({ job: job.name, ms: Date.now() - started, result: 'error', error: err?.name || 'Error' });
   }

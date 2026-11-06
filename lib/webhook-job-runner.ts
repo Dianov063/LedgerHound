@@ -8,19 +8,24 @@ import {
   deleteJob,
   listPendingJobs,
   moveToFailed,
+  moveToManualReview,
   paymentIdOf,
   putJobIfOwned,
   type StoredJob,
 } from '@/lib/webhook-jobs';
+import { ManualReviewError } from '@/lib/purchase-snapshot';
+import { readOrderHealth, type OrderHealth } from '@/lib/order-health';
 import logger from '@/lib/logger';
 
-export type RunResult = CheckoutOutcome | 'failed';
+export type RunResult = CheckoutOutcome | 'failed' | 'manual-review';
 
 /**
  * Runs one attempt of a job that this caller has ACQUIRED (acquireJob: the
  * record is already marked running with attempts incremented). Removes the
  * job on success, parks it in failed/ (invalid or out of attempts), or puts
- * it back as pending for a later retry. Failure writes are conditional on the
+ * it back as pending for a later retry. A ManualReviewError (the order's data
+ * is missing or inconsistent, confirmed) parks it in manual-review/ at once:
+ * retrying cannot help and nothing was generated. Failure writes are conditional on the
  * ETag from acquiring, so a runner that was taken over cannot clobber the new
  * runner's state. Never throws.
  */
@@ -37,6 +42,16 @@ export async function runJob(acquired: StoredJob, opts: { resumed: boolean }): P
     return outcome;
   } catch (err) {
     const reason = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
+    if (err instanceof ManualReviewError) {
+      try {
+        await moveToManualReview(job, reason);
+        logger.error({ eventId: job.eventId, code: err.code }, '[webhook-jobs] Order needs manual review (webhook-jobs/manual-review/)');
+        return 'manual-review';
+      } catch (storeErr) {
+        // Not parked: left as it is, the sweep retries it and reaches the same verdict.
+        logger.error({ err: storeErr, eventId: job.eventId }, '[webhook-jobs] Could not park job for manual review');
+      }
+    }
     try {
       if (job.attempts >= MAX_ATTEMPTS) {
         await moveToFailed(job, reason);
@@ -70,6 +85,10 @@ export interface SweepSummary {
   skippedTaken: number;
   /** Jobs whose payment is owned by a different event (duplicates), removed. */
   duplicates: number;
+  /** Parked for manual review during this sweep. */
+  manualReview: number;
+  /** Queue counts after the sweep (null fields: could not be read). */
+  orders?: OrderHealth;
 }
 
 /**
@@ -84,7 +103,7 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
   const now = opts.now ?? Date.now();
   const jobs = await listPendingJobs();
   const summary: SweepSummary = {
-    pending: jobs.length, resumed: 0, succeeded: 0, failed: 0, expired: 0, waiting: 0, skippedInFlight: 0, skippedTaken: 0, duplicates: 0,
+    pending: jobs.length, resumed: 0, succeeded: 0, failed: 0, expired: 0, waiting: 0, skippedInFlight: 0, skippedTaken: 0, duplicates: 0, manualReview: 0,
   };
 
   for (const { job, etag } of jobs) {
@@ -118,7 +137,9 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
     runInBackground(run, job.eventId); // tracked so SIGTERM drains it too
     const result = await run;
     if (result === 'failed') summary.failed++;
+    else if (result === 'manual-review') summary.manualReview++;
     else summary.succeeded++;
   }
+  summary.orders = await readOrderHealth();
   return summary;
 }

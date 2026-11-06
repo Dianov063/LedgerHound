@@ -75,7 +75,8 @@ export interface CaseData {
   victimEmail: string;
   country: string;
   incidentDate: string;
-  lossAmount: number;
+  /** null: the victim did not state it; documents leave a blank to fill in. */
+  lossAmount: number | null;
   lossCurrency: string;
   cryptoType: string;
   scammerAddress: string;

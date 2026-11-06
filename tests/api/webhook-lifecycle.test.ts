@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getJson, putJson, resetS3, s3Faults, s3Store } from './helpers/aws-s3-mock';
 import { resetResend, sentEmails } from './helpers/resend-mock';
 import { resetStripe } from './helpers/stripe-mock';
+import { seedSnapshot } from './helpers/purchase';
 import { POST as webhook } from '@/app/api/webhook/route';
 import { GET as sweep } from '@/app/api/admin/resume-webhook-jobs/route';
 import { GET as health } from '@/app/api/health/route';
@@ -271,7 +272,9 @@ describe('emergency pack completeness', () => {
   const marker = `legal-packs/cases/${CASE}/complete.json`;
   const packEvent = () => {
     const e = event();
-    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US' } as never;
+    const ref = seedSnapshot({ caseId: CASE });
+    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US',
+      purchaseId: ref.purchaseId, snapshotSha256: ref.snapshotSha256 } as never;
     return e;
   };
   const writeAll = async () => {
@@ -334,7 +337,9 @@ describe('emergency pack with its mandatory forensic report', () => {
   const marker = `legal-packs/cases/${CASE}/complete.json`;
   const packWithWallet = () => {
     const e = event();
-    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US', walletAddress: '0xabc' } as never;
+    const ref = seedSnapshot({ caseId: CASE, case: { walletAddress: '0xabc' } });
+    e.data.object.metadata = { product: 'emergency_pack', email: 'buyer@example.com', caseId: CASE, country: 'US', walletAddress: '0xabc',
+      purchaseId: ref.purchaseId, snapshotSha256: ref.snapshotSha256 } as never;
     return e;
   };
   const summary = {

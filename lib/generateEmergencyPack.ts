@@ -5,6 +5,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEmailTransport, sendEmailOnce } from '@/lib/idempotent-email';
 import { readPackManifest, writePackManifestOnce, type PackManifest } from '@/lib/legal-packs/manifest';
 import { getResearch } from '@/lib/legal-packs/s3';
+import { ManualReviewError } from '@/lib/purchase-snapshot';
 import {
   PoliceComplaintDoc,
   PreservationLetterDoc,
@@ -121,6 +122,13 @@ function resultFrom(manifest: PackManifest, country: string): GeneratePackResult
 }
 
 /** Sends the frozen pack email; throws when it is not sent. */
+/** A manifest written for another payment of this case is never sent or reused for this one. */
+function assertSamePayment(manifest: PackManifest, paymentId?: string): void {
+  if (manifest.paymentId && paymentId && manifest.paymentId !== paymentId) {
+    throw new ManualReviewError('case_paid_twice', 'the pack of this case belongs to another payment');
+  }
+}
+
 async function sendPackEmail(manifest: PackManifest, idempotencyKey?: string): Promise<void> {
   const sent = await sendEmailOnce(manifest.email, idempotencyKey, {
     transport: manifest.emailTransport ?? 'resend',
@@ -154,7 +162,8 @@ export interface GeneratePackInput {
   countryCode: string;
   email: string;
   victimName: string;
-  lossAmount: number;
+  /** The loss the victim stated; null when unknown (printed as a blank, never replaced by the price). */
+  lossAmount: number | null;
   lossCurrency?: string;
   scamType: string;
   walletAddress: string;
@@ -171,6 +180,8 @@ export interface GeneratePackInput {
   enrichment?: EnrichmentData;
   /** Same key on every retry of one purchase, so the pack email goes out once. */
   idempotencyKey?: string;
+  /** The payment this pack is for; recorded in the manifest so another payment never reuses it. */
+  paymentId?: string;
 }
 
 export interface GeneratePackResult {
@@ -193,6 +204,7 @@ export interface GeneratePackResult {
 export async function generateEmergencyPack(input: GeneratePackInput): Promise<GeneratePackResult> {
   const frozen = await readPackManifest(input.caseId);
   if (frozen) {
+    assertSamePayment(frozen, input.paymentId);
     await sendPackEmail(frozen, input.idempotencyKey);
     return resultFrom(frozen, input.countryCode.toUpperCase());
   }
@@ -252,7 +264,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     lossDate: incidentDate,
     blockchainConfirmed: !!(txHashes?.[0]),
     network: netKey,
-    lossAmount: lossAmount || 0,
+    lossAmount: lossAmount ?? 0,
   });
 
   // Determine risk and urgency levels
@@ -287,7 +299,7 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
     state: victimState || '',
     country: code,
     incidentDate,
-    lossAmount: lossAmount || 0,
+    lossAmount: lossAmount ?? null,
     lossCurrency: inputCurrency || 'USD',
     cryptoType,
     scammerAddress: walletAddress || '',
@@ -399,7 +411,10 @@ export async function generateEmergencyPack(input: GeneratePackInput): Promise<G
       documents: templates.map((t) => ({ type: t.type, label: t.label, key: t.key, url: t.url })),
       email: packEmail,
       emailTransport: getEmailTransport(),
+      ...(input.paymentId ? { paymentId: input.paymentId } : {}),
     });
+    // Another payment's run may have written the manifest first.
+    assertSamePayment(manifest, input.paymentId);
     await sendPackEmail(manifest, input.idempotencyKey);
     return resultFrom(manifest, code);
   }

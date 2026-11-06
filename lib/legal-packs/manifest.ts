@@ -17,6 +17,8 @@ export interface PackManifest {
   email: CreateEmailOptions;
   /** Missing only on manifests written before selectable transports existed. */
   emailTransport?: EmailTransport;
+  /** Payment the pack was built for; missing on manifests written before purchase snapshots. */
+  paymentId?: string;
 }
 
 export const packManifestKey = (caseId: string) => `legal-packs/cases/${caseId}/manifest.json`;

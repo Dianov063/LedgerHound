@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { S3Client } from '@aws-sdk/client-s3';
 import { putJson, resetS3, s3Store } from './helpers/aws-s3-mock';
 import { resetStripe } from './helpers/stripe-mock';
+import { seedSnapshot } from './helpers/purchase';
 import { POST as webhook } from '@/app/api/webhook/route';
 import { drainBackgroundTasks, __resetBackgroundTasksForTests } from '@/lib/background-tasks';
 import { resumeStaleJobs } from '@/lib/webhook-job-runner';
@@ -19,10 +20,12 @@ const PAYMENT = 'pi_review';
 const CASE = 'ER-MGK1Z2AB-0123456789abcdef';
 const key = `webhook-jobs/pending/${EVENT}.json`;
 function event(pack = false) {
+  const ref = pack ? seedSnapshot({ caseId: CASE, case: { walletAddress: '0xabc' } }) : null;
   return { id: EVENT, type: 'checkout.session.completed', data: { object: {
     id: 'cs_test_review0001', payment_intent: PAYMENT, amount_total: 7900,
     metadata: { email: 'buyer@example.com', walletAddress: '0xabc', country: 'US', caseId: CASE,
-      product: pack ? 'emergency_pack' : 'forensic_report' }, customer_details: { name: 'Buyer' },
+      product: pack ? 'emergency_pack' : 'forensic_report',
+      ...(ref ? { purchaseId: ref.purchaseId, snapshotSha256: ref.snapshotSha256 } : {}) }, customer_details: { name: 'Buyer' },
   } } };
 }
 const deliver = (pack = false) => webhook(new Request('https://www.ledgerhound.vip/api/webhook', {

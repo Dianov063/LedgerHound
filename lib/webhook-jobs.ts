@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createReportCaseId } from '@/lib/report-delivery';
+import { purchaseRefFrom, type PurchaseRef } from '@/lib/purchase-snapshot';
 
 /**
  * Durable record of a paid checkout that still needs its report / pack.
@@ -30,8 +31,13 @@ const getS3 = () =>
 const bucket = () => process.env.AWS_S3_BUCKET!;
 
 export const PENDING_PREFIX = 'webhook-jobs/pending/';
+/** Retries ran out or the job expired: a temporary cause did not pass in time. */
 export const FAILED_PREFIX = 'webhook-jobs/failed/';
+/** The order's data cannot be trusted or found (confirmed): retrying would not help. */
+export const MANUAL_REVIEW_PREFIX = 'webhook-jobs/manual-review/';
 export const PAYMENT_LOCK_PREFIX = 'webhook-payment-locks/';
+/** One per payment, written when the purchase was delivered; checked before any work. */
+export const DELIVERED_PREFIX = 'webhook-deliveries/';
 
 export const MAX_ATTEMPTS = 3;
 /** A running job with no completion after this long has lost its runner. */
@@ -66,6 +72,14 @@ export interface WebhookJob {
   lastError?: string;
   /** Forensic report case id, fixed when the job is created so every attempt reuses it. */
   reportCaseId?: string;
+  /** The immutable purchase snapshot this payment bought (absent for sessions created before snapshots). */
+  purchase?: PurchaseRef;
+  /** Set when parked: why an operator has to look at it. */
+  parkedReason?: string;
+  /** Manual re-runs: when, how many, and the creation time of the original job. */
+  requeuedAt?: string;
+  requeueCount?: number;
+  originalCreatedAt?: string;
   session: JobSession;
 }
 
@@ -76,12 +90,14 @@ export function paymentIdOf(session: JobSession): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function jobFromEvent(event: any, now = new Date()): WebhookJob {
   const s = event?.data?.object ?? {};
+  const purchase = purchaseRefFrom(s.metadata);
   return {
     eventId: String(event.id),
     createdAt: now.toISOString(),
     status: 'pending',
     attempts: 0,
     reportCaseId: createReportCaseId(now.getTime()),
+    ...(purchase ? { purchase } : {}),
     session: {
       id: String(s.id ?? ''),
       payment_intent: typeof s.payment_intent === 'string' ? s.payment_intent : null,
@@ -233,10 +249,163 @@ export async function deleteJob(eventId: string): Promise<void> {
 /** Parks a job for manual follow-up; it is never retried automatically. */
 export async function moveToFailed(job: WebhookJob, reason: string): Promise<void> {
   await getS3().send(new PutObjectCommand({
-    ...body({ ...job, lastError: reason }),
+    ...body({ ...job, lastError: reason, parkedReason: reason }),
     Key: `${FAILED_PREFIX}${job.eventId}.json`,
   }));
   await deleteJob(job.eventId);
+}
+
+/**
+ * Parks a job whose data cannot be trusted or found. Nothing was generated,
+ * emailed or marked complete for it. An operator resolves it (see
+ * docs in app/api/admin/webhook-jobs/route.ts) and may re-run it.
+ */
+export async function moveToManualReview(job: WebhookJob, reason: string): Promise<void> {
+  await getS3().send(new PutObjectCommand({
+    ...body({ ...job, status: 'pending', lastError: reason, parkedReason: reason }),
+    Key: `${MANUAL_REVIEW_PREFIX}${job.eventId}.json`,
+  }));
+  await deleteJob(job.eventId);
+}
+
+export interface DeliveredMarker {
+  paymentId: string;
+  eventId: string;
+  product: string;
+  purchaseId?: string;
+  deliveredAt: string;
+}
+
+/** The delivery record of a payment; null when there is none. A failed read throws. */
+export async function getDelivered(paymentId: string): Promise<DeliveredMarker | null> {
+  if (!paymentId) return null;
+  try {
+    const r = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: `${DELIVERED_PREFIX}${paymentId}.json` }));
+    return JSON.parse((await r.Body?.transformToString()) || '{}') as DeliveredMarker;
+  } catch (err) {
+    if (isStatus(err, [404], ['NoSuchKey'])) return null;
+    throw err;
+  }
+}
+
+/** Records that the purchase of this payment was delivered (first writer wins). */
+export async function markDelivered(marker: DeliveredMarker): Promise<void> {
+  if (!marker.paymentId) return;
+  try {
+    await getS3().send(new PutObjectCommand({
+      Bucket: bucket(),
+      Key: `${DELIVERED_PREFIX}${marker.paymentId}.json`,
+      Body: JSON.stringify(marker),
+      ContentType: 'application/json',
+      ServerSideEncryption: 'aws:kms',
+      IfNoneMatch: '*',
+    }));
+  } catch (err) {
+    if (!isStatus(err, [412], ['PreconditionFailed', 'ConditionalCheckFailed'])) throw err;
+  }
+}
+
+export type ParkedState = 'failed' | 'manual-review';
+
+async function getParked(eventId: string): Promise<{ job: WebhookJob; state: ParkedState } | null> {
+  for (const [state, prefix] of [['manual-review', MANUAL_REVIEW_PREFIX], ['failed', FAILED_PREFIX]] as const) {
+    try {
+      const r = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: `${prefix}${eventId}.json` }));
+      return { job: JSON.parse((await r.Body?.transformToString()) || '{}') as WebhookJob, state };
+    } catch (err) {
+      if (!isStatus(err, [404], ['NoSuchKey'])) throw err;
+    }
+  }
+  return null;
+}
+
+export type RequeueResult =
+  | { result: 'requeued'; from: ParkedState; job: WebhookJob }
+  | { result: 'not-found' | 'already-pending' | 'already-delivered' }
+  | { result: 'email-window-passed'; originalCreatedAt: string };
+
+/**
+ * Manual re-run of a parked job, after the operator fixed its cause.
+ * - A purchase already marked delivered is never re-run (one delivery, one email).
+ * - The pending record is created with If-None-Match, so two operators (or a
+ *   webhook redelivery) cannot both start it; the parked copy is removed after.
+ * - Past the email provider's idempotency window (EXPIRE_MS from the original
+ *   payment) a re-run could send an email the provider no longer recognises;
+ *   it needs `emailChecked` (the operator confirmed in the provider log that no
+ *   email for this payment was accepted).
+ */
+export async function requeueParkedJob(eventId: string, opts: { now?: number; emailChecked?: boolean } = {}): Promise<RequeueResult> {
+  const now = opts.now ?? Date.now();
+  const parked = await getParked(eventId);
+  if (!parked) return { result: 'not-found' };
+  const { job, state } = parked;
+  if (await getDelivered(paymentIdOf(job.session))) return { result: 'already-delivered' };
+  const originalCreatedAt = job.originalCreatedAt || job.createdAt;
+  if (!(now - Date.parse(originalCreatedAt) <= EXPIRE_MS) && !opts.emailChecked) {
+    return { result: 'email-window-passed', originalCreatedAt };
+  }
+  const at = new Date(now).toISOString();
+  const fresh: WebhookJob = {
+    ...job,
+    status: 'pending',
+    attempts: 0,
+    createdAt: at,
+    originalCreatedAt,
+    requeuedAt: at,
+    requeueCount: (job.requeueCount ?? 0) + 1,
+    startedAt: undefined,
+    lastAttemptAt: undefined,
+    parkedReason: undefined,
+  };
+  if (await saveJob(fresh) === 'exists') return { result: 'already-pending' };
+  await getS3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: `${state === 'failed' ? FAILED_PREFIX : MANUAL_REVIEW_PREFIX}${eventId}.json` }));
+  return { result: 'requeued', from: state, job: fresh };
+}
+
+export interface ParkedSummary {
+  eventId: string;
+  state: ParkedState;
+  product: string;
+  caseId: string;
+  purchaseId: string;
+  paymentId: string;
+  createdAt: string;
+  reason: string;
+}
+
+/** Operator view of parked jobs: ids and reasons, no email or case content. */
+export async function listParkedJobs(): Promise<ParkedSummary[]> {
+  const out: ParkedSummary[] = [];
+  for (const [state, prefix] of [['manual-review', MANUAL_REVIEW_PREFIX], ['failed', FAILED_PREFIX]] as const) {
+    for (const key of await listKeys(prefix)) {
+      const id = key.slice(prefix.length).replace(/\.json$/, '');
+      const r = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+      const job = JSON.parse((await r.Body?.transformToString()) || '{}') as WebhookJob;
+      out.push({
+        eventId: id,
+        state,
+        product: job.session?.metadata?.product || 'forensic_report',
+        caseId: job.session?.metadata?.caseId || '',
+        purchaseId: job.purchase?.purchaseId || '',
+        paymentId: job.session ? paymentIdOf(job.session) : '',
+        createdAt: job.originalCreatedAt || job.createdAt,
+        reason: (job.parkedReason || job.lastError || '').slice(0, 300),
+      });
+    }
+  }
+  return out;
+}
+
+/** Every key under a prefix (paginated). Throws on any S3 error. */
+export async function listKeys(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let token: string | undefined;
+  do {
+    const r = await getS3().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }));
+    for (const o of r.Contents ?? []) if (o.Key && o.Key !== prefix) keys.push(o.Key);
+    token = r.IsTruncated ? r.NextContinuationToken : undefined;
+  } while (token);
+  return keys;
 }
 
 export async function listPendingJobs(): Promise<StoredJob[]> {
