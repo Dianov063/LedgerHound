@@ -31,10 +31,14 @@ export const maxDuration = 300;
  *     - manual-review case_paid_twice: a second payment for an already
  *       delivered case; refund the duplicate payment in Stripe.
  *  3. POST to re-run only when the cause is gone. A payment already marked
- *     delivered is refused, so a re-run never sends a second delivery. Past
- *     23 h from the payment the email provider may no longer recognise its
- *     idempotency key: check the provider log for this payment first and pass
- *     `emailChecked: true` only if no email for it was accepted.
+ *     delivered is refused, so a re-run never sends a second delivery. The
+ *     re-run restarts the attempt budget but keeps the job's
+ *     emailRetryDeadline (fixed 23 h after the payment arrived): automatic
+ *     attempts still stop there. Past that deadline the request is refused
+ *     with the idempotency keys of every email of the purchase (forensic
+ *     report and pack); check each of them in the provider log and pass
+ *     `emailChecked: true` only if none was accepted. That confirmation is
+ *     recorded on the job (emailChecks) and opens one new 23 h window.
  */
 export async function GET(req: NextRequest) {
   const denied = await requireAdmin(req);

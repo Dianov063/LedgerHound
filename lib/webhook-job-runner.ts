@@ -111,7 +111,7 @@ export async function resumeStaleJobs(opts: { limit?: number; now?: number } = {
     if (decision === 'skip-in-flight') { summary.skippedInFlight++; continue; }
     if (decision === 'wait') { summary.waiting++; continue; }
     if (decision === 'expire') {
-      await moveToFailed(job, job.attempts >= MAX_ATTEMPTS ? 'out of attempts' : 'expired before completion');
+      await moveToFailed(job, job.attempts >= MAX_ATTEMPTS ? 'out of attempts' : 'email retry deadline passed before completion');
       logger.error({ eventId: job.eventId }, '[webhook-jobs] Job expired; parked in webhook-jobs/failed/');
       summary.expired++;
       continue;

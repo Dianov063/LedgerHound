@@ -3,17 +3,14 @@ import { generateReport } from '@/lib/generateReport';
 import { generateEmergencyPack } from '@/lib/generateEmergencyPack';
 import { deliverFrozenReport, getFrozenReport, summarizeReport, type ReportSummary } from '@/lib/report-delivery';
 import { getDelivered, markDelivered, paymentIdOf, type WebhookJob } from '@/lib/webhook-jobs';
-import { readPackManifest } from '@/lib/legal-packs/manifest';
+import { claimPackOwner, readPackManifest } from '@/lib/legal-packs/manifest';
 import {
   ManualReviewError,
   RetryableReadError,
-  freezeLegacySnapshot,
   isNotFound,
   lossAmountOf,
   purchaseRefFrom,
-  readLegacySnapshot,
   readSnapshot,
-  readText,
   type PurchaseSnapshot,
 } from '@/lib/purchase-snapshot';
 import logger from '@/lib/logger';
@@ -39,8 +36,8 @@ import logger from '@/lib/logger';
  * RetryableReadError before anything is generated, emailed or marked; a
  * confirmed missing or inconsistent snapshot throws ManualReviewError, which
  * the runner parks in webhook-jobs/manual-review/. Sessions created before
- * snapshots existed are verified against their recorded checkout (see
- * legacyPackSnapshot) or sent to manual review.
+ * snapshots existed cannot prove what they bought (the old checkout rewrote
+ * one shared case file per link), so they go to manual review.
  *
  * A delivered purchase is recorded per payment (webhook-deliveries/); any
  * later run for that payment (webhook replay, sweep, manual re-run) stops
@@ -59,67 +56,6 @@ const getS3 = () =>
 
 const s3Bucket = () => process.env.AWS_S3_BUCKET!;
 
-/** Fields the old checkout copied into the session metadata; all must still match the case file. */
-const LEGACY_MIRRORED = ['product', 'email', 'country', 'walletAddress', 'network', 'platformName', 'scamType', 'route', 'txid'] as const;
-
-function parseJson(text: string, code: string, what: string): Record<string, unknown> {
-  try {
-    const value = JSON.parse(text);
-    if (value && typeof value === 'object') return value as Record<string, unknown>;
-  } catch { /* below */ }
-  throw new ManualReviewError(code, `${what} is not valid JSON`);
-}
-
-/**
- * Pack sessions created before purchase snapshots existed. The old checkout
- * rewrote emergency-cases/<caseId>.json on every new link, so the case file
- * matches THIS session only if it was saved before this session was recorded
- * (no later checkout rewrote it) and every field the session itself carries
- * still matches. Then it is frozen as this purchase's snapshot; otherwise the
- * original data cannot be proven and the order goes to manual review.
- */
-async function legacyPackSnapshot(job: WebhookJob): Promise<PurchaseSnapshot> {
-  const meta = job.session.metadata;
-  const caseId = meta.caseId || '';
-  const sessionId = job.session.id;
-  if (!caseId || !sessionId) throw new ManualReviewError('legacy_no_case', 'the session names no case');
-
-  const frozen = await readLegacySnapshot(caseId, sessionId);
-  if (frozen) return frozen;
-
-  const caseText = await readText(`emergency-cases/${caseId}.json`, 'case');
-  if (caseText === null) throw new ManualReviewError('legacy_case_missing', 'the case of this older session no longer exists');
-  const recordText = await readText(`emergency-case-sessions/${caseId}/${sessionId}.json`, 'session record');
-  if (recordText === null) throw new ManualReviewError('legacy_session_unrecorded', 'the checkout of this older session was not recorded');
-  const saved = parseJson(caseText, 'legacy_case_unreadable', 'the case');
-  const record = parseJson(recordText, 'legacy_session_unrecorded', 'the session record');
-
-  const savedAt = Date.parse(String(saved.savedAt ?? ''));
-  const recordedAt = Date.parse(String(record.createdAt ?? ''));
-  if (!(savedAt <= recordedAt)) {
-    throw new ManualReviewError('legacy_case_changed', 'the case was saved again after this payment link was created');
-  }
-  const mismatch = LEGACY_MIRRORED.filter((f) => String(saved[f] ?? '') !== String(meta[f] ?? ''));
-  if (String(saved.lossAmount ?? '') !== String(meta.lossAmount ?? '')) mismatch.push('lossAmount' as never);
-  if (mismatch.length) {
-    throw new ManualReviewError('legacy_case_changed', `the case differs from this payment link (${mismatch.join(', ')})`);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { ownerSecretHash: _hash, ...caseData } = saved;
-  return freezeLegacySnapshot({
-    version: 1,
-    purchaseId: `legacy-${sessionId}`,
-    caseId,
-    product: 'emergency_pack',
-    createdAt: new Date().toISOString(),
-    amountCents: job.session.amount_total ?? 0,
-    currency: 'usd',
-    source: 'legacy-verified',
-    sessionId,
-    case: caseData,
-  });
-}
-
 /** The snapshot this Emergency purchase bought, or null for products that never had one. */
 async function purchaseSnapshotOf(job: WebhookJob, product: string): Promise<PurchaseSnapshot | null> {
   const ref = job.purchase ?? purchaseRefFrom(job.session.metadata);
@@ -132,7 +68,12 @@ async function purchaseSnapshotOf(job: WebhookJob, product: string): Promise<Pur
     }
     return readSnapshot(ref);
   }
-  if (product === 'emergency_pack') return legacyPackSnapshot(job);
+  if (product === 'emergency_pack') {
+    // The old checkout kept one case file per case and rewrote it for every new
+    // link; neither timestamps nor the few fields copied into the session can
+    // prove which version this payment bought (two checkouts can interleave).
+    throw new ManualReviewError('legacy_unverifiable', 'this older pack link has no purchase snapshot; its data cannot be proven');
+  }
   // Summary report before snapshots: it was always built from its own session
   // metadata alone (never from the shared case), which Stripe keeps unchanged.
   return null;
@@ -248,12 +189,18 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
     // open links both paid) must not receive or overwrite the first one.
     const completion = await packCompletion(caseId);
     if (completion) {
-      if (completion.paymentId && completion.paymentId !== paymentId) {
+      if (!completion.paymentId) {
+        throw new ManualReviewError('pack_artifacts_unowned', 'a pack of this case was completed without a recorded payment');
+      }
+      if (completion.paymentId !== paymentId) {
         throw new ManualReviewError('case_paid_twice', 'the pack of this case was already delivered for another payment');
       }
       logger.info({ eventId, caseId }, '[webhook] Pack already delivered, skipping');
       return finish('already-done');
     }
+    // Own the case's document set before the forensic report, the first PDF
+    // or any email: a competing payment goes to manual review here.
+    await claimPackOwner(caseId, paymentId, snapshot?.purchaseId);
     let manifest;
     try {
       manifest = await readPackManifest(caseId);
@@ -329,6 +276,7 @@ export async function processCheckoutJob(job: WebhookJob, opts: { resumed: boole
       enrichment,
       idempotencyKey: `ledgerhound:pack:${paymentId}`,
       paymentId,
+      purchaseId: snapshot?.purchaseId,
     });
     // Reached only when every document was saved and the email went out.
     await markPackComplete(caseId, job, packResult.templates.map((t) => t.type));

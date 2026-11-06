@@ -80,6 +80,15 @@ export interface WebhookJob {
   requeuedAt?: string;
   requeueCount?: number;
   originalCreatedAt?: string;
+  /**
+   * Last moment an attempt may start automatically. Any email this payment may
+   * already have received must still be recognised by the provider's
+   * idempotency window, so it is fixed once, from the first job record, and a
+   * manual re-run never moves it. Only an operator's recorded confirmation that
+   * no email of this payment was accepted (emailChecks) sets a new one.
+   */
+  emailRetryDeadline?: string;
+  emailChecks?: { at: string; keys: string[]; previousDeadline: string; newDeadline: string }[];
   session: JobSession;
 }
 
@@ -97,6 +106,7 @@ export function jobFromEvent(event: any, now = new Date()): WebhookJob {
     status: 'pending',
     attempts: 0,
     reportCaseId: createReportCaseId(now.getTime()),
+    emailRetryDeadline: new Date(now.getTime() + EXPIRE_MS).toISOString(),
     ...(purchase ? { purchase } : {}),
     session: {
       id: String(s.id ?? ''),
@@ -106,6 +116,29 @@ export function jobFromEvent(event: any, now = new Date()): WebhookJob {
       customer_details: s.customer_details ? { name: s.customer_details.name ?? null } : null,
     },
   };
+}
+
+/**
+ * The automatic retry deadline of a job (ms). Records written before the field
+ * existed use their original creation time; an unreadable value is NaN, which
+ * every check treats as passed.
+ */
+export function emailRetryDeadlineOf(job: WebhookJob): number {
+  const explicit = Date.parse(job.emailRetryDeadline ?? '');
+  if (Number.isFinite(explicit)) return explicit;
+  return Date.parse(job.originalCreatedAt || job.createdAt) + EXPIRE_MS;
+}
+
+/** True while an attempt may still start automatically (deadline not passed). */
+export function withinEmailRetryWindow(job: WebhookJob, now: number): boolean {
+  return now <= emailRetryDeadlineOf(job);
+}
+
+/** Idempotency keys of every email this payment's purchase can send. */
+export function emailKeysOf(job: WebhookJob): string[] {
+  const pi = paymentIdOf(job.session);
+  const product = job.session.metadata?.product || 'forensic_report';
+  return product === 'emergency_pack' ? [`ledgerhound:report:${pi}`, `ledgerhound:pack:${pi}`] : [`ledgerhound:report:${pi}`];
 }
 
 export type JobDecision = 'skip-in-flight' | 'expire' | 'resume' | 'wait' | 'check-claim';
@@ -121,7 +154,7 @@ export type JobDecision = 'skip-in-flight' | 'expire' | 'resume' | 'wait' | 'che
 export function classifyJob(job: WebhookJob, now: number, inFlight: boolean): JobDecision {
   if (inFlight) return 'skip-in-flight';
   const age = now - Date.parse(job.createdAt);
-  if (!(age >= 0) || age > EXPIRE_MS) return 'expire';
+  if (!(age >= 0) || !withinEmailRetryWindow(job, now)) return 'expire';
   if (job.attempts >= MAX_ATTEMPTS) return 'expire';
   if (job.status === 'running') {
     const since = now - Date.parse(job.startedAt || job.createdAt);
@@ -185,6 +218,8 @@ export async function getJob(eventId: string): Promise<WebhookJob | null> {
 /** True when a new attempt may start: pending, or running with a runner that went silent. */
 export function isAcquirable(job: WebhookJob, now: number): boolean {
   if (job.attempts >= MAX_ATTEMPTS) return false;
+  // Webhook redelivery, sweep and manual re-run all acquire here.
+  if (!withinEmailRetryWindow(job, now)) return false;
   if (job.status === 'pending') return true;
   return now - Date.parse(job.startedAt || job.createdAt) > STALE_RUNNING_MS;
 }
@@ -322,17 +357,20 @@ async function getParked(eventId: string): Promise<{ job: WebhookJob; state: Par
 export type RequeueResult =
   | { result: 'requeued'; from: ParkedState; job: WebhookJob }
   | { result: 'not-found' | 'already-pending' | 'already-delivered' }
-  | { result: 'email-window-passed'; originalCreatedAt: string };
+  | { result: 'email-window-passed'; emailRetryDeadline: string; idempotencyKeys: string[] };
 
 /**
  * Manual re-run of a parked job, after the operator fixed its cause.
  * - A purchase already marked delivered is never re-run (one delivery, one email).
  * - The pending record is created with If-None-Match, so two operators (or a
  *   webhook redelivery) cannot both start it; the parked copy is removed after.
- * - Past the email provider's idempotency window (EXPIRE_MS from the original
- *   payment) a re-run could send an email the provider no longer recognises;
- *   it needs `emailChecked` (the operator confirmed in the provider log that no
- *   email for this payment was accepted).
+ * - The attempt budget restarts, the email retry deadline does NOT: automatic
+ *   attempts still stop at the deadline fixed when the payment arrived.
+ * - Past that deadline the provider may no longer recognise the idempotency
+ *   keys of an email already accepted. The re-run then needs `emailChecked`:
+ *   the operator confirmed in the provider log that no email under any of the
+ *   returned keys was accepted. That decision is recorded on the job and opens
+ *   one new window of EXPIRE_MS.
  */
 export async function requeueParkedJob(eventId: string, opts: { now?: number; emailChecked?: boolean } = {}): Promise<RequeueResult> {
   const now = opts.now ?? Date.now();
@@ -340,9 +378,15 @@ export async function requeueParkedJob(eventId: string, opts: { now?: number; em
   if (!parked) return { result: 'not-found' };
   const { job, state } = parked;
   if (await getDelivered(paymentIdOf(job.session))) return { result: 'already-delivered' };
-  const originalCreatedAt = job.originalCreatedAt || job.createdAt;
-  if (!(now - Date.parse(originalCreatedAt) <= EXPIRE_MS) && !opts.emailChecked) {
-    return { result: 'email-window-passed', originalCreatedAt };
+  const deadline = emailRetryDeadlineOf(job);
+  const keys = emailKeysOf(job);
+  let emailRetryDeadline = new Date(Number.isFinite(deadline) ? deadline : now).toISOString();
+  let emailChecks = job.emailChecks;
+  if (!withinEmailRetryWindow(job, now)) {
+    if (!opts.emailChecked) return { result: 'email-window-passed', emailRetryDeadline, idempotencyKeys: keys };
+    const newDeadline = new Date(now + EXPIRE_MS).toISOString();
+    emailChecks = [...(job.emailChecks ?? []), { at: new Date(now).toISOString(), keys, previousDeadline: emailRetryDeadline, newDeadline }];
+    emailRetryDeadline = newDeadline;
   }
   const at = new Date(now).toISOString();
   const fresh: WebhookJob = {
@@ -350,7 +394,9 @@ export async function requeueParkedJob(eventId: string, opts: { now?: number; em
     status: 'pending',
     attempts: 0,
     createdAt: at,
-    originalCreatedAt,
+    originalCreatedAt: job.originalCreatedAt || job.createdAt,
+    emailRetryDeadline,
+    ...(emailChecks ? { emailChecks } : {}),
     requeuedAt: at,
     requeueCount: (job.requeueCount ?? 0) + 1,
     startedAt: undefined,

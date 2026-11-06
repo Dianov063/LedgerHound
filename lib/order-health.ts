@@ -1,4 +1,4 @@
-import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { FAILED_PREFIX, MANUAL_REVIEW_PREFIX, PENDING_PREFIX } from '@/lib/webhook-jobs';
 
 /**
@@ -22,10 +22,13 @@ import { FAILED_PREFIX, MANUAL_REVIEW_PREFIX, PENDING_PREFIX } from '@/lib/webho
 /** A pending job older than this is late: normal retries finish well before it. */
 export const PENDING_ATTENTION_MS = 60 * 60 * 1000;
 const CACHE_MS = 60 * 1000;
+/** Above this many pending records their ages are not read one by one; the age is then unknown. */
+const MAX_AGE_READS = 100;
 
 export interface OrderHealth {
   status: 'ok' | 'attention' | 'unknown';
   pending: number | null;
+  /** Age of the oldest pending ORDER (from its first job record), not of its last retry. */
   oldestPendingAgeSeconds: number | null;
   failed: number | null;
   manualReview: number | null;
@@ -42,42 +45,57 @@ const getS3 = () =>
   });
 const bucket = () => process.env.AWS_S3_BUCKET!;
 
-interface Queue { count: number; oldest: number | null }
-
-/** Counts the records of one queue (and the oldest one's age by LastModified). Throws on any error. */
-async function readQueue(prefix: string): Promise<Queue> {
-  let count = 0;
-  let oldest: number | null = null;
+/** Keys of one queue. Throws on any error. */
+async function listQueue(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
   let token: string | undefined;
   do {
     const r = await getS3().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }));
-    for (const o of r.Contents ?? []) {
-      if (!o.Key || o.Key === prefix) continue;
-      count++;
-      const t = o.LastModified ? new Date(o.LastModified).getTime() : NaN;
-      if (Number.isFinite(t) && (oldest === null || t < oldest)) oldest = t;
-    }
+    for (const o of r.Contents ?? []) if (o.Key && o.Key !== prefix) keys.push(o.Key);
     token = r.IsTruncated ? r.NextContinuationToken : undefined;
   } while (token);
-  return { count, oldest };
+  return keys;
 }
 
-const settledQueue = (p: Promise<Queue>) => p.then((q) => q, () => null);
-
 /**
- * Pending age uses the record's LastModified: it moves when an attempt starts
- * or fails, so a job that keeps being retried looks younger than its payment.
- * The sweep parks jobs older than 23 h in failed/ anyway, where they count.
+ * When the order behind a pending record started: originalCreatedAt (kept
+ * across manual re-runs) or the first record's createdAt. Retries and
+ * acquisitions rewrite the record but never these fields, so a late order
+ * cannot look new. Throws when the record or its time cannot be read.
  */
+async function orderStartOf(key: string): Promise<number> {
+  const r = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  const job = JSON.parse((await r.Body?.transformToString()) || '') as { originalCreatedAt?: string; createdAt?: string };
+  const t = Date.parse(job.originalCreatedAt || job.createdAt || '');
+  if (!Number.isFinite(t)) throw new Error('pending record without a valid creation time');
+  return t;
+}
+
+/** Age (s) of the oldest pending order; null when any record cannot be read (never 0 by default). */
+async function oldestPendingAge(keys: string[], now: number): Promise<number | null> {
+  if (keys.length === 0) return 0;
+  if (keys.length > MAX_AGE_READS) return null;
+  try {
+    const starts = await Promise.all(keys.map(orderStartOf));
+    return Math.max(0, Math.round((now - Math.min(...starts)) / 1000));
+  } catch {
+    return null;
+  }
+}
+
+const settled = <T,>(p: Promise<T>) => p.then((v) => v, () => null);
+
 export async function readOrderHealth(now = Date.now()): Promise<OrderHealth> {
-  const [pending, failed, manual] = await Promise.all([
-    settledQueue(readQueue(PENDING_PREFIX)),
-    settledQueue(readQueue(FAILED_PREFIX)),
-    settledQueue(readQueue(MANUAL_REVIEW_PREFIX)),
+  const [pendingKeys, failedKeys, manualKeys] = await Promise.all([
+    settled(listQueue(PENDING_PREFIX)),
+    settled(listQueue(FAILED_PREFIX)),
+    settled(listQueue(MANUAL_REVIEW_PREFIX)),
   ]);
-  const oldestPendingAgeSeconds = pending === null ? null
-    : pending.oldest === null ? 0 : Math.max(0, Math.round((now - pending.oldest) / 1000));
-  const known = pending !== null && failed !== null && manual !== null;
+  const oldestPendingAgeSeconds = pendingKeys === null ? null : await oldestPendingAge(pendingKeys, now);
+  const pending = pendingKeys && { count: pendingKeys.length };
+  const failed = failedKeys && { count: failedKeys.length };
+  const manual = manualKeys && { count: manualKeys.length };
+  const known = pending !== null && failed !== null && manual !== null && oldestPendingAgeSeconds !== null;
   const attention = (failed?.count ?? 0) > 0 || (manual?.count ?? 0) > 0
     || (oldestPendingAgeSeconds ?? 0) * 1000 > PENDING_ATTENTION_MS;
   return {

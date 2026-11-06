@@ -307,13 +307,23 @@ describe('emergency pack completeness', () => {
     expect(s3Store.has(jobKey())).toBe(false);
   });
 
-  it('a stray PDF without the completion marker is not taken for a delivered pack', async () => {
+  it('a stray PDF of this payment without the completion marker is not taken for a delivered pack', async () => {
+    putJson(`legal-packs/cases/${CASE}/owner.json`, { caseId: CASE, paymentId: PAYMENT, claimedAt: 'earlier' });
     putJson(pdf(DOCS[0]), { pdf: DOCS[0] });
     gen.pack.mockImplementationOnce(writeAll);
     seedJob(staleRunning());
     await resumeStaleJobs();
     expect(gen.pack).toHaveBeenCalledTimes(1);
     expect(s3Store.has(marker)).toBe(true);
+  });
+
+  it('a stray PDF with no recorded owner is neither adopted nor taken for a delivery', async () => {
+    putJson(pdf(DOCS[0]), { pdf: DOCS[0] });
+    seedJob(staleRunning());
+    await resumeStaleJobs();
+    expect(gen.pack).not.toHaveBeenCalled();
+    expect(s3Store.has(marker)).toBe(false);
+    expect(getJson<WebhookJob>(`webhook-jobs/manual-review/${EVENT_ID}.json`)!.parkedReason).toContain('pack_artifacts_unowned');
   });
 
   it('a completed pack is not regenerated', async () => {

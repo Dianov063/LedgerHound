@@ -19,7 +19,10 @@ import { GET as sweepRoute } from '@/app/api/admin/resume-webhook-jobs/route';
 import { __resetBackgroundTasksForTests, drainBackgroundTasks } from '@/lib/background-tasks';
 import { __resetOrderHealthCacheForTests, readOrderHealth } from '@/lib/order-health';
 import { sendEmailOnce } from '@/lib/idempotent-email';
-import { EXPIRE_MS, MAX_ATTEMPTS, RETRY_BACKOFF_MS, STALE_RUNNING_MS, type WebhookJob } from '@/lib/webhook-jobs';
+import {
+  EXPIRE_MS, MAX_ATTEMPTS, RETRY_BACKOFF_MS, STALE_RUNNING_MS,
+  acquireJob, classifyJob, isAcquirable, jobFromEvent, requeueParkedJob, type WebhookJob,
+} from '@/lib/webhook-jobs';
 import { resumeStaleJobs } from '@/lib/webhook-job-runner';
 import { logOrders } from '@/scripts/cron-runner.mjs';
 
@@ -198,13 +201,21 @@ describe('sessions A and B each deliver their own snapshot', () => {
 
   it('an edit made while A is being generated does not reach A', async () => {
     const a = await openCheckout();
+    let checkoutDuringGeneration = 0;
     gen.pack.mockImplementationOnce(async (input: Record<string, unknown>) => {
-      // The owner opens another checkout with new data in the middle of generation.
-      await openCheckout({ description: 'edited during generation', victimWallet: '0xvictimC' });
+      // A new checkout is refused once A owns the case documents...
+      const res = await checkout(postJson('/api/emergency/checkout', {
+        product: 'emergency_pack', caseId: CASE, caseSecret: ownerSecret, email: 'buyer@example.com', description: 'edited during generation',
+      }));
+      checkoutDuringGeneration = res.status;
+      // ...and even a direct rewrite of the shared case file does not reach A.
+      const saved = getJson<Record<string, unknown>>(`emergency-cases/${CASE}.json`)!;
+      putJson(`emergency-cases/${CASE}.json`, { ...saved, description: 'edited during generation', victimWallet: '0xvictimC' });
       return packThatEmails(input);
     });
     await deliver(paidEvent(a, 'evt_a', 'pi_a'));
     await settle();
+    expect(checkoutDuringGeneration).toBe(409);
     expect(packInput()).toMatchObject({ description: 'original description', victimWallet: '0xvictimA' });
     expect(getJson<Record<string, unknown>>(`emergency-cases/${CASE}.json`)!.description).toBe('edited during generation');
     expect(s3Store.has(marker)).toBe(true);
@@ -312,7 +323,8 @@ describe('one payment, one delivery, one email', () => {
     // First process: takes the job, sends the email, is killed before the completion marker.
     gen.pack.mockImplementationOnce(async (input: Record<string, unknown>) => {
       await packThatEmails(input);
-      await openCheckout({ description: 'edited after the kill' });
+      const saved = getJson<Record<string, unknown>>(`emergency-cases/${CASE}.json`)!;
+      putJson(`emergency-cases/${CASE}.json`, { ...saved, description: 'edited after the kill' });
       return new Promise(() => {}); // never returns: the process is gone
     });
     await deliver(paidEvent(a, 'evt_a', 'pi_a'));
@@ -381,7 +393,7 @@ describe('one payment, one delivery, one email', () => {
     expect(sentEmails).toHaveLength(1);
   });
 
-  it('a re-run past the email idempotency window needs the operator to confirm the provider log', async () => {
+  it('a re-run past the email retry deadline needs the operator to confirm every email key', async () => {
     const job = {
       eventId: 'evt_old', createdAt: new Date(Date.now() - EXPIRE_MS - 60_000).toISOString(), status: 'pending', attempts: 3,
       session: { id: 'cs_old', payment_intent: 'pi_old', amount_total: 4900, metadata: { email: 'buyer@example.com', walletAddress: '0xabc' }, customer_details: null },
@@ -389,7 +401,7 @@ describe('one payment, one delivery, one email', () => {
     putJson(failedKey('evt_old'), job);
     const refused = await rerun(postJson('/api/admin/webhook-jobs', { eventId: 'evt_old' }, { 'x-admin-key': ADMIN }));
     expect(refused.status).toBe(409);
-    expect((await refused.json()).result).toBe('email-window-passed');
+    expect(await refused.json()).toMatchObject({ result: 'email-window-passed', idempotencyKeys: ['ledgerhound:report:pi_old'] });
     expect(gen.report).not.toHaveBeenCalled();
     const confirmed = await rerun(postJson('/api/admin/webhook-jobs', { eventId: 'evt_old', emailChecked: true }, { 'x-admin-key': ADMIN }));
     expect((await confirmed.json()).outcome).toBe('done');
@@ -402,57 +414,27 @@ describe('sessions created before purchase snapshots', () => {
     platformName: 'Fictional Exchange', scamType: 'romance', route: '', lossAmount: '2500', txid: '' };
   const legacyEvent = (id = 'evt_legacy') => ({ id, type: 'checkout.session.completed', data: { object: {
     id: SESSION, payment_intent: 'pi_legacy', amount_total: 7900, metadata: { ...meta }, customer_details: { name: 'B' } } } });
-  const seedLegacy = (savedAt: string, recordedAt: string, over: Record<string, unknown> = {}) => {
-    putJson(`emergency-cases/${CASE}.json`, { ...meta, ownerSecretHash: 'h', description: 'legacy description', savedAt, ...over });
-    putJson(`emergency-case-sessions/${CASE}/${SESSION}.json`, { sessionId: SESSION, product: 'emergency_pack', createdAt: recordedAt });
-  };
 
-  it('a case saved for this link and unchanged since is used and frozen as the snapshot', async () => {
-    seedLegacy('2026-11-01T10:00:00.000Z', '2026-11-01T10:00:01.000Z');
-    await deliver(legacyEvent());
-    await settle();
-    expect(packInput()).toMatchObject({ description: 'legacy description', lossAmount: 2500, platformName: 'Fictional Exchange' });
-    const frozen = getJson<{ source: string; case: Record<string, unknown> }>(`emergency-purchases/${CASE}/legacy-${SESSION}.json`)!;
-    expect(frozen.source).toBe('legacy-verified');
-    expect(frozen.case).not.toHaveProperty('ownerSecretHash');
-  });
-
-  it('a case saved again after the link was created goes to manual review', async () => {
-    seedLegacy('2026-11-01T10:05:00.000Z', '2026-11-01T10:00:01.000Z');
+  it('R2: interleaved older checkouts are not trusted, even when the timestamps and copied fields agree', async () => {
+    // A saved at 10:00:00; B overwrote the case at 10:00:01; A's session was recorded at 10:00:02.
+    putJson(`emergency-cases/${CASE}.json`, { ...meta, ownerSecretHash: 'h', description: 'PURCHASE B', savedAt: '2026-11-06T10:00:01.000Z' });
+    putJson(`emergency-case-sessions/${CASE}/${SESSION}.json`, { sessionId: SESSION, product: 'emergency_pack', createdAt: '2026-11-06T10:00:02.000Z' });
     await deliver(legacyEvent());
     await settle();
     expect(gen.pack).not.toHaveBeenCalled();
-    expect(getJson<WebhookJob>(manualKey('evt_legacy'))!.parkedReason).toContain('legacy_case_changed');
+    expect(gen.report).not.toHaveBeenCalled();
+    expect(sentEmails).toHaveLength(0);
+    expect(getJson<WebhookJob>(manualKey('evt_legacy'))!.parkedReason).toContain('legacy_unverifiable');
+    expect(Array.from(s3Store.keys()).some((k) => k.startsWith('emergency-purchases/'))).toBe(false); // nothing frozen
+    expect(s3Store.has(`legal-packs/cases/${CASE}/owner.json`)).toBe(false);
   });
 
-  it('a case whose fields differ from the link goes to manual review', async () => {
-    seedLegacy('2026-11-01T10:00:00.000Z', '2026-11-01T10:00:01.000Z', { country: 'DE' });
-    await deliver(legacyEvent());
+  it('every older pack session goes to manual review, whatever its case looks like', async () => {
+    putJson(`emergency-cases/${CASE}.json`, { ...meta, description: 'whatever', savedAt: '2026-11-01T10:00:00.000Z' });
+    putJson(`emergency-case-sessions/${CASE}/${SESSION}.json`, { sessionId: SESSION, createdAt: '2026-11-01T10:00:01.000Z' });
+    await deliver(legacyEvent('evt_l2'));
     await settle();
-    expect(getJson<WebhookJob>(manualKey('evt_legacy'))!.parkedReason).toContain('country');
-  });
-
-  it('a missing case or session record goes to manual review; an unreadable one is retried', async () => {
-    // Case present (from setup) but this link was never recorded.
-    await deliver(legacyEvent('evt_l0'));
-    await settle();
-    expect(getJson<WebhookJob>(manualKey('evt_l0'))!.parkedReason).toContain('legacy_session_unrecorded');
-
-    s3Store.delete(`emergency-cases/${CASE}.json`);
-    const gone = legacyEvent('evt_l1');
-    gone.data.object.payment_intent = 'pi_legacy1';
-    await deliver(gone);
-    await settle();
-    expect(getJson<WebhookJob>(manualKey('evt_l1'))!.parkedReason).toContain('legacy_case_missing');
-
-    seedLegacy('2026-11-01T10:00:00.000Z', '2026-11-01T10:00:01.000Z');
-    failReads('emergency-cases/');
-    const evt = legacyEvent('evt_l2');
-    evt.data.object.payment_intent = 'pi_legacy2';
-    await deliver(evt);
-    await settle();
-    expect(s3Store.has(manualKey('evt_l2'))).toBe(false);
-    expect(getJson<WebhookJob>(pendingKey('evt_l2'))!.lastError).toContain('Could not read case');
+    expect(getJson<WebhookJob>(manualKey('evt_l2'))!.parkedReason).toContain('legacy_unverifiable');
     expect(gen.pack).not.toHaveBeenCalled();
   });
 
@@ -466,11 +448,139 @@ describe('sessions created before purchase snapshots', () => {
   });
 });
 
+describe('R1: the case document set has one owner from the start', () => {
+  const owner = `legal-packs/cases/${CASE}/owner.json`;
+
+  it('the owner is recorded before the forensic report and the first document', async () => {
+    const a = await openCheckout({ walletAddress: '0xabc' });
+    gen.report.mockImplementationOnce(async () => {
+      expect(getJson(owner)).toMatchObject({ paymentId: 'pi_a', caseId: CASE });
+      return { caseId: 'LH', identifiedEntities: [] };
+    });
+    await deliver(paidEvent(a, 'evt_a', 'pi_a'));
+    await settle();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(gen.pack).toHaveBeenCalledTimes(1);
+  });
+
+  it('a payment that finds another owner sends nothing: no report, no documents, no email', async () => {
+    const a = await openCheckout({ walletAddress: '0xabc' });
+    const b = await openCheckout({ walletAddress: '0xabc', description: 'B' });
+    // A owns the set and was interrupted before its manifest.
+    gen.pack.mockRejectedValueOnce(new Error('renderer crashed after the first PDF'));
+    await deliver(paidEvent(a, 'evt_a', 'pi_a'));
+    await settle();
+    expect(getJson(owner)).toMatchObject({ paymentId: 'pi_a' });
+    await deliver(paidEvent(b, 'evt_b', 'pi_b'));
+    await settle();
+    expect(gen.report).toHaveBeenCalledTimes(1);
+    expect(gen.pack).toHaveBeenCalledTimes(1);
+    expect(sentEmails).toHaveLength(0);
+    expect(getJson<WebhookJob>(manualKey('evt_b'))!.parkedReason).toContain('case_paid_twice');
+    expect(s3Store.has(pendingKey('evt_a'))).toBe(true); // A keeps retrying its own set
+  });
+
+  it('A and B paid at the same moment: exactly one owns the set, the other goes to manual review', async () => {
+    const a = await openCheckout();
+    const b = await openCheckout({ description: 'B' });
+    await Promise.all([deliver(paidEvent(a, 'evt_a', 'pi_a')), deliver(paidEvent(b, 'evt_b', 'pi_b'))]);
+    await settle();
+    expect(gen.pack).toHaveBeenCalledTimes(1);
+    expect(sentEmails).toHaveLength(1);
+    const winner = getJson<{ paymentId: string }>(owner)!.paymentId;
+    const loser = winner === 'pi_a' ? 'evt_b' : 'evt_a';
+    expect(getJson<WebhookJob>(manualKey(loser))!.parkedReason).toContain('case_paid_twice');
+  });
+
+  it.each([
+    ['a PDF', 'police-complaint.pdf', { pdf: 'old' }],
+    ['a manifest without a payment', 'manifest.json', { caseId: CASE, documents: [] }],
+  ])('existing documents without an owner (%s) are not adopted', async (_label, file, body) => {
+    const a = await openCheckout({ walletAddress: '0xabc' });
+    putJson(`legal-packs/cases/${CASE}/${file}`, body);
+    await deliver(paidEvent(a, 'evt_a', 'pi_a'));
+    await settle();
+    expect(gen.report).not.toHaveBeenCalled();
+    expect(gen.pack).not.toHaveBeenCalled();
+    expect(getJson<WebhookJob>(manualKey('evt_a'))!.parkedReason).toContain('pack_artifacts_unowned');
+    expect(s3Store.has(owner)).toBe(false);
+  });
+
+  it('a completion marker without a payment is not taken for this payment', async () => {
+    const a = await openCheckout();
+    putJson(`legal-packs/cases/${CASE}/complete.json`, { completedAt: 'earlier' });
+    await deliver(paidEvent(a, 'evt_a', 'pi_a'));
+    await settle();
+    expect(getJson<WebhookJob>(manualKey('evt_a'))!.parkedReason).toContain('pack_artifacts_unowned');
+    expect(s3Store.has(delivered('pi_a'))).toBe(false);
+  });
+
+  it('an unreadable owner record is retried, not decided', async () => {
+    const a = await openCheckout();
+    failReads(`legal-packs/cases/${CASE}/owner.json`);
+    await deliver(paidEvent(a, 'evt_a', 'pi_a'));
+    await settle();
+    expect(gen.pack).not.toHaveBeenCalled();
+    expect(getJson<WebhookJob>(pendingKey('evt_a'))!.lastError).toContain('Could not read pack owner');
+  });
+});
+
+describe('R3: the email retry deadline survives manual re-runs', () => {
+  const parkedAt = (ageMs: number, now: number) => ({
+    eventId: 'evt_old', createdAt: new Date(now - ageMs).toISOString(), status: 'pending' as const, attempts: 3,
+    session: { id: 'cs_old', payment_intent: 'pi_old', amount_total: 7900, metadata: { product: 'emergency_pack' }, customer_details: null },
+  });
+
+  it('a re-run 1 minute before the deadline keeps it: after a failed attempt and 2 h the job expires', async () => {
+    const now = Date.now();
+    putJson(failedKey('evt_old'), parkedAt(EXPIRE_MS - 60_000, now));
+    const requeued = await requeueParkedJob('evt_old', { now });
+    expect(requeued.result).toBe('requeued');
+    const fresh = getJson<WebhookJob>(pendingKey('evt_old'))!;
+    expect(Date.parse(fresh.emailRetryDeadline!)).toBe(Date.parse(fresh.originalCreatedAt!) + EXPIRE_MS);
+    const retry = { ...fresh, attempts: 1, lastAttemptAt: new Date(now).toISOString() };
+    expect(classifyJob(retry, now + 2 * 3600_000, false)).toBe('expire');
+    expect(isAcquirable(retry, now + 2 * 3600_000)).toBe(false);
+  });
+
+  it('after the deadline no path starts the job: acquire and webhook redelivery do nothing, the sweep parks it', async () => {
+    const now = Date.now();
+    const evt = { id: 'evt_dl', type: 'checkout.session.completed', data: { object: {
+      id: 'cs_dl', payment_intent: 'pi_dl', amount_total: 4900, customer_details: null, metadata: { email: 'buyer@example.com', walletAddress: '0xabc' } } } };
+    // A recent createdAt (as after a re-run) must not matter: the deadline is what counts.
+    const job = { ...jobFromEvent(evt, new Date(now - EXPIRE_MS - 60_000)), attempts: 1,
+      lastAttemptAt: new Date(now - RETRY_BACKOFF_MS - 60_000).toISOString(), createdAt: new Date(now - 60_000).toISOString() };
+    putJson(pendingKey('evt_dl'), job);
+    expect(await acquireJob('evt_dl', { now })).toBeNull();
+    putJson('webhook-payment-locks/pi_dl', { eventId: 'evt_dl' });
+    putJson('webhook-events/evt_dl', { claimedAt: 'earlier' });
+    await deliver(evt);
+    await settle();
+    expect(gen.report).not.toHaveBeenCalled();
+    await resumeStaleJobs({ now });
+    expect(getJson<WebhookJob>(failedKey('evt_dl'))!.parkedReason).toContain('email retry deadline');
+    expect(gen.report).not.toHaveBeenCalled();
+  });
+
+  it('an operator confirmation is recorded with the keys it covered and opens one new window', async () => {
+    const now = Date.now();
+    putJson(failedKey('evt_old'), parkedAt(EXPIRE_MS + 3600_000, now));
+    expect(await requeueParkedJob('evt_old', { now })).toMatchObject({
+      result: 'email-window-passed', idempotencyKeys: ['ledgerhound:report:pi_old', 'ledgerhound:pack:pi_old'],
+    });
+    const ok = await requeueParkedJob('evt_old', { now, emailChecked: true });
+    expect(ok.result).toBe('requeued');
+    const fresh = getJson<WebhookJob>(pendingKey('evt_old'))!;
+    expect(fresh.emailChecks).toEqual([expect.objectContaining({ keys: ['ledgerhound:report:pi_old', 'ledgerhound:pack:pi_old'] })]);
+    expect(Date.parse(fresh.emailRetryDeadline!)).toBe(now + EXPIRE_MS);
+  });
+});
+
 describe('order health', () => {
   it('counts pending, failed and manual review without ids or personal data; /api/health stays ok', async () => {
     putJson(manualKey('evt_m'), { eventId: 'evt_m', session: { metadata: { email: 'secret-person@example.com' } } });
     putJson(failedKey('evt_f'), { eventId: 'evt_f' });
-    putJson(pendingKey('evt_p'), { eventId: 'evt_p' }, new Date(Date.now() - 2 * 60 * 60 * 1000));
+    putJson(pendingKey('evt_p'), { eventId: 'evt_p', createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() });
     const res = await ordersHealth();
     const text = await res.text();
     expect(res.status).toBe(200);
@@ -487,6 +597,29 @@ describe('order health', () => {
     s3Faults.push((cmd, input) => (cmd === 'ListObjectsV2Command' && input.Prefix === 'webhook-jobs/failed/' ? s3Error('AccessDenied', 403) : null));
     const orders = await readOrderHealth();
     expect(orders).toMatchObject({ status: 'unknown', failed: null, pending: 0, manualReview: 0 });
+  });
+
+  it('R4: a 3-hour-old order retried a moment ago is still 3 hours old', async () => {
+    const now = Date.now();
+    putJson(pendingKey('evt_late'), { createdAt: new Date(now - 3 * 3600_000).toISOString(), status: 'pending', attempts: 1 }, new Date(now));
+    const orders = await readOrderHealth(now);
+    expect(orders).toMatchObject({ pending: 1, status: 'attention' });
+    expect(orders.oldestPendingAgeSeconds).toBeGreaterThanOrEqual(3 * 3600);
+  });
+
+  it('R4: a manual re-run does not make an order look new', async () => {
+    const now = Date.now();
+    putJson(pendingKey('evt_rq'), { createdAt: new Date(now).toISOString(), originalCreatedAt: new Date(now - 5 * 3600_000).toISOString(), status: 'pending', attempts: 0 });
+    expect((await readOrderHealth(now)).oldestPendingAgeSeconds).toBeGreaterThanOrEqual(5 * 3600);
+  });
+
+  it('R4: an unreadable pending record makes the age unknown, never zero', async () => {
+    putJson(pendingKey('evt_bad'), { status: 'pending' }); // no creation time
+    expect(await readOrderHealth()).toMatchObject({ pending: 1, oldestPendingAgeSeconds: null, status: 'unknown' });
+    s3Store.delete(pendingKey('evt_bad'));
+    putJson(pendingKey('evt_x'), { createdAt: new Date().toISOString() });
+    s3Faults.push((cmd, input) => (cmd === 'GetObjectCommand' && String(input.Key).startsWith('webhook-jobs/pending/') ? s3Error('ServiceUnavailable', 503) : null));
+    expect(await readOrderHealth()).toMatchObject({ pending: 1, oldestPendingAgeSeconds: null, status: 'unknown' });
   });
 
   it('an empty system is ok', async () => {

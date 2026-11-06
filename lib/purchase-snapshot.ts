@@ -25,8 +25,6 @@ export const PURCHASE_ID_RE = /^pur_[0-9a-f]{24}$/;
 export const SNAPSHOT_SHA_RE = /^[0-9a-f]{64}$/;
 
 export const snapshotKey = (caseId: string, purchaseId: string) => `${SNAPSHOT_PREFIX}${caseId}/${purchaseId}.json`;
-/** Snapshot frozen at processing time for a session created before snapshots existed. */
-export const legacySnapshotKey = (caseId: string, sessionId: string) => `${SNAPSHOT_PREFIX}${caseId}/legacy-${sessionId}.json`;
 
 export interface PurchaseRef {
   purchaseId: string;
@@ -44,10 +42,8 @@ export interface PurchaseSnapshot {
   /** What was charged. Never a substitute for the loss amount. */
   amountCents: number;
   currency: 'usd';
-  /** 'checkout': written before the link. 'legacy-verified': rebuilt for an older session after checks. */
-  source: 'checkout' | 'legacy-verified';
-  /** Only for legacy snapshots: the session they were verified against. */
-  sessionId?: string;
+  /** Written by the checkout before the payment link. */
+  source: 'checkout';
   /** The case exactly as submitted for this purchase (owner secret hash removed). */
   case: Record<string, unknown>;
 }
@@ -82,11 +78,6 @@ const bucket = () => process.env.AWS_S3_BUCKET!;
 export function isNotFound(err: unknown): boolean {
   const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
   return e?.$metadata?.httpStatusCode === 404 || e?.name === 'NoSuchKey' || e?.name === 'NotFound';
-}
-
-function isPreconditionFailed(err: unknown): boolean {
-  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return e?.$metadata?.httpStatusCode === 412 || e?.name === 'PreconditionFailed' || e?.name === 'ConditionalCheckFailed';
 }
 
 export const sha256 = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
@@ -158,40 +149,6 @@ export async function readSnapshot(ref: PurchaseRef): Promise<PurchaseSnapshot> 
     throw new ManualReviewError('snapshot_integrity', 'the purchase snapshot does not belong to this payment');
   }
   return snapshot;
-}
-
-/**
- * Freezes the legacy snapshot once. If another attempt froze it first, that
- * version wins (same session, so the same verified data).
- */
-export async function freezeLegacySnapshot(snapshot: PurchaseSnapshot): Promise<PurchaseSnapshot> {
-  const key = legacySnapshotKey(snapshot.caseId, snapshot.sessionId!);
-  try {
-    await getS3().send(new PutObjectCommand({
-      Bucket: bucket(),
-      Key: key,
-      Body: JSON.stringify(snapshot),
-      ContentType: 'application/json',
-      ServerSideEncryption: 'aws:kms',
-      IfNoneMatch: '*',
-    }));
-    return snapshot;
-  } catch (err) {
-    if (!isPreconditionFailed(err)) throw err;
-    const existing = await readLegacySnapshot(snapshot.caseId, snapshot.sessionId!);
-    if (!existing) throw new RetryableReadError('legacy purchase snapshot', err);
-    return existing;
-  }
-}
-
-export async function readLegacySnapshot(caseId: string, sessionId: string): Promise<PurchaseSnapshot | null> {
-  const text = await readText(legacySnapshotKey(caseId, sessionId), 'legacy purchase snapshot');
-  if (text === null) return null;
-  try {
-    const snapshot = JSON.parse(text) as PurchaseSnapshot;
-    if (snapshot.source === 'legacy-verified' && snapshot.caseId === caseId && snapshot.sessionId === sessionId && snapshot.case) return snapshot;
-  } catch { /* falls through */ }
-  throw new ManualReviewError('snapshot_integrity', 'the frozen legacy snapshot is unreadable');
 }
 
 /** Positive finite loss amount, or null. The price of the pack is never used in its place. */

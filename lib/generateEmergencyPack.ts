@@ -3,7 +3,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEmailTransport, sendEmailOnce } from '@/lib/idempotent-email';
-import { readPackManifest, writePackManifestOnce, type PackManifest } from '@/lib/legal-packs/manifest';
+import { claimPackOwner, readPackManifest, writePackManifestOnce, type PackManifest } from '@/lib/legal-packs/manifest';
 import { getResearch } from '@/lib/legal-packs/s3';
 import { ManualReviewError } from '@/lib/purchase-snapshot';
 import {
@@ -180,8 +180,14 @@ export interface GeneratePackInput {
   enrichment?: EnrichmentData;
   /** Same key on every retry of one purchase, so the pack email goes out once. */
   idempotencyKey?: string;
-  /** The payment this pack is for; recorded in the manifest so another payment never reuses it. */
+  /**
+   * The payment this pack is for. When set, the case's document set must be
+   * owned by it (claimed here if nobody owns it) before anything is read,
+   * rendered or sent, and the manifest records it. Only the admin
+   * generate-pack tool calls without it.
+   */
   paymentId?: string;
+  purchaseId?: string;
 }
 
 export interface GeneratePackResult {
@@ -202,6 +208,7 @@ export interface GeneratePackResult {
  * stored, email payload fixed) a retry only re-sends that exact email.
  */
 export async function generateEmergencyPack(input: GeneratePackInput): Promise<GeneratePackResult> {
+  if (input.paymentId) await claimPackOwner(input.caseId, input.paymentId, input.purchaseId);
   const frozen = await readPackManifest(input.caseId);
   if (frozen) {
     assertSamePayment(frozen, input.paymentId);
