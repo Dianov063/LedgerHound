@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { createHash } from 'crypto';
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -17,16 +18,29 @@ const getS3 = () =>
 
 const bucket = () => process.env.AWS_S3_BUCKET!;
 
-/* ── Types ── */
-interface VictimGroup {
-  platformName: string;
+/*
+ * The list of people affected by a platform (review/44, option A).
+ *
+ * One record per person and platform: scam-database/groups/<slug>/members/<id>.json,
+ * where <id> is a hash of the platform and the normalised email. The record links the
+ * email to the country, loss and case it came with. It is created with If-None-Match,
+ * so two parallel joins cannot overwrite each other, and a repeat join finds the
+ * existing record instead of counting the person twice. Changes to a record use
+ * If-Match. Totals are counted from the records.
+ *
+ * The older one-file-per-group format (scam-database/groups/<slug>.json, emails kept
+ * apart from amounts) is left untouched; moving it is a separate, backed-up step.
+ */
+interface GroupMember {
   slug: string;
-  victims: number;
-  totalLoss: number;
-  threshold: number;
-  jurisdictions: string[];
-  emails: string[]; // encrypted/hashed in production
-  createdAt: string;
+  platformName: string;
+  email: string;
+  country: string;
+  lossAmount: number;
+  scamType: string;
+  caseId: string;
+  walletAddress: string;
+  joinedAt: string;
   updatedAt: string;
 }
 
@@ -39,36 +53,53 @@ const slugify = (name: string) =>
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-async function streamToString(stream: any): Promise<string> {
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
-}
+const membersPrefix = (slug: string) => `scam-database/groups/${slug}/members/`;
+const memberId = (slug: string, email: string) =>
+  createHash('sha256').update(`${slug}\n${email.trim().toLowerCase()}`).digest('hex').slice(0, 32);
 
-async function s3Get(key: string): Promise<any | null> {
+const isPreconditionFailed = (err: any) =>
+  err?.$metadata?.httpStatusCode === 412 || err?.name === 'PreconditionFailed';
+
+async function readMember(key: string): Promise<{ member: GroupMember; etag: string | undefined } | null> {
   try {
-    const data = await getS3().send(
-      new GetObjectCommand({ Bucket: bucket(), Key: key }),
-    );
-    const str = await streamToString(data.Body);
-    return JSON.parse(str);
+    const res = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+    return { member: JSON.parse(await res.Body!.transformToString()), etag: res.ETag };
   } catch (err: any) {
-    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) return null;
+    if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) return null;
     throw err;
   }
 }
 
-async function s3Put(key: string, data: any): Promise<void> {
-  await getS3().send(
-    new PutObjectCommand({
-      Bucket: bucket(),
-      Key: key,
-      Body: JSON.stringify(data),
-      ContentType: 'application/json',
-    }),
-  );
+async function writeMember(key: string, member: GroupMember, condition: { IfNoneMatch: '*' } | { IfMatch: string }) {
+  await getS3().send(new PutObjectCommand({
+    Bucket: bucket(),
+    Key: key,
+    Body: JSON.stringify(member),
+    ContentType: 'application/json',
+    ServerSideEncryption: 'aws:kms',
+    ...condition,
+  }));
+}
+
+/** Count the people on a platform's list and their reported losses, from the records. */
+async function countMembers(slug: string): Promise<{ victims: number; totalLoss: number }> {
+  const s3 = getS3();
+  let victims = 0;
+  let totalLoss = 0;
+  let token: string | undefined;
+  const keys: string[] = [];
+  do {
+    const res = await s3.send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: membersPrefix(slug), ContinuationToken: token }));
+    for (const o of res.Contents ?? []) if (o.Key?.endsWith('.json')) keys.push(o.Key);
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  for (const key of keys) {
+    const found = await readMember(key);
+    if (!found) continue;
+    victims++;
+    totalLoss += Number(found.member.lossAmount) || 0;
+  }
+  return { victims, totalLoss };
 }
 
 export async function POST(req: NextRequest) {
@@ -81,86 +112,78 @@ export async function POST(req: NextRequest) {
     }
 
     /* ── Parse body ── */
-    const { caseId, email, country, walletAddress, platformName, lossAmount, scamType } =
-      await req.json();
+    const body = await req.json().catch(() => null);
+    const { caseId, email: rawEmail, country, walletAddress, platformName, lossAmount, scamType } = body ?? {};
+    const email = typeof rawEmail === 'string' ? rawEmail.trim() : rawEmail;
 
     /* ── Validate ── */
-    if (!caseId) {
+    if (!caseId || typeof caseId !== 'string') {
       return NextResponse.json({ error: 'Missing caseId' }, { status: 400 });
     }
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    if (!platformName) {
+    if (!platformName || typeof platformName !== 'string') {
       return NextResponse.json({ error: 'Missing platformName' }, { status: 400 });
     }
 
-    if (!lossAmount || typeof lossAmount !== 'number' || lossAmount <= 0) {
+    if (!lossAmount || typeof lossAmount !== 'number' || !Number.isFinite(lossAmount) || lossAmount <= 0) {
       return NextResponse.json({ error: 'Invalid lossAmount' }, { status: 400 });
     }
 
     /* ── Generate slug ── */
-    const slug = slugify(platformName);
+    const slug = slugify(platformName).slice(0, 60);
     if (!slug) {
       return NextResponse.json({ error: 'Invalid platformName' }, { status: 400 });
     }
 
-    /* ── Load or create group ── */
-    const groupKey = `scam-database/groups/${slug}.json`;
-    let group: VictimGroup | null = await s3Get(groupKey);
+    const now = new Date().toISOString();
+    const key = `${membersPrefix(slug)}${memberId(slug, email)}.json`;
+    const fresh: GroupMember = {
+      slug,
+      platformName: platformName.slice(0, 200),
+      email: email.trim(),
+      country: typeof country === 'string' ? country.slice(0, 8) : '',
+      lossAmount,
+      scamType: typeof scamType === 'string' ? scamType.slice(0, 40) : '',
+      caseId: caseId.slice(0, 80),
+      walletAddress: typeof walletAddress === 'string' ? walletAddress.slice(0, 128) : '',
+      joinedAt: now,
+      updatedAt: now,
+    };
 
-    const nowISO = new Date().toISOString();
-
-    if (!group) {
-      group = {
-        platformName,
-        slug,
-        victims: 0,
-        totalLoss: 0,
-        threshold: 500000,
-        jurisdictions: [],
-        emails: [],
-        createdAt: nowISO,
-        updatedAt: nowISO,
-      };
+    /* ── Add the person, or update the record they already have ── */
+    let alreadyOnList = false;
+    for (let attempt = 0; ; attempt++) {
+      const existing = await readMember(key);
+      try {
+        if (!existing) {
+          await writeMember(key, fresh, { IfNoneMatch: '*' });
+        } else {
+          alreadyOnList = true;
+          const { member } = existing;
+          const same = member.lossAmount === fresh.lossAmount && member.country === fresh.country
+            && member.caseId === fresh.caseId && member.scamType === fresh.scamType && member.walletAddress === fresh.walletAddress;
+          if (!same) {
+            // The latest answers replace the earlier ones; the person still counts once.
+            await writeMember(key, { ...fresh, joinedAt: member.joinedAt }, { IfMatch: existing.etag ?? '*' });
+          }
+        }
+        break;
+      } catch (err) {
+        // Someone wrote the same record in between: read it again and retry.
+        if (!isPreconditionFailed(err) || attempt >= 2) throw err;
+      }
     }
 
-    /* ── Add victim to group ── */
-    group.victims++;
-    group.totalLoss += lossAmount;
+    const { victims, totalLoss } = await countMembers(slug);
+    console.log(`[emergency/join-group] ${alreadyOnList ? 'Updated' : 'Added'} a member of "${slug}": ${victims} on the list`);
 
-    if (country && !group.jurisdictions.includes(country)) {
-      group.jurisdictions.push(country);
-    }
-
-    if (!group.emails.includes(email)) {
-      group.emails.push(email);
-    }
-
-    group.threshold = Math.max(group.totalLoss * 2, 500000);
-    group.updatedAt = nowISO;
-
-    /* ── Save back to S3 ── */
-    await s3Put(groupKey, group);
-
-    const progress = Math.round((group.totalLoss / group.threshold) * 100);
-
-    console.log(
-      `[emergency/join-group] Victim joined group "${slug}": ${group.victims} victims, $${group.totalLoss} total loss`,
-    );
-
-    return NextResponse.json({
-      success: true,
-      groupSlug: slug,
-      victims: group.victims,
-      totalLoss: group.totalLoss,
-      threshold: group.threshold,
-      progress,
-    });
+    return NextResponse.json({ success: true, groupSlug: slug, alreadyOnList, victims, totalLoss });
   } catch (err: any) {
-    console.error('[emergency/join-group] Error:', err);
+    console.error('[emergency/join-group] Error:', err?.name || err);
     return NextResponse.json(
       { error: 'Failed to join group' },
       { status: 500 },
