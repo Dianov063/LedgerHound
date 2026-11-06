@@ -64,6 +64,28 @@ const EVM_NETWORKS: Network[] = ['eth', 'bnb', 'polygon', 'base', 'arb', 'op', '
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/* Each address costs several paid provider calls (two Alchemy transfer queries plus
+   timestamp backfill on EVM), so the request is bounded before any of them start. */
+const MAX_ADDRESSES = 5;
+/** Raw list length accepted before validation, so a huge array is refused unread. */
+const MAX_RAW_ADDRESSES = 50;
+/** Addresses fetched at the same time within one request. */
+const ADDRESS_CONCURRENCY = 2;
+
+/** Run fn over items, at most `limit` at a time, settling like Promise.allSettled. */
+async function settleLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const out: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      try { out[i] = { status: 'fulfilled', value: await fn(items[i]) }; }
+      catch (reason) { out[i] = { status: 'rejected', reason }; }
+    }
+  }));
+  return out;
+}
+
 async function fetchAlchemyTransfers(alchemyUrl: string, params: object) {
   // Retry with backoff on rate limit
   let json: any;
@@ -126,7 +148,7 @@ async function fetchTransfersForNetwork(
 ): Promise<any[]> {
   switch (network) {
     case 'btc': {
-      const settled = await Promise.allSettled(addresses.map((a) => fetchBtcTransfers(a)));
+      const settled = await settleLimited(addresses, ADDRESS_CONCURRENCY, (a) => fetchBtcTransfers(a));
       const failed = settled.filter(r => r.status === 'rejected');
       if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} BTC address fetches failed`);
       return settled
@@ -137,7 +159,7 @@ async function fetchTransfersForNetwork(
     case 'polygon':
     case 'bnb': {
       const url = getAlchemyUrls()[network];
-      const settled = await Promise.allSettled(addresses.map((a) => fetchAlchemyForAddress(a, url, network)));
+      const settled = await settleLimited(addresses, ADDRESS_CONCURRENCY, (a) => fetchAlchemyForAddress(a, url, network));
       const failed = settled.filter(r => r.status === 'rejected');
       if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} ${network} address fetches failed`);
       return settled
@@ -145,7 +167,7 @@ async function fetchTransfersForNetwork(
         .flatMap((r) => r.value);
     }
     case 'sol': {
-      const settled = await Promise.allSettled(addresses.map((a) => fetchSolTransfers(a)));
+      const settled = await settleLimited(addresses, ADDRESS_CONCURRENCY, (a) => fetchSolTransfers(a));
       const failed = settled.filter(r => r.status === 'rejected');
       if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} SOL address fetches failed`);
       return settled
@@ -153,7 +175,7 @@ async function fetchTransfersForNetwork(
         .flatMap((r) => r.value.transfers);
     }
     case 'trx': {
-      const settled = await Promise.allSettled(addresses.map((a) => fetchTronTransfers(a)));
+      const settled = await settleLimited(addresses, ADDRESS_CONCURRENCY, (a) => fetchTronTransfers(a));
       const failed = settled.filter(r => r.status === 'rejected');
       if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} TRX address fetches failed`);
       return settled
@@ -168,7 +190,7 @@ async function fetchTransfersForNetwork(
     case 'zksync':
     case 'scroll':
     case 'mantle': {
-      const settled = await Promise.allSettled(addresses.map((a) => fetchEtherscanV2Transfers(a, network)));
+      const settled = await settleLimited(addresses, ADDRESS_CONCURRENCY, (a) => fetchEtherscanV2Transfers(a, network));
       const failed = settled.filter(r => r.status === 'rejected');
       if (failed.length > 0) console.warn(`[track] ${failed.length}/${settled.length} ${network} address fetches failed`);
       return settled
@@ -188,8 +210,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
     }
 
-    const body = await req.json();
-    const { addresses: rawAddresses, network: rawNetwork } = body;
+    const body = await req.json().catch(() => null);
+    const { addresses: rawAddresses, network: rawNetwork } = body ?? {};
     const network: Network = rawNetwork || 'eth';
 
     if (!VALID_NETWORKS.includes(network)) {
@@ -202,12 +224,22 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(rawAddresses) || rawAddresses.length === 0) {
       return NextResponse.json({ error: 'Provide at least one address' }, { status: 400 });
     }
+    if (rawAddresses.length > MAX_RAW_ADDRESSES) {
+      return NextResponse.json({ error: `Track at most ${MAX_ADDRESSES} addresses at a time.` }, { status: 413 });
+    }
+    if (rawAddresses.some((a: unknown) => typeof a !== 'string')) {
+      return NextResponse.json({ error: 'Addresses must be strings' }, { status: 400 });
+    }
 
-    // Normalize addresses: only lowercase EVM addresses
-    const addresses = rawAddresses.map((a: string) => {
-      if (EVM_NETWORKS.includes(network)) return a.toLowerCase();
-      return a;
-    });
+    // Normalize addresses (only EVM addresses are lowercased) and drop repeats,
+    // so the same address never costs twice.
+    const addresses: string[] = Array.from(new Set((rawAddresses as string[]).map((a) => {
+      const trimmed = a.trim();
+      return EVM_NETWORKS.includes(network) ? trimmed.toLowerCase() : trimmed;
+    })));
+    if (addresses.length > MAX_ADDRESSES) {
+      return NextResponse.json({ error: `Track at most ${MAX_ADDRESSES} addresses at a time.` }, { status: 413 });
+    }
 
     const pattern = ADDRESS_PATTERNS[network];
     const invalid = addresses.find((a: string) => !pattern.test(a));
