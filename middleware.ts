@@ -35,8 +35,47 @@ function addCorsHeaders(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-key, x-submission-token');
 }
 
+/* Open-redirect guard (next-intl < 4.9.1, GHSA-8f24-v5vv-gm5j). With localePrefix
+   'as-needed', next-intl redirects /en/<rest> to /<rest>. A control character the URL
+   parser drops — e.g. /en/%09/evil.example — turns <rest> into //evil.example, a
+   protocol-relative redirect off the site. Two independent checks:
+   1. a path that decodes to a control character or a backslash is refused;
+   2. a redirect or rewrite to another origin is never sent, whatever produced it. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_PATH = /[\u0000-\u001F\u007F\\]/;
+
+function badRequest() {
+  const response = new NextResponse('Bad Request', { status: 400 });
+  addSecurityHeaders(response);
+  return response;
+}
+
+function hasUnsafePath(pathname: string): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return true; // malformed escape sequence
+  }
+  return UNSAFE_PATH.test(decoded) || UNSAFE_PATH.test(pathname);
+}
+
+function leavesOrigin(response: NextResponse, origin: string): boolean {
+  return ['location', 'x-middleware-rewrite'].some((header) => {
+    const target = response.headers.get(header);
+    if (!target) return false;
+    try {
+      return new URL(target, origin).origin !== origin;
+    } catch {
+      return true;
+    }
+  });
+}
+
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (!pathname.startsWith('/api/') && hasUnsafePath(pathname)) return badRequest();
 
   // Handle CORS preflight for API routes (except webhook — Stripe needs open access)
   if (pathname.startsWith('/api/') && pathname !== '/api/webhook') {
@@ -58,6 +97,7 @@ export default function middleware(request: NextRequest) {
 
   // All other routes go through i18n middleware
   const response = intlMiddleware(request);
+  if (leavesOrigin(response, request.nextUrl.origin)) return badRequest();
   addSecurityHeaders(response);
   return response;
 }
