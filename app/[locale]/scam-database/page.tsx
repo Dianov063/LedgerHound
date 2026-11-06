@@ -86,8 +86,9 @@ export default function ScamDatabasePage() {
       fetch('/api/scam-database/stats').then(r => r.json()),
       fetch('/api/scam-database/search?q=').then(r => r.json()),
     ]).then(([statsData, platformsData]) => {
-      setStats(statsData);
-      setPlatforms(platformsData.platforms || []);
+      // An error answer ({ error }) has no totals: show no stats rather than crash.
+      setStats(typeof statsData?.totalReports === 'number' ? statsData : null);
+      setPlatforms(Array.isArray(platformsData?.platforms) ? platformsData.platforms : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

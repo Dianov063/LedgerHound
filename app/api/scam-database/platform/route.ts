@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getPlatformBySlug, getReportsForPlatform } from '@/lib/scam-db';
+import { getPublicPlatform } from '@/lib/scam-db';
 
 // Reads request.url (query params) → must be dynamic, like the sibling scam-db
 // API routes. Silences the build-time "Dynamic server usage" warning.
@@ -14,13 +14,14 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: 'Missing slug parameter' }, { status: 400 });
     }
 
-    const platform = await getPlatformBySlug(slug);
-    if (!platform) {
+    // Rejected reports and everything derived from them are not public.
+    const found = await getPublicPlatform(slug);
+    if (!found) {
       return Response.json({ error: 'Platform not found' }, { status: 404 });
     }
+    const { platform, reports } = found;
 
-    // Fetch individual reports (strip private data)
-    const reports = await getReportsForPlatform(platform.reportIds);
+    // Strip private data from the published reports
     const safeReports = reports.map(r => ({
       id: r.id,
       createdAt: r.createdAt,

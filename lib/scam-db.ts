@@ -154,6 +154,8 @@ export function slugify(name: string): string {
 }
 
 async function streamToString(stream: any): Promise<string> {
+  // SDK v3 response bodies can convert themselves; fall back to reading the stream.
+  if (typeof stream?.transformToString === 'function') return stream.transformToString();
   const chunks: Uint8Array[] = [];
   for await (const chunk of stream) {
     chunks.push(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk);
@@ -213,6 +215,158 @@ export function getTrustLabel(score: number): { label: string; color: string; em
   if (score >= 10) return { label: 'Likely Scam', color: 'orange', emoji: '🔴' };
   if (score >= 4) return { label: 'Suspicious', color: 'yellow', emoji: '⚠️' };
   return { label: 'Community Reported', color: 'gray', emoji: '' };
+}
+
+/* ── Public view ──
+   Stored platform, index and address files are append-only counters written when a
+   report arrives. What the public sees is derived from the reports themselves:
+   - a rejected report (or one whose file cannot be read) contributes nothing:
+     no text, address, URL, loss, victim count or score;
+   - reports nobody has moderated cannot raise a community platform above
+     "Suspicious" (score 9), however many of them arrive;
+   - seeded platforms (with external sources) keep their seeded values.
+   Stored files written before this rule are corrected here at read time. */
+
+/** Report statuses the public may see. */
+export const PUBLISHED_STATUSES: readonly ScamReport['status'][] = ['pending', 'verified'];
+export const isPublished = (report: Pick<ScamReport, 'status'>) => PUBLISHED_STATUSES.includes(report.status);
+
+/** Highest score a community platform reaches without a moderator-verified report. */
+export const UNMODERATED_SCORE_CAP = 9;
+
+const hasSources = (platform: ScamPlatform) => (platform.sources?.length ?? 0) > 0;
+
+/** Read reports by id; a report that is missing or cannot be read is left out. */
+async function loadReports(ids: string[]): Promise<ScamReport[]> {
+  const unique = Array.from(new Set(ids));
+  const results = await Promise.allSettled(unique.map(id => s3Get(`reports/${id}.json`)));
+  const failed = results.filter(r => r.status === 'rejected').length;
+  if (failed) console.warn(`[scam-db] ${failed}/${results.length} report reads failed; they are not shown`);
+  return results
+    .map(r => (r.status === 'fulfilled' ? r.value : null))
+    .filter((r): r is ScamReport => !!r && unique.includes(r.id));
+}
+
+/**
+ * The platform as the public may see it, or null when nothing about it may be shown.
+ * `reports` are the platform's loaded report files (any status).
+ */
+export function toPublicPlatform(platform: ScamPlatform, reports: ScamReport[]): ScamPlatform | null {
+  const sourced = hasSources(platform);
+  if (platform.reportIds.length === 0) return sourced || platform.victims > 0 ? platform : null;
+
+  const published = reports.filter(isPublished);
+  if (!sourced && published.length === 0) return null;
+  // With a report unread, an item it carried would look seeded: show no seeded items then.
+  const complete = new Set(platform.reportIds).size === reports.length;
+  const seeded = sourced && complete;
+
+  // An item (address, URL, type) is shown when a published report carries it, or —
+  // on a seeded platform — when no report carries it at all (it came from the seed).
+  const keep = <T>(stored: T[], of: (r: ScamReport) => (T | undefined)[]): T[] => {
+    const fromPublished = new Set(published.flatMap(of));
+    const fromAny = new Set(reports.flatMap(of));
+    const fromSeed = seeded ? stored.filter(x => !fromAny.has(x)) : [];
+    return Array.from(new Set([...fromSeed, ...stored.filter(x => fromPublished.has(x)), ...Array.from(fromPublished)]))
+      .filter((x): x is T => x !== undefined && x !== '');
+  };
+
+  const seedVictims = sourced ? Math.max(0, platform.victims - platform.reportIds.length) : 0;
+  const seedLoss = seeded ? Math.max(0, platform.totalLoss - reports.reduce((s, r) => s + (r.lossAmount || 0), 0)) : 0;
+  const seedChain = seeded ? Math.max(0, platform.blockchainVerifiedCount - reports.filter(r => r.blockchainConfirmed).length) : 0;
+  const staffVerifiedReport = published.some(r => r.status === 'verified' && r.trustTier === 3);
+  const moderated = published.some(r => r.status === 'verified');
+  const dates = published.map(r => r.createdAt).sort();
+
+  const view: ScamPlatform = {
+    ...platform,
+    reportIds: published.map(r => r.id),
+    victims: seedVictims + published.length,
+    totalLoss: seedLoss + published.reduce((s, r) => s + (r.lossAmount || 0), 0),
+    blockchainVerifiedCount: seedChain + published.filter(r => r.blockchainConfirmed).length,
+    staffVerified: (sourced && platform.staffVerified) || staffVerifiedReport,
+    addresses: keep(platform.addresses, r => [r.scamAddress]),
+    urls: keep(platform.urls, r => [r.platformUrl, ...(r.platformUrls || [])]),
+    types: keep(platform.types, r => [r.platformType]),
+    firstReported: sourced ? platform.firstReported : dates[0],
+    lastReported: sourced && !dates.length ? platform.lastReported : dates[dates.length - 1],
+  };
+  let score = calcTrustScore(view);
+  if (sourced) score = Math.max(score, platform.trustScore);
+  else if (!moderated) score = Math.min(score, UNMODERATED_SCORE_CAP);
+  view.trustScore = score;
+  view.verified = (sourced && platform.verified) || score >= 10;
+  return view;
+}
+
+const toIndexEntry = (p: ScamPlatform): PlatformIndexEntry => ({
+  slug: p.slug,
+  name: p.name,
+  victims: p.victims,
+  totalLoss: p.totalLoss,
+  verified: p.verified,
+  trustScore: p.trustScore,
+  types: p.types,
+  urls: p.urls,
+  lastReported: p.lastReported,
+  addresses: p.addresses,
+});
+
+/** Public platform and its published reports, or null when it may not be shown. */
+export async function getPublicPlatform(slug: string): Promise<{ platform: ScamPlatform; reports: ScamReport[] } | null> {
+  const platform: ScamPlatform | null = await s3Get(`platforms/${slug}.json`);
+  if (!platform) return null;
+  const reports = await loadReports(platform.reportIds);
+  const view = toPublicPlatform(platform, reports);
+  if (!view) return null;
+  const order = new Map(view.reportIds.map((id, i) => [id, i]));
+  return { platform: view, reports: reports.filter(r => order.has(r.id)).sort((a, b) => order.get(a.id)! - order.get(b.id)!) };
+}
+
+/* The public index is recomputed from platform and report files; cached briefly in
+   this process and dropped on every write made here. */
+const INDEX_TTL_MS = 30_000;
+let publicIndexCache: { at: number; value: PlatformIndexEntry[] } | null = null;
+export function _clearPublicIndexCache(): void { publicIndexCache = null; }
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
+  }));
+  return out;
+}
+
+async function readStoredIndex(): Promise<PlatformIndexEntry[]> {
+  const data = await s3Get('index/platforms.json');
+  return Array.isArray(data) ? data : [];
+}
+
+async function buildPublicIndex(stored: PlatformIndexEntry[]): Promise<PlatformIndexEntry[]> {
+  const entries = await mapLimit(stored, 8, async (entry) => {
+    // Seeded entries without reports have nothing to correct.
+    if (!entry.victims) return entry;
+    const view = await getPublicPlatform(entry.slug);
+    return view ? toIndexEntry(view.platform) : null;
+  });
+  return entries.filter((e): e is PlatformIndexEntry => !!e);
+}
+
+/** Recompute this platform's public index entry (or remove it) after a write. */
+async function refreshIndexEntry(slug: string): Promise<PlatformIndexEntry[]> {
+  const index = await readStoredIndex();
+  const view = await getPublicPlatform(slug);
+  const at = index.findIndex(p => p.slug === slug);
+  if (view) {
+    if (at >= 0) index[at] = toIndexEntry(view.platform);
+    else index.push(toIndexEntry(view.platform));
+  } else if (at >= 0) {
+    index.splice(at, 1);
+  }
+  await s3Put('index/platforms.json', index);
+  publicIndexCache = null;
+  return index;
 }
 
 /* ── TXID uniqueness (atomic — file existence check) ── */
@@ -282,8 +436,11 @@ export async function saveReport(report: Omit<ScamReport, 'id' | 'createdAt'>): 
   if (full.trustTier === 3) platform.staffVerified = true;
   platform.lastReported = now;
   if (now < platform.firstReported) platform.firstReported = now;
-  platform.trustScore = calcTrustScore(platform);
-  platform.verified = platform.trustScore >= 10;
+  // Seeded platforms keep their seeded score; community scores are derived at read time.
+  if (!hasSources(platform)) {
+    platform.trustScore = calcTrustScore(platform);
+    platform.verified = platform.trustScore >= 10;
+  }
   await s3Put(`platforms/${slug}.json`, platform);
 
   // 4. Update address index if address provided
@@ -308,24 +465,8 @@ export async function saveReport(report: Omit<ScamReport, 'id' | 'createdAt'>): 
     await s3Put(`addresses/${addrKey}.json`, addr);
   }
 
-  // 5. Update platform index (append/update one entry — lightweight)
-  const index: PlatformIndexEntry[] = (await s3Get('index/platforms.json')) || [];
-  const existing = index.findIndex(p => p.slug === slug);
-  const entry: PlatformIndexEntry = {
-    slug,
-    name: platform.name,
-    victims: platform.victims,
-    totalLoss: platform.totalLoss,
-    verified: platform.verified,
-    trustScore: platform.trustScore,
-    types: platform.types,
-    urls: platform.urls,
-    lastReported: platform.lastReported,
-    addresses: platform.addresses,
-  };
-  if (existing >= 0) index[existing] = entry;
-  else index.push(entry);
-  await s3Put('index/platforms.json', index);
+  // 5. Update this platform's entry in the index with its public view
+  const index = await refreshIndexEntry(slug);
 
   // 6. Update stats (increment only)
   const stats: ScamStats = (await s3Get('index/stats.json')) || defaultStats();
@@ -348,14 +489,25 @@ export async function saveDispute(dispute: Omit<ScamDispute, 'id' | 'createdAt' 
 }
 
 /* ── Read data ── */
+/** Public platform index: only what may be shown, with aggregates from published reports. */
 export async function getPlatformIndex(): Promise<PlatformIndexEntry[]> {
-  const data = await s3Get('index/platforms.json');
-  if (Array.isArray(data)) {
-    console.log('[platforms] Loaded', data.length, 'platforms from S3');
-    return data;
-  }
-  console.log('[platforms] No platform index found in S3 (key: scam-database/index/platforms.json)');
-  return [];
+  if (publicIndexCache && Date.now() - publicIndexCache.at < INDEX_TTL_MS) return publicIndexCache.value;
+  const value = await buildPublicIndex(await readStoredIndex());
+  publicIndexCache = { at: Date.now(), value };
+  return value;
+}
+
+/** Public totals, derived from the public index rather than the stored counters. */
+export async function getPublicStats(): Promise<ScamStats> {
+  const [stored, index] = await Promise.all([getStats(), getPlatformIndex()]);
+  const totalReports = index.reduce((sum, p) => sum + p.victims, 0);
+  return {
+    totalReports,
+    totalPlatforms: index.length,
+    totalLoss: index.reduce((sum, p) => sum + p.totalLoss, 0),
+    blockchainVerified: Math.min(Math.max(0, stored.blockchainVerified), totalReports),
+    updatedAt: stored.updatedAt,
+  };
 }
 
 export async function getStats(): Promise<ScamStats> {
@@ -376,20 +528,42 @@ export async function getReportById(id: string): Promise<ScamReport | null> {
   return s3Get(`reports/${id}.json`);
 }
 
-export async function getReportsForPlatform(reportIds: string[]): Promise<ScamReport[]> {
-  const results = await Promise.allSettled(reportIds.map(id => s3Get(`reports/${id}.json`)));
-  const failed = results.filter(r => r.status === 'rejected');
-  if (failed.length > 0) {
-    console.warn(`[scam-db] getReportsForPlatform: ${failed.length}/${results.length} S3 fetches failed`);
-  }
-  return results
-    .filter((r): r is PromiseFulfilledResult<ScamReport | null> => r.status === 'fulfilled')
-    .map(r => r.value)
-    .filter(Boolean) as ScamReport[];
-}
-
+/**
+ * Public address entry: only platforms and reports that may be shown, or null.
+ * Throws when the address file cannot be read, so callers can say "unavailable".
+ */
 export async function getAddressIndex(address: string): Promise<AddressIndex | null> {
-  return s3Get(`addresses/${address.toLowerCase()}.json`);
+  const stored: AddressIndex | null = await s3Get(`addresses/${address.toLowerCase()}.json`);
+  if (!stored) return null;
+  const ids = stored.reports || [];
+  if (ids.length === 0) return stored.platforms?.length ? stored : null; // seeded entry
+
+  const reports = await loadReports(ids);
+  const published = reports.filter(isPublished);
+  const fromAny = new Set(reports.map(r => slugify(r.platformName)));
+  const fromPublished = new Set(published.map(r => slugify(r.platformName)));
+  // A platform stays when a published report names it, or no report names it (seeded).
+  // With a report unread, any platform could be its: then only published ones stay.
+  const complete = new Set(ids).size === reports.length;
+  const platforms = stored.platforms.filter(slug => fromPublished.has(slug) || (complete && !fromAny.has(slug)));
+  if (platforms.length === 0) return null;
+  const seeded = platforms.filter(slug => !fromAny.has(slug));
+  const names = Array.from(new Set([
+    ...published.map(r => r.platformName),
+    ...stored.platformNames.filter(name => seeded.includes(slugify(name))),
+  ]));
+  const seedLoss = seeded.length ? Math.max(0, stored.totalLoss - reports.reduce((s, r) => s + (r.lossAmount || 0), 0)) : 0;
+  const dates = published.map(r => r.createdAt).sort();
+  return {
+    address: stored.address,
+    platforms,
+    platformNames: names,
+    reports: published.map(r => r.id),
+    totalLoss: seedLoss + published.reduce((s, r) => s + (r.lossAmount || 0), 0),
+    networks: Array.from(new Set(published.map(r => r.network).filter((n): n is string => !!n))),
+    firstSeen: dates[0] ?? stored.firstSeen,
+    lastSeen: dates[dates.length - 1] ?? stored.lastSeen,
+  };
 }
 
 /* ── Search ── */
@@ -456,31 +630,20 @@ export async function updateReportStatus(id: string, status: 'verified' | 'rejec
   if (status === 'verified') report.verifiedAt = new Date().toISOString();
   await s3Put(`reports/${id}.json`, report);
 
-  // Update the platform's trust score
+  // The platform's public view (score, counts, addresses) is derived from its reports;
+  // the stored index entry is refreshed so lists and search follow the new status.
   const slug = slugify(report.platformName);
-  const platform = await getPlatformBySlug(slug);
-  if (platform) {
-    if (status === 'verified' && trustTier === 3) platform.staffVerified = true;
-    platform.trustScore = calcTrustScore(platform);
-    platform.verified = platform.trustScore >= 10;
-    await s3Put(`platforms/${slug}.json`, platform);
+  if (await getPlatformBySlug(slug)) await refreshIndexEntry(slug);
+  publicIndexCache = null;
 
-    // Update index entry
-    const index = await getPlatformIndex();
-    const idx = index.findIndex(p => p.slug === slug);
-    if (idx >= 0) {
-      index[idx].trustScore = platform.trustScore;
-      index[idx].verified = platform.verified;
-      await s3Put('index/platforms.json', index);
-    }
-  }
-
-  // Update stats if rejecting
-  if (status === 'rejected' && oldStatus !== 'rejected') {
+  // Stored counters follow the change in both directions.
+  const wasPublished = isPublished({ status: oldStatus });
+  if (wasPublished !== isPublished(report)) {
+    const sign = isPublished(report) ? 1 : -1;
     const stats = await getStats();
-    stats.totalReports = Math.max(0, stats.totalReports - 1);
-    stats.totalLoss -= report.lossAmount || 0;
-    if (report.blockchainConfirmed) stats.blockchainVerified = Math.max(0, stats.blockchainVerified - 1);
+    stats.totalReports = Math.max(0, stats.totalReports + sign);
+    stats.totalLoss = Math.max(0, stats.totalLoss + sign * (report.lossAmount || 0));
+    if (report.blockchainConfirmed) stats.blockchainVerified = Math.max(0, stats.blockchainVerified + sign);
     stats.updatedAt = new Date().toISOString();
     await s3Put('index/stats.json', stats);
   }
@@ -596,7 +759,7 @@ export async function seedDatabase(force = false): Promise<{ seeded: number; ski
   console.log('[seed] Bucket:', bucket(), 'Region:', process.env.AWS_REGION || 'eu-central-1');
 
   // Check if already seeded (skip unless force=true)
-  const existing = await getPlatformIndex();
+  const existing = await readStoredIndex();
   if (!force && existing.length > 0) {
     console.log('[seed] Database already has', existing.length, 'platforms, skipping (use force=true to re-seed)');
     return { seeded: 0, skipped: true };
@@ -682,6 +845,7 @@ export async function seedDatabase(force = false): Promise<{ seeded: number; ski
     await Promise.all(allAddresses.map(a => s3Put(a.key, a.data)));
   }
 
+  publicIndexCache = null;
   console.log(`[seed] Done! ${stats.totalPlatforms} verified platforms seeded.`);
   return { seeded: allPlatforms.length, skipped: false };
 }
@@ -708,9 +872,10 @@ export async function deleteReportAndPlatform(reportId: string, platformSlug: st
   } catch (e) { console.log(`[delete] platform ${platformSlug} not found, skipping`); }
 
   // 3. Update platforms index — remove the entry
-  const platforms = await getPlatformIndex();
+  const platforms = await readStoredIndex();
   const filtered = platforms.filter(p => p.slug !== platformSlug);
   await s3Put('index/platforms.json', filtered);
+  publicIndexCache = null;
   deleted.push('index/platforms.json (updated)');
 
   // 4. Update stats
