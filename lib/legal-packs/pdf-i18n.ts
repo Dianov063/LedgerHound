@@ -220,6 +220,8 @@ export interface PdfTranslations {
     blockchain_verified: string;
     transaction_traced: string;
     police_filed: string;
+    /** Used when the case has no police reference yet; {agency} is replaced. */
+    police_to_complete: string;
     other_victims: string;
     aware_of_victims: string;
     estimated_victims: string;
@@ -366,7 +368,7 @@ const en: PdfTranslations = {
     description: 'DESCRIPTION',
     evidence_summary: 'EVIDENCE SUMMARY',
     blockchain_verified: 'Transaction details provided by the complainant',
-    transaction_traced: 'Receiving address match in LedgerHound’s reference list of exchange addresses', police_filed: 'Police complaint filed with',
+    transaction_traced: 'Receiving address match in LedgerHound’s reference list of exchange addresses', police_filed: 'Police complaint filed with', police_to_complete: 'Police complaint to {agency}: reference ____________ (fill in before submitting)',
     other_victims: 'OTHER VICTIMS', aware_of_victims: 'I am aware of other victims',
     estimated_victims: 'Estimated number of victims', total_losses: 'Total estimated losses',
     requested_action: 'REQUESTED ACTION',
@@ -504,7 +506,7 @@ const ru: PdfTranslations = {
     description: 'ОПИСАНИЕ',
     evidence_summary: 'СВОДКА ДОКАЗАТЕЛЬСТВ',
     blockchain_verified: 'Данные транзакции со слов заявителя',
-    transaction_traced: 'Совпадение адреса получателя в справочном списке адресов бирж LedgerHound', police_filed: 'Заявление в полицию подано в',
+    transaction_traced: 'Совпадение адреса получателя в справочном списке адресов бирж LedgerHound', police_filed: 'Заявление в полицию подано в', police_to_complete: 'Заявление в полицию ({agency}): номер ____________ (заполните перед подачей)',
     other_victims: 'ДРУГИЕ ПОСТРАДАВШИЕ', aware_of_victims: 'Мне известно о других пострадавших',
     estimated_victims: 'Предполагаемое число пострадавших', total_losses: 'Общий предполагаемый ущерб',
     requested_action: 'ЗАПРАШИВАЕМЫЕ ДЕЙСТВИЯ',
@@ -642,7 +644,7 @@ const de: PdfTranslations = {
     description: 'BESCHREIBUNG',
     evidence_summary: 'BEWEISZUSAMMENFASSUNG',
     blockchain_verified: 'Transaktionsdaten nach Angaben des Beschwerdeführers',
-    transaction_traced: 'Übereinstimmung der Empfangsadresse in der LedgerHound-Referenzliste von Börsenadressen', police_filed: 'Strafanzeige erstattet bei',
+    transaction_traced: 'Übereinstimmung der Empfangsadresse in der LedgerHound-Referenzliste von Börsenadressen', police_filed: 'Strafanzeige erstattet bei', police_to_complete: 'Strafanzeige bei {agency}: Aktenzeichen ____________ (vor dem Einreichen ausfüllen)',
     other_victims: 'WEITERE GESCHÄDIGTE', aware_of_victims: 'Mir sind weitere Geschädigte bekannt',
     estimated_victims: 'Geschätzte Anzahl der Geschädigten', total_losses: 'Geschätzter Gesamtschaden',
     requested_action: 'GEFORDERTE MASSNAHMEN',
@@ -735,7 +737,7 @@ const es: PdfTranslations = {
   },
   police: {
     title: 'DENUNCIA POLICIAL', subtitle: 'Informe de Fraude con Criptomonedas',
-    filing_info: 'INFORMACIÓN DE PRESENTACIÓN', filing_with: 'Presentada ante', jurisdiction: 'Jurisdicción',
+    filing_info: 'INFORMACIÓN DE PRESENTACIÓN', filing_with: 'Se presenta ante', jurisdiction: 'Jurisdicción',
     online_portal: 'Portal en línea', reference: 'Referencia',
     complainant: 'DENUNCIANTE', full_name: 'Nombre completo', email: 'Correo electrónico', phone: 'Teléfono',
     country: 'País', state_region: 'Estado/Región',
@@ -765,7 +767,7 @@ const es: PdfTranslations = {
   },
   regulator: {
     title: 'QUEJA AL REGULADOR FINANCIERO', subtitle: 'Fraude de Inversión en Criptomonedas',
-    regulatory_body: 'ORGANISMO REGULADOR', filing_with: 'Presentada ante', online_portal: 'Portal en línea', scope: 'Ámbito',
+    regulatory_body: 'ORGANISMO REGULADOR', filing_with: 'Se presenta ante', online_portal: 'Portal en línea', scope: 'Ámbito',
     complainant: 'DENUNCIANTE', name: 'Nombre', email: 'Correo electrónico', country: 'País', police_report: 'Denuncia policial',
     subject_of_complaint: 'OBJETO DE LA QUEJA', platform_entity: 'Plataforma/Entidad',
     website: 'Sitio web', type_of_activity: 'Tipo de actividad', period: 'Período',
@@ -778,7 +780,7 @@ const es: PdfTranslations = {
     description: 'DESCRIPCIÓN',
     evidence_summary: 'RESUMEN DE PRUEBAS',
     blockchain_verified: 'Datos de la transacción aportados por el denunciante',
-    transaction_traced: 'Coincidencia de la dirección receptora en la lista de referencia de direcciones de exchanges de LedgerHound', police_filed: 'Denuncia presentada ante',
+    transaction_traced: 'Coincidencia de la dirección receptora en la lista de referencia de direcciones de exchanges de LedgerHound', police_filed: 'Denuncia presentada ante', police_to_complete: 'Denuncia ante {agency}: número ____________ (complételo antes de presentar)',
     other_victims: 'OTRAS VÍCTIMAS', aware_of_victims: 'Tengo conocimiento de otras víctimas',
     estimated_victims: 'Número estimado de víctimas', total_losses: 'Pérdidas totales estimadas',
     requested_action: 'ACCIÓN SOLICITADA',
@@ -871,7 +873,7 @@ const fr: PdfTranslations = {
   },
   police: {
     title: 'PLAINTE', subtitle: 'Rapport de Fraude aux Cryptomonnaies',
-    filing_info: 'INFORMATIONS DE DÉPÔT', filing_with: 'Déposée auprès de', jurisdiction: 'Juridiction',
+    filing_info: 'INFORMATIONS DE DÉPÔT', filing_with: 'À déposer auprès de', jurisdiction: 'Juridiction',
     online_portal: 'Portail en ligne', reference: 'Référence',
     complainant: 'PLAIGNANT', full_name: 'Nom complet', email: 'Email', phone: 'Téléphone',
     country: 'Pays', state_region: 'Département/Région',
@@ -901,7 +903,7 @@ const fr: PdfTranslations = {
   },
   regulator: {
     title: 'PLAINTE AU RÉGULATEUR FINANCIER', subtitle: 'Fraude à l\'Investissement en Cryptomonnaies',
-    regulatory_body: 'ORGANISME DE RÉGULATION', filing_with: 'Déposée auprès de', online_portal: 'Portail en ligne', scope: 'Champ de compétence',
+    regulatory_body: 'ORGANISME DE RÉGULATION', filing_with: 'À déposer auprès de', online_portal: 'Portail en ligne', scope: 'Champ de compétence',
     complainant: 'PLAIGNANT', name: 'Nom', email: 'Email', country: 'Pays', police_report: 'Plainte policière',
     subject_of_complaint: 'OBJET DE LA PLAINTE', platform_entity: 'Plateforme/Entité',
     website: 'Site web', type_of_activity: 'Type d\'activité', period: 'Période',
@@ -914,7 +916,7 @@ const fr: PdfTranslations = {
     description: 'DESCRIPTION',
     evidence_summary: 'RÉSUMÉ DES PREUVES',
     blockchain_verified: 'Données de la transaction fournies par le plaignant',
-    transaction_traced: 'Correspondance de l’adresse de réception dans la liste de référence des adresses de plateformes d’échange de LedgerHound', police_filed: 'Plainte déposée auprès de',
+    transaction_traced: 'Correspondance de l’adresse de réception dans la liste de référence des adresses de plateformes d’échange de LedgerHound', police_filed: 'Plainte déposée auprès de', police_to_complete: 'Plainte auprès de {agency} : référence ____________ (à compléter avant l’envoi)',
     other_victims: 'AUTRES VICTIMES', aware_of_victims: 'J\'ai connaissance d\'autres victimes',
     estimated_victims: 'Nombre estimé de victimes', total_losses: 'Pertes totales estimées',
     requested_action: 'ACTION DEMANDÉE',

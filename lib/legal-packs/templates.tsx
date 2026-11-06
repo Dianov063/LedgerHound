@@ -330,8 +330,9 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         <PlSection>FRAUD SUMMARY</PlSection>
         <PlField label="Type" value={fraudTypeLocalized(caseData.scamType)} />
         <PlField label="Platform Used" value={caseData.platformName || '[Under investigation]'} />
-        <PlField label="Police Report" value={`Filed with ${research.policeAgency.name}`} />
-        <PlField label="Reference" value={caseData.policeReportNumber || '[Pending]'} />
+        {/* "Filed" only when the case carries the police reference; otherwise a blank to complete. */}
+        <PlField label="Police Report" value={caseData.policeReportNumber ? `Filed with ${research.policeAgency.name}` : `${research.policeAgency.name} (complete before sending)`} />
+        <PlField label="Reference" value={caseData.policeReportNumber || '____________'} />
 
         {/* SOURCES: what the victim reported vs what LedgerHound looked up */}
         <PlSection>SOURCES OF THIS INFORMATION</PlSection>
@@ -379,7 +380,11 @@ export const PreservationLetterDoc = ({ research, caseData }: { research: Countr
         {/* LEGAL BASIS */}
         <PlSection>LEGAL BASIS</PlSection>
         <Text style={{ fontSize: 9, color: slate600, lineHeight: 1.5, marginBottom: 8 }}>{research.preservationLetter.legalBasis}</Text>
-        <Text style={{ fontSize: 9, color: slate600, marginBottom: 12 }}>A formal police report has been filed with {research.policeAgency.name}.</Text>
+        <Text style={{ fontSize: 9, color: slate600, marginBottom: 12 }}>
+          {caseData.policeReportNumber
+            ? `A formal police report has been filed with ${research.policeAgency.name} (reference ${caseData.policeReportNumber}).`
+            : `Police report with ${research.policeAgency.name}: date ____________, reference ____________ (complete before sending).`}
+        </Text>
 
         {/* CONTACT */}
         <PlSection>CONTACT</PlSection>
@@ -444,7 +449,7 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
         <Field label={t.regulator.name} value={caseData.victimName} />
         <Field label={t.regulator.email} value={caseData.victimEmail} />
         <Field label={t.regulator.country} value={caseData.country} />
-        <Field label={t.regulator.police_report} value={caseData.policeReportNumber || t.common.pending} />
+        <Field label={t.regulator.police_report} value={caseData.policeReportNumber || '____________'} />
 
         {/* SUBJECT OF COMPLAINT */}
         <SectionTitle>{t.regulator.subject_of_complaint}</SectionTitle>
@@ -490,7 +495,9 @@ export const RegulatorComplaintDoc = ({ research, caseData }: { research: Countr
           </View>
           <View style={{ flexDirection: 'row', marginBottom: 3 }}>
             <Text style={{ fontSize: 9, color: slate600, width: 14, flexShrink: 0 }}>{'\u2022'}</Text>
-            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{t.regulator.police_filed} {research.policeAgency.name}</Text>
+            <Text style={{ fontSize: 9, color: slate600, flex: 1 }}>{caseData.policeReportNumber
+              ? `${t.regulator.police_filed} ${research.policeAgency.name} (${caseData.policeReportNumber})`
+              : t.regulator.police_to_complete.replace('{agency}', research.policeAgency.name)}</Text>
           </View>
         </View>
 
