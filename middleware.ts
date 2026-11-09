@@ -18,7 +18,7 @@ const CSP_DIRECTIVES = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self' https://api.stripe.com https://challenges.cloudflare.com https://*.alchemy.com https://*.etherscan.io https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com",
+  "connect-src 'self' https://platform-staging.hubmail.vip https://api.stripe.com https://challenges.cloudflare.com https://*.alchemy.com https://*.etherscan.io https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com",
   "frame-src https://js.stripe.com https://challenges.cloudflare.com",
 ].join('; ');
 
