@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { VERIFIED_SEED_PLATFORMS } from './scam-db-verified-seed';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
 
@@ -217,6 +218,70 @@ async function s3Put(key: string, data: any): Promise<void> {
   }));
 }
 
+/* ── Conditional writes (optimistic concurrency) ──
+   Shared files (platform, address, public index, stats, a report being moderated) are changed by
+   read -> change -> write. Without a condition two concurrent writers overwrite each other and
+   one change is lost (reports accepted with 200 but never linked to their platform, platforms
+   missing from the index). Every such write now carries If-Match with the ETag that was read
+   (If-None-Match: * when the file did not exist); S3 refuses it with 412 when the file changed in
+   between, and the change is recomputed from a fresh read. Works across processes and instances. */
+const CONDITIONAL_ATTEMPTS = 40;
+
+const isWriteConflict = (err: any): boolean =>
+  err?.name === 'PreconditionFailed' || err?.$metadata?.httpStatusCode === 412
+  || err?.name === 'ConditionalRequestConflict' || err?.$metadata?.httpStatusCode === 409;
+
+async function s3GetWithEtag<T>(key: string): Promise<{ data: T | null; etag?: string }> {
+  try {
+    const res = await getS3().send(new GetObjectCommand({ Bucket: bucket(), Key: `${PREFIX}/${key}` }));
+    return { data: JSON.parse(await streamToString(res.Body)) as T, etag: res.ETag };
+  } catch (err: any) {
+    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) return { data: null };
+    throw err;
+  }
+}
+
+/** Writes only if the object is still at `etag`, or (no etag) does not exist yet. */
+async function s3PutIf(key: string, data: unknown, etag?: string): Promise<string | undefined> {
+  const res = await getS3().send(new PutObjectCommand({
+    Bucket: bucket(),
+    Key: `${PREFIX}/${key}`,
+    Body: JSON.stringify(data),
+    ContentType: 'application/json',
+    ...(etag ? { IfMatch: etag } : { IfNoneMatch: '*' }),
+  }));
+  return res?.ETag;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Read-change-write that cannot lose a concurrent update. `change` gets a fresh copy of the
+ * stored value on every attempt (null when absent) and returns the new value, or undefined to
+ * leave the file as it is. Retries on a write conflict; any other error is thrown.
+ */
+async function updateJson<T>(key: string, change: (current: T | null) => Promise<T | undefined> | T | undefined): Promise<T | null> {
+  for (let attempt = 1; ; attempt++) {
+    const { data, etag } = await s3GetWithEtag<T>(key);
+    const next = await change(data);
+    if (next === undefined) return data;
+    try {
+      await s3PutIf(key, next, etag);
+      return next;
+    } catch (err: any) {
+      // S3 answers If-Match on an object deleted meanwhile with 404: also a conflict.
+      const vanished = !!etag && (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404);
+      if (!(isWriteConflict(err) || vanished) || attempt >= CONDITIONAL_ATTEMPTS) throw err;
+      await sleep(Math.min(400, 4 * 2 ** Math.min(attempt, 7)) * (0.5 + Math.random()));
+    }
+  }
+}
+
+/** The transaction hash was claimed by another report (also when two arrive at once). */
+export class TxidAlreadyUsedError extends Error {
+  constructor() { super('This transaction hash has already been used in a previous report.'); this.name = 'TxidAlreadyUsedError'; }
+}
+
 async function s3Exists(key: string): Promise<boolean> {
   try {
     await getS3().send(new HeadObjectCommand({ Bucket: bucket(), Key: `${PREFIX}/${key}` }));
@@ -230,6 +295,18 @@ async function s3Delete(key: string): Promise<void> {
   await getS3().send(new DeleteObjectCommand({
     Bucket: bucket(),
     Key: `${PREFIX}/${key}`,
+  }));
+}
+
+/**
+ * Deletes only if the object is still at `etag` (S3 conditional delete, If-Match; supported by
+ * Amazon S3 general purpose buckets). Storage answers 412 when the object changed meanwhile.
+ */
+async function s3DeleteIf(key: string, etag: string): Promise<void> {
+  await getS3().send(new DeleteObjectCommand({
+    Bucket: bucket(),
+    Key: `${PREFIX}/${key}`,
+    IfMatch: etag,
   }));
 }
 
@@ -417,33 +494,208 @@ async function buildPublicIndex(stored: PlatformIndexEntry[]): Promise<PlatformI
   return entries.filter((e): e is PlatformIndexEntry => !!e);
 }
 
-/** Recompute this platform's public index entry (or remove it) after a write. */
-async function refreshIndexEntry(slug: string): Promise<PlatformIndexEntry[]> {
-  const index = await readStoredIndex();
-  const view = await getPublicPlatform(slug);
-  const at = index.findIndex(p => p.slug === slug);
-  if (view) {
-    if (at >= 0) index[at] = toIndexEntry(view.platform);
-    else index.push(toIndexEntry(view.platform));
-  } else if (at >= 0) {
-    index.splice(at, 1);
+/* ── Reads made by writes ──
+   The public readers above leave out a report whose read fails: a page is better shown without
+   it than not at all, and the next read shows it again. A WRITE must not do that: what it reads
+   is stored (index entry, counters) and stays wrong after the error is gone. A report accepted
+   with a temporary storage error would then be on its card but missing from search and totals.
+   So a write retries a temporary error a few times and otherwise fails; it never stores a view
+   computed from an incomplete read. A missing file is not an error (left out, as before). */
+const TRANSIENT_READ_ATTEMPTS = 4;
+const TRANSIENT_NAMES = new Set(['ServiceUnavailable', 'SlowDown', 'InternalError', 'RequestTimeout', 'TimeoutError', 'ThrottlingException']);
+const TRANSIENT_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'ECONNREFUSED', 'EAI_AGAIN']);
+
+function isTransientStorageError(err: any): boolean {
+  const status = err?.$metadata?.httpStatusCode;
+  return (typeof status === 'number' && (status >= 500 || status === 429))
+    || TRANSIENT_NAMES.has(err?.name) || TRANSIENT_CODES.has(err?.code);
+}
+
+/** s3Get for a write: a temporary error is retried, then thrown; never read as "absent". */
+async function s3GetForWrite(key: string): Promise<any | null> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await s3Get(key);
+    } catch (err) {
+      if (!isTransientStorageError(err) || attempt >= TRANSIENT_READ_ATTEMPTS) throw err;
+      await sleep(50 * 2 ** (attempt - 1) * (0.5 + Math.random()));
+    }
   }
-  await s3Put('index/platforms.json', index);
+}
+
+/** Every listed report that exists, or an error: never a silently shorter list. */
+async function loadReportsForWrite(ids: string[]): Promise<ScamReport[]> {
+  const unique = Array.from(new Set(ids));
+  const reports = await mapLimit(unique, 8, (id) => s3GetForWrite(`reports/${id}.json`) as Promise<ScamReport | null>);
+  return reports.filter((r): r is ScamReport => !!r && unique.includes(r.id));
+}
+
+/** The platform's public view computed from a complete read, for storing in the index. */
+async function publicPlatformForWrite(slug: string): Promise<ScamPlatform | null> {
+  const platform: ScamPlatform | null = await s3GetForWrite(`platforms/${slug}.json`);
+  if (!platform) return null;
+  return toPublicPlatform(platform, await loadReportsForWrite(platform.reportIds));
+}
+
+/**
+ * Recompute this platform's public index entry (or remove it) after a write. On every attempt
+ * the index is read first and the platform's view computed after it, so a view that misses a
+ * concurrent report can only be written while that report's own refresh is still to come.
+ * The view comes from a complete read (publicPlatformForWrite): a storage error fails the write.
+ */
+async function refreshIndexEntry(slug: string): Promise<PlatformIndexEntry[]> {
+  const index = await updateJson<PlatformIndexEntry[]>('index/platforms.json', async (stored) => {
+    const next = Array.isArray(stored) ? stored : [];
+    const view = await publicPlatformForWrite(slug);
+    const at = next.findIndex(p => p.slug === slug);
+    if (view) {
+      if (at >= 0) next[at] = toIndexEntry(view);
+      else next.push(toIndexEntry(view));
+    } else if (at >= 0) {
+      next.splice(at, 1);
+    }
+    return next;
+  });
   publicIndexCache = null;
-  return index;
+  return index ?? [];
 }
 
-/* ── TXID uniqueness (atomic — file existence check) ── */
-export async function isTxidUsed(txid: string): Promise<boolean> {
-  return s3Exists(`txids/${txid.toLowerCase()}.json`);
+/* ── TXID uniqueness ──
+   txids/<hash>.json binds a transaction hash to ONE report id, for good:
+     { reportId, createdAt, state: 'claimed' }  written before that report's file (If-None-Match),
+     state 'saved'                               once its file exists (conditional, same report only),
+     state 'done'                                once it is linked; new submissions are refused (409).
+   A record without `state` was written by the previous version after its report was saved: done.
+   Every change is conditional, and a report is linked only after its own 'saved' transition, so
+   two reports can never both hold one hash. The binding has no time limit (round 4 of Codex: a
+   lease let a delayed request continue after its retry). Another report may take a hash over only
+   while it is merely 'claimed' and the claiming report's file is absent or does not carry the hash
+   (an attempt that failed before saving, or a claim left by a duplicate attempt); taking over is a
+   conditional write on the same record as the 'saved' transition, so only one of them can win. */
+type TxidState = 'claimed' | 'saved' | 'done';
+type TxidRecord = { reportId: string; createdAt: string; state?: TxidState };
+const normTx = (txid: string) => txid.trim().toLowerCase();
+const txidKey = (txid: string) => `txids/${normTx(txid)}.json`;
+const stateOf = (record: TxidRecord): TxidState => record.state ?? 'done';
+
+/** The report id of a submission with this transaction hash and no submission key. */
+export function txReportId(txid: string): string {
+  const h = createHash('sha256').update(`ledgerhound-scam-report:${normTx(txid)}`).digest('hex').toUpperCase();
+  return `TX${h.slice(0, 10)}-${h.slice(10, 16)}`;
 }
 
-async function markTxidUsed(txid: string, reportId: string): Promise<void> {
-  await s3Put(`txids/${txid.toLowerCase()}.json`, { reportId, createdAt: new Date().toISOString() });
+/**
+ * True when a report with this hash was saved and linked completely — by a report other than
+ * `ownReportId` (the id of the submission asking, when it is known: a retry of the very
+ * submission that used the hash is not refused).
+ */
+export async function isTxidUsed(txid: string, ownReportId?: string): Promise<boolean> {
+  const record = await s3Get(txidKey(txid)) as TxidRecord | null;
+  return !!record && stateOf(record) === 'done' && record.reportId !== ownReportId;
+}
+
+/**
+ * Bind the hash to report `id` before its file is written, or throw TxidAlreadyUsedError.
+ * `doneIsOwn`: a done binding to this same id is this submission's own (a retry with the same
+ * submission key after a lost answer); without a key a done hash is refused, as before.
+ */
+async function claimTxid(tx: string, id: string, createdAt: string, doneIsOwn: boolean): Promise<void> {
+  const key = txidKey(tx);
+  for (let attempt = 1; attempt <= CONDITIONAL_ATTEMPTS; attempt++) {
+    const { data, etag } = await s3GetWithEtag<TxidRecord>(key);
+    if (data && data.reportId === id) {
+      if (stateOf(data) === 'done' && !doneIsOwn) throw new TxidAlreadyUsedError();
+      return;
+    }
+    if (data) {
+      if (stateOf(data) !== 'claimed') throw new TxidAlreadyUsedError();
+      const holder = await s3GetForWrite(`reports/${data.reportId}.json`) as ScamReport | null;
+      if (holder?.txHash && normTx(holder.txHash) === normTx(tx)) throw new TxidAlreadyUsedError();
+      // the claiming attempt saved nothing with this hash: take the stale claim over
+    }
+    try {
+      await s3PutIf(key, { reportId: id, createdAt, state: 'claimed' } satisfies TxidRecord, data ? etag : undefined);
+      return;
+    } catch (err) {
+      if (!isWriteConflict(err)) throw err;
+    }
+  }
+  throw new Error('txid claim: too many concurrent changes');
+}
+
+/** getWithEtag for a write: a temporary error is retried, then thrown; never read as "absent". */
+async function getWithEtagForWrite<T>(key: string): Promise<{ data: T | null; etag?: string }> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await s3GetWithEtag<T>(key);
+    } catch (err) {
+      if (!isTransientStorageError(err) || attempt >= TRANSIENT_READ_ATTEMPTS) throw err;
+      await sleep(50 * 2 ** (attempt - 1) * (0.5 + Math.random()));
+    }
+  }
+}
+
+/**
+ * A report file left by an attempt that lost its transaction hash to another report. Such a file
+ * was never linked: a report is linked only after its own 'claimed' -> 'saved' transition, and a
+ * hash in 'saved' or 'done' never changes hands. So the file is not public and may be replaced.
+ */
+async function isLeftover(report: ScamReport, id: string): Promise<boolean> {
+  const tx = report.txHash?.trim();
+  if (!tx) return false;
+  const record = await s3GetForWrite(txidKey(tx)) as TxidRecord | null;
+  return !record || record.reportId !== id;
+}
+
+/**
+ * Remove report `id`'s file if it is (still) a leftover — and, with `etag`, only that version of
+ * it. The checked version is passed to the delete itself (If-Match): a delete that arrives late,
+ * after a retry of the same submission replaced the file with its accepted report, is refused by
+ * storage (412) and the accepted report stays. Repeatable: an absent file or one that changed
+ * meanwhile is left alone.
+ */
+async function removeLeftover(reportKey: string, id: string, etag?: string): Promise<void> {
+  const current = await getWithEtagForWrite<ScamReport>(reportKey);
+  if (!current.data || !current.etag) return;
+  if (etag ? current.etag !== etag : !(await isLeftover(current.data, id))) return;
+  try {
+    await s3DeleteIf(reportKey, current.etag);
+  } catch (err: any) {
+    // 412: the file is no longer the checked version (replaced meanwhile); 404: already gone.
+    if (isWriteConflict(err) || err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) return;
+    throw err;
+  }
+}
+
+/**
+ * Early check of the report route (before the transaction lookup): true when a submission with
+ * this hash is to be refused (409) because another report completed it. A retry of the submission
+ * whose saved report is completed is not refused, whatever hash it carries; a leftover file of a
+ * losing attempt of this submission is removed on the way. saveReport enforces the same rule.
+ */
+export async function isTxidRefused(txid: string, submissionKey?: string): Promise<boolean> {
+  const id = submissionKey ? submissionReportId(submissionKey) : txReportId(txid);
+  const record = await s3Get(txidKey(txid)) as TxidRecord | null;
+  if (!record || stateOf(record) !== 'done') return false;
+  if (record.reportId === id) return !submissionKey; // without a key a completed hash is refused, as before
+  const own = submissionKey ? await getWithEtagForWrite<ScamReport>(`reports/${id}.json`) : { data: null };
+  if (own.data && !(await isLeftover(own.data, id))) return false; // completes its own saved report
+  await removeLeftover(`reports/${id}.json`, id);
+  return true;
+}
+
+/** The report's file exists: 'claimed' -> 'saved'. False when another report holds the hash. */
+async function markTxidSaved(tx: string, id: string): Promise<boolean> {
+  let lost = false;
+  await updateJson<TxidRecord>(txidKey(tx), (stored) => {
+    if (!stored || stored.reportId !== id) { lost = true; return undefined; }
+    return stateOf(stored) === 'claimed' ? { ...stored, state: 'saved' } : undefined;
+  });
+  return !lost;
 }
 
 /* ── Default platform ── */
-function defaultPlatform(report: Omit<ScamReport, 'id' | 'createdAt'>, slug: string): ScamPlatform {
+function defaultPlatform(report: Pick<ScamReport, 'platformName'>, slug: string): ScamPlatform {
   return {
     slug,
     name: report.platformName,
@@ -467,82 +719,190 @@ function defaultStats(): ScamStats {
   return { totalReports: 0, totalPlatforms: 0, totalLoss: 0, blockchainVerified: 0, updatedAt: new Date().toISOString() };
 }
 
-/* ── Save report (INCREMENTAL — no full rebuild) ── */
-export async function saveReport(report: Omit<ScamReport, 'id' | 'createdAt'>): Promise<{ id: string; report: ScamReport }> {
-  const id = generateId();
-  const now = new Date().toISOString();
-  const full: ScamReport = { ...report, id, createdAt: now };
+/**
+ * Stored counters (index/stats.json) are recomputed from the stored index on every attempt, never
+ * incremented: a retry, however late, or two writers at once always produce the same numbers, and
+ * nothing can be counted twice. They equal the public totals (getPublicStats) for stored entries.
+ */
+async function recomputeStoredStats(): Promise<void> {
+  await updateJson<ScamStats>('index/stats.json', async (stored) => {
+    const index = await readStoredIndex();
+    const next: ScamStats = {
+      totalReports: index.reduce((sum, p) => sum + p.victims, 0),
+      totalPlatforms: index.length,
+      totalLoss: index.reduce((sum, p) => sum + p.totalLoss, 0),
+      blockchainVerified: index.reduce((sum, p) => sum + publicChainCount(p), 0),
+      updatedAt: new Date().toISOString(),
+    };
+    const same = stored && stored.totalReports === next.totalReports && stored.totalPlatforms === next.totalPlatforms
+      && stored.totalLoss === next.totalLoss && stored.blockchainVerified === next.blockchainVerified && Object.keys(stored).length === 5;
+    return same ? undefined : next;
+  });
+}
 
-  // 1. Save report file
-  await s3Put(`reports/${id}.json`, full);
+/**
+ * Steps 3-6 for a saved report: platform, address, index and stored counters. Every step is
+ * conditional and idempotent per report id, so it can be repeated after a failure or run by two
+ * requests at once without double counting.
+ */
+async function linkReport(full: ScamReport): Promise<void> {
+  const { id, createdAt: now } = full;
 
-  // 2. TXID uniqueness (atomic file check)
-  if (full.txHash) {
-    await markTxidUsed(full.txHash, id);
-  }
-
-  // 3. Update ONLY this platform file (not all platforms)
+  // 3. Platform file
   const slug = slugify(full.platformName);
-  const platform: ScamPlatform = (await s3Get(`platforms/${slug}.json`)) || defaultPlatform(report, slug);
-  if (hasSources(platform) && !platform.seedBaseline && platform.reportIds.length === 0) {
-    platform.seedBaseline = seedBaselineFrom(platform);
-  }
-  platform.victims++;
-  platform.totalLoss += full.lossAmount || 0;
-  if (full.lossCurrency) platform.lossCurrency = full.lossCurrency;
-  platform.reportIds.push(id);
-  if (full.platformUrl && !platform.urls.includes(full.platformUrl)) platform.urls.push(full.platformUrl);
-  if (full.platformUrls) {
-    for (const u of full.platformUrls) {
-      if (u && !platform.urls.includes(u)) platform.urls.push(u);
+  await updateJson<ScamPlatform>(`platforms/${slug}.json`, (stored) => {
+    const platform = stored || defaultPlatform(full, slug);
+    if (platform.reportIds.includes(id)) return undefined;
+    if (hasSources(platform) && !platform.seedBaseline && platform.reportIds.length === 0) {
+      platform.seedBaseline = seedBaselineFrom(platform);
     }
-  }
-  if (full.scamAddress && !platform.addresses.includes(full.scamAddress)) platform.addresses.push(full.scamAddress);
-  if (full.platformType && !platform.types.includes(full.platformType)) platform.types.push(full.platformType);
-  if (full.blockchainConfirmed) platform.blockchainVerifiedCount++;
-  if (full.trustTier === 3) platform.staffVerified = true;
-  platform.lastReported = now;
-  if (now < platform.firstReported) platform.firstReported = now;
-  // Seeded platforms keep their seeded score; community scores are derived at read time.
-  if (!hasSources(platform)) {
-    platform.trustScore = calcTrustScore(platform);
-    platform.verified = platform.trustScore >= 10;
-  }
-  await s3Put(`platforms/${slug}.json`, platform);
+    platform.victims++;
+    platform.totalLoss += full.lossAmount || 0;
+    if (full.lossCurrency) platform.lossCurrency = full.lossCurrency;
+    platform.reportIds.push(id);
+    if (full.platformUrl && !platform.urls.includes(full.platformUrl)) platform.urls.push(full.platformUrl);
+    if (full.platformUrls) {
+      for (const u of full.platformUrls) {
+        if (u && !platform.urls.includes(u)) platform.urls.push(u);
+      }
+    }
+    if (full.scamAddress && !platform.addresses.includes(full.scamAddress)) platform.addresses.push(full.scamAddress);
+    if (full.platformType && !platform.types.includes(full.platformType)) platform.types.push(full.platformType);
+    if (full.blockchainConfirmed) platform.blockchainVerifiedCount++;
+    if (full.trustTier === 3) platform.staffVerified = true;
+    if (!platform.lastReported || now > platform.lastReported) platform.lastReported = now;
+    if (now < platform.firstReported) platform.firstReported = now;
+    // Seeded platforms keep their seeded score; community scores are derived at read time.
+    if (!hasSources(platform)) {
+      platform.trustScore = calcTrustScore(platform);
+      platform.verified = platform.trustScore >= 10;
+    }
+    return platform;
+  });
 
-  // 4. Update address index if address provided
+  // 4. Address index
   if (full.scamAddress) {
     const addrKey = full.scamAddress.toLowerCase();
-    const addr: AddressIndex = (await s3Get(`addresses/${addrKey}.json`)) || {
-      address: full.scamAddress,
-      platforms: [],
-      platformNames: [],
-      reports: [],
-      totalLoss: 0,
-      networks: [],
-      firstSeen: now,
-      lastSeen: now,
-    };
-    if (!addr.platforms.includes(slug)) addr.platforms.push(slug);
-    if (!addr.platformNames.includes(full.platformName)) addr.platformNames.push(full.platformName);
-    addr.reports.push(id);
-    addr.totalLoss += full.lossAmount || 0;
-    if (full.network && !addr.networks.includes(full.network)) addr.networks.push(full.network);
-    addr.lastSeen = now;
-    await s3Put(`addresses/${addrKey}.json`, addr);
+    await updateJson<AddressIndex>(`addresses/${addrKey}.json`, (stored) => {
+      const addr: AddressIndex = stored || {
+        address: full.scamAddress!,
+        platforms: [],
+        platformNames: [],
+        reports: [],
+        totalLoss: 0,
+        networks: [],
+        firstSeen: now,
+        lastSeen: now,
+      };
+      if (addr.reports.includes(id)) return undefined;
+      if (!addr.platforms.includes(slug)) addr.platforms.push(slug);
+      if (!addr.platformNames.includes(full.platformName)) addr.platformNames.push(full.platformName);
+      addr.reports.push(id);
+      addr.totalLoss += full.lossAmount || 0;
+      if (full.network && !addr.networks.includes(full.network)) addr.networks.push(full.network);
+      if (now > addr.lastSeen) addr.lastSeen = now;
+      return addr;
+    });
   }
 
-  // 5. Update this platform's entry in the index with its public view
-  const index = await refreshIndexEntry(slug);
+  // 5. This platform's entry in the public index
+  await refreshIndexEntry(slug);
 
-  // 6. Update stats (increment only)
-  const stats: ScamStats = (await s3Get('index/stats.json')) || defaultStats();
-  stats.totalReports++;
-  stats.totalPlatforms = index.length;
-  stats.totalLoss += full.lossAmount || 0;
-  if (full.blockchainConfirmed) stats.blockchainVerified++;
-  stats.updatedAt = now;
-  await s3Put('index/stats.json', stats);
+  // 6. Stored counters, recomputed from the stored index (idempotent)
+  await recomputeStoredStats();
+}
+
+/**
+ * The report id of a form submission with this key (lib/submission-key): the same for every
+ * attempt of that submission, so a retry after an error completes the same report.
+ */
+export function submissionReportId(key: string): string {
+  const h = createHash('sha256').update(`ledgerhound-scam-submission:${key}`).digest('hex').toUpperCase();
+  return `SB${h.slice(0, 10)}-${h.slice(10, 16)}`;
+}
+
+/* ── Save report (INCREMENTAL — no full rebuild) ──
+   The report id belongs to the SUBMISSION: from the form's submission key when there is one
+   (whatever the transaction hash of this attempt: adding or removing the hash after an error does
+   not change it), else from the transaction hash, else random (callers without a key, e.g.
+   seeding). Every attempt of one submission meets the same report file; the first saved version
+   is the report, and a retry only completes it. One hash still belongs to one report (claimTxid). */
+export async function saveReport(
+  report: Omit<ScamReport, 'id' | 'createdAt'>,
+  options: { submissionKey?: string } = {},
+): Promise<{ id: string; report: ScamReport }> {
+  const requestTx = report.txHash?.trim() || undefined;
+  const key = options.submissionKey;
+  const id = key ? submissionReportId(key) : requestTx ? txReportId(requestTx) : generateId();
+  const reportKey = `reports/${id}.json`;
+  const derived = !!(key || requestTx);
+  let full: ScamReport = { ...report, ...(requestTx ? { txHash: requestTx } : {}), id, createdAt: new Date().toISOString() };
+  let writtenEtag: string | undefined; // set when THIS attempt wrote the report file
+
+  // 0. Without a submission key nothing tells a retry from a new submission: a hash whose report
+  //    is complete is refused (409), as before. A leftover file of a losing attempt with that id
+  //    is removed on the way (see 1).
+  if (requestTx && !key && await isTxidUsed(requestTx)) {
+    await removeLeftover(reportKey, id);
+    throw new TxidAlreadyUsedError();
+  }
+
+  // 1. An earlier attempt of this submission already saved the report: complete THAT report —
+  //    unless it is a LEFTOVER: a file whose hash another report holds was never linked (linking
+  //    needs this report's own 'saved' state, and a saved or done hash never changes hands). Its
+  //    attempt lost the hash and could not remove the file (e.g. storage failed). It is not the
+  //    report: this attempt replaces it (or removes it, when this attempt is refused too).
+  const found = derived ? await getWithEtagForWrite<ScamReport>(reportKey) : { data: null };
+  const leftoverEtag = found.data && await isLeftover(found.data, id) ? found.etag : undefined;
+  if (found.data && !leftoverEtag) {
+    full = found.data;
+  } else {
+    // 2. Bind the hash of this attempt to this report before its file is written (409 when
+    //    another report holds it), then write the file once (replacing a leftover, If-Match).
+    if (requestTx) {
+      try {
+        await claimTxid(requestTx, id, full.createdAt, !!key);
+      } catch (err) {
+        if (leftoverEtag && (err as Error)?.name === 'TxidAlreadyUsedError') await removeLeftover(reportKey, id, leftoverEtag);
+        throw err;
+      }
+    }
+    try {
+      writtenEtag = await s3PutIf(reportKey, full, leftoverEtag) ?? '';
+    } catch (err) {
+      if (!derived || !(isWriteConflict(err) || (leftoverEtag && (err as any)?.$metadata?.httpStatusCode === 404))) throw err;
+      const parallel = await s3GetForWrite(reportKey) as ScamReport | null; // a parallel attempt of this submission
+      if (!parallel) throw err; // the leftover vanished meanwhile: a retry writes the file
+      full = parallel;
+    }
+  }
+
+  // 3. The hash the saved report carries is this report's, and nobody else's.
+  const tx = full.txHash?.trim() || undefined;
+  if (tx && !(await markTxidSaved(tx, id))) {
+    // Another report took the hash over while this attempt was delayed before writing its file:
+    // this file was never linked, so it is removed and the submission is refused. When the
+    // removal fails, the file stays a leftover that the next attempt of this submission handles.
+    if (writtenEtag !== undefined) {
+      try {
+        await removeLeftover(reportKey, id, writtenEtag || undefined);
+      } catch (err) {
+        console.warn('[scam-db] leftover report file not removed; the next attempt removes or replaces it', (err as Error)?.name);
+      }
+    }
+    throw new TxidAlreadyUsedError();
+  }
+
+  // 4-7. Platform, address, index, counters (idempotent per report id)
+  await linkReport(full);
+
+  // 8. The hash is used for good only now that its report is linked.
+  if (tx) {
+    await updateJson<TxidRecord>(txidKey(tx), (stored) => {
+      if (!stored || stored.reportId !== id) throw new TxidAlreadyUsedError(); // cannot happen after step 3
+      return stateOf(stored) === 'done' ? undefined : { ...stored, state: 'done' };
+    });
+  }
 
   return { id, report: full };
 }
@@ -695,16 +1055,74 @@ export async function listAllReports(): Promise<ScamReport[]> {
   return allReports.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/**
+ * Every report, or an error. Unlike listAllReports (which drops unreadable objects for the
+ * admin list), any listing or read failure throws, so a scheduled summary can never present
+ * an incomplete read as a smaller number.
+ */
+export async function listAllReportsStrict(): Promise<ScamReport[]> {
+  const s3 = getS3();
+  const keys: string[] = [];
+  let ContinuationToken: string | undefined;
+  do {
+    const res = await s3.send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: `${PREFIX}/reports/`, ContinuationToken }));
+    for (const obj of res.Contents || []) if (obj.Key) keys.push(obj.Key);
+    ContinuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+    if (res.IsTruncated && !ContinuationToken) throw new Error('report listing truncated without a continuation token');
+  } while (ContinuationToken);
+  const reports: ScamReport[] = [];
+  for (let i = 0; i < keys.length; i += 16) {
+    const batch = await Promise.allSettled(keys.slice(i, i + 16).map(async (Key) => {
+      const data = await s3.send(new GetObjectCommand({ Bucket: bucket(), Key }));
+      return JSON.parse(await streamToString(data.Body)) as ScamReport;
+    }));
+    const failed = batch.filter((r) => r.status === 'rejected').length;
+    if (failed) throw new Error(`${failed} of ${keys.length} report objects could not be read`);
+    for (const r of batch) if (r.status === 'fulfilled') reports.push(r.value);
+  }
+  return reports;
+}
+
+/* Owner digest record of one day (scam-database/digests/owner-<day>.json): the frozen e-mail and
+   its delivery state, see lib/owner-digest.ts. */
+const digestKey = (day: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('invalid digest day');
+  return `digests/owner-${day}.json`;
+};
+
+export async function readOwnerDigestRecord<T = unknown>(day: string): Promise<T | null> {
+  return s3Get(digestKey(day));
+}
+
+/** Creates the record only if absent (If-None-Match: *); false when it already exists. */
+export async function createOwnerDigestRecord(day: string, record: unknown): Promise<boolean> {
+  try {
+    await s3PutIf(digestKey(day), record);
+    return true;
+  } catch (err) {
+    if (isWriteConflict(err)) return false;
+    throw err;
+  }
+}
+
+export async function markOwnerDigestDelivered(day: string, result: string, deliveredAt: string): Promise<void> {
+  await updateJson<Record<string, unknown>>(digestKey(day), (stored) => {
+    if (!stored) throw new Error('digest record missing');
+    return { ...stored, state: 'delivered', result, deliveredAt };
+  });
+}
+
 /* ── Admin: update report status ── */
 export async function updateReportStatus(id: string, status: 'verified' | 'rejected', trustTier?: 1 | 2 | 3): Promise<void> {
-  const report = await getReportById(id);
+  // Conditional: two moderators changing the same report cannot overwrite each other.
+  const report = await updateJson<ScamReport>(`reports/${id}.json`, (stored) => {
+    if (!stored) throw new Error('Report not found');
+    stored.status = status;
+    if (trustTier) stored.trustTier = trustTier;
+    if (status === 'verified') stored.verifiedAt = new Date().toISOString();
+    return stored;
+  });
   if (!report) throw new Error('Report not found');
-
-  const oldStatus = report.status;
-  report.status = status;
-  if (trustTier) report.trustTier = trustTier;
-  if (status === 'verified') report.verifiedAt = new Date().toISOString();
-  await s3Put(`reports/${id}.json`, report);
 
   // The platform's public view (score, counts, addresses) is derived from its reports;
   // the stored index entry is refreshed so lists and search follow the new status.
@@ -712,17 +1130,8 @@ export async function updateReportStatus(id: string, status: 'verified' | 'rejec
   if (await getPlatformBySlug(slug)) await refreshIndexEntry(slug);
   publicIndexCache = null;
 
-  // Stored counters follow the change in both directions.
-  const wasPublished = isPublished({ status: oldStatus });
-  if (wasPublished !== isPublished(report)) {
-    const sign = isPublished(report) ? 1 : -1;
-    const stats = await getStats();
-    stats.totalReports = Math.max(0, stats.totalReports + sign);
-    stats.totalLoss = Math.max(0, stats.totalLoss + sign * (report.lossAmount || 0));
-    if (report.blockchainConfirmed) stats.blockchainVerified = Math.max(0, stats.blockchainVerified + sign);
-    stats.updatedAt = new Date().toISOString();
-    await s3Put('index/stats.json', stats);
-  }
+  // Stored counters follow the index (recomputed, so a repeated moderation call cannot double count).
+  await recomputeStoredStats();
 }
 
 /* ── List disputes ── */
@@ -946,20 +1355,14 @@ export async function deleteReportAndPlatform(reportId: string, platformSlug: st
   } catch (e) { console.log(`[delete] platform ${platformSlug} not found, skipping`); }
 
   // 3. Update platforms index — remove the entry
-  const platforms = await readStoredIndex();
-  const filtered = platforms.filter(p => p.slug !== platformSlug);
-  await s3Put('index/platforms.json', filtered);
+  const filtered = (await updateJson<PlatformIndexEntry[]>('index/platforms.json',
+    (stored) => (Array.isArray(stored) ? stored : []).filter(p => p.slug !== platformSlug))) ?? [];
   publicIndexCache = null;
   deleted.push('index/platforms.json (updated)');
 
-  // 4. Update stats
+  // 4. Update stats (recomputed from the stored index)
+  await recomputeStoredStats();
   const stats = await getStats();
-  stats.totalPlatforms = filtered.length;
-  // Recalculate from remaining platforms
-  stats.totalReports = filtered.reduce((sum, p) => sum + p.victims, 0);
-  stats.totalLoss = filtered.reduce((sum, p) => sum + p.totalLoss, 0);
-  stats.updatedAt = new Date().toISOString();
-  await s3Put('index/stats.json', stats);
   deleted.push('index/stats.json (updated)');
 
   // 5. Clean up address index entries referencing this platform

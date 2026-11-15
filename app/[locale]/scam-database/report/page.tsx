@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { newSubmissionKey } from '@/lib/submission-key';
 import {
   ArrowRight,
   ArrowLeft,
@@ -55,6 +56,10 @@ export default function ReportScamPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<any>(null);
   const [error, setError] = useState('');
+  // One key for this submission, created on the first attempt (in the browser) and kept across
+  // retries after an error: the server then completes the report an earlier attempt may have
+  // saved instead of adding a second one.
+  const submissionKey = useRef<string | null>(null);
 
   // Step 1: Platform
   const [platformName, setPlatformName] = useState('');
@@ -150,6 +155,7 @@ export default function ReportScamPage() {
           lossCurrency,
           lossDate: lossDate || undefined,
           reporterEmail: reporterEmail.trim() || undefined,
+          submissionKey: (submissionKey.current ??= newSubmissionKey()),
         }),
       });
       const data = await res.json();

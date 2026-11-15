@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { getJson, putJson, resetS3, s3Faults } from '../api/helpers/aws-s3-mock';
 import {
@@ -8,9 +8,14 @@ import {
   type ScamPlatform, type ScamReport,
 } from '@/lib/scam-db';
 import { GET as platformApi } from '@/app/api/scam-database/platform/route';
+import { POST as submitReport } from '@/app/api/scam-database/report/route';
+import { POST as moderateReport } from '@/app/api/scam-database/admin/route';
+import { GET as searchApi } from '@/app/api/scam-database/search/route';
 import { GET as statsApi } from '@/app/api/scam-database/stats/route';
 
 vi.mock('@aws-sdk/client-s3', () => import('../api/helpers/aws-s3-mock'));
+vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn().mockResolvedValue({ success: true }) }));
+vi.mock('@/lib/dispute-emails', () => ({ sendDisputeResolution: vi.fn() }));
 
 const P = 'scam-database';
 const ADDR = '0x' + '1'.repeat(40);
@@ -56,7 +61,86 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe('public scam database', () => {
+  it('submits and moderates two reports from an empty database via the API', async () => {
+    vi.stubEnv('ADMIN_PASSWORD', 'local-qa-admin');
+    const outboundFetch = vi.fn().mockRejectedValue(new Error('Unexpected external request'));
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const post = (route: string, body: object, headers?: HeadersInit) => new NextRequest(
+      `http://localhost/api/scam-database/${route}`, { method: 'POST', headers, body: JSON.stringify(body) },
+    );
+    const search = async (query: Record<string, string>) => {
+      const response = await searchApi(new NextRequest(
+        `http://localhost/api/scam-database/search?${new URLSearchParams(query)}`,
+      ));
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+
+    expect(await (await statsApi()).json()).toMatchObject({ totalReports: 0, totalPlatforms: 0, totalLoss: 0 });
+    const acceptedReport = report({
+      lossAmount: 40,
+      description: 'Synthetic report A for the moderation test. All details are fictional and the report will be approved by the test operator.',
+    });
+    const rejectedReport = report({
+      scamAddress: OTHER, lossAmount: 900, platformUrl: 'rejected-mirror.invalid', platformType: 'phishing',
+      description: 'Synthetic report B for the moderation test. All details are fictional and the report will be rejected by the test operator.',
+    });
+    const ids: string[] = [];
+    for (const details of [acceptedReport, rejectedReport]) {
+      const response = await submitReport(post('report', details));
+      expect(response.status).toBe(200);
+      const submission = await response.json();
+      expect(submission.reportId).toEqual(expect.any(String));
+      ids.push(submission.reportId);
+    }
+    const [acceptedId, rejectedId] = ids;
+    expect(acceptedId).not.toBe(rejectedId);
+
+    const pending = await platformApiFor('fictional-exchange');
+    expect(pending.status).toBe(200);
+    expect(pending.body.reports.map((entry: ScamReport) => entry.status)).toEqual(['pending', 'pending']);
+    expect((await search({ q: 'Fictional Exchange' })).platforms[0]).toMatchObject({ victims: 2, verified: false });
+    expect(getTrustLabel(pending.body.platform.trustScore).label).not.toBe('Confirmed Scam');
+
+    for (const [reportId, status] of [[acceptedId, 'verified'], [rejectedId, 'rejected']]) {
+      const response = await moderateReport(post('admin', { action: 'updateStatus', reportId, status }, {
+        'x-admin-key': 'local-qa-admin',
+      }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true });
+    }
+    expect(getJson(`${P}/reports/${rejectedId}.json`)).toMatchObject({ status: 'rejected' });
+
+    const page = await platformApiFor('fictional-exchange');
+    expect(page.status).toBe(200);
+    expect(page.body.platform).toMatchObject({
+      victims: 1, totalLoss: 40, addresses: [ADDR], urls: ['fictional-exchange.invalid'],
+      types: ['fake_exchange'], reportIds: [acceptedId],
+    });
+    expect(page.body.reports).toHaveLength(1);
+    expect(page.body.reports[0]).toMatchObject({ id: acceptedId, status: 'verified', description: acceptedReport.description });
+    expect(page.body.reports[0]).not.toHaveProperty('reporterEmail');
+
+    expect(await search({ q: 'Fictional Exchange' })).toMatchObject({
+      total: 1, platforms: [{ slug: 'fictional-exchange', victims: 1, totalLoss: 40, addresses: [ADDR] }],
+    });
+    expect(await search({ address: ADDR })).toMatchObject({ total: 1 });
+    expect(await search({ address: OTHER })).toEqual({ total: 0, platforms: [] });
+    expect(await getAddressIndex(OTHER)).toBeNull();
+    const stats = await statsApi();
+    expect(stats.status).toBe(200);
+    expect(await stats.json()).toMatchObject({ totalReports: 1, totalPlatforms: 1, totalLoss: 40, blockchainVerified: 0 });
+    expect(outboundFetch).not.toHaveBeenCalled();
+  });
+
   it('a rejected report disappears from every public view', async () => {
     const { id } = await saveReport(report());
     expect((await publicSurface('fictional-exchange')).page.status).toBe(200);

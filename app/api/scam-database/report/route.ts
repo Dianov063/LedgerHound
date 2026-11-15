@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
-import { saveReport, isTxidUsed, calcRecoveryScore } from '@/lib/scam-db';
+import { saveReport, isTxidRefused, calcRecoveryScore } from '@/lib/scam-db';
 import type { ScamType } from '@/lib/scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getPublicOrigin } from '@/lib/public-origin';
+import { isSubmissionKey } from '@/lib/submission-key';
 
 const VALID_TYPES: ScamType[] = ['fake_exchange', 'pig_butchering', 'rug_pull', 'phishing', 'ponzi', 'other'];
 
@@ -28,7 +29,13 @@ export async function POST(req: NextRequest) {
       lossDate,
       description,
       reporterEmail,
+      submissionKey,
     } = body;
+
+    /* The form's submission key: every retry of one submission completes the same report. */
+    if (submissionKey !== undefined && !isSubmissionKey(submissionKey)) {
+      return Response.json({ error: 'Invalid submission key.' }, { status: 400 });
+    }
 
     /* Validate required fields */
     if (!platformName || typeof platformName !== 'string' || platformName.trim().length < 2) {
@@ -41,10 +48,10 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Description is required (minimum 100 characters).' }, { status: 400 });
     }
 
-    /* Check TXID uniqueness */
+    /* Check TXID uniqueness (early, before the transaction lookup; lib/scam-db isTxidRefused).
+       saveReport enforces the same rule in every case. */
     if (txHash && typeof txHash === 'string' && txHash.trim().length > 0) {
-      const used = await isTxidUsed(txHash.trim());
-      if (used) {
+      if (await isTxidRefused(txHash.trim(), submissionKey)) {
         return Response.json({ error: 'This transaction hash has already been used in a previous report.' }, { status: 409 });
       }
     }
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
       reporterEmail: reporterEmail?.trim() || undefined,
       status: 'pending',
       trustTier,
-    });
+    }, { submissionKey });
 
     /* Calculate recovery score */
     const recoveryScore = calcRecoveryScore({
@@ -113,17 +120,24 @@ export async function POST(req: NextRequest) {
       lossAmount: report.lossAmount,
     });
 
+    // The answer describes the SAVED report: on a retry that is the first saved version, which may
+    // differ from this attempt (e.g. a hash added or removed after an error).
+    const sameTx = (report.txHash?.toLowerCase() ?? '') === (txHash?.trim().toLowerCase() ?? '');
     return Response.json({
       reportId: id,
       trustTier: report.trustTier,
       verified: report.blockchainConfirmed,
-      verifiedTxData,
+      verifiedTxData: sameTx ? verifiedTxData : null,
       recoveryScore,
-      message: blockchainConfirmed
+      message: report.blockchainConfirmed
         ? 'Report submitted and blockchain-verified. It will be reviewed by our team.'
         : 'Report submitted. It will be reviewed by our team.',
     });
   } catch (err: any) {
+    // Two reports with the same hash at the same moment: the second loses the atomic claim.
+    if (err?.name === 'TxidAlreadyUsedError') {
+      return Response.json({ error: 'This transaction hash has already been used in a previous report.' }, { status: 409 });
+    }
     console.error('[scam-database/report]', err);
     return Response.json({ error: 'Failed to submit report' }, { status: 500 });
   }

@@ -27,6 +27,7 @@ const scamDb = vi.hoisted(() => ({ saveReport: vi.fn() }));
 vi.mock('@/lib/scam-db', () => ({
   saveReport: scamDb.saveReport,
   isTxidUsed: async () => false,
+  isTxidRefused: async () => false,
   calcRecoveryScore: () => ({ score: 50, label: 'x', factors: [] }),
   getPlatformIndex: async () => [],
   slugify: (s: string) => s.toLowerCase(),

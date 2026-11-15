@@ -37,3 +37,6 @@ next-env.d.ts
 
 # Test report regeneration output
 /test-reports
+
+# QA run output (package 58)
+/qa-output
