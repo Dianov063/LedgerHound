@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { makeMetadata } from '@/lib/metadata';
 import { translatePaymentSafety } from '@/lib/payment-safety-i18n';
 
-export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const params = await props.params;
   return makeMetadata({
     locale: params.locale,
     path: '/payment-safety',

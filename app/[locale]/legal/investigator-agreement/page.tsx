@@ -1,9 +1,13 @@
+import { use } from 'react';
+import { setRequestLocale } from 'next-intl/server';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-export default function InvestigatorAgreementPage() {
+export default function InvestigatorAgreementPage(props: { params: Promise<{ locale: string }> }) {
+  // Static rendering: the layout's setRequestLocale does not cover the page (Next 15+).
+  setRequestLocale(use(props.params).locale);
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;
 

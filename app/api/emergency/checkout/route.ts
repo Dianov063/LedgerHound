@@ -22,7 +22,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const getStripe = () => {
-  // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 

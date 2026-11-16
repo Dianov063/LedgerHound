@@ -1,3 +1,5 @@
+import { use } from 'react';
+import { setRequestLocale } from 'next-intl/server';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
@@ -39,7 +41,9 @@ const scenarioPages = [
   ['fake-local-service-scam', 'local'],
 ];
 
-export default function PaymentScamReportSeoPage() {
+export default function PaymentScamReportSeoPage(props: { params: Promise<{ locale: string }> }) {
+  // Static rendering: the layout's setRequestLocale does not cover the page (Next 15+).
+  setRequestLocale(use(props.params).locale);
   const locale = useLocale();
   const t = useTranslations('payment_scam_report');
   const base = locale === 'en' ? '' : `/${locale}`;

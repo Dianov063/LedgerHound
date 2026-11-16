@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import middleware from '@/middleware';
+import middleware from '@/proxy';
 
 const ORIGIN = 'https://www.ledgerhound.vip';
 const EVIL = 'evil.example';

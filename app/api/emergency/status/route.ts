@@ -17,7 +17,6 @@ const LEGACY_PACK_AGE_MS = 48 * 60 * 60 * 1000;
 export const dynamic = 'force-dynamic';
 
 const getStripe = () => {
-  // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 

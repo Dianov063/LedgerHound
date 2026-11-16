@@ -6,13 +6,17 @@ import Footer from '@/components/Footer';
 import { getPaymentScamScenario, PAYMENT_SCAM_SCENARIOS } from '@/lib/payment-scam-scenarios';
 import { getScenarioCopy } from '@/lib/payment-scam-i18n';
 
+/** The old slug that now redirects: prerendered too, so its redirect is built once like every other page of this route. */
+const LEGACY_REDIRECT_SLUG = 'telegram-russian-community-scams';
+
 export function generateStaticParams() {
-  return PAYMENT_SCAM_SCENARIOS.map((scenario) => ({ scenario: scenario.slug }));
+  return [...PAYMENT_SCAM_SCENARIOS.map((scenario) => ({ scenario: scenario.slug })), { scenario: LEGACY_REDIRECT_SLUG }];
 }
 
-export default function PaymentScamScenarioPage({ params }: { params: { locale: string; scenario: string } }) {
+export default async function PaymentScamScenarioPage(props: { params: Promise<{ locale: string; scenario: string }> }) {
+  const params = await props.params;
   const base = params.locale === 'en' ? '' : `/${params.locale}`;
-  if (params.scenario === 'telegram-russian-community-scams') {
+  if (params.scenario === LEGACY_REDIRECT_SLUG) {
     redirect(`${base}/payment-scam/telegram-payment-scams`);
   }
   const scenario = getPaymentScamScenario(params.scenario);

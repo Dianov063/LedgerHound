@@ -1,3 +1,5 @@
+import { use } from 'react';
+import { setRequestLocale } from 'next-intl/server';
 import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
@@ -8,7 +10,13 @@ import {
 } from 'lucide-react';
 import { makeMetadata } from '@/lib/metadata';
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   return await makeMetadata({
     locale,
     path: '',
@@ -30,7 +38,9 @@ const RAILS = ['Zelle', 'Cash App', 'Venmo', 'PayPal', 'Apple Cash', 'Chime', 'B
  * fork near the bottom, styled deliberately unlike the rest of the page so it
  * reads as a separate product rather than another menu item.
  */
-export default function PaymentsHomePage() {
+export default function PaymentsHomePage(props: { params: Promise<{ locale: string }> }) {
+  // Static rendering: the layout's setRequestLocale does not cover the page (Next 15+).
+  setRequestLocale(use(props.params).locale);
   const t = useTranslations('payments_home');
   const locale = useLocale();
   const base = locale === 'en' ? '' : `/${locale}`;

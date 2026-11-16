@@ -6,7 +6,6 @@ import { isStripeSessionId } from '@/lib/emergency-case-access';
 import logger from '@/lib/logger';
 
 const getStripe = (): any => {
-  // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 

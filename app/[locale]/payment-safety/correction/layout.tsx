@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import { translatePaymentSafety } from '@/lib/payment-safety-i18n';
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   return {
     title: translatePaymentSafety(locale, 'Payment Warning Correction Request | LedgerHound'),
     description: translatePaymentSafety(locale, 'Request review or correction of a LedgerHound payment recipient warning.'),

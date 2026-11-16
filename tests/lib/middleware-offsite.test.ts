@@ -9,7 +9,7 @@ vi.mock('next-intl/middleware', () => ({ default: () => () => answer.make() }));
 
 const run = async (make: () => Response) => {
   answer.make = make;
-  const { default: middleware } = await import('@/middleware');
+  const { default: middleware } = await import('@/proxy');
   return middleware(new NextRequest('https://www.ledgerhound.vip/en/pricing'));
 };
 

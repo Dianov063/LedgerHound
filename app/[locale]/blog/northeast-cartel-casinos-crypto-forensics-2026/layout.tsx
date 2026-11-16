@@ -17,7 +17,13 @@ const descriptions: Record<string, string> = {
   ar: 'فرضت وزارة الخزانة الأمريكية عقوبات على كازينوهين مكسيكيين بسبب صلاتهما بكارتل الشمال الشرقي. تعرف على كيفية غسل الكازينوهات للأموال الرقمية وكيف يتتبعها الطب الشرعي لسلسلة الكتل.',
 };
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   return await makeMetadata({
     locale,
     path: '/blog/northeast-cartel-casinos-crypto-forensics-2026',

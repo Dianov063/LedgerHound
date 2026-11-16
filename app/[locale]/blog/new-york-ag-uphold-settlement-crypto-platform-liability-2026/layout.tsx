@@ -17,7 +17,13 @@ const descriptions: Record<string, string> = {
   ar: 'حصل المدعي العام لنيويورك على أكثر من 5 ملايين دولار من Uphold للترويج لمخطط احتيال للعملات المشفرة. تحلل هذه المقالة آثار المسؤولية على البورصات وما يعنيه للمستثمرين.',
 };
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   return makeMetadata({
     locale,
     path: '/blog/new-york-ag-uphold-settlement-crypto-platform-liability-2026',

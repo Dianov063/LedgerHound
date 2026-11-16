@@ -9,6 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
+    // next-intl 4 is ESM-only and imports 'next/server' without an extension; Node cannot resolve that
+    // for an externalized dependency, so Vite processes next-intl itself (next-intl's testing guide).
+    server: { deps: { inline: ['next-intl'] } },
   },
   resolve: {
     alias: {

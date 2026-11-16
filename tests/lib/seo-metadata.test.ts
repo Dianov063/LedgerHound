@@ -70,7 +70,7 @@ describe('sitemap', () => {
 
 describe('page metadata', () => {
   it.each(locales)('/payment-safety in %s has its own canonical and all hreflang', async (locale) => {
-    const m = await safetyMetadata({ params: { locale } });
+    const m = await safetyMetadata({ params: Promise.resolve({ locale }) });
     expect(m.alternates?.canonical).toBe(urlFor(locale, '/payment-safety'));
     expect(m.alternates?.languages).toEqual(hreflang('/payment-safety'));
     expect(m.robots).toBeUndefined();
@@ -78,20 +78,20 @@ describe('page metadata', () => {
   });
 
   it('/payment-safety keeps its translated title', async () => {
-    const en = await safetyMetadata({ params: { locale: 'en' } });
-    const ru = await safetyMetadata({ params: { locale: 'ru' } });
+    const en = await safetyMetadata({ params: Promise.resolve({ locale: 'en' }) });
+    const ru = await safetyMetadata({ params: Promise.resolve({ locale: 'ru' }) });
     expect(ru.title).not.toBe(en.title);
   });
 
   it.each(locales)('the noindex correction page in %s does not inherit canonical or hreflang', async (locale) => {
-    const m = await correctionMetadata({ params: { locale } });
+    const m = await correctionMetadata({ params: Promise.resolve({ locale }) });
     expect(m.robots).toEqual({ index: false, follow: false });
     expect(m.alternates).toBeNull();
   });
 
   it('the correction page keeps a translated title', async () => {
-    const en = await correctionMetadata({ params: { locale: 'en' } });
-    const ar = await correctionMetadata({ params: { locale: 'ar' } });
+    const en = await correctionMetadata({ params: Promise.resolve({ locale: 'en' }) });
+    const ar = await correctionMetadata({ params: Promise.resolve({ locale: 'ar' }) });
     expect(ar.title).not.toBe(en.title);
   });
 
@@ -104,7 +104,7 @@ describe('page metadata', () => {
 
     it.each(locales)('in %s has its own canonical, all hreflang and its own copy', async (locale) => {
       const { getScenarioCopy } = await import('@/lib/payment-scam-i18n');
-      const m = await scenarioMetadata({ params: { locale, scenario: slug } });
+      const m = await scenarioMetadata({ params: Promise.resolve({ locale, scenario: slug }) });
       expect(m.alternates?.canonical).toBe(urlFor(locale, path));
       expect(m.alternates?.languages).toEqual(hreflang(path));
       expect(m.title).toBe(getScenarioCopy(slug, locale).metadataTitle);
@@ -113,26 +113,26 @@ describe('page metadata', () => {
   });
 
   it('the old Telegram alias resolves to the same canonical', async () => {
-    const m = await scenarioMetadata({ params: { locale: 'ru', scenario: 'telegram-russian-community-scams' } });
+    const m = await scenarioMetadata({ params: Promise.resolve({ locale: 'ru', scenario: 'telegram-russian-community-scams' }) });
     expect(m.alternates?.canonical).toBe(urlFor('ru', TELEGRAM));
   });
 
   it('the Telegram scenario keeps its localized title and description', async () => {
     const { getTelegramScamCopy } = await import('@/lib/payment-scam-i18n');
-    const m = await scenarioMetadata({ params: { locale: 'ru', scenario: 'telegram-payment-scams' } });
+    const m = await scenarioMetadata({ params: Promise.resolve({ locale: 'ru', scenario: 'telegram-payment-scams' }) });
     expect(m.title).toBe(getTelegramScamCopy('ru').metadataTitle);
     expect(m.description).toBe(getTelegramScamCopy('ru').metadataDescription);
   });
 
   it.each(locales)('/payment-scam-report in %s has its own canonical and all hreflang', async (locale) => {
-    const m = await reportMetadata({ params: { locale } });
+    const m = await reportMetadata({ params: Promise.resolve({ locale }) });
     expect(m.alternates?.canonical).toBe(urlFor(locale, '/payment-scam-report'));
     expect(m.alternates?.languages).toEqual(hreflang('/payment-scam-report'));
     expect(m.title).toBe('paymentScamReport.title');
   });
 
   it.each(locales)('/emergency in %s has its own canonical and all hreflang', async (locale) => {
-    const m = await emergencyMetadata({ params: { locale } });
+    const m = await emergencyMetadata({ params: Promise.resolve({ locale }) });
     expect(m.alternates?.canonical).toBe(urlFor(locale, '/emergency'));
     expect(m.alternates?.languages).toEqual(hreflang('/emergency'));
     expect(m.robots).toBeUndefined();

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
-import { usePathname, useRouter } from '@/i18n/navigation';
+import { usePathname } from '@/i18n/navigation';
+import { switchLocale as switchLocaleByNavigation } from '@/lib/locale-switch';
 import { Menu, X, Globe, ChevronDown } from 'lucide-react';
 import { locales } from '@/i18n';
 
@@ -30,16 +31,11 @@ export default function Navbar() {
   const t = useTranslations('nav');
   const locale = useLocale();
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
-  const switchLocale = (newLocale: string) => {
-    // usePathname has no query or fragment. Take them verbatim from the address bar,
-    // so repeated keys and encoded values survive the switch unchanged.
-    const { search, hash } = window.location;
-    router.replace(`${pathname}${search}${hash}`, { locale: newLocale });
-  };
+  // A full page load to the final address; see lib/locale-switch.ts for why it is not a soft navigation.
+  const switchLocale = (newLocale: string) => switchLocaleByNavigation(newLocale, locale, pathname);
 
   const prefix = locale === 'en' ? '' : `/${locale}`;
   /* The first two links are the visitor's two states — hasn't paid yet, already

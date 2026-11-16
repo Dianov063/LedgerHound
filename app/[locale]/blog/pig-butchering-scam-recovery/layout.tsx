@@ -33,7 +33,13 @@ const metadataByLocale: Record<string, { title: string; description: string; key
   },
 };
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   const meta = metadataByLocale[locale] || metadataByLocale.en;
 
   return await makeMetadata({

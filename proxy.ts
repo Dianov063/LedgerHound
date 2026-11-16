@@ -1,13 +1,9 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { locales, defaultLocale } from './i18n';
+import { routing } from './i18n/routing';
 
-const intlMiddleware = createMiddleware({
-  locales,
-  defaultLocale,
-  localePrefix: 'as-needed',
-});
+const intlMiddleware = createMiddleware(routing);
 
 const CSP_DIRECTIVES = [
   "default-src 'self'",
@@ -35,7 +31,8 @@ function addCorsHeaders(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-key, x-submission-token');
 }
 
-/* Open-redirect guard (next-intl < 4.9.1, GHSA-8f24-v5vv-gm5j). With localePrefix
+/* Open-redirect guard. It was added for next-intl < 4.9.1 (GHSA-8f24-v5vv-gm5j) and is kept as
+   defence in depth now that the library is fixed. With localePrefix
    'as-needed', next-intl redirects /en/<rest> to /<rest>. A control character the URL
    parser drops — e.g. /en/%09/evil.example — turns <rest> into //evil.example, a
    protocol-relative redirect off the site. Two independent checks:
@@ -72,7 +69,7 @@ function leavesOrigin(response: NextResponse, origin: string): boolean {
   });
 }
 
-export default function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!pathname.startsWith('/api/') && hasUnsafePath(pathname)) return badRequest();

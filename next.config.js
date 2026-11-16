@@ -94,16 +94,16 @@ const legacyBlogRedirects = LEGACY_BLOG_SLUGS.flatMap((slug) => [
 
 // Self-hosted build (Dockerfile sets LEDGERHOUND_SELF_HOST=1). Vercel builds
 // are unchanged. Standalone output for the container; the built-in image
-// optimizer is off (one logo uses next/image, and the self-hosted optimizer
-// is the attack surface of the open Next 14 Image Optimizer advisory); the
-// instrumentation hook installs the graceful SIGTERM drain (instrumentation.ts).
+// optimizer stays off there (one logo uses next/image; the self-hosted
+// optimizer has been the attack surface of several Next advisories).
+// instrumentation.ts (graceful SIGTERM drain) is loaded by Next itself since
+// Next 15; it acts only when LEDGERHOUND_SELF_HOST=1.
 const selfHost = process.env.LEDGERHOUND_SELF_HOST === '1';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(selfHost ? { output: 'standalone', experimental: { instrumentationHook: true } } : {}),
+  ...(selfHost ? { output: 'standalone' } : {}),
   images: {
-    domains: [],
     ...(selfHost ? { unoptimized: true } : {}),
   },
   async redirects() {

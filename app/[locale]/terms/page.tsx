@@ -1,9 +1,17 @@
+import { use } from 'react';
+import { setRequestLocale } from 'next-intl/server';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useTranslations } from 'next-intl';
 import { makeMetadata } from '@/lib/metadata';
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+export async function generateMetadata(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
+
+  const {
+    locale
+  } = params;
+
   return await makeMetadata({
     locale,
     path: '/terms',
@@ -11,7 +19,9 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 });
 }
 
-export default function TermsPage() {
+export default function TermsPage(props: { params: Promise<{ locale: string }> }) {
+  // Static rendering: the layout's setRequestLocale does not cover the page (Next 15+).
+  setRequestLocale(use(props.params).locale);
   const t = useTranslations('terms');
 
   const s4Items = [t('s4_i1'), t('s4_i2'), t('s4_i3'), t('s4_i4'), t('s4_i5'), t('s4_i6')];

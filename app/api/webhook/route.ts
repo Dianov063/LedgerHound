@@ -79,7 +79,6 @@ async function logWebhookEvent(event: { id: string; type: string; data?: { objec
 }
 
 const getStripe = () => {
-  // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 

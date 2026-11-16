@@ -5,7 +5,6 @@ import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 const getStripe = () => {
-  // @ts-expect-error Stripe types mismatch with ESM default import
   return new Stripe(process.env.STRIPE_SECRET_KEY!);
 };
 

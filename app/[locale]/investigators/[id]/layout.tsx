@@ -2,11 +2,18 @@ import type { Metadata } from 'next';
 import { makeMetadata } from '@/lib/metadata';
 import { getApproved } from '@/lib/investigators/storage';
 
-export async function generateMetadata({
-  params: { locale, id },
-}: {
-  params: { locale: string; id: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string; id: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
+
+  const {
+    locale,
+    id
+  } = params;
+
   const inv = await getApproved(id);
   if (!inv || !inv.isApproved || !inv.isActive) {
     return await makeMetadata({
