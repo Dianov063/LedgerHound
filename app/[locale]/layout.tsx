@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { analyticsId } from '@/lib/analytics';
 import { locales, rtlLocales, type Locale } from '@/i18n';
 import '../globals.css';
 
@@ -94,6 +95,8 @@ export default async function LocaleLayout(
   if (!locales.includes(locale as Locale)) notFound();
 
   setRequestLocale(locale);
+  // Never on a Vercel Preview; see lib/analytics.ts.
+  const gaId = analyticsId(process.env.NEXT_PUBLIC_GA_ID, process.env.VERCEL_ENV);
 
   const messages = await getMessages();
   const isRtl = rtlLocales.includes(locale as Locale);
@@ -108,9 +111,7 @@ export default async function LocaleLayout(
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>
-        {process.env.NEXT_PUBLIC_GA_ID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
-        )}
+        {gaId && <GoogleAnalytics gaId={gaId} />}
       </body>
     </html>
   );
