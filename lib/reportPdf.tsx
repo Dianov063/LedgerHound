@@ -6,6 +6,7 @@ import { getNodeColor, type GraphData, type GraphNode, type GraphEdge } from './
 import { firstDifferingCharParts } from './address-poisoning';
 import { getCodepoints, normalizeForDisplay, detectScriptCategory } from './unicode-spoofing';
 import { getReportTranslations, type ReportTranslations, type ReportLocale } from './report-i18n';
+import { uncheckedSources } from './labels/coverage';
 
 /**
  * Report i18n. Translations are resolved once in ReportDocument via
@@ -708,10 +709,13 @@ const NarrativePage = ({ data, t }: { data: ReportData; t: ReportTranslations })
               // 2026-05-21: critical factors (e.g. confirmed misdirection)
               // render red + bold; high-severity stays slate but bold.
               const isCritical = f.severity === 'critical';
-              const textColor = isCritical ? red : f.met ? slate900 : slate400;
+              // 'unverified': the check behind the factor did not complete. Amber, so it is not
+              // read as a negative finding like the grey unmet lines (audit F9).
+              const isUnverified = f.severity === 'unverified';
+              const textColor = isCritical ? red : isUnverified ? amber : f.met ? slate900 : slate400;
               return (
                 <View key={i} style={{ flexDirection: 'row', marginBottom: 2, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 8, width: 12, color: isCritical ? red : f.met ? green : slate400 }}>{f.met ? '\u2714' : '\u2716'}</Text>
+                  <Text style={{ fontSize: 8, width: 12, color: isCritical ? red : isUnverified ? amber : f.met ? green : slate400 }}>{f.met ? '\u2714' : isUnverified ? '?' : '\u2716'}</Text>
                   <Text style={{ fontSize: 7, color: textColor, flex: 1, fontFamily: isCritical ? 'Helvetica-Bold' : 'Helvetica' }}>{f.label}</Text>
                 </View>
               );
@@ -1262,6 +1266,27 @@ const SOURCE_LABELS: Record<string, string> = {
   known_phishing: 'ETHERSCAN',
 };
 
+/**
+ * The two coverage notes of the page (audit F9), as text: which sources failed, and which were not
+ * asked, each with "n of total" addresses. Null when there is nothing to say or the report data
+ * predates the coverage summary (then only the general note is shown).
+ */
+export function coverageNotes(
+  data: Pick<ReportData, 'sourceCoverage'>,
+  av: ReportTranslations['addressVerification'],
+): { unavailable: string | null; notConsulted: string | null } {
+  const c = data.sourceCoverage;
+  if (!c) return { unavailable: null, notConsulted: null };
+  const items = (names: string[], pick: (name: string) => number) =>
+    names.map((name) => av.coverageItem(av.sourceName(name), pick(name), c.analyzed));
+  const unavailable = items(c.unavailableSources, (name) => c.bySource[name as keyof typeof c.bySource].unavailable);
+  const notConsulted = items(c.notConsultedSources, (name) => c.bySource[name as keyof typeof c.bySource].notConsulted);
+  return {
+    unavailable: unavailable.length ? av.degradedSources(unavailable) : null,
+    notConsulted: notConsulted.length ? av.notConsultedBody(notConsulted) : null,
+  };
+}
+
 function severityRankFor(r: { hasSanctionsFlag: boolean; hasPhishingFlag: boolean; hasScamFlag: boolean; isKycExchange: boolean; labels: { length: number } }): number {
   // Higher = more important to surface. Sanctions > phishing > scam > CEX > other > clean.
   if (r.hasSanctionsFlag) return 4;
@@ -1273,10 +1298,13 @@ function severityRankFor(r: { hasSanctionsFlag: boolean; hasPhishingFlag: boolea
 }
 
 const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslations }) => {
-  if (!data.addressLabels || data.addressLabels.length === 0) return null;
+  const labels = data.addressLabels ?? [];
+  // No addresses and no failure: nothing to show. No addresses BECAUSE the verification failed:
+  // the page stays and says so, instead of the section silently disappearing (audit F9).
+  if (labels.length === 0 && !data.externalIntelligenceDegraded) return null;
 
   // Sort: severity DESC, then by highestConfidence DESC.
-  const sorted = [...data.addressLabels].sort((a, b) => {
+  const sorted = [...labels].sort((a, b) => {
     const sa = severityRankFor(a);
     const sb = severityRankFor(b);
     if (sa !== sb) return sb - sa;
@@ -1287,6 +1315,7 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
   const shown = sorted.slice(0, MAX_ENTRIES);
   const remaining = Math.max(0, sorted.length - MAX_ENTRIES);
   const av = t.addressVerification;
+  const notes = coverageNotes(data, av);
 
   return (
     <Page size="A4" style={s.page}>
@@ -1298,9 +1327,18 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
 
       {data.externalIntelligenceDegraded && (
         <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#fde68a' }}>
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>{av.degradedTitle}</Text>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: amber, marginBottom: 2 }}>{labels.length === 0 ? av.notPerformedTitle : av.degradedTitle}</Text>
           <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
-            {av.degradedBody}
+            {labels.length === 0 ? av.notPerformed : `${notes.unavailable ? `${notes.unavailable} ` : ''}${av.degradedBody}`}
+          </Text>
+        </View>
+      )}
+
+      {notes.notConsulted && (
+        <View style={{ backgroundColor: '#f8fafc', borderRadius: 6, padding: 8, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: slate600, marginBottom: 2 }}>{av.notConsultedTitle}</Text>
+          <Text style={{ fontSize: 7, color: slate600, lineHeight: 1.4 }}>
+            {notes.notConsulted}
           </Text>
         </View>
       )}
@@ -1310,6 +1348,11 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
         const borderColor = sev >= 3 ? red : sev === 2 ? amber : sev === 1 ? green : slate400;
         const bg = sev >= 3 ? '#fef2f2' : sev === 2 ? '#fffbeb' : sev === 1 ? '#f0fdf4' : '#f8fafc';
         const symbol = sev >= 3 ? '!!' : sev === 2 ? '!' : sev === 1 ? '✓' : '·';
+        // Sources whose silence about this address is not a negative result (audit F9).
+        const unchecked = uncheckedSources(r).map((name) => av.sourceName(name));
+        // Report data saved before per-source statuses existed carries only the failure flag:
+        // which source failed is not known, so none is named.
+        const unknownGap = !r.sources && r.hadExternalSourceFailure;
         return (
           <View key={i} style={{ backgroundColor: bg, borderRadius: 4, padding: 6, marginBottom: 5, borderLeftWidth: 3, borderLeftColor: borderColor }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
@@ -1317,7 +1360,7 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
               <Text style={{ fontSize: 6, color: slate400 }}>{av.sourcesSuffix(r.labels.length)}</Text>
             </View>
             {r.labels.length === 0 ? (
-              <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>{av.noMatches}</Text>
+              <Text style={{ fontSize: 7, color: slate400, fontStyle: 'italic' }}>{unchecked.length > 0 ? av.noMatchesPartial : av.noMatches}</Text>
             ) : (
               r.labels.slice(0, 4).map((l, j) => (
                 <Text key={j} style={{ fontSize: 7, color: slate600, marginBottom: 1, lineHeight: 1.3 }}>
@@ -1326,6 +1369,9 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
                   {l.confidence < 1 ? av.confLabel(Math.round(l.confidence * 100)) : ''}
                 </Text>
               ))
+            )}
+            {unchecked.length > 0 && (
+              <Text style={{ fontSize: 6, color: amber, marginTop: 1 }}>{unknownGap ? av.incompleteUnknown : av.notChecked(unchecked)}</Text>
             )}
           </View>
         );
@@ -2545,7 +2591,8 @@ export const ReportDocument = ({ data, locale, country, reportHash }: { data: Re
   const hasCrossChain = data.crossChainTrace?.detected === true;
   // 2026-05-20 Phase 1: only render the new federation page when at least
   // one counterparty was analyzed. Avoids a blank section on tiny wallets.
-  const hasAddressLabels = (data.addressLabels?.length ?? 0) > 0;
+  // Also rendered when the verification failed as a whole, so the report says it was not done.
+  const hasAddressLabels = (data.addressLabels?.length ?? 0) > 0 || data.externalIntelligenceDegraded === true;
   // Phase 2: only render the attack page when a technique was detected.
   const at = data.attackTechniques;
   const hasAttackTechniques = !!at && (at.addressPoisoning?.detected || at.unicodeSpoofing?.detected);

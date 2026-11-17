@@ -11,7 +11,7 @@
  * 2026-05-20: Phase 1 federation.
  */
 
-import type { AddressLabel, LabelCategory } from './types';
+import type { LabelCategory, SourceResult } from './types';
 
 const TIMEOUT_MS = 8000;
 
@@ -29,9 +29,43 @@ const CHAIN_IDS: Record<string, string> = {
   linea: '59144',
 };
 
-export async function queryGoPlus(address: string, network: string): Promise<AddressLabel | null> {
+/**
+ * The risk flags of the address_security answer ("1"/"0" strings), as documented at
+ * docs.gopluslabs.io/reference/response-details-1 (read 2026-11-17), with the name shown in the
+ * label. `contract_address` and `reinit` describe the contract and are not risk flags. The last
+ * five were not read before: an address GoPlus marked only with one of them counted as clean.
+ */
+const RISK_FLAGS: readonly (readonly [field: string, name: string])[] = [
+  ['phishing_activities', 'phishing'],
+  ['fake_kyc', 'fake KYC'],
+  ['fake_standard_interface', 'fake standard interface'],
+  ['malicious_mining_activities', 'malicious mining'],
+  ['blacklist_doubt', 'blacklisted'],
+  ['honeypot_related_address', 'honeypot related'],
+  ['blackmail_activities', 'blackmail'],
+  ['stealing_attack', 'stealing attack'],
+  ['sanctioned', 'sanctioned'],
+  ['darkweb_transactions', 'darkweb'],
+  ['money_laundering', 'money laundering'],
+  ['cybercrime', 'cybercrime'],
+  ['financial_crime', 'financial crime'],
+  ['mixer', 'mixer'],
+  ['gas_abuse', 'gas abuse'],
+  ['fake_token', 'fake token'],
+];
+
+/**
+ * The answer always says what happened (audit F9): a failed call is `unavailable`, never
+ * "no risk flags".
+ *   match        GoPlus reports at least one risk flag (with the label);
+ *   no_match     GoPlus answered (code 1) with flag data and every risk flag is "0";
+ *   unavailable  the call failed, GoPlus answered with an error code, or the answer carries
+ *                no flag data we recognize (`reason`);
+ *   skipped      the network is not one GoPlus covers (EVM only), so no call was made.
+ */
+export async function queryGoPlus(address: string, network: string): Promise<SourceResult> {
   const chainId = CHAIN_IDS[network.toLowerCase()];
-  if (!chainId) return null; // non-EVM or unsupported
+  if (!chainId) return { status: 'skipped', reason: 'unsupported_network' }; // non-EVM or unsupported
 
   const url = `https://api.gopluslabs.io/api/v1/address_security/${address}?chain_id=${chainId}`;
 
@@ -45,12 +79,12 @@ export async function queryGoPlus(address: string, network: string): Promise<Add
   } catch (e: any) {
     const isTimeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
     console.warn(`[goplus] ${isTimeout ? 'timeout' : 'fetch error'} for ${address}: ${e?.message}`);
-    return null;
+    return { status: 'unavailable', reason: isTimeout ? 'timeout' : 'network_error' };
   }
 
   if (!res.ok) {
-    if (res.status !== 404) console.warn(`[goplus] HTTP ${res.status} for ${address}`);
-    return null;
+    console.warn(`[goplus] HTTP ${res.status} for ${address}`);
+    return { status: 'unavailable', reason: `http_${res.status}` };
   }
 
   let data: any;
@@ -58,40 +92,49 @@ export async function queryGoPlus(address: string, network: string): Promise<Add
     data = await res.json();
   } catch (e: any) {
     console.warn(`[goplus] JSON parse failure for ${address}: ${e?.message}`);
-    return null;
+    return { status: 'unavailable', reason: 'invalid_json' };
   }
 
   // GoPlus convention: code: 1 = success, result holds the flags ("1"/"0" strings).
-  if (data?.code !== 1 || !data?.result) return null;
+  // Any other code (rate limit, internal error) is not an answer about the address.
+  if (data?.code !== 1 || !data?.result || typeof data.result !== 'object') {
+    console.warn(`[goplus] error answer for ${address}: code ${data?.code}`);
+    return { status: 'unavailable', reason: `code_${data?.code ?? 'missing'}` };
+  }
   const r = data.result;
 
-  const flags: string[] = [];
-  if (r.phishing_activities === '1') flags.push('phishing');
-  if (r.fake_kyc === '1') flags.push('fake KYC');
-  if (r.fake_standard_interface === '1') flags.push('fake standard interface');
-  if (r.malicious_mining_activities === '1') flags.push('malicious mining');
-  if (r.blacklist_doubt === '1') flags.push('blacklisted');
-  if (r.honeypot_related_address === '1') flags.push('honeypot related');
-  if (r.blackmail_activities === '1') flags.push('blackmail');
-  if (r.stealing_attack === '1') flags.push('stealing attack');
-  if (r.sanctioned === '1') flags.push('sanctioned');
-  if (r.darkweb_transactions === '1') flags.push('darkweb');
-  if (r.money_laundering === '1') flags.push('money laundering');
+  // "No flags" is a result only when the answer carries flag data: `result: {}`, `result: []`
+  // or an object with other fields says nothing about the address (review of package 63).
+  // (An array has none of these fields either, so `[]` and `[{...}]` fail the same test.)
+  const answered = RISK_FLAGS.some(([field]) => r[field] === '0' || r[field] === '1');
+  if (!answered) {
+    console.warn(`[goplus] answer without flag data for ${address}`);
+    return { status: 'unavailable', reason: Array.isArray(r) || Object.keys(r).length === 0 ? 'empty_result' : 'unrecognized_result' };
+  }
 
-  if (flags.length === 0) return null;
+  const flags: string[] = RISK_FLAGS.filter(([field]) => r[field] === '1').map(([, name]) => name);
+  const created = Number(r.number_of_malicious_contracts_created);
+  if (Number.isFinite(created) && created > 0) flags.push('created malicious contracts');
+
+  if (flags.length === 0) return { status: 'no_match' };
 
   const category: LabelCategory = flags.includes('sanctioned')
     ? 'sanctions'
     : flags.includes('phishing')
       ? 'phishing'
-      : 'scam';
+      : flags.length === 1 && flags[0] === 'mixer'
+        ? 'mixer'
+        : 'scam';
 
   return {
-    source: 'goplus',
-    tag: `GoPlus risk: ${flags.join(', ')}`,
-    category,
-    confidence: 0.8,
-    url: `https://gopluslabs.io/token-security/${chainId}/${address}`,
-    verifiedAt: new Date().toISOString().split('T')[0],
+    status: 'match',
+    label: {
+      source: 'goplus',
+      tag: `GoPlus risk: ${flags.join(', ')}`,
+      category,
+      confidence: 0.8,
+      url: `https://gopluslabs.io/token-security/${chainId}/${address}`,
+      verifiedAt: new Date().toISOString().split('T')[0],
+    },
   };
 }

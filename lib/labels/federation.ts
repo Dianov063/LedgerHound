@@ -2,31 +2,34 @@
  * Address Labels Federation — single entry point.
  *
  *   getAddressLabels(address, network)
- *     → cache hit? return cached.
+ *     → cache hit? return cached, with OFAC checked again against the current list.
  *     → run local sources (KNOWN_ENTITIES, KNOWN_PHISHING, scam-db) sequentially
  *       and external sources (Chainabuse, GoPlus, OFAC) in parallel.
  *     → aggregate flags, write to cache, return.
  *
  * Graceful degradation: any single source can fail without breaking the
- * federation. A `hadExternalSourceFailure` flag is bubbled up to the caller
- * so the PDF can show a footnote when external intelligence was unavailable.
+ * federation. The response says what every source answered (`sources`): a
+ * source that failed or was not asked is never counted as "nothing found"
+ * (audit F9). `hadExternalSourceFailure` is true when any source failed, and
+ * such a result is not cached, so a failure is not served for 7 days as a
+ * negative result.
  *
  * 2026-05-20: Phase 1 federation.
  */
 
 import { getKnownEntity } from '../known-entities';
 import { getPhishingEntry } from '../known-phishing';
-import { getAddressIndex } from '../scam-db';
+import { getAddressIndexChecked } from '../scam-db';
 import {
   queryChainabuse,
   shouldQueryChainabuse,
-  getMonthlyUsage,
-  incrementUsage,
+  reserveChainabuseCall,
 } from './chainabuse';
 import { queryGoPlus } from './goplus';
 import { checkOfac } from './ofac';
 import { getFromCache, saveToCache } from './cache';
-import type { AddressLabel, AddressLabelResponse, LabelCategory } from './types';
+import type { AddressLabel, AddressLabelResponse, LabelCategory, SourceCheck, SourceName } from './types';
+import { LABELS_SCHEMA } from './types';
 
 const TTL_DAYS = 7;
 
@@ -41,6 +44,53 @@ function mapEntityType(type: string): LabelCategory {
   }
 }
 
+/** The summary flags of a response, derived from its labels. */
+function flagsOf(labels: AddressLabel[]) {
+  return {
+    hasPhishingFlag: labels.some((l) => l.category === 'phishing'),
+    hasSanctionsFlag: labels.some((l) => l.category === 'sanctions'),
+    hasScamFlag: labels.some((l) => l.category === 'scam' || l.category === 'phishing'),
+    isKycExchange: labels.some((l) => l.category === 'cex'),
+    highestConfidence: labels.reduce((m, l) => Math.max(m, l.confidence), 0),
+  };
+}
+
+/**
+ * A cached response with its OFAC answer replaced by the answer of the list as it is NOW.
+ *
+ * OFAC is never served from the cache (audit F9, review of package 63). A cached "not listed"
+ * came from the list of the day it was written; served for 7 days it outlived the list's own
+ * maximum age, and missed an address sanctioned since. The check is a lookup in a list this
+ * process already holds, so repeating it costs nothing and spends no quota.
+ *
+ *   not listed, list fresh      → no_match (as cached);
+ *   not listed, list too old    → ofac `unavailable`, result incomplete (the cache keeps its entry);
+ *   listed now, was not         → the sanctions label is added;
+ *   listed before               → stays listed while the list cannot confirm otherwise;
+ *   was listed, is not any more → null: the other sources were skipped because of that listing,
+ *                                 so everything is looked up again.
+ */
+async function withCurrentOfac(cached: AddressLabelResponse, address: string): Promise<AddressLabelResponse | null> {
+  const sources = cached.sources!;
+  const wasListed = sources.ofac.status === 'match';
+  let ofac: AddressLabel | null;
+  try {
+    ofac = await checkOfac(address);
+  } catch (e: any) {
+    if (wasListed) return cached;
+    console.warn('[federation] ofac not confirmed for a cached result:', e?.message || e);
+    return {
+      ...cached,
+      sources: { ...sources, ofac: { status: 'unavailable', reason: String(e?.name || 'error') } },
+      hadExternalSourceFailure: true,
+    };
+  }
+  if (!!ofac === wasListed) return cached;
+  if (!ofac) return null;
+  const labels = [...cached.labels.filter((l) => l.source !== 'ofac'), ofac];
+  return { ...cached, labels, ...flagsOf(labels), sources: { ...sources, ofac: { status: 'match' } } };
+}
+
 /**
  * Fetch all available labels for a single address, with caching.
  * `network` defaults to 'eth'. Non-EVM networks skip GoPlus automatically.
@@ -52,18 +102,20 @@ export async function getAddressLabels(
   const start = Date.now();
   const normalized = address.startsWith('0x') ? address.toLowerCase() : address;
 
-  // 1. Cache lookup
+  // 1. Cache lookup. Everything but OFAC is served from it; see withCurrentOfac.
   const cached = await getFromCache(normalized, network);
-  if (cached) {
+  const current = cached ? await withCurrentOfac(cached, normalized) : null;
+  if (current) {
     console.log(JSON.stringify({
       event: 'address_labels_federation',
       address: normalized,
       network,
       cache_hit: true,
-      total_labels: cached.labels.length,
+      ofac: current.sources?.ofac,
+      total_labels: current.labels.length,
       duration_ms: Date.now() - start,
     }));
-    return cached;
+    return current;
   }
 
   const labels: AddressLabel[] = [];
@@ -105,100 +157,112 @@ export async function getAddressLabels(
 
   // 2b. Phase A async — scam-db (S3) + OFAC (S3) + GoPlus (HTTP), parallel.
   const phaseA = await Promise.allSettled([
-    getAddressIndex(normalized),
+    getAddressIndexChecked(normalized),
     checkOfac(normalized),
     queryGoPlus(normalized, network),
   ]);
 
-  const phaseASourceNames = ['scam_db', 'ofac', 'goplus'] as const;
-  const sourceSucceeded: Record<string, boolean> = {};
-  let externalSourceFailureCount = 0;
-  for (let i = 0; i < phaseA.length; i++) {
-    const name = phaseASourceNames[i];
-    if (phaseA[i].status === 'rejected') {
-      sourceSucceeded[name] = false;
-      externalSourceFailureCount++;
-      const reason = (phaseA[i] as PromiseRejectedResult).reason;
-      console.warn(`[federation] ${name} rejected:`, reason?.message || reason);
-    } else {
-      sourceSucceeded[name] = true;
-    }
-  }
+  const failure = (index: number, name: string): SourceCheck => {
+    const reason = (phaseA[index] as PromiseRejectedResult).reason;
+    console.warn(`[federation] ${name} rejected:`, reason?.message || reason);
+    return { status: 'unavailable', reason: String(reason?.name || 'error') };
+  };
 
-  const scamDbResult = phaseA[0].status === 'fulfilled' ? phaseA[0].value : null;
+  const scamDbLookup = phaseA[0].status === 'fulfilled' ? phaseA[0].value : null;
+  const scamDbResult = scamDbLookup?.index ?? null;
   const ofacResult = phaseA[1].status === 'fulfilled' ? phaseA[1].value : null;
-  const goplusResult = phaseA[2].status === 'fulfilled' ? phaseA[2].value : null;
+  const goplus = phaseA[2].status === 'fulfilled' ? phaseA[2].value : null;
+  const scamDbMatched = !!scamDbResult && scamDbResult.platforms.length > 0;
 
-  if (scamDbResult && scamDbResult.platforms.length > 0) {
+  // The address index was read, but a report it names was not: what was read may show a match,
+  // but it cannot show that there is none.
+  const scamDbCheck = (): SourceCheck => {
+    if (scamDbMatched) return { status: 'match' };
+    if (scamDbLookup!.failedReads > 0) {
+      console.warn(`[federation] scam_db: ${scamDbLookup!.failedReads} report read(s) failed for ${normalized}`);
+      return { status: 'unavailable', reason: 'incomplete_read' };
+    }
+    return { status: 'no_match' };
+  };
+
+  // What each source answered. Only `no_match` means the source has nothing on the address.
+  const sources: Record<SourceName, SourceCheck> = {
+    scam_db: phaseA[0].status === 'rejected' ? failure(0, 'scam_db') : scamDbCheck(),
+    ofac: phaseA[1].status === 'rejected' ? failure(1, 'ofac') : { status: ofacResult ? 'match' : 'no_match' },
+    goplus: phaseA[2].status === 'rejected' ? failure(2, 'goplus') : { status: goplus!.status, ...(goplus!.reason ? { reason: goplus!.reason } : {}) },
+    chainabuse: { status: 'skipped', reason: 'not_reached' },
+  };
+
+  if (scamDbMatched) {
     labels.push({
       source: 'ledgerhound_scam_db',
-      tag: scamDbResult.platformNames.join(', '),
+      tag: scamDbResult!.platformNames.join(', '),
       category: 'scam',
       confidence: 0.85,
-      reportCount: scamDbResult.reports.length,
-      notes: scamDbResult.totalLoss > 0 ? `$${scamDbResult.totalLoss.toLocaleString()} reported losses` : undefined,
+      reportCount: scamDbResult!.reports.length,
+      notes: scamDbResult!.totalLoss > 0 ? `$${scamDbResult!.totalLoss.toLocaleString()} reported losses` : undefined,
     });
   }
   if (ofacResult) labels.push(ofacResult);
-  if (goplusResult) labels.push(goplusResult);
+  if (goplus?.label) labels.push(goplus.label);
 
   // ── 3. Phase B: gated Chainabuse call ────────────────────────────────
   // We only spend monthly quota when no other source has already flagged
   // or whitelisted the address. See shouldQueryChainabuse() for the rules.
-  const usage = await getMonthlyUsage();
+  // The quota itself is decided by the reservation, not here: reading the
+  // counter and writing it after the call let parallel lookups overspend it.
   const decision = shouldQueryChainabuse({
     address: normalized,
     knownEntity: known,
     isKnownPhishing: !!phishing,
-    scamDbMatch: scamDbResult && scamDbResult.platforms.length > 0 ? scamDbResult : null,
+    scamDbMatch: scamDbMatched ? scamDbResult : null,
     ofacMatch: ofacResult,
-    monthlyCallsUsed: usage.calls_used,
+    monthlyCallsUsed: 0,
     hasApiKey: !!process.env.CHAINABUSE_API_KEY,
   });
 
+  let chainabuseCalled = false;
+  let monthlyUsed: number | undefined;
+
   if (!decision.shouldQuery) {
-    console.log(JSON.stringify({
-      event: 'chainabuse_skip',
-      address: normalized,
-      reason: decision.reason,
-      monthly_used: usage.calls_used,
-      monthly_cap: usage.calls_limit,
-    }));
-    sourceSucceeded.chainabuse_skipped = true;
+    sources.chainabuse = { status: 'skipped', reason: decision.reason };
   } else {
-    try {
-      const chainabuseLabel = await queryChainabuse(normalized);
-      // Increment counter only on a successful billable round-trip — we treat
-      // "no reports" (null) as a billable call since the API was hit.
-      // queryChainabuse returns null both for "no reports" and for transient
-      // errors, so to be conservative we only increment when we got a
-      // response object back. The conservative path slightly under-counts
-      // but never over-counts.
-      if (chainabuseLabel) {
-        labels.push(chainabuseLabel);
+    // A slot is reserved BEFORE the call by a conditional write. No slot, no call.
+    const slot = await reserveChainabuseCall();
+    monthlyUsed = slot.usage?.calls_used;
+    if (slot.reserved === false) {
+      // Quota spent: the source was not asked. Counter unreadable: we cannot tell whether a call
+      // is allowed, so none is made, and the lookup is incomplete (retried by the next one).
+      sources.chainabuse = slot.reason === 'rate_limit_reached'
+        ? { status: 'skipped', reason: 'rate_limit_reached' }
+        : { status: 'unavailable', reason: 'quota_check_failed' };
+    } else {
+      chainabuseCalled = true;
+      let result: SourceCheck & { label?: AddressLabel };
+      try {
+        result = await queryChainabuse(normalized);
+      } catch (e: any) {
+        // queryChainabuse reports its own failures; a throw here is unexpected code.
+        console.warn('[federation] chainabuse threw:', e?.message || e);
+        result = { status: 'unavailable', reason: String(e?.name || 'error') };
       }
-      // Always increment after a fetch attempt — even null responses count
-      // toward quota per Chainabuse billing. Doing so protects the budget.
-      await incrementUsage();
-      sourceSucceeded.chainabuse = true;
-      console.log(JSON.stringify({
-        event: 'chainabuse_call',
-        address: normalized,
-        had_match: !!chainabuseLabel,
-        monthly_used_after: usage.calls_used + 1,
-      }));
-    } catch (e: any) {
-      // queryChainabuse already swallows errors and returns null, so a throw
-      // here would be from unexpected code. Treat as soft failure.
-      sourceSucceeded.chainabuse = false;
-      externalSourceFailureCount++;
-      console.warn('[federation] chainabuse threw:', e?.message || e);
+      if (result.label) labels.push(result.label);
+      // The reserved slot stays spent whatever the call returned: Chainabuse may bill a failed
+      // call, and a failing API must not be retried without limit.
+      sources.chainabuse = { status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
     }
   }
 
-  // Treat scam-db failure as a partial external failure for the footnote.
-  const scamDbFailed = phaseA[0].status === 'rejected';
-  const hadExternalSourceFailure = externalSourceFailureCount > 0 || scamDbFailed;
+  console.log(JSON.stringify({
+    event: chainabuseCalled ? 'chainabuse_call' : 'chainabuse_skip',
+    address: normalized,
+    status: sources.chainabuse.status,
+    reason: sources.chainabuse.reason,
+    monthly_used: monthlyUsed,
+  }));
+
+  // A source that could not be read makes the result incomplete, whichever source it is.
+  const hadExternalSourceFailure = Object.values(sources).some((check) => check.status === 'unavailable');
 
   const response: AddressLabelResponse = {
     address: normalized,
@@ -206,30 +270,25 @@ export async function getAddressLabels(
     labels,
     cached_at: new Date().toISOString(),
     ttl_days: TTL_DAYS,
-    hasPhishingFlag: labels.some((l) => l.category === 'phishing'),
-    hasSanctionsFlag: labels.some((l) => l.category === 'sanctions'),
-    hasScamFlag: labels.some((l) => l.category === 'scam' || l.category === 'phishing'),
-    isKycExchange: labels.some((l) => l.category === 'cex'),
-    highestConfidence: labels.reduce((m, l) => Math.max(m, l.confidence), 0),
+    ...flagsOf(labels),
     hadExternalSourceFailure,
+    sources,
+    schema: LABELS_SCHEMA,
   };
 
-  // 5. Cache write (best-effort)
-  await saveToCache(response);
+  // 5. Cache write (best-effort). An incomplete lookup is not cached: the next one asks the
+  //    failed source again instead of serving its failure for 7 days as "nothing found".
+  if (!hadExternalSourceFailure) await saveToCache(response);
 
   console.log(JSON.stringify({
     event: 'address_labels_federation',
     address: normalized,
     network,
     cache_hit: false,
-    // Phase A queried unconditionally; Chainabuse only when gate allowed it.
-    sources_queried: decision.shouldQuery
-      ? ['scam_db', 'ofac', 'goplus', 'chainabuse']
-      : ['scam_db', 'ofac', 'goplus'],
-    chainabuse_decision: decision.reason,
-    chainabuse_monthly_used: usage.calls_used + (decision.shouldQuery ? 1 : 0),
-    sources_succeeded: sourceSucceeded,
-    scam_db_failed: scamDbFailed,
+    chainabuse_called: chainabuseCalled,
+    chainabuse_monthly_used: monthlyUsed,
+    sources,
+    cached: !hadExternalSourceFailure,
     total_labels: labels.length,
     flags: {
       phishing: response.hasPhishingFlag,
@@ -278,6 +337,14 @@ export async function getAddressLabelsBatch(
           isKycExchange: false,
           highestConfidence: 0,
           hadExternalSourceFailure: true,
+          // The lookup itself crashed: no source can be said to have answered.
+          sources: {
+            scam_db: { status: 'unavailable', reason: 'federation_error' },
+            ofac: { status: 'unavailable', reason: 'federation_error' },
+            goplus: { status: 'unavailable', reason: 'federation_error' },
+            chainabuse: { status: 'unavailable', reason: 'federation_error' },
+          },
+          schema: LABELS_SCHEMA,
         };
       }
     }

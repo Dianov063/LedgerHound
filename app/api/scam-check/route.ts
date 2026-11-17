@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getAddressIndex } from '@/lib/scam-db';
+import { getAddressIndexChecked } from '@/lib/scam-db';
 import { getScamCheckView } from '@/lib/known-entities';
 import { checkOfac } from '@/lib/labels/ofac';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     /* 2. Check LedgerHound Scam Database (address index) */
     let scamDbPlatforms: string[] = [];
     try {
-      const addrIndex = await getAddressIndex(addr);
+      const { index: addrIndex, failedReads } = await getAddressIndexChecked(addr);
       if (addrIndex && addrIndex.platforms.length > 0) {
         scamDbPlatforms = addrIndex.platformNames;
         sources.push({
@@ -55,6 +55,9 @@ export async function POST(req: NextRequest) {
           type: 'scam',
           category: 'Scam',
         });
+      } else if (failedReads > 0) {
+        // The index names reports that could not be read: not "nothing in the database".
+        unavailableSources.push('LedgerHound Scam Database');
       }
     } catch {
       unavailableSources.push('LedgerHound Scam Database');

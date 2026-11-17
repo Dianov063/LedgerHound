@@ -347,15 +347,25 @@ export const UNMODERATED_SCORE_CAP = 9;
 
 const hasSources = (platform: ScamPlatform) => (platform.sources?.length ?? 0) > 0;
 
-/** Read reports by id; a report that is missing or cannot be read is left out. */
-async function loadReports(ids: string[]): Promise<ScamReport[]> {
+/**
+ * Read reports by id; a report that is missing or cannot be read is left out. `failed` counts the
+ * reads that ended in an error (a missing file is not one): with failed > 0 the absence of a
+ * report in the result does not mean there is none.
+ */
+async function loadReportsChecked(ids: string[]): Promise<{ reports: ScamReport[]; failed: number }> {
   const unique = Array.from(new Set(ids));
   const results = await Promise.allSettled(unique.map(id => s3Get(`reports/${id}.json`)));
   const failed = results.filter(r => r.status === 'rejected').length;
   if (failed) console.warn(`[scam-db] ${failed}/${results.length} report reads failed; they are not shown`);
-  return results
+  const reports = results
     .map(r => (r.status === 'fulfilled' ? r.value : null))
     .filter((r): r is ScamReport => !!r && unique.includes(r.id));
+  return { reports, failed };
+}
+
+/** Read reports by id; a report that is missing or cannot be read is left out. */
+async function loadReports(ids: string[]): Promise<ScamReport[]> {
+  return (await loadReportsChecked(ids)).reports;
 }
 
 /** Which values of a platform came from the verified seed, before any report. */
@@ -966,14 +976,34 @@ export async function getReportById(id: string): Promise<ScamReport | null> {
  * Public address entry: only platforms and reports that may be shown, or null.
  * Throws when the address file cannot be read, so callers can say "unavailable".
  */
+export interface AddressIndexLookup {
+  /** What the public may see about the address, or null when nothing was found. */
+  index: AddressIndex | null;
+  /**
+   * Report files named by the address index that could not be read (audit F9). With
+   * failedReads > 0 a null `index` is NOT "the address is not in the database", and the totals
+   * of a non-null one may be short.
+   */
+  failedReads: number;
+}
+
+/** The address as the public may see it. Same result as `getAddressIndexChecked`, without the read count. */
 export async function getAddressIndex(address: string): Promise<AddressIndex | null> {
+  return (await getAddressIndexChecked(address)).index;
+}
+
+/**
+ * Like `getAddressIndex`, and also says whether every report the index names could be read.
+ * Callers that print a negative result ("not in the database") must use this one.
+ */
+export async function getAddressIndexChecked(address: string): Promise<AddressIndexLookup> {
   const stored: AddressIndex | null = await s3Get(`addresses/${address.toLowerCase()}.json`);
-  if (!stored) return null;
+  if (!stored) return { index: null, failedReads: 0 };
   const ids = stored.reports || [];
-  if (ids.length === 0) return stored.platforms?.length ? stored : null; // seeded entry
+  if (ids.length === 0) return { index: stored.platforms?.length ? stored : null, failedReads: 0 }; // seeded entry
 
   const key = address.toLowerCase();
-  const reports = await loadReports(ids);
+  const { reports, failed: failedReads } = await loadReportsChecked(ids);
   const published = reports.filter(r => isPublished(r) && r.scamAddress?.toLowerCase() === key);
   const fromPublished = new Set(published.map(r => slugify(r.platformName)));
 
@@ -987,10 +1017,10 @@ export async function getAddressIndex(address: string): Promise<AddressIndex | n
     if (platform && base?.addresses.some(a => a.toLowerCase() === key)) seeded.push({ slug, name: platform.name, base });
   }
   const platforms = Array.from(new Set([...Array.from(fromPublished), ...seeded.map(x => x.slug)]));
-  if (platforms.length === 0) return null;
+  if (platforms.length === 0) return { index: null, failedReads };
   const names = Array.from(new Set([...published.map(r => r.platformName), ...seeded.map(x => x.name)]));
   const dates = published.map(r => r.createdAt).sort();
-  return {
+  const index: AddressIndex = {
     address: stored.address,
     platforms,
     platformNames: names,
@@ -1000,6 +1030,7 @@ export async function getAddressIndex(address: string): Promise<AddressIndex | n
     firstSeen: dates[0] ?? stored.firstSeen,
     lastSeen: dates[dates.length - 1] ?? stored.lastSeen,
   };
+  return { index, failedReads };
 }
 
 /* ── Search ── */

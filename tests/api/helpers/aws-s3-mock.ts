@@ -101,6 +101,8 @@ export class S3Client {
         Body: {
           transformToString: async () => o.body,
           transformToByteArray: async () => new Uint8Array(o.bytes ?? Buffer.from(o.body, 'utf8')),
+          // The SDK's Body is also a readable stream; some modules read it with `for await`.
+          async *[Symbol.asyncIterator]() { yield o.bytes ?? Buffer.from(o.body, 'utf8'); },
         },
         LastModified: o.modified,
         ETag: o.etag,

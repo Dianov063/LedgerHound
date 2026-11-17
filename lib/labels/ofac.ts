@@ -27,7 +27,37 @@ export interface OfacEntry {
 
 let ofacMap: Map<string, OfacEntry> | null = null;
 let ofacLoadedAt = 0;
+/** When the CONTENT of the loaded list was last refreshed (the S3 object's LastModified), or 0 if unknown. */
+let ofacListAsOf = 0;
 const MEM_TTL_MS = 24 * 60 * 60 * 1000; // 24h in-memory cache
+
+/**
+ * How old the list may be for "not listed" to count as a result (audit F9).
+ *
+ * The list is refreshed weekly (refresh-ofac, Monday 06:00 UTC). Nothing limited its age before:
+ * if the refresh kept failing, or a process kept reusing the list it had loaded, an address
+ * sanctioned since then was reported as not listed for as long as that lasted. 16 days allows one
+ * missed weekly refresh and two days of margin. OFAC_MAX_AGE_DAYS overrides it.
+ *
+ * A HIT is valid from a list of any age: a listed address is listed. Only a miss needs a fresh list.
+ */
+export const OFAC_MAX_AGE_DAYS = 16;
+
+function maxAgeMs(): number {
+  const configured = Number(process.env.OFAC_MAX_AGE_DAYS);
+  return (Number.isFinite(configured) && configured > 0 ? configured : OFAC_MAX_AGE_DAYS) * 24 * 60 * 60 * 1000;
+}
+
+/** Age of the loaded list's content in ms, or null when it is unknown (no list, or no date for it). */
+export function ofacListAgeMs(now: number = Date.now()): number | null {
+  return ofacMap && ofacListAsOf > 0 ? Math.max(0, now - ofacListAsOf) : null;
+}
+
+/** True when the loaded list is recent enough for a miss to mean "not listed". */
+export function isOfacListFresh(now: number = Date.now()): boolean {
+  const age = ofacListAgeMs(now);
+  return age !== null && age <= maxAgeMs();
+}
 
 function getS3(): S3Client {
   return new S3Client({
@@ -54,6 +84,10 @@ export class OfacUnavailableError extends Error {
  * did load is reused (the source changes weekly); with no list loaded yet the
  * failure is thrown as OfacUnavailableError, so callers can tell "not listed"
  * from "not checked". A missing object counts as a failure, not an empty list.
+ *
+ * The list's own date is kept (`ofacListAgeMs`): it is the S3 object's
+ * LastModified, and does not move when a reload fails, so a reused list ages.
+ * checkOfac refuses to call an address clear from a list that is too old.
  */
 export async function loadOfacList(): Promise<Map<string, OfacEntry>> {
   if (ofacMap && Date.now() - ofacLoadedAt < MEM_TTL_MS) {
@@ -70,6 +104,11 @@ export async function loadOfacList(): Promise<Map<string, OfacEntry>> {
       const body = await (res.Body as { transformToString(): Promise<string> }).transformToString();
       const entries: OfacEntry[] = JSON.parse(body);
       if (!Array.isArray(entries) || entries.length === 0) throw new Error('list is empty');
+      // The refresh job rewrites the whole object, so its LastModified is the date of the content.
+      // Without it (never the case on S3) the newest `added` date of the entries is used.
+      const modified = res.LastModified instanceof Date ? res.LastModified.getTime() : NaN;
+      const newestAdded = entries.reduce((max, e) => Math.max(max, Date.parse(e?.added) || 0), 0);
+      const asOf = Number.isFinite(modified) ? modified : newestAdded;
       // Use lower-case lookup for EVM addresses; non-EVM keys keep their case.
       const map = new Map<string, OfacEntry>();
       for (const e of entries) {
@@ -79,7 +118,8 @@ export async function loadOfacList(): Promise<Map<string, OfacEntry>> {
       }
       ofacMap = map;
       ofacLoadedAt = Date.now();
-      console.log(`[ofac] Loaded ${map.size} OFAC SDN entries from s3://${bucket}/${OFAC_S3_KEY}`);
+      ofacListAsOf = asOf;
+      console.log(`[ofac] Loaded ${map.size} OFAC SDN entries from s3://${bucket}/${OFAC_S3_KEY}, list dated ${asOf ? new Date(asOf).toISOString() : 'unknown'}`);
       return ofacMap;
     } catch (e: any) {
       reason = e?.name === 'NoSuchKey' || e?.Code === 'NoSuchKey'
@@ -98,13 +138,25 @@ export async function loadOfacList(): Promise<Map<string, OfacEntry>> {
 
 /**
  * Check if an address is on the OFAC SDN list. Returns an AddressLabel if so,
- * null if not listed. Throws OfacUnavailableError when the list cannot be read.
+ * null if not listed. Throws OfacUnavailableError when the list cannot be read,
+ * or when the address is not on it but the list is too old (or undated) for
+ * that to mean "not listed". A hit is returned from a list of any age.
  */
 export async function checkOfac(address: string): Promise<AddressLabel | null> {
   const list = await loadOfacList();
   const key = address.startsWith('0x') ? address.toLowerCase() : address;
   const entry = list.get(key);
-  if (!entry) return null;
+  if (!entry) {
+    if (!isOfacListFresh()) {
+      const age = ofacListAgeMs();
+      const reason = age === null
+        ? 'the list has no date, so "not listed" cannot be confirmed'
+        : `the list is ${Math.floor(age / 86_400_000)} days old (limit ${Math.round(maxAgeMs() / 86_400_000)}), so "not listed" cannot be confirmed`;
+      console.warn(`[ofac] ${reason}`);
+      throw new OfacUnavailableError(reason);
+    }
+    return null;
+  }
 
   return {
     source: 'ofac',
@@ -124,4 +176,5 @@ export async function checkOfac(address: string): Promise<AddressLabel | null> {
 export function _clearOfacCache(): void {
   ofacMap = null;
   ofacLoadedAt = 0;
+  ofacListAsOf = 0;
 }

@@ -8,7 +8,7 @@ import { fetchBtcTransfers } from './bitcoin-tracker';
 import { fetchSolTransfers } from './solana-tracker';
 import { fetchTronTransfers } from './tron-tracker';
 import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
-import { getAddressIndex } from './scam-db';
+import { crossReferenceScamDb, scamDbEvidenceFactor } from './report-scam-db';
 import { buildGraphData, type GraphData } from './generateGraphData';
 import QRCode from 'qrcode';
 import logger from '@/lib/logger';
@@ -19,6 +19,7 @@ export type { CrossChainTrace, CrossChainHop, BridgeInteraction, ChainActivity }
 import { KNOWN_ENTITIES, getKnownEntity, getComplianceEmail, getComplianceEmailByParent, isCexAddress } from './known-entities';
 import { isKnownPhishing, getPhishingTag } from './known-phishing';
 import { getAddressLabelsBatch } from './labels/federation';
+import { summarizeCoverage, type SourceCoverage } from './labels/coverage';
 import type { AddressLabelResponse } from './labels/types';
 import { detectSpoofTarget, detectScriptCategory, LEGITIMATE_TOKENS, detectUnicodeSpoofing, normalizeForDisplay } from './unicode-spoofing';
 import { detectAddressPoisoning } from './address-poisoning';
@@ -555,6 +556,11 @@ export interface ReportData {
   recoveryLabel: string;
   ofacWarning: boolean;
   scamDbMatches: ScamDbMatch[];
+  /**
+   * How many counterparties were looked up in the scam database and for how many the lookup
+   * did not complete (audit F9). Absent in report data built before this field existed.
+   */
+  scamDbCheck?: { checked: number; failed: number };
   keyFindings: string[];
   recommendations: string[];
   transactions: {
@@ -616,11 +622,17 @@ export interface ReportData {
    */
   addressLabels: import('./labels/types').AddressLabelResponse[];
   /**
-   * True when at least one external source (Chainabuse/GoPlus/OFAC) failed
-   * during federation. The PDF shows a footnote when set so readers know
-   * intelligence may be incomplete. Added 2026-05-20.
+   * True when at least one source (scam database, OFAC, GoPlus, Chainabuse) failed
+   * during federation, or the federation itself crashed. The PDF shows a note when
+   * set so readers know intelligence may be incomplete. Added 2026-05-20.
    */
   externalIntelligenceDegraded: boolean;
+  /**
+   * Which sources answered for how many of the analyzed addresses (audit F9): the PDF names the
+   * sources that failed and those that were not asked, instead of a general "may be incomplete".
+   * Absent when the federation crashed, and in report data built before this field existed.
+   */
+  sourceCoverage?: import('./labels/coverage').SourceCoverage;
   /**
    * Phase 2 attack-technique analysis: address poisoning (vanity-address
    * spoofing) and Unicode spoofing (look-alike token symbols). Both run on
@@ -746,9 +758,11 @@ export interface EvidenceStrength {
   /**
    * `severity` (2026-05-21) flags a met factor that should be visually
    * emphasised — 'critical' renders red in the PDF (e.g. confirmed
-   * misdirection of victim funds to a spoof address).
+   * misdirection of victim funds to a spoof address). 'unverified' marks a
+   * factor that is not met because its check did not complete (amber): it is
+   * not a negative finding.
    */
-  factors: { label: string; met: boolean; severity?: 'critical' | 'high' }[];
+  factors: { label: string; met: boolean; severity?: 'critical' | 'high' | 'unverified' }[];
 }
 
 function classifyAssets(
@@ -1242,25 +1256,14 @@ export async function generateReport(
   const ofacWarning = ofacEntities.length > 0;
 
   // ── Scam Database cross-reference ──
-  const scamDbMatches: ScamDbMatch[] = [];
+  // A lookup that fails is counted, not skipped (audit F9): the evidence list prints
+  // "check incomplete" instead of an unmet line that reads as "no counterparty in the database".
   const counterpartyAddresses = Array.from(counterpartyMap.keys()).slice(0, 30);
-  try {
-    const lookups = counterpartyAddresses.map(async (addr) => {
-      try {
-        const data = await getAddressIndex(addr);
-        if (data && data.platforms.length > 0) {
-          scamDbMatches.push({
-            address: addr,
-            platformNames: data.platformNames,
-            platformSlugs: data.platforms,
-            totalLoss: data.totalLoss,
-            reports: data.reports.length,
-          });
-        }
-      } catch { /* skip individual lookup errors */ }
-    });
-    await Promise.all(lookups);
-  } catch { /* scam DB unavailable — continue without it */ }
+  const scamDbCheck = await crossReferenceScamDb(counterpartyAddresses);
+  const scamDbMatches: ScamDbMatch[] = scamDbCheck.matches;
+  if (scamDbCheck.failed > 0) {
+    logger.warn({ checked: scamDbCheck.checked, failed: scamDbCheck.failed }, '[generateReport] Scam database cross-reference incomplete');
+  }
 
   // Generate QR codes for scam DB matches (for PDF)
   for (const m of scamDbMatches) {
@@ -1280,6 +1283,7 @@ export async function generateReport(
   // warmed by the 7-day S3 cache).
   let addressLabels: AddressLabelResponse[] = [];
   let externalIntelligenceDegraded = false;
+  let sourceCoverage: SourceCoverage | undefined;
   try {
     const top20 = Array.from(counterpartyMap.entries())
       .sort((a, b) => b[1].volume - a[1].volume)
@@ -1287,11 +1291,14 @@ export async function generateReport(
       .map(([addr]) => addr);
     addressLabels = await getAddressLabelsBatch(top20, network, 8);
     externalIntelligenceDegraded = addressLabels.some(r => r.hadExternalSourceFailure);
+    sourceCoverage = summarizeCoverage(addressLabels);
     const flaggedCount = addressLabels.filter(r => r.hasPhishingFlag || r.hasSanctionsFlag || r.hasScamFlag).length;
     logger.info({
       analyzed: top20.length,
       flagged: flaggedCount,
       degraded: externalIntelligenceDegraded,
+      unavailableSources: sourceCoverage.unavailableSources,
+      notConsultedSources: sourceCoverage.notConsultedSources,
     }, '[generateReport] Address labels federation done');
   } catch (err) {
     logger.error({ err }, '[generateReport] Address labels federation crashed — continuing without');
@@ -1989,14 +1996,13 @@ export async function generateReport(
       : { label: tInv.evidence.scammerKycExit, met: exitPointAnalysis.hasKycExit },
     { label: tInv.evidence.criticalPatterns(criticalPatterns), met: criticalPatterns > 0 },
     // Scam-DB / phishing — wording differs by role.
-    isVictimRole
-      ? {
-          label: counterpartyScamDbMatches > 0
-            ? tInv.evidence.counterpartyScamDb(counterpartyScamDbMatches)
-            : tInv.evidence.counterpartyScamDbGeneric,
-          met: counterpartyScamDbMatches > 0,
-        }
-      : { label: tInv.evidence.scamDbMatch, met: scamDbMatches.length > 0 },
+    scamDbEvidenceFactor({
+      isVictimRole,
+      counterpartyMatches: counterpartyScamDbMatches,
+      totalMatches: scamDbMatches.length,
+      check: scamDbCheck,
+      strings: tInv.evidence,
+    }),
     isVictimRole
       ? {
           label: counterpartyPhishingFlags > 0
@@ -2150,6 +2156,7 @@ export async function generateReport(
     recoveryLabel,
     ofacWarning,
     scamDbMatches,
+    scamDbCheck: { checked: scamDbCheck.checked, failed: scamDbCheck.failed },
     keyFindings,
     recommendations,
     transactions: allTxs,
@@ -2187,6 +2194,7 @@ export async function generateReport(
     counterpartyScamDbMatches,
     addressLabels,
     externalIntelligenceDegraded,
+    sourceCoverage,
     attackTechniques: {
       addressPoisoning,
       unicodeSpoofing,

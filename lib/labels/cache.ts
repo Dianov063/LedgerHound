@@ -4,6 +4,10 @@
  * Layout: s3://<bucket>/address-labels/<network>/<address>.json
  * TTL:    7 days (configurable per call).
  *
+ * Only complete results are stored: the federation does not cache a lookup in which a source was
+ * unavailable (audit F9), so a failure is never served for 7 days as a negative result. The OFAC
+ * answer of an entry is not served as it is: the federation checks the current list on every hit.
+ *
  * Reads are best-effort — any S3 error (missing key, transient outage)
  * results in a cache miss; the federation will re-query upstream sources.
  * Writes are also best-effort — federation succeeds even if the write fails
@@ -14,6 +18,7 @@
 
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import type { AddressLabelResponse } from './types';
+import { LABELS_SCHEMA } from './types';
 
 const CACHE_PREFIX = 'address-labels';
 const DEFAULT_TTL_DAYS = 7;
@@ -57,6 +62,10 @@ export async function getFromCache(
     const res = await getS3().send(new GetObjectCommand({ Bucket: b, Key: keyFor(address, network) }));
     const body = await streamToString(res.Body);
     const data = JSON.parse(body) as AddressLabelResponse;
+
+    // Entries written before per-source statuses existed cannot say whether a source had failed
+    // (a failed Chainabuse or GoPlus call was stored as "no label"): they are not used.
+    if (data.schema !== LABELS_SCHEMA || !data.sources) return null;
 
     const ageMs = Date.now() - new Date(data.cached_at).getTime();
     const ttlMs = (data.ttl_days || DEFAULT_TTL_DAYS) * 24 * 60 * 60 * 1000;

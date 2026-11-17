@@ -68,8 +68,39 @@ export interface AddressLabelResponse {
   /** Max confidence across all labels (helps prioritise display). */
   highestConfidence: number;
   /**
-   * True when at least one external source (chainabuse/goplus/ofac) was
+   * True when at least one source (scam_db/ofac/goplus/chainabuse) was
    * unavailable during this lookup. Caller may show a footnote warning.
    */
   hadExternalSourceFailure: boolean;
+  /**
+   * What each queried source answered for this address (audit F9). "No label from a source" has
+   * three different meanings, and only `no_match` is a negative result:
+   *   no_match    the source answered and has nothing on the address;
+   *   unavailable the source could not be read (timeout, HTTP error, bad answer);
+   *   skipped     the source was not asked (see `reason`).
+   * Absent only in a response synthesized or cached before this field existed.
+   */
+  sources?: Record<SourceName, SourceCheck>;
+  /** Cache format; entries without the current value are ignored (see cache.ts). */
+  schema?: number;
 }
+
+/** The sources the federation queries over the network or from storage. */
+export type SourceName = 'scam_db' | 'ofac' | 'goplus' | 'chainabuse';
+export const SOURCE_NAMES: readonly SourceName[] = ['scam_db', 'ofac', 'goplus', 'chainabuse'];
+
+export type SourceStatus = 'match' | 'no_match' | 'unavailable' | 'skipped';
+
+export interface SourceCheck {
+  status: SourceStatus;
+  /** Why the source was unavailable or skipped, e.g. 'timeout', 'http_429', 'rate_limit_reached', 'cex_whitelisted'. */
+  reason?: string;
+}
+
+/** What one source lookup returns: the label on a match, and always the status. */
+export interface SourceResult extends SourceCheck {
+  label?: AddressLabel;
+}
+
+/** Current format of a cached federation response. */
+export const LABELS_SCHEMA = 2;

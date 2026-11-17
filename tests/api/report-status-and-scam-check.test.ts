@@ -19,11 +19,15 @@ vi.mock('@/lib/labels/ofac', () => ({
   },
 }));
 let scamDbDown = false;
+let scamDbFailedReads = 0;
 const scamDbListed = new Set<string>();
 vi.mock('@/lib/scam-db', () => ({
-  getAddressIndex: async (address: string) => {
+  getAddressIndexChecked: async (address: string) => {
     if (scamDbDown) throw new Error('S3 timeout');
-    return scamDbListed.has(address) ? { platforms: ['demo'], platformNames: ['Demo Platform'], reports: [{}] } : null;
+    return {
+      index: scamDbListed.has(address) ? { platforms: ['demo'], platformNames: ['Demo Platform'], reports: [{}] } : null,
+      failedReads: scamDbFailedReads,
+    };
   },
 }));
 
@@ -112,6 +116,19 @@ describe('POST /api/scam-check', () => {
     breakSource();
     const body = await (await check(CLEAN)).json();
     expect(body).toMatchObject({ isFlagged: false, riskLevel: 'INCOMPLETE', incomplete: true, unavailableSources: [source] });
+  });
+
+  it('does not call an address clean when a report named by the address index could not be read', async () => {
+    scamDbFailedReads = 1;
+    const body = await (await check(CLEAN)).json();
+    expect(body).toMatchObject({ isFlagged: false, riskLevel: 'INCOMPLETE', incomplete: true, unavailableSources: ['LedgerHound Scam Database'] });
+  });
+
+  it('a match found among the reports that could be read stays a match', async () => {
+    scamDbFailedReads = 1;
+    scamDbListed.add(CLEAN);
+    const body = await (await check(CLEAN)).json();
+    expect(body).toMatchObject({ isFlagged: true, incomplete: false, unavailableSources: [] });
   });
 
   it('keeps a match from one source and marks the result incomplete when another is down', async () => {

@@ -478,8 +478,26 @@ export interface AddressVerification {
   intro: string;
   degradedTitle: string;
   degradedBody: string;
+  /** Shown when the verification failed as a whole and no address could be checked. */
+  notPerformedTitle: string;
+  notPerformed: string;
+  /** For one address of report data in the older format: a source failed, which one is not known. */
+  incompleteUnknown: string;
+  /** Audit F9: names the sources that failed, each with "n of total" addresses. */
+  degradedSources: (items: string[]) => string;
+  /** Title and body of the note about sources that were not asked for some addresses. */
+  notConsultedTitle: string;
+  notConsultedBody: (items: string[]) => string;
+  /** "Chainabuse: 3 of 20 addresses" */
+  coverageItem: (source: string, n: number, total: number) => string;
+  /** Reader-facing name of a queried source ('scam_db' | 'ofac' | 'goplus' | 'chainabuse'). */
+  sourceName: (source: string) => string;
   sourcesSuffix: (n: number) => string;
   noMatches: string;
+  /** Shown instead of noMatches when some source did not answer for this address. */
+  noMatchesPartial: string;
+  /** "Not checked: Chainabuse, GoPlus" for one address. */
+  notChecked: (sources: string[]) => string;
   reportsSuffix: (n: number) => string;
   confLabel: (pct: number) => string;
   remaining: (n: number) => string;
@@ -761,6 +779,8 @@ export interface Investigation {
     counterpartyScamDb: (n: number) => string;
     counterpartyScamDbGeneric: string;
     scamDbMatch: string;
+    /** Audit F9: shown instead of an unmet scam-database line when lookups failed. */
+    scamDbIncomplete: (failed: number, checked: number) => string;
     counterpartyPhishing: (n: number) => string;
     counterpartyPhishingGeneric: string;
     phishingTagged: string;
@@ -1040,6 +1060,7 @@ const en: ReportTranslations = {
       counterpartyScamDb: (n) => `Counterparty in LedgerHound Scam Database (${n} match${n > 1 ? 'es' : ''})`,
       counterpartyScamDbGeneric: 'Counterparty in LedgerHound Scam Database',
       scamDbMatch: 'Scam database match found',
+      scamDbIncomplete: (failed, checked) => `Scam Database check incomplete: ${failed} of ${checked} counterpart${checked === 1 ? 'y' : 'ies'} could not be checked`,
       counterpartyPhishing: (n) => `Counterparty phishing flag confirmed (${n} wallet${n > 1 ? 's' : ''})`,
       counterpartyPhishingGeneric: 'Counterparty phishing flag confirmed (external sources)',
       phishingTagged: 'Phishing-tagged counterparty (Etherscan)',
@@ -1258,13 +1279,25 @@ const en: ReportTranslations = {
   addressVerification: {
     intro: 'Top counterparty addresses (by volume) cross-referenced with multiple verification sources: LedgerHound Scam Database, OFAC SDN, Chainabuse community reports, GoPlus Security risk flags, and our curated Etherscan Fake_Phishing list. Sources are queried independently; agreement across sources increases confidence.',
     degradedTitle: 'External intelligence partially unavailable',
-    degradedBody: 'One or more external sources (Chainabuse, GoPlus, OFAC) were unavailable during report generation. Some labels may be incomplete. Internal database matches and curated Etherscan tags are unaffected.',
+    degradedBody: 'One or more sources were unavailable during report generation. Where a source did not answer, the absence of a label from it is not a negative result. Curated Etherscan tags and the known-entity list are unaffected.',
+    notPerformedTitle: 'Address verification not performed',
+    incompleteUnknown: 'One or more sources did not answer for this address.',
+    notPerformed: 'Counterparty address verification could not be performed while this report was generated. No counterparty address was checked against the sources below, so this report makes no statement about them.',
+    degradedSources: (items) => `Unavailable: ${items.join('; ')}.`,
+    notConsultedTitle: 'Sources not queried for every address',
+    notConsultedBody: (items) => `Not queried: ${items.join('; ')}. Chainabuse lookups are limited by a monthly quota and are spent only on addresses no other source has identified; GoPlus covers EVM networks only. For these addresses the absence of a label from that source is not a negative result.`,
+    coverageItem: (source, n, total) => `${source} for ${n} of ${total} address${total === 1 ? '' : 'es'}`,
+    sourceName: (source) => (({
+      scam_db: 'LedgerHound Scam Database', ofac: 'OFAC SDN', goplus: 'GoPlus', chainabuse: 'Chainabuse',
+    } as Record<string, string>)[source] ?? source),
     sourcesSuffix: (n) => `${n} source${n === 1 ? '' : 's'}`,
     noMatches: 'No matches in any verification source.',
+    noMatchesPartial: 'No matches in the sources that answered.',
+    notChecked: (sources) => `Not checked: ${sources.join(', ')}.`,
     reportsSuffix: (n) => `  (${n} reports)`,
     confLabel: (pct) => `  conf=${pct}%`,
     remaining: (n) => `+ ${n} more counterpart${n === 1 ? 'y' : 'ies'} analyzed but not shown (capped at 15). Full data available via the LedgerHound API.`,
-    methodology: 'Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days.',
+    methodology: 'Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days; a lookup in which a source was unavailable is not cached, and the OFAC check is repeated against the current list for every report.',
     sourceLabel: (source) => (({
       etherscan_manual: 'ETHERSCAN', chainabuse: 'CHAINABUSE', goplus: 'GOPLUS', ofac: 'OFAC SDN',
       ledgerhound_scam_db: 'LEDGERHOUND DB', cex_whitelist: 'KYC EXCHANGE', known_entity: 'KNOWN ENTITY',
@@ -1706,6 +1739,7 @@ const es: ReportTranslations = {
       counterpartyScamDb: (n) => `Contraparte en la Base de Datos de Estafas de LedgerHound (${n} coincidencia${n > 1 ? 's' : ''})`,
       counterpartyScamDbGeneric: 'Contraparte en la Base de Datos de Estafas de LedgerHound',
       scamDbMatch: 'Coincidencia encontrada en la base de datos de estafas',
+      scamDbIncomplete: (failed, checked) => `Verificación en la Base de Datos de Estafas incompleta: ${failed} de ${checked} contraparte${checked === 1 ? '' : 's'} sin comprobar`,
       counterpartyPhishing: (n) => `Marca de phishing de contraparte confirmada (${n} wallet${n > 1 ? 's' : ''})`,
       counterpartyPhishingGeneric: 'Marca de phishing de contraparte confirmada (fuentes externas)',
       phishingTagged: 'Contraparte etiquetada como phishing (Etherscan)',
@@ -1924,13 +1958,25 @@ const es: ReportTranslations = {
   addressVerification: {
     intro: 'Las principales direcciones de contraparte (por volumen) se cruzan con múltiples fuentes de verificación: la Base de Datos de Estafas de LedgerHound, OFAC SDN, reportes comunitarios de Chainabuse, indicadores de riesgo de GoPlus Security, y nuestra lista curada de Fake_Phishing de Etherscan. Las fuentes se consultan de forma independiente; la concordancia entre fuentes aumenta la confianza.',
     degradedTitle: 'Inteligencia externa parcialmente no disponible',
-    degradedBody: 'Una o más fuentes externas (Chainabuse, GoPlus, OFAC) no estaban disponibles durante la generación del informe. Algunas etiquetas pueden estar incompletas. Las coincidencias de la base de datos interna y las etiquetas curadas de Etherscan no se ven afectadas.',
+    notPerformedTitle: 'Verificación de direcciones no realizada',
+    incompleteUnknown: 'Una o más fuentes no respondieron para esta dirección.',
+    notPerformed: 'La verificación de direcciones de contrapartes no pudo realizarse durante la generación de este informe. Ninguna dirección de contraparte fue comprobada en las fuentes indicadas, por lo que este informe no afirma nada sobre ellas.',
+    degradedSources: (items) => `No disponibles: ${items.join('; ')}.`,
+    notConsultedTitle: 'Fuentes no consultadas para todas las direcciones',
+    notConsultedBody: (items) => `No consultadas: ${items.join('; ')}. Las consultas a Chainabuse están limitadas por una cuota mensual y solo se usan en direcciones que ninguna otra fuente ha identificado; GoPlus cubre únicamente redes EVM. Para estas direcciones, la ausencia de una etiqueta de esa fuente no es un resultado negativo.`,
+    coverageItem: (source, n, total) => `${source} en ${n} de ${total} ${total === 1 ? 'dirección' : 'direcciones'}`,
+    sourceName: (source) => (({
+      scam_db: 'Base de Datos de Estafas de LedgerHound', ofac: 'OFAC SDN', goplus: 'GoPlus', chainabuse: 'Chainabuse',
+    } as Record<string, string>)[source] ?? source),
+    noMatchesPartial: 'Sin coincidencias en las fuentes que respondieron.',
+    notChecked: (sources) => `No verificado: ${sources.join(', ')}.`,
+    degradedBody: 'Una o más fuentes no estaban disponibles durante la generación del informe. Cuando una fuente no respondió, la ausencia de una etiqueta de esa fuente no es un resultado negativo. Las etiquetas curadas de Etherscan y la lista de entidades conocidas no se ven afectadas.',
     sourcesSuffix: (n) => `${n} fuente${n === 1 ? '' : 's'}`,
     noMatches: 'Sin coincidencias en ninguna fuente de verificación.',
     reportsSuffix: (n) => `  (${n} reportes)`,
     confLabel: (pct) => `  conf=${pct}%`,
     remaining: (n) => `+ ${n} contraparte${n === 1 ? '' : 's'} más analizada${n === 1 ? '' : 's'} pero no mostrada${n === 1 ? '' : 's'} (limitado a 15). Datos completos disponibles vía la API de LedgerHound.`,
-    methodology: 'Metodología: Las etiquetas se agregan de fuentes independientes. Las entradas de OFAC SDN reflejan la lista de sanciones del Tesoro de EE. UU. publicada en el espejo de github `0xB10C/ofac-sanctioned-digital-currency-addresses`. La confianza de Chainabuse escala con el número de reportes comunitarios. Las puntuaciones de GoPlus reflejan señales de riesgo on-chain (phishing, listas negras, atribución de fondos robados). Los resultados de federación se almacenan en caché en S3 durante 7 días.',
+    methodology: 'Metodología: Las etiquetas se agregan de fuentes independientes. Las entradas de OFAC SDN reflejan la lista de sanciones del Tesoro de EE. UU. publicada en el espejo de github `0xB10C/ofac-sanctioned-digital-currency-addresses`. La confianza de Chainabuse escala con el número de reportes comunitarios. Las puntuaciones de GoPlus reflejan señales de riesgo on-chain (phishing, listas negras, atribución de fondos robados). Los resultados de federación se almacenan en caché en S3 durante 7 días; una consulta en la que una fuente no estuvo disponible no se almacena, y la comprobación OFAC se repite con la lista vigente en cada informe.',
     sourceLabel: (source) => (({
       etherscan_manual: 'ETHERSCAN', chainabuse: 'CHAINABUSE', goplus: 'GOPLUS', ofac: 'OFAC SDN',
       ledgerhound_scam_db: 'LEDGERHOUND DB', cex_whitelist: 'EXCHANGE KYC', known_entity: 'ENTIDAD CONOCIDA',
