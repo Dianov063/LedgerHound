@@ -433,6 +433,8 @@ export interface ScamDbMatch {
   platformSlugs: string[];
   totalLoss: number;
   reports: number;
+  /** True when `reports` and `totalLoss` are a lower bound: some report files could not be read (audit F9). */
+  incomplete?: boolean;
   qrDataUri?: string; // Pre-generated QR code data URI for PDF
 }
 
@@ -1578,7 +1580,8 @@ export async function generateReport(
   if (hasScam) keyFindings.push(tFind.scamFlagged);
   if (scamDbMatches.length > 0) {
     for (const m of scamDbMatches) {
-      keyFindings.push(tFind.scamDbMatch(`${m.address.slice(0, 10)}...`, m.platformNames.join(', '), m.reports, m.totalLoss.toLocaleString()));
+      const finding = tFind.scamDbMatch(`${m.address.slice(0, 10)}...`, m.platformNames.join(', '), m.reports, m.totalLoss.toLocaleString());
+      keyFindings.push(m.incomplete ? `${finding} ${tReport.exec.countsIncomplete}` : finding);
     }
   }
   // Phase 2.7 (Issue #2): surface the substantive stablecoin movement first —

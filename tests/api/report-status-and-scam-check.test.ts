@@ -129,6 +129,11 @@ describe('POST /api/scam-check', () => {
     scamDbListed.add(CLEAN);
     const body = await (await check(CLEAN)).json();
     expect(body).toMatchObject({ isFlagged: true, incomplete: false, unavailableSources: [] });
+    // the count is then a lower bound, and says so
+    expect(JSON.stringify(body)).toContain('Reported in at least 1 report(s)');
+    scamDbFailedReads = 0;
+    const whole = await (await check(CLEAN)).json();
+    expect(JSON.stringify(whole)).toContain('Reported in 1 report(s)');
   });
 
   it('keeps a match from one source and marks the result incomplete when another is down', async () => {

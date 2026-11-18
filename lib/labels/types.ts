@@ -46,6 +46,11 @@ export interface AddressLabel {
   confidence: number;
   /** Optional: number of community reports backing this label (Chainabuse). */
   reportCount?: number;
+  /**
+   * True when `reportCount` (and any loss total in `notes`) is a lower bound: the source
+   * confirmed the match but some of its records could not be read (audit F9).
+   */
+  countIncomplete?: boolean;
   /** Optional: ISO date when the label was last verified by us or its source. */
   verifiedAt?: string;
   /** Optional: link to the source page for verification by the user. */
@@ -95,6 +100,12 @@ export interface SourceCheck {
   status: SourceStatus;
   /** Why the source was unavailable or skipped, e.g. 'timeout', 'http_429', 'rate_limit_reached', 'cex_whitelisted'. */
   reason?: string;
+  /**
+   * Only with `match`: the match is confirmed, but the source could not read all of its records,
+   * so the counts shown with it are a lower bound. A response with a partial source is not
+   * cached: the next lookup reads the source again.
+   */
+  partial?: boolean;
 }
 
 /** What one source lookup returns: the label on a match, and always the status. */

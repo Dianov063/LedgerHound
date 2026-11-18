@@ -150,6 +150,24 @@ describe('paid report PDF: source coverage on the address verification page', ()
     expect(text).toContain(squash(methodology));
   }, 60_000);
 
+  it.each([
+    ['en', 'at least 1 report; some could not be read', 'lower bound: some reports could not be read'],
+    ['es', 'al menos 1 reporte; algunos no pudieron leerse', 'algunos reportes no pudieron leerse'],
+  ] as const)('%s: a scam-database match read only in part shows its counts as a lower bound', async (locale, labelMark, summaryMark) => {
+    const partial = [labelled(addr('a'), { scam_db: { status: 'match', reason: 'incomplete_read', partial: true }, ofac: ok, goplus: ok, chainabuse: { status: 'skipped', reason: 'scam_db_match' } },
+      [{ source: 'ledgerhound_scam_db', tag: 'Demo Platform', category: 'scam', confidence: 0.85, reportCount: 1, countIncomplete: true }])];
+    const match = { address: addr('a'), platformNames: ['Demo Platform'], platformSlugs: ['demo-platform'], totalLoss: 1200, reports: 1 };
+    const text = await render(reportData({ addressLabels: partial, sourceCoverage: summarizeCoverage(partial), scamDbMatches: [{ ...match, incomplete: true }] }), locale);
+    expect(text).toContain(squash(labelMark));
+    expect(text).toContain(squash(summaryMark));
+    // the same data read in full carries neither mark
+    const whole = [labelled(addr('a'), { scam_db: { status: 'match' }, ofac: ok, goplus: ok, chainabuse: { status: 'skipped', reason: 'scam_db_match' } },
+      [{ source: 'ledgerhound_scam_db', tag: 'Demo Platform', category: 'scam', confidence: 0.85, reportCount: 1 }])];
+    const clean = await render(reportData({ addressLabels: whole, sourceCoverage: summarizeCoverage(whole), scamDbMatches: [match] }), locale);
+    expect(clean).not.toContain(squash(labelMark));
+    expect(clean).not.toContain(squash(summaryMark));
+  }, 120_000);
+
   it('report data saved before the coverage summary existed still renders, with the general note', async () => {
     const legacy = LABELS.map(({ sources: _s, schema: _v, ...rest }) => rest as AddressLabelResponse);
     const text = await render(reportData({ addressLabels: legacy, externalIntelligenceDegraded: true }), 'en');

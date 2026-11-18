@@ -88,6 +88,8 @@ export interface ReportTranslations {
     scamDbLinked: string;
     scamDbCounterpartyLinked: string;
     reportsLosses: (reports: number, loss: string) => string;
+    /** Audit F9: follows report and loss counts that are a lower bound. */
+    countsIncomplete: string;
     keyFindings: string;
   };
   /** Recovery Readiness page (content computed in reportPdf, fully localized). */
@@ -499,6 +501,8 @@ export interface AddressVerification {
   /** "Not checked: Chainabuse, GoPlus" for one address. */
   notChecked: (sources: string[]) => string;
   reportsSuffix: (n: number) => string;
+  /** Like reportsSuffix, for a count that is a lower bound (some reports could not be read). */
+  reportsSuffixAtLeast: (n: number) => string;
   confLabel: (pct: number) => string;
   remaining: (n: number) => string;
   methodology: string;
@@ -882,6 +886,7 @@ const en: ReportTranslations = {
     scamDbLinked: 'Linked to LedgerHound Scam Database',
     scamDbCounterpartyLinked: 'Counterparty Linked to LedgerHound Scam Database',
     reportsLosses: (reports, loss) => `${reports} reports, $${loss} losses`,
+    countsIncomplete: '(lower bound: some reports could not be read)',
     keyFindings: 'Key Findings',
   },
   readiness: {
@@ -1295,6 +1300,7 @@ const en: ReportTranslations = {
     noMatchesPartial: 'No matches in the sources that answered.',
     notChecked: (sources) => `Not checked: ${sources.join(', ')}.`,
     reportsSuffix: (n) => `  (${n} reports)`,
+    reportsSuffixAtLeast: (n) => `  (at least ${n} report${n === 1 ? '' : 's'}; some could not be read)`,
     confLabel: (pct) => `  conf=${pct}%`,
     remaining: (n) => `+ ${n} more counterpart${n === 1 ? 'y' : 'ies'} analyzed but not shown (capped at 15). Full data available via the LedgerHound API.`,
     methodology: 'Methodology: Labels are aggregated from independent sources. OFAC SDN entries reflect the US Treasury sanctions list as published by the github mirror `0xB10C/ofac-sanctioned-digital-currency-addresses`. Chainabuse confidence scales with community report count. GoPlus scores reflect on-chain risk signals (phishing, blacklisting, stolen-funds attribution). Federation results are cached in S3 for 7 days; a lookup in which a source was unavailable is not cached, and the OFAC check is repeated against the current list for every report.',
@@ -1561,6 +1567,7 @@ const es: ReportTranslations = {
     scamDbLinked: 'Vinculada a la Base de Datos de Estafas de LedgerHound',
     scamDbCounterpartyLinked: 'Contraparte Vinculada a la Base de Datos de Estafas de LedgerHound',
     reportsLosses: (reports, loss) => `${reports} reportes, $${loss} en pérdidas`,
+    countsIncomplete: '(mínimo: algunos reportes no pudieron leerse)',
     keyFindings: 'Hallazgos Clave',
   },
   readiness: {
@@ -1974,6 +1981,7 @@ const es: ReportTranslations = {
     sourcesSuffix: (n) => `${n} fuente${n === 1 ? '' : 's'}`,
     noMatches: 'Sin coincidencias en ninguna fuente de verificación.',
     reportsSuffix: (n) => `  (${n} reportes)`,
+    reportsSuffixAtLeast: (n) => `  (al menos ${n} reporte${n === 1 ? '' : 's'}; algunos no pudieron leerse)`,
     confLabel: (pct) => `  conf=${pct}%`,
     remaining: (n) => `+ ${n} contraparte${n === 1 ? '' : 's'} más analizada${n === 1 ? '' : 's'} pero no mostrada${n === 1 ? '' : 's'} (limitado a 15). Datos completos disponibles vía la API de LedgerHound.`,
     methodology: 'Metodología: Las etiquetas se agregan de fuentes independientes. Las entradas de OFAC SDN reflejan la lista de sanciones del Tesoro de EE. UU. publicada en el espejo de github `0xB10C/ofac-sanctioned-digital-currency-addresses`. La confianza de Chainabuse escala con el número de reportes comunitarios. Las puntuaciones de GoPlus reflejan señales de riesgo on-chain (phishing, listas negras, atribución de fondos robados). Los resultados de federación se almacenan en caché en S3 durante 7 días; una consulta en la que una fuente no estuvo disponible no se almacena, y la comprobación OFAC se repite con la lista vigente en cada informe.',

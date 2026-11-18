@@ -6,6 +6,9 @@
  *  2. parallel lookups overspent the Chainabuse quota, and an unreadable counter counted as zero;
  *  3. the scam database said "no match" when the address index was read but a report it names was not;
  *  4. GoPlus `code: 1` with an empty result counted as "no risk flags".
+ * And from the review of the second revision:
+ *  5. a scam-database match read only in part was cached with its short counts;
+ *  6. GoPlus keeps the set of flags read before this package (new signals are a separate change).
  * No request leaves the test: fetch and S3 are replaced.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -278,16 +281,33 @@ describe('3. the scam database does not hide a failed read', () => {
     expect(calls.chainabuse).toBe(0);
   });
 
-  it('one report read, one not: what was read still shows the match', async () => {
+  it('one report read, one not: the match stands, its counts are marked as a lower bound, nothing is cached', async () => {
     seedIndex(ADDRESS, ['SB1', 'SB2']);
     putJson('scam-database/reports/SB1.json', report('SB1'));
-    putJson('scam-database/reports/SB2.json', report('SB2'));
+    putJson('scam-database/reports/SB2.json', report('SB2', { lossAmount: 800 }));
     failReport('SB2');
     stubFetch();
     const lookup = await getAddressIndexChecked(ADDRESS);
     expect(lookup.failedReads).toBe(1);
     expect(lookup.index).toMatchObject({ platforms: ['demo-platform'], reports: ['SB1'] });
-    expect((await getAddressLabels(ADDRESS)).sources!.scam_db).toEqual({ status: 'match' });
+
+    const partial = await getAddressLabels(ADDRESS);
+    expect(partial.sources!.scam_db).toEqual({ status: 'match', reason: 'incomplete_read', partial: true });
+    expect(partial.hasScamFlag).toBe(true);
+    expect(partial.labels[0]).toMatchObject({ source: 'ledgerhound_scam_db', reportCount: 1, countIncomplete: true, notes: `at least $${(1200).toLocaleString()} reported losses` });
+    expect(uncheckedSources(partial)).toEqual([]); // the address IS identified
+    expect(s3Store.has(cacheKey(ADDRESS))).toBe(false);
+
+    // The reviewer's scenario: storage recovers, and the next lookup must show both reports.
+    s3Faults.length = 0;
+    const complete = await getAddressLabels(ADDRESS);
+    expect(complete.sources!.scam_db).toEqual({ status: 'match' });
+    expect(complete.labels[0]).toMatchObject({ reportCount: 2, notes: `$${(2000).toLocaleString()} reported losses` });
+    expect(complete.labels[0].countIncomplete).toBeUndefined();
+    expect(getJson(cacheKey(ADDRESS))).toMatchObject({ sources: { scam_db: { status: 'match' } } });
+    // and only the complete result is served from the cache afterwards
+    failReport('SB2');
+    expect((await getAddressLabels(ADDRESS)).labels[0]).toMatchObject({ reportCount: 2 });
   });
 
   it('a report that was removed or rejected is not a failed read: no_match', async () => {
@@ -315,6 +335,19 @@ describe('3. the scam database does not hide a failed read', () => {
     expect(await crossReferenceScamDb([clean])).toEqual({ matches: [], checked: 1, failed: 0 });
   });
 
+  it('the report cross-reference marks a match whose reports were read only in part', async () => {
+    const partly = addr('5');
+    seedIndex(partly, ['SB1', 'SB2']);
+    putJson('scam-database/reports/SB1.json', report('SB1', { scamAddress: partly }));
+    putJson('scam-database/reports/SB2.json', report('SB2', { scamAddress: partly }));
+    failReport('SB2');
+    const result = await crossReferenceScamDb([partly]);
+    expect(result).toMatchObject({ checked: 1, failed: 0 }); // a match is not a failed lookup
+    expect(result.matches).toEqual([{ address: partly, platformNames: ['Demo Platform'], platformSlugs: ['demo-platform'], totalLoss: 1200, reports: 1, incomplete: true }]);
+    s3Faults.length = 0;
+    expect((await crossReferenceScamDb([partly])).matches[0]).toEqual({ address: partly, platformNames: ['Demo Platform'], platformSlugs: ['demo-platform'], totalLoss: 2400, reports: 2 });
+  });
+
   it.each(['en', 'es'] as const)('%s evidence line: incomplete instead of an unmet "in the database" line', (locale) => {
     const strings = getReportTranslations(locale).investigation.evidence;
     const factor = (isVictimRole: boolean, matches: number, failed: number) =>
@@ -337,6 +370,7 @@ describe('4. GoPlus: "no flags" needs an answer with flag data', () => {
     ['an empty list', [], 'empty_result'],
     ['an empty object', {}, 'empty_result'],
     ['an object without any known flag', { data_source: 'GoPlus', contract_address: '0' }, 'unrecognized_result'],
+    ['only fields this code does not read', { cybercrime: '1', gas_abuse: '0', number_of_malicious_contracts_created: 3 }, 'unrecognized_result'],
     ['flags with values that are not "0" or "1"', { phishing_activities: null, sanctioned: '' }, 'unrecognized_result'],
     ['a list of objects', [{ phishing_activities: '0' }], 'empty_result'],
   ])('code 1 with %s is unavailable', async (_name, result, reason) => {
@@ -357,23 +391,33 @@ describe('4. GoPlus: "no flags" needs an answer with flag data', () => {
     expect(await queryGoPlus(ADDRESS, 'eth')).toEqual({ status: 'no_match' });
   });
 
+  // The flags read are the ones read before this package: a flag is a match and moves the risk
+  // score of the paid report, so new signals go into a package of their own. These cases hold
+  // the set still; they are not a statement that the unread signals do not matter.
   it.each([
-    ['cybercrime', { cybercrime: '1', phishing_activities: '0' }, 'scam', 'cybercrime'],
-    ['financial_crime', { financial_crime: '1' }, 'scam', 'financial crime'],
-    ['fake_token', { fake_token: '1' }, 'scam', 'fake token'],
-    ['gas_abuse', { gas_abuse: '1' }, 'scam', 'gas abuse'],
-    ['mixer', { mixer: '1', phishing_activities: '0' }, 'mixer', 'mixer'],
-    ['number_of_malicious_contracts_created', { phishing_activities: '0', number_of_malicious_contracts_created: 3 }, 'scam', 'created malicious contracts'],
-    ['mixer together with sanctioned', { mixer: '1', sanctioned: '1' }, 'sanctions', 'sanctioned, mixer'],
-  ])('a documented flag that was not read before (%s) is a match', async (_name, result, category, tag) => {
-    stubFetch({ goplus: json({ code: 1, result }) });
-    const r = await queryGoPlus(ADDRESS, 'eth');
-    expect(r.status).toBe('match');
-    expect(r.label).toMatchObject({ source: 'goplus', category, tag: `GoPlus risk: ${tag}` });
+    ['cybercrime', { cybercrime: '1' }],
+    ['financial_crime', { financial_crime: '1' }],
+    ['mixer', { mixer: '1' }],
+    ['gas_abuse', { gas_abuse: '1' }],
+    ['fake_token', { fake_token: '1' }],
+    ['a count of malicious contracts', { number_of_malicious_contracts_created: 3 }],
+    ['a malformed count of malicious contracts', { number_of_malicious_contracts_created: true }],
+    ['contract properties', { contract_address: '1', reinit: '1' }],
+  ])('a signal outside the set read before (%s) does not change the result', async (_name, extra) => {
+    stubFetch({ goplus: json({ code: 1, result: { phishing_activities: '0', sanctioned: '0', ...extra } }) });
+    expect(await queryGoPlus(ADDRESS, 'eth')).toEqual({ status: 'no_match' });
+    stubFetch({ goplus: json({ code: 1, result: { phishing_activities: '1', sanctioned: '0', ...extra } }) });
+    expect((await queryGoPlus(ADDRESS, 'eth')).label).toMatchObject({ category: 'phishing', tag: 'GoPlus risk: phishing' });
   });
 
-  it('contract properties are not risk flags', async () => {
-    stubFetch({ goplus: json({ code: 1, result: { phishing_activities: '0', contract_address: '1', reinit: '1', number_of_malicious_contracts_created: '0' } }) });
-    expect(await queryGoPlus(ADDRESS, 'eth')).toEqual({ status: 'no_match' });
+  it('the eleven flags read before are all still read', async () => {
+    const flags = ['phishing_activities', 'fake_kyc', 'fake_standard_interface', 'malicious_mining_activities', 'blacklist_doubt',
+      'honeypot_related_address', 'blackmail_activities', 'stealing_attack', 'sanctioned', 'darkweb_transactions', 'money_laundering'];
+    for (const flag of flags) {
+      stubFetch({ goplus: json({ code: 1, result: { [flag]: '1' } }) });
+      const r = await queryGoPlus(ADDRESS, 'eth');
+      expect(r.status, flag).toBe('match');
+      expect(r.label!.category, flag).toBe(flag === 'sanctioned' ? 'sanctions' : flag === 'phishing_activities' ? 'phishing' : 'scam');
+    }
   });
 });

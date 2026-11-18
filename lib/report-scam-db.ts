@@ -31,6 +31,8 @@ export async function crossReferenceScamDb(addresses: string[]): Promise<ScamDbC
           platformSlugs: index.platforms,
           totalLoss: index.totalLoss,
           reports: index.reports.length,
+          // The match is confirmed; with unread report files its counts are a lower bound.
+          ...(failedReads > 0 ? { incomplete: true } : {}),
         };
       }
       return failedReads > 0 ? 'failed' : null;

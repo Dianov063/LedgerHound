@@ -12,7 +12,7 @@
  * source that failed or was not asked is never counted as "nothing found"
  * (audit F9). `hadExternalSourceFailure` is true when any source failed, and
  * such a result is not cached, so a failure is not served for 7 days as a
- * negative result.
+ * negative result. A match read only in part (`partial`) is not cached either.
  *
  * 2026-05-20: Phase 1 federation.
  */
@@ -62,6 +62,10 @@ function flagsOf(labels: AddressLabel[]) {
  * came from the list of the day it was written; served for 7 days it outlived the list's own
  * maximum age, and missed an address sanctioned since. The check is a lookup in a list this
  * process already holds, so repeating it costs nothing and spends no quota.
+ *
+ * "The list as it is now" means the copy this process holds: it is reloaded from S3 at most
+ * every 24 hours (ofac.ts, MEM_TTL_MS), so an address added by a refresh shows up here within
+ * a day of that refresh, not at once.
  *
  *   not listed, list fresh      → no_match (as cached);
  *   not listed, list too old    → ofac `unavailable`, result incomplete (the cache keeps its entry);
@@ -176,8 +180,10 @@ export async function getAddressLabels(
 
   // The address index was read, but a report it names was not: what was read may show a match,
   // but it cannot show that there is none.
+  const scamDbPartial = scamDbMatched && scamDbLookup!.failedReads > 0;
   const scamDbCheck = (): SourceCheck => {
-    if (scamDbMatched) return { status: 'match' };
+    // A match stays a match; with unread reports its counts are a lower bound.
+    if (scamDbMatched) return scamDbPartial ? { status: 'match', reason: 'incomplete_read', partial: true } : { status: 'match' };
     if (scamDbLookup!.failedReads > 0) {
       console.warn(`[federation] scam_db: ${scamDbLookup!.failedReads} report read(s) failed for ${normalized}`);
       return { status: 'unavailable', reason: 'incomplete_read' };
@@ -200,7 +206,10 @@ export async function getAddressLabels(
       category: 'scam',
       confidence: 0.85,
       reportCount: scamDbResult!.reports.length,
-      notes: scamDbResult!.totalLoss > 0 ? `$${scamDbResult!.totalLoss.toLocaleString()} reported losses` : undefined,
+      ...(scamDbPartial ? { countIncomplete: true } : {}),
+      notes: scamDbResult!.totalLoss > 0
+        ? `${scamDbPartial ? 'at least ' : ''}$${scamDbResult!.totalLoss.toLocaleString()} reported losses`
+        : undefined,
     });
   }
   if (ofacResult) labels.push(ofacResult);
@@ -277,8 +286,10 @@ export async function getAddressLabels(
   };
 
   // 5. Cache write (best-effort). An incomplete lookup is not cached: the next one asks the
-  //    failed source again instead of serving its failure for 7 days as "nothing found".
-  if (!hadExternalSourceFailure) await saveToCache(response);
+  //    failed source again instead of serving its failure for 7 days as "nothing found". The same
+  //    holds for a match read only in part: cached, its short counts would outlive the failure.
+  const cacheable = !hadExternalSourceFailure && !Object.values(sources).some((check) => check.partial);
+  if (cacheable) await saveToCache(response);
 
   console.log(JSON.stringify({
     event: 'address_labels_federation',
@@ -288,7 +299,7 @@ export async function getAddressLabels(
     chainabuse_called: chainabuseCalled,
     chainabuse_monthly_used: monthlyUsed,
     sources,
-    cached: !hadExternalSourceFailure,
+    cached: cacheable,
     total_labels: labels.length,
     flags: {
       phishing: response.hasPhishingFlag,

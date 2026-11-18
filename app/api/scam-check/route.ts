@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
         scamDbPlatforms = addrIndex.platformNames;
         sources.push({
           source: 'LedgerHound Scam Database',
-          label: `Reported in ${addrIndex.reports.length} report(s) — ${addrIndex.platformNames.join(', ')}`,
+          // With unread report files the match stands and the count is a lower bound.
+          label: `Reported in ${failedReads > 0 ? 'at least ' : ''}${addrIndex.reports.length} report(s) — ${addrIndex.platformNames.join(', ')}`,
           type: 'scam',
           category: 'Scam',
         });

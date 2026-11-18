@@ -30,10 +30,14 @@ const CHAIN_IDS: Record<string, string> = {
 };
 
 /**
- * The risk flags of the address_security answer ("1"/"0" strings), as documented at
- * docs.gopluslabs.io/reference/response-details-1 (read 2026-11-17), with the name shown in the
- * label. `contract_address` and `reinit` describe the contract and are not risk flags. The last
- * five were not read before: an address GoPlus marked only with one of them counted as clean.
+ * The risk flags read from the address_security answer ("1"/"0" strings), with the name shown in
+ * the label. This is the set read before audit F9, unchanged: a flag is a match and feeds the
+ * report's risk score.
+ *
+ * NOT read, although documented at docs.gopluslabs.io/reference/response-details-1 (read
+ * 2026-11-17): cybercrime, financial_crime, mixer, gas_abuse, fake_token and
+ * number_of_malicious_contracts_created. Reading them changes the risk score of paid reports, so
+ * it is left to a package of its own, with their weight in the score reviewed.
  */
 const RISK_FLAGS: readonly (readonly [field: string, name: string])[] = [
   ['phishing_activities', 'phishing'],
@@ -47,11 +51,6 @@ const RISK_FLAGS: readonly (readonly [field: string, name: string])[] = [
   ['sanctioned', 'sanctioned'],
   ['darkweb_transactions', 'darkweb'],
   ['money_laundering', 'money laundering'],
-  ['cybercrime', 'cybercrime'],
-  ['financial_crime', 'financial crime'],
-  ['mixer', 'mixer'],
-  ['gas_abuse', 'gas abuse'],
-  ['fake_token', 'fake token'],
 ];
 
 /**
@@ -104,7 +103,7 @@ export async function queryGoPlus(address: string, network: string): Promise<Sou
   const r = data.result;
 
   // "No flags" is a result only when the answer carries flag data: `result: {}`, `result: []`
-  // or an object with other fields says nothing about the address (review of package 63).
+  // or an object with none of the flags we read says nothing about them (review of package 63).
   // (An array has none of these fields either, so `[]` and `[{...}]` fail the same test.)
   const answered = RISK_FLAGS.some(([field]) => r[field] === '0' || r[field] === '1');
   if (!answered) {
@@ -113,8 +112,6 @@ export async function queryGoPlus(address: string, network: string): Promise<Sou
   }
 
   const flags: string[] = RISK_FLAGS.filter(([field]) => r[field] === '1').map(([, name]) => name);
-  const created = Number(r.number_of_malicious_contracts_created);
-  if (Number.isFinite(created) && created > 0) flags.push('created malicious contracts');
 
   if (flags.length === 0) return { status: 'no_match' };
 
@@ -122,9 +119,7 @@ export async function queryGoPlus(address: string, network: string): Promise<Sou
     ? 'sanctions'
     : flags.includes('phishing')
       ? 'phishing'
-      : flags.length === 1 && flags[0] === 'mixer'
-        ? 'mixer'
-        : 'scam';
+      : 'scam';
 
   return {
     status: 'match',

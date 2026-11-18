@@ -336,7 +336,7 @@ const SummaryPage = ({ data, t, country }: { data: ReportData; t: ReportTranslat
               )}
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 9, color: slate900, fontFamily: 'Helvetica-Bold' }}>{m.platformNames.join(', ')}</Text>
-                <Text style={{ fontSize: 8, color: slate600 }}>{shortAddr(m.address)} — {t.exec.reportsLosses(m.reports, m.totalLoss.toLocaleString())}</Text>
+                <Text style={{ fontSize: 8, color: slate600 }}>{shortAddr(m.address)} — {t.exec.reportsLosses(m.reports, m.totalLoss.toLocaleString())}{m.incomplete ? ` ${t.exec.countsIncomplete}` : ''}</Text>
                 {m.platformSlugs[0] && (
                   <Text style={{ fontSize: 7, color: blue }}>www.ledgerhound.vip/scam-database/platform/{m.platformSlugs[0]}</Text>
                 )}
@@ -1365,7 +1365,7 @@ const AddressLabelsPage = ({ data, t }: { data: ReportData; t: ReportTranslation
               r.labels.slice(0, 4).map((l, j) => (
                 <Text key={j} style={{ fontSize: 7, color: slate600, marginBottom: 1, lineHeight: 1.3 }}>
                   [{av.sourceLabel(l.source)}] {l.tag}
-                  {l.reportCount ? av.reportsSuffix(l.reportCount) : ''}
+                  {l.reportCount ? (l.countIncomplete ? av.reportsSuffixAtLeast(l.reportCount) : av.reportsSuffix(l.reportCount)) : ''}
                   {l.confidence < 1 ? av.confLabel(Math.round(l.confidence * 100)) : ''}
                 </Text>
               ))
