@@ -11,7 +11,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { ReportDocument } from '@/lib/reportPdf';
 import type { ReportData } from '@/lib/generateReport';
 import { summarizeCoverage } from '@/lib/labels/coverage';
-import { scamDbEvidenceFactor } from '@/lib/report-scam-db';
+import { scamDbEvidenceFactor, subjectScamDbReasoning } from '@/lib/report-scam-db';
 import { getReportTranslations } from '@/lib/report-i18n';
 import { LABELS_SCHEMA, type AddressLabel, type AddressLabelResponse, type SourceCheck, type SourceName } from '@/lib/labels/types';
 
@@ -166,6 +166,28 @@ describe('paid report PDF: source coverage on the address verification page', ()
     const clean = await render(reportData({ addressLabels: whole, sourceCoverage: summarizeCoverage(whole), scamDbMatches: [match] }), locale);
     expect(clean).not.toContain(squash(labelMark));
     expect(clean).not.toContain(squash(summaryMark));
+  }, 120_000);
+
+  it.each([
+    ['en', 'Linked to documented losses of at least $950 (some reports could not be read)', 'approximately $950'],
+    ['es', 'documentadas de al menos $950 (algunos reportes no pudieron leerse)', 'aproximadamente $950'],
+  ] as const)('%s: "How we classified this wallet" words a partly read subject match as a lower bound', async (locale, lowerBound, estimate) => {
+    const strings = getReportTranslations(locale).investigation.roleReasoning;
+    const hit = { address: SUBJECT, platformNames: ['Demo Platform'], platformSlugs: ['demo-platform'], totalLoss: 950, reports: 1 };
+    const withReasoning = (match: typeof hit & { incomplete?: boolean }) => {
+      const base = reportData({});
+      return reportData({
+        scamDbMatches: [match],
+        narrative: { ...base.narrative, walletType: 'aggregator', roleReasoning: subjectScamDbReasoning(match, strings) },
+      });
+    };
+    const partial = await render(withReasoning({ ...hit, incomplete: true }), locale);
+    expect(partial).toContain(squash(lowerBound));
+    expect(partial).not.toContain(squash(estimate));
+    // read in full, the same block keeps the estimate wording
+    const whole = await render(withReasoning(hit), locale);
+    expect(whole).toContain(squash(estimate));
+    expect(whole).not.toContain(squash(lowerBound));
   }, 120_000);
 
   it('report data saved before the coverage summary existed still renders, with the general note', async () => {

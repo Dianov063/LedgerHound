@@ -22,7 +22,7 @@ import { getAddressLabels, getAddressLabelsBatch } from '@/lib/labels/federation
 import { uncheckedSources } from '@/lib/labels/coverage';
 import { _clearOfacCache } from '@/lib/labels/ofac';
 import { getAddressIndex, getAddressIndexChecked } from '@/lib/scam-db';
-import { crossReferenceScamDb, scamDbEvidenceFactor } from '@/lib/report-scam-db';
+import { crossReferenceScamDb, scamDbEvidenceFactor, subjectScamDbReasoning } from '@/lib/report-scam-db';
 import { getReportTranslations } from '@/lib/report-i18n';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -333,6 +333,28 @@ describe('3. the scam database does not hide a failed read', () => {
     expect(result).toMatchObject({ checked: 4, failed: 2 });
     expect(result.matches).toEqual([{ address: found, platformNames: ['Demo Platform'], platformSlugs: ['demo-platform'], totalLoss: 1200, reports: 1 }]);
     expect(await crossReferenceScamDb([clean])).toEqual({ matches: [], checked: 1, failed: 0 });
+  });
+
+  it.each(['en', 'es'] as const)('%s wallet-role reasoning: a subject wallet matched only in part gets "at least", not "approximately"', async (locale) => {
+    const strings = getReportTranslations(locale).investigation.roleReasoning;
+    const subject = addr('6');
+    seedIndex(subject, ['SB1', 'SB2']);
+    putJson('scam-database/reports/SB1.json', report('SB1', { scamAddress: subject, lossAmount: 950 }));
+    putJson('scam-database/reports/SB2.json', report('SB2', { scamAddress: subject, lossAmount: 40 }));
+    failReport('SB2');
+    const [partial] = (await crossReferenceScamDb([subject])).matches;
+    expect(partial).toMatchObject({ incomplete: true, totalLoss: 950 });
+    expect(subjectScamDbReasoning(partial, strings)).toEqual([strings.scamDbListed('Demo Platform'), strings.documentedLossesAtLeast('950')]);
+    expect(strings.documentedLossesAtLeast('950')).toMatch(locale === 'en' ? /at least \$950/ : /al menos \$950/);
+    expect(strings.documentedLossesAtLeast('950')).not.toMatch(/approximately|aproximadamente/);
+
+    // read in full: the estimate wording, with the full total
+    s3Faults.length = 0;
+    const [whole] = (await crossReferenceScamDb([subject])).matches;
+    expect(whole.incomplete).toBeUndefined();
+    expect(subjectScamDbReasoning(whole, strings)).toEqual([strings.scamDbListed('Demo Platform'), strings.documentedLosses('990')]);
+    // no loss recorded: no loss line at all
+    expect(subjectScamDbReasoning({ platformNames: ['Demo Platform'], totalLoss: 0, incomplete: true }, strings)).toEqual([strings.scamDbListed('Demo Platform')]);
   });
 
   it('the report cross-reference marks a match whose reports were read only in part', async () => {

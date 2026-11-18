@@ -47,6 +47,29 @@ export async function crossReferenceScamDb(addresses: string[]): Promise<ScamDbC
   };
 }
 
+export interface SubjectScamDbStrings {
+  scamDbListed: (platforms: string) => string;
+  documentedLosses: (amount: string) => string;
+  documentedLossesAtLeast: (amount: string) => string;
+}
+
+/**
+ * The lines of "How we classified this wallet" for a subject wallet found in the scam database.
+ * When the match was read only in part, its loss total is a lower bound and is worded as one
+ * ("at least"), not as an estimate ("approximately").
+ */
+export function subjectScamDbReasoning(
+  hit: Pick<ScamDbMatch, 'platformNames' | 'totalLoss' | 'incomplete'>,
+  strings: SubjectScamDbStrings,
+): string[] {
+  const lines = [strings.scamDbListed((hit.platformNames || []).join(', '))];
+  if (hit.totalLoss) {
+    const amount = hit.totalLoss.toLocaleString();
+    lines.push(hit.incomplete ? strings.documentedLossesAtLeast(amount) : strings.documentedLosses(amount));
+  }
+  return lines;
+}
+
 export interface ScamDbEvidenceStrings {
   counterpartyScamDb: (n: number) => string;
   counterpartyScamDbGeneric: string;

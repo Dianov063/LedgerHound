@@ -731,6 +731,8 @@ export interface Investigation {
   roleReasoning: {
     scamDbListed: (platforms: string) => string;
     documentedLosses: (amount: string) => string;
+    /** Audit F9: the total is a lower bound, because some reports could not be read. */
+    documentedLossesAtLeast: (amount: string) => string;
     knownExchange: (label: string) => string;
     knownInfra: (label: string) => string;
     victimKycEntry: (n: number) => string;
@@ -1008,6 +1010,7 @@ const en: ReportTranslations = {
     roleReasoning: {
       scamDbListed: (platforms) => `Subject wallet is listed in LedgerHound Scam Database as part of "${platforms}"`,
       documentedLosses: (amount) => `Linked to documented losses of approximately $${amount}`,
+      documentedLossesAtLeast: (amount) => `Linked to documented losses of at least $${amount} (some reports could not be read)`,
       knownExchange: (label) => `Subject wallet is a known ${label} address (KYC exchange)`,
       knownInfra: (label) => `Subject wallet is a known ${label} — analyzing as opaque infrastructure, not as victim/scammer`,
       victimKycEntry: (n) => `Received funds from ${n} KYC exchange deposit(s) — characteristic of a victim funding their own wallet`,
@@ -1689,6 +1692,7 @@ const es: ReportTranslations = {
     roleReasoning: {
       scamDbListed: (platforms) => `La wallet analizada figura en la Base de Datos de Estafas de LedgerHound como parte de "${platforms}"`,
       documentedLosses: (amount) => `Vinculada a pérdidas documentadas de aproximadamente $${amount}`,
+      documentedLossesAtLeast: (amount) => `Vinculada a pérdidas documentadas de al menos $${amount} (algunos reportes no pudieron leerse)`,
       knownExchange: (label) => `La wallet analizada es una dirección conocida de ${label} (exchange KYC)`,
       knownInfra: (label) => `La wallet analizada es un(a) ${label} conocido(a) — analizada como infraestructura opaca, no como víctima/estafador`,
       victimKycEntry: (n) => `Recibió fondos de ${n} depósito(s) de exchange KYC — característico de una víctima financiando su propia wallet`,

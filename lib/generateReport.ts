@@ -8,7 +8,7 @@ import { fetchBtcTransfers } from './bitcoin-tracker';
 import { fetchSolTransfers } from './solana-tracker';
 import { fetchTronTransfers } from './tron-tracker';
 import { fetchEtherscanV2Transfers } from './etherscan-v2-tracker';
-import { crossReferenceScamDb, scamDbEvidenceFactor } from './report-scam-db';
+import { crossReferenceScamDb, scamDbEvidenceFactor, subjectScamDbReasoning } from './report-scam-db';
 import { buildGraphData, type GraphData } from './generateGraphData';
 import QRCode from 'qrcode';
 import logger from '@/lib/logger';
@@ -1849,8 +1849,7 @@ export async function generateReport(
   if (subjectScamDbHit) {
     walletRole = 'aggregator';
     roleConfidence = 0.95;
-    roleReasoning.push(tInv.roleReasoning.scamDbListed((subjectScamDbHit.platformNames || []).join(', ')));
-    if (subjectScamDbHit.totalLoss) roleReasoning.push(tInv.roleReasoning.documentedLosses(subjectScamDbHit.totalLoss.toLocaleString()));
+    roleReasoning.push(...subjectScamDbReasoning(subjectScamDbHit, tInv.roleReasoning));
   } else if (subjectKnownEntity?.type === 'exchange') {
     walletRole = 'exchange_deposit';
     roleConfidence = 1.0;
