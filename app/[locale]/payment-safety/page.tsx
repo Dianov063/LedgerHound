@@ -11,6 +11,7 @@ import {
   isCommunityLanguage,
   type CommunityLanguage,
 } from '@/lib/community-languages';
+import { ALL_PAYMENT_SEARCH, paymentSearchNeedsCountry, SEARCH_COUNTRY_REQUIRED } from '@/lib/payment-recipient-search';
 import {
   translateApiError,
   translatePaymentSafety,
@@ -357,12 +358,12 @@ export default function PaymentSafetyPage() {
 
   const [mode, setMode] = useState<'check' | 'report'>('check');
 
-  const [checkCountry, setCheckCountry] = useState('US');
-  const [checkRail, setCheckRail] = useState<PaymentRail>('zelle');
+  const [checkCountry, setCheckCountry] = useState(ALL_PAYMENT_SEARCH);
+  const [checkRail, setCheckRail] = useState<PaymentRail | 'all'>(ALL_PAYMENT_SEARCH);
   const [checkIdentifier, setCheckIdentifier] = useState('');
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkError, setCheckError] = useState('');
-  const [checkResult, setCheckResult] = useState<{ matched: boolean; identity: IdentityView | null } | null>(null);
+  const [checkResult, setCheckResult] = useState<{ identities: IdentityView[] } | null>(null);
   const [publicWarnings, setPublicWarnings] = useState<IdentityView[]>([]);
   const [warningsLoading, setWarningsLoading] = useState(true);
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
@@ -644,6 +645,9 @@ export default function PaymentSafetyPage() {
     setCheckError('');
     setCheckResult(null);
     try {
+      if (paymentSearchNeedsCountry(checkCountry, checkRail, checkIdentifier)) {
+        throw new VisibleError(t(SEARCH_COUNTRY_REQUIRED));
+      }
       const params = new URLSearchParams({
         country: checkCountry,
         rail: checkRail,
@@ -652,7 +656,7 @@ export default function PaymentSafetyPage() {
       const res = await fetch(`/api/non-crypto-scam-database/search?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new VisibleError(translateApiError(locale, data.error, t('Search failed')));
-      setCheckResult({ matched: data.matched, identity: data.identity || null });
+      setCheckResult({ identities: Array.isArray(data.identities) ? data.identities : data.identity ? [data.identity] : [] });
     } catch (err) {
       setCheckError(visibleErrorMessage(err, t('Search failed')));
     } finally {
@@ -881,23 +885,27 @@ export default function PaymentSafetyPage() {
                 <h2 className="font-display font-bold text-2xl text-slate-950 mb-6">{t('Recipient check')}</h2>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Country')}</label>
-                    <select value={checkCountry} onChange={(e) => setCheckCountry(e.target.value)} className="input bg-white">
+                    <label htmlFor="check-country" className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Country')}</label>
+                    <select id="check-country" value={checkCountry} onChange={(e) => setCheckCountry(e.target.value)} className="input bg-white">
+                      <option value={ALL_PAYMENT_SEARCH}>{t('All countries')}</option>
                       {countryOptions.map(({ code, label }) => (
                         <option key={code} value={code}>{label} ({code})</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Payment method')}</label>
-                    <select value={checkRail} onChange={(e) => setCheckRail(e.target.value as PaymentRail)} className="input bg-white">
+                    <label htmlFor="check-rail" className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Payment method')}</label>
+                    <select id="check-rail" value={checkRail} onChange={(e) => setCheckRail(e.target.value as PaymentRail | 'all')} className="input bg-white">
+                      <option value={ALL_PAYMENT_SEARCH}>{t('All payment methods')}</option>
                       {RAILS.map((r) => <option key={r.value} value={r.value}>{t(r.label)}</option>)}
                     </select>
                   </div>
                 </div>
                 <div className="mb-5">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Recipient identifier')}</label>
+                  <label htmlFor="check-identifier" className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Recipient identifier')}</label>
                   <input
+                    id="check-identifier"
+                    maxLength={512}
                     value={checkIdentifier}
                     onChange={(e) => setCheckIdentifier(e.target.value)}
                     required
@@ -1623,7 +1631,7 @@ function PublicWarningsSection({ warnings, loading, base }: { warnings: Identity
   );
 }
 
-function ResultPanel({ result }: { result: { matched: boolean; identity: IdentityView | null } | null }) {
+function ResultPanel({ result }: { result: { identities: IdentityView[] } | null }) {
   const locale = useLocale();
   const t = (text: string) => translatePaymentSafety(locale, text);
   if (!result) {
@@ -1638,7 +1646,7 @@ function ResultPanel({ result }: { result: { matched: boolean; identity: Identit
     );
   }
 
-  if (!result.matched || !result.identity) {
+  if (result.identities.length === 0) {
     return (
       <aside className="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm">
         <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center mb-4">
@@ -1650,13 +1658,28 @@ function ResultPanel({ result }: { result: { matched: boolean; identity: Identit
     );
   }
 
-  const identity = result.identity;
+  return (
+    <div className="space-y-4">
+      {result.identities.length > 1 && <p className="text-sm text-slate-600">{t('Results are shown separately by country and payment method.')}</p>}
+      {result.identities.map((identity) => <RecipientResult key={identity.identityHash} identity={identity} />)}
+    </div>
+  );
+}
+
+function RecipientResult({ identity }: { identity: IdentityView }) {
+  const locale = useLocale();
+  const t = (text: string) => translatePaymentSafety(locale, text);
+  const country = identity.country === 'OTHER' ? t('Other territory')
+    : /^[A-Z]{2}$/.test(identity.country)
+      ? new Intl.DisplayNames([locale, 'en'], { type: 'region' }).of(identity.country) || identity.country
+      : identity.country;
   return (
     <aside className="bg-white border border-amber-200 rounded-2xl p-6 shadow-sm">
       <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center mb-4">
         <AlertTriangle size={21} className="text-amber-600" />
       </div>
       <h3 className="font-display font-bold text-lg text-slate-950 mb-2">{t('Matching reports found')}</h3>
+      <p className="text-sm font-semibold text-slate-700 mb-2">{country} ({identity.country}) / {t(RAILS.find((rail) => rail.value === identity.rail)?.label || identity.rail)}</p>
       <p className="text-sm text-slate-500 mb-5"><bdi dir="ltr">{identity.identityMask}</bdi></p>
 
       <div className="space-y-3 text-sm">

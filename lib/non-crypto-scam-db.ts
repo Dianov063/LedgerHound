@@ -11,6 +11,7 @@ import {
   isCommunityLanguage,
   type CommunityLanguage,
 } from '@/lib/community-languages';
+import { ALL_PAYMENT_SEARCH, PAYMENT_SEARCH_RAILS, paymentSearchNeedsCountry, paymentSearchSupportsFormat, SEARCH_COUNTRY_REQUIRED } from '@/lib/payment-recipient-search';
 
 const getS3 = () =>
   new S3Client({
@@ -880,6 +881,56 @@ export async function searchPaymentIdentity(input: {
   const identity = normalizePaymentIdentifier(input.rail, input.paymentIdentifier, input.country);
   const summary = await s3Get<PaymentIdentitySummary>(`identities/${identity.hash}.json`);
   return summary ? publicView(summary) : null;
+}
+
+/** Match public identities without combining their countries, rails or counts.
+ * Broad searches use only the public index to discover candidates, then read
+ * current summaries so an old index cannot resurrect a paused/private warning.
+ * No private reports are listed or read, and any storage error fails the search.
+ */
+export async function searchPublicPaymentIdentities(input: {
+  country?: string;
+  rail?: PaymentRail;
+  paymentIdentifier: string;
+}): Promise<PaymentIdentityPublicView[]> {
+  const country = input.country?.toLowerCase() === ALL_PAYMENT_SEARCH ? undefined : input.country;
+  if (paymentSearchNeedsCountry(country, input.rail, input.paymentIdentifier)) {
+    throw new Error(SEARCH_COUNTRY_REQUIRED);
+  }
+  if (country && input.rail) {
+    const match = await searchPaymentIdentity({ ...input, country, rail: input.rail });
+    return match?.publicEligible && !match.publicationPaused ? [match] : [];
+  }
+  const index = await getPublicPaymentIdentityIndex();
+  const candidates = new Map<string, PaymentIdentityPublicView>();
+  for (const entry of index) {
+    if (entry.publicationPaused || (country && entry.country !== normalizeCountry(country))
+      || (input.rail && entry.rail !== input.rail)) continue;
+    if (!PAYMENT_SEARCH_RAILS.includes(entry.rail)) throw new Error('Invalid public payment index');
+    if (!input.rail && !paymentSearchSupportsFormat(entry.rail, input.paymentIdentifier)) continue;
+    // Global phone searches must not compare a phone with a domestic bank account.
+    if (!country && entry.rail === 'bank_account') continue;
+    const normalized = normalizePaymentIdentifier(entry.rail, input.paymentIdentifier, entry.country);
+    if (!normalized.normalized) continue;
+    const key = normalized.hash;
+    if (entry.identityHash === key) candidates.set(key, entry);
+  }
+  const matches: PaymentIdentityPublicView[] = [];
+  const entries = [...candidates.values()];
+  for (let offset = 0; offset < entries.length; offset += 8) {
+    const batch = await Promise.all(entries.slice(offset, offset + 8).map(async (entry) => {
+      const current = await searchPaymentIdentity({
+        country: entry.country, rail: entry.rail, paymentIdentifier: input.paymentIdentifier,
+      });
+      if (!current) throw new Error('Public payment identity is missing');
+      if (current.identityHash !== entry.identityHash || current.country !== entry.country || current.rail !== entry.rail) {
+        throw new Error('Inconsistent public payment identity');
+      }
+      return current.publicEligible && !current.publicationPaused ? current : null;
+    }));
+    matches.push(...batch.filter((entry): entry is PaymentIdentityPublicView => entry !== null));
+  }
+  return matches;
 }
 
 export async function getNonCryptoStats(): Promise<NonCryptoStats> {

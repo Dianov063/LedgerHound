@@ -1,31 +1,16 @@
 import { NextRequest } from 'next/server';
 import {
   getPublicPaymentIdentityIndex,
-  searchPaymentIdentity,
+  searchPublicPaymentIdentities,
   type PaymentRail,
 } from '@/lib/non-crypto-scam-db';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { ALL_PAYMENT_SEARCH, PAYMENT_SEARCH_RAILS, paymentSearchNeedsCountry, SEARCH_COUNTRY_REQUIRED } from '@/lib/payment-recipient-search';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const VALID_RAILS: PaymentRail[] = [
-  'zelle',
-  'cashapp',
-  'venmo',
-  'paypal',
-  'apple_cash',
-  'chime',
-  'wise',
-  'revolut',
-  'iban',
-  'bank_account',
-  'phone',
-  'email',
-  'social_handle',
-  'marketplace_profile',
-  'other',
-];
+const VALID_RAILS: readonly PaymentRail[] = PAYMENT_SEARCH_RAILS;
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,26 +21,35 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const rail = searchParams.get('rail') as PaymentRail | null;
+    const railValue = searchParams.get('rail');
+    const rail = railValue && railValue !== ALL_PAYMENT_SEARCH ? railValue as PaymentRail : undefined;
     const paymentIdentifier = searchParams.get('paymentIdentifier') || '';
-    const country = searchParams.get('country') || undefined;
+    const countryValue = searchParams.get('country') || undefined;
+    const country = countryValue?.toLowerCase() === ALL_PAYMENT_SEARCH ? undefined : countryValue;
 
-    if (!rail && !paymentIdentifier) {
+    if (!railValue && !paymentIdentifier) {
       const publicIdentities = await getPublicPaymentIdentityIndex();
       return Response.json({ identities: publicIdentities, total: publicIdentities.length });
     }
 
-    if (!rail || !VALID_RAILS.includes(rail)) {
+    if (rail && !VALID_RAILS.includes(rail)) {
       return Response.json({ error: `Invalid payment rail. Must be one of: ${VALID_RAILS.join(', ')}` }, { status: 400 });
     }
     if (!paymentIdentifier.trim()) {
       return Response.json({ error: 'Payment identifier is required.' }, { status: 400 });
     }
-
-    const match = await searchPaymentIdentity({ country, rail, paymentIdentifier });
-    const publicMatch = match?.publicEligible ? match : null;
+    if (paymentIdentifier.length > 512) return Response.json({ error: 'Recipient identifier is too long.' }, { status: 400 });
+    if (country && !/^(?:[a-z]{2,3}|OTHER)$/i.test(country)) {
+      return Response.json({ error: 'Valid country is required.' }, { status: 400 });
+    }
+    if (paymentSearchNeedsCountry(country, rail, paymentIdentifier)) {
+      return Response.json({ error: SEARCH_COUNTRY_REQUIRED }, { status: 400 });
+    }
+    const identities = await searchPublicPaymentIdentities({ country, rail, paymentIdentifier });
+    const publicMatch = identities[0] || null;
     return Response.json({
-      matched: !!publicMatch,
+      matched: identities.length > 0,
+      identities,
       identity: publicMatch,
       publicWarning: publicMatch,
     });

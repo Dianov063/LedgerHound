@@ -4,6 +4,11 @@ type TranslationTable = Record<string, string>;
 
 const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTable> = {
   ru: {
+    "All countries": "Все страны",
+    "Results are shown separately by country and payment method.": "Результаты показаны отдельно по стране и способу оплаты.",
+    "Select a country for a local phone number or bank account. For an international phone number, include + and the country code.": "Для местного номера телефона или банковского счёта выберите страну. Для международного номера укажите + и код страны.",
+    "Recipient identifier is too long.": "Реквизит получателя слишком длинный.",
+    "Valid country is required.": "Выберите допустимую страну.",
     'Security check': 'Проверка безопасности',
     'Complete the security check before submitting.': 'Пройдите проверку безопасности перед отправкой.',
     'Security check expired. Please try again.': 'Проверка безопасности истекла. Пройдите её ещё раз.',
@@ -300,6 +305,11 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Request review or correction of a LedgerHound payment recipient warning.': 'Запросите проверку или исправление предупреждения о получателе платежа LedgerHound.',
   },
   es: {
+    "All countries": "Todos los países",
+    "Results are shown separately by country and payment method.": "Los resultados se muestran por separado según el país y el método de pago.",
+    "Select a country for a local phone number or bank account. For an international phone number, include + and the country code.": "Seleccione un país para un número de teléfono local o una cuenta bancaria. Para un número internacional, incluya + y el código de país.",
+    "Recipient identifier is too long.": "El identificador del destinatario es demasiado largo.",
+    "Valid country is required.": "Seleccione un país válido.",
     'Security check': 'Comprobación de seguridad',
     'Complete the security check before submitting.': 'Completa la comprobación de seguridad antes de enviar.',
     'Security check expired. Please try again.': 'La comprobación de seguridad caducó. Inténtalo de nuevo.',
@@ -596,6 +606,11 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Request review or correction of a LedgerHound payment recipient warning.': 'Solicita la revisión o corrección de una alerta sobre un destinatario de pagos de LedgerHound.',
   },
   zh: {
+    "All countries": "所有国家",
+    "Results are shown separately by country and payment method.": "结果按国家和支付方式分别显示。",
+    "Select a country for a local phone number or bank account. For an international phone number, include + and the country code.": "查询本地电话号码或银行账户时请选择国家。国际电话号码请包含 + 和国家代码。",
+    "Recipient identifier is too long.": "收款人标识过长。",
+    "Valid country is required.": "请选择有效的国家。",
     'Security check': '安全验证',
     'Complete the security check before submitting.': '请先完成安全验证再提交。',
     'Security check expired. Please try again.': '安全验证已过期，请重试。',
@@ -892,6 +907,11 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Request review or correction of a LedgerHound payment recipient warning.': '申请审核或更正 LedgerHound 支付收款方警示。',
   },
   fr: {
+    "All countries": "Tous les pays",
+    "Results are shown separately by country and payment method.": "Les résultats sont affichés séparément par pays et moyen de paiement.",
+    "Select a country for a local phone number or bank account. For an international phone number, include + and the country code.": "Sélectionnez un pays pour un numéro de téléphone local ou un compte bancaire. Pour un numéro international, indiquez + et le code du pays.",
+    "Recipient identifier is too long.": "L’identifiant du destinataire est trop long.",
+    "Valid country is required.": "Sélectionnez un pays valide.",
     'Security check': 'Vérification de sécurité',
     'Complete the security check before submitting.': 'Effectuez la vérification de sécurité avant l’envoi.',
     'Security check expired. Please try again.': 'La vérification de sécurité a expiré. Réessayez.',
@@ -1188,6 +1208,11 @@ const PAYMENT_SAFETY_TRANSLATIONS: Record<Exclude<Locale, 'en'>, TranslationTabl
     'Request review or correction of a LedgerHound payment recipient warning.': 'Demander un examen ou une correction d’une alerte LedgerHound concernant un destinataire de paiements.',
   },
   ar: {
+    "All countries": "جميع البلدان",
+    "Results are shown separately by country and payment method.": "تُعرض النتائج بشكل منفصل حسب البلد وطريقة الدفع.",
+    "Select a country for a local phone number or bank account. For an international phone number, include + and the country code.": "اختر بلداً لرقم هاتف محلي أو حساب مصرفي. للرقم الدولي، أضف + ورمز البلد.",
+    "Recipient identifier is too long.": "معرّف المستلم طويل جداً.",
+    "Valid country is required.": "اختر بلداً صالحاً.",
     'Security check': 'فحص الأمان',
     'Complete the security check before submitting.': 'أكمل فحص الأمان قبل الإرسال.',
     'Security check expired. Please try again.': 'انتهت صلاحية فحص الأمان. حاول مرة أخرى.',
