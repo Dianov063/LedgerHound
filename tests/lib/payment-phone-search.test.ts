@@ -33,7 +33,7 @@ describe('country-aware phone search aliases', () => {
     expect(phoneSearchIdentifiers('phone', '2125550199', country)).toEqual(['2125550199']);
     expect(phoneSearchIdentifiers('phone', '+12125550199', country)).toEqual(['+12125550199']);
   });
-  it.each(['bank_account', 'iban', 'cashapp', 'venmo', 'wise', 'revolut', 'social_handle', 'other'])('does not give %s account names or references phone aliases', (rail) => {
+  it.each(['bank_account', 'iban', 'cashapp', 'chime', 'venmo', 'wise', 'revolut', 'social_handle', 'other'])('does not give %s account names or references phone aliases', (rail) => {
     expect(phoneSearchIdentifiers(rail, '2125550199', 'US')).toEqual(['2125550199']);
   });
   it.each(['seller2125550199@example.invalid', '$2125550199', '@2125550199', '2125550199 ext 123', 'GB82 WEST 1234 5698 7654 32', '123', '+999123456789'])('keeps non-phone or invalid input exact: %s', (value) => {

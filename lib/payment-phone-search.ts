@@ -2,7 +2,9 @@ import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from
 
 // These rails have an existing phone-specific storage normalization. A numeric
 // username, bank account or generic recipient reference must not gain phone aliases.
-const PHONE_RAILS = new Set(['phone', 'zelle', 'apple_cash', 'chime']);
+// Chime is also excluded: the old writer drops '$' from a numeric ChimeSign,
+// leaving the same stored key as a local phone. Query syntax cannot recover it.
+const PHONE_RAILS = new Set(['phone', 'zelle', 'apple_cash']);
 
 export function isPhoneFormatSearch(rail: string, raw: string): boolean {
   return PHONE_RAILS.has(rail) && /^\+?[\d\s().-]+$/.test(raw.trim()) && /\d/.test(raw);

@@ -26,7 +26,7 @@ async function search(value: string, country = 'all', rail = 'all') {
 beforeEach(resetS3);
 
 describe('phone-format compatibility through the real public API', () => {
-  it.each(['phone', 'zelle', 'apple_cash', 'chime'] as const)('%s finds old national and international keys both ways without the index', async (rail) => {
+  it.each(['phone', 'zelle', 'apple_cash'] as const)('%s finds old national and international keys both ways without the index', async (rail) => {
     const national = record('2125550199', 'US', rail);
     const first = await search('+1 (212) 555-0199', 'US', rail);
     expect(first.status).toBe(200); expect(first.body.identities.map((i: PaymentIdentitySummary) => i.identityHash)).toEqual([national.identityHash]);
@@ -64,6 +64,13 @@ describe('phone-format compatibility through the real public API', () => {
     const phone = record('+12125550199'), bank = record('12125550199', 'US', 'bank_account'), handle = record('12125550199', 'US', 'cashapp');
     index(phone, bank, handle);
     expect((await search('2125550199', 'US')).body.identities.map((i: PaymentIdentitySummary) => i.rail)).toEqual(['phone']);
+  });
+  it('does not reinterpret the stored digits of an old numeric $ChimeSign as a phone alias', async () => {
+    const handle = record('$2125550199', 'US', 'chime'); index(handle);
+    // The original writer irreversibly removed '$' from this stored key.
+    expect(handle.identityHash).toBe(normalizePaymentIdentifier('chime', '2125550199', 'US').hash);
+    expect((await search('+12125550199')).body.identities).toEqual([]);
+    expect((await search('+12125550199', 'US', 'chime')).body.identities).toEqual([]);
   });
   it('rechecks privacy of every matching old-format key', async () => {
     const a = record('2125550199'), b = record('+12125550199'); index(a, b);
