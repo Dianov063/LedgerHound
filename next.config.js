@@ -102,7 +102,14 @@ const selfHost = process.env.LEDGERHOUND_SELF_HOST === '1';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(selfHost ? { output: 'standalone' } : {}),
+  ...(selfHost ? {
+    output: 'standalone',
+    // Next 16 also caches negative responses/build seeds under .next/server/route-cache,
+    // outside the writable .next/cache volume. Keep the image read-only instead
+    // of creating an unbounded writable store for arbitrary requested paths.
+    experimental: { isrFlushToDisk: false },
+    cacheMaxMemorySize: 50 * 1024 * 1024,
+  } : {}),
   images: {
     ...(selfHost ? { unoptimized: true } : {}),
   },
